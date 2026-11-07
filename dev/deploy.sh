@@ -52,7 +52,8 @@ deploy_pc() {
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         # Over SSH the installer cannot start Beamer: anything launched here lands in session 0.
         # The autostart task runs in the signed-in desktop session instead.
-        $task = Get-ScheduledTask -EA SilentlyContinue | Where-Object TaskName -like "Beamer*" | Select-Object -First 1
+        # Beamer-<host>-<user> runs Beamer.exe; other Beamer-* tasks (GameInput recovery) do not.
+        $task = Get-ScheduledTask -EA SilentlyContinue | Where-Object { $_.Actions.Execute -like "*\Beamer.exe" } | Select-Object -First 1
         if ($task) { Start-ScheduledTask -TaskName $task.TaskName; "started via task $($task.TaskName)" }
         else { "no Beamer task yet: start Beamer once at the PC and turn on Start at sign-in" }' \
         > "$LOG_DIR/pc.log" 2>&1
