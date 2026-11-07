@@ -5,12 +5,27 @@ significant step. Branch: `feat/audio` (from `dev/local-build`).
 
 ## En attente d'Alex
 
+Grouped; nothing else is blocked. Ordered by what it unblocks.
+
 1. **Mac: the `beamer-hal` root helper is missing** (start check 1 failed, 2026-11-07 14:51).
    `/usr/local/libexec/beamer-hal` does not exist and `sudo -n -l /usr/local/libexec/beamer-hal install`
-   asks for a password, so there is no sudoers rule either. Needed: the helper script plus a
-   NOPASSWD rule for `beamer-hal install|uninstall|restart`. Unblocks: installing
-   `BeamerAudio.driver` (the remote mic as a real input on the Mac). Everything else continues;
-   the driver is built and tested as far as possible without installing it.
+   asks for a password, so there is no sudoers rule either. Needed: the helper (install/uninstall/restart
+   of `~/Developer/beamer-hal-staging/BeamerAudio.driver` into /Library/Audio/Plug-Ins/HAL + coreaudiod
+   reload) and a NOPASSWD rule for `beamer-hal install|uninstall|restart`. Unblocks: the PC microphone
+   appearing on the Mac as "Beamer Microphone" (driver is built, signed Beamer Dev, tested out of process).
+2. **Decision: echo between machines on one desk.** The PC's Wave:3 hears the MacBook speakers at about
+   -11 dB; forwarding a mic to a machine that plays on speakers howls. Options: (a) acoustic echo
+   cancellation in Beamer when a forwarded mic and local speakers are both active (more work, some latency),
+   (b) rule "forward the mic only when the listening side uses a headset", (c) both. My default if you
+   don't answer: (c), AEC on, with a warning in the UI.
+3. **Decision: how the PC's "active mic" reaches apps.** The PC's communications default is the DualSense
+   (input and output). Either Beamer switches the default (console + communications) recording device to
+   CABLE Output while a remote mic is active (undocumented Windows API, restores on stop), or you pick
+   "CABLE Output" once in Zoom/Discord. My default: pick it once in the apps (documented, no surprise).
+4. **Ear checks, 2 minutes, whenever you are at the machines** (not blocking): (a) PC: during a
+   `--mute-local` run the G733 is really silent (the API says muted, no microphone can hear the headset);
+   (b) plug/unplug a USB or Bluetooth audio device on each machine while `beamer-audio watch` runs (real
+   hot-plug events were never seen, only simulated).
 
 ## Phase
 
