@@ -108,6 +108,7 @@ static void logErr(const char* what, HRESULT hr) { logj(J().str("level", "error"
 
 struct Args {
     std::map<string, string> kv;
+    std::map<string, int> count;  // how often each option was given (the last value wins in kv)
     bool has(const char* k) const { return kv.count(k) > 0; }
     string get(const char* k, const string& d = "") const { auto it = kv.find(k); return it == kv.end() ? d : it->second; }
     int geti(const char* k, int d) const { return has(k) ? atoi(get(k).c_str()) : d; }
@@ -119,6 +120,7 @@ static Args parseArgs(int argc, wchar_t** argv, int start) {
         string k = utf8(argv[i]);
         if (k.rfind("--", 0) != 0) continue;
         k = k.substr(2);
+        a.count[k]++;
         if (i + 1 < argc && wcsncmp(argv[i + 1], L"--", 2) != 0) a.kv[k] = utf8(argv[++i]);
         else a.kv[k] = "1";
     }
@@ -793,7 +795,23 @@ static int cmdCaptureSystem(const Args& a) {
     if (!d) return 2;
     Stream s;
     string proc = a.get("process-loopback");
-    if (!proc.empty()) {
+    if (a.has("exclude-pid")) {
+        // Process loopback can exclude exactly one process tree. Beamer arranges for its player(s)
+        // and this capture to run as children of one parent (Beamer.exe) and passes that parent's PID.
+        if (a.count.at("exclude-pid") > 1 || !proc.empty()) {
+            logj(J().str("level", "error").str("what", "Windows can exclude one process tree only: pass a single --exclude-pid "
+                                                    "(the common parent of the processes to leave out), without --process-loopback"));
+            return 2;
+        }
+        DWORD pid = (DWORD)a.geti("exclude-pid", 0);
+        HANDLE ph = pid ? OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid) : nullptr;
+        if (!ph) { logj(J().str("level", "error").str("what", "--exclude-pid: no such process").i("pid", pid)); return 2; }
+        wchar_t img[MAX_PATH]; DWORD n = MAX_PATH;
+        string image = QueryFullProcessImageNameW(ph, 0, img, &n) ? utf8(wstring(img, n)) : "";
+        CloseHandle(ph);
+        logj(J().str("event", "exclude_tree").i("pid", pid).str("image", image));
+        if (!openProcessLoopback(pid, false, rate, mixChannels(d.Get(), ch), s)) return 1;
+    } else if (!proc.empty()) {
         DWORD pid = (DWORD)a.geti("pid", (int)GetCurrentProcessId());
         if (!openProcessLoopback(pid, proc == "include", rate, mixChannels(d.Get(), ch), s)) return 1;
     } else if (!openStream(d.Get(), Kind::Loopback, rate, ch, -1, s)) return 1;
@@ -1659,7 +1677,7 @@ static void usage() {
               "beamer-audio watch [--seconds S]\n"
               "beamer-audio capture-mic [--device ID|NAME] [--rate 48000] [--channels 1] [--period-ms P] [--seconds S]\n"
               "beamer-audio capture-system [--device ID|NAME] [--mute-local] [--rate 48000] [--channels 2] [--seconds S] [--no-keepalive]\n"
-              "                            [--process-loopback include|exclude --pid PID]\n"
+              "                            [--process-loopback include|exclude --pid PID] [--exclude-pid PID]\n"
               "beamer-audio play [--device ID|NAME] [--rate 48000] [--channels 2] [--period-ms P] [--queue-ms 40] [--live-drop-ms N] [--seconds S]\n"
               "beamer-audio measure periods|mute-matrix|latency|latency-stdio|glitch|drift|level|tone|gen|pcm-stats|burn|default-swap [...]\n"
               "beamer-audio restore-endpoint");

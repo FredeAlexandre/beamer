@@ -24,7 +24,7 @@ beamer-audio list [--json] [--all]
 beamer-audio watch [--seconds S]
 beamer-audio capture-mic [--device ID|NAME] [--rate 48000] [--channels 1] [--period-ms P] [--seconds S]
 beamer-audio capture-system [--device ID|NAME] [--mute-local] [--rate 48000] [--channels 2] [--seconds S]
-                            [--no-keepalive] [--process-loopback include|exclude --pid PID]
+                            [--no-keepalive] [--process-loopback include|exclude --pid PID] [--exclude-pid PID]
 beamer-audio play [--device ID|NAME] [--rate 48000] [--channels 2] [--period-ms P] [--pad-periods 2]
                   [--queue-ms 40] [--live-drop-ms N] [--seconds S]
 beamer-audio restore-endpoint
@@ -39,6 +39,23 @@ beamer-audio measure periods|mute-matrix|latency|latency-stdio|glitch|drift|leve
 - `play` blocks the producer when its queue is full. Pass `--live-drop-ms N` for a live source, to
   discard backlog above N ms instead.
 - `--process-loopback exclude` without `--pid` excludes this process's own tree.
+- `--exclude-pid PID` captures every process except the tree rooted at PID (process loopback,
+  `PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE`), so audio that Beamer's own player renders is
+  not captured and sent back (the echo loop when both machines share system sound). Windows takes one
+  target tree only, so a second `--exclude-pid` is refused: Beamer starts its player(s) and this capture
+  as children of one parent (the Beamer process that spawns them) and passes that parent's PID.
+  Tested (-40 dBFS tone in the player, level in the capture):
+  - player started before the capture, child of the excluded PID: -128 dBFS (included: -40);
+  - player started 2 s after the capture: -168 dBFS;
+  - grandchild (cmd -> cmd -> play, outer cmd excluded): -102 dBFS;
+  - **a Python venv launcher is not followed**: excluding `venv\Scripts\python.exe` left the player that
+    its base interpreter spawned audible (-40 dBFS), excluding the base interpreter silenced it
+    (-95 dBFS); `--process-loopback include` of the launcher captured nothing. So pass the PID of the
+    process that really spawns the helpers (`os.getpid()` inside Python), not a launcher's; check the
+    same for a PyInstaller one-file bootloader.
+  - with `--mute-local`: the endpoint is muted as usual (checked mid-run) and restored after.
+  Process loopback is not tied to the endpoint: it captures every non-excluded process on every
+  render device (here it also picked up a test tone another program was playing into VB-CABLE).
 
 ### Format handling
 
