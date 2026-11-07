@@ -38,7 +38,12 @@ HDR_LEN = HDR.size  # 24
 TAG_LEN = 16
 OVERHEAD_UDP = HDR_LEN + TAG_LEN + 8 + 20  # + UDP + IPv4 headers
 
-MEDIA, HELLO, PING, PONG, STATS, BYE = range(6)
+MEDIA, HELLO, PING, PONG, STATS, BYE, RR = range(7)
+# RR (receiver report): sent by a side that receives media but sends none, at the media frame
+# rate. Payload: highest media ts received (u32) + JB level in 0.1 ms (u16). Its real job is to
+# make the receiving machine transmit: a Wi-Fi station that only receives is let into power
+# save by some drivers (seen on the PC's MediaTek RZ616, "Power Saving: Auto"), and the AP then
+# holds its downlink frames for tens of ms (README, "Mac->PC jitter").
 F_FEC, F_MARK, F_SILENCE = 1, 2, 4
 C_CTRL, C_OPUS, C_PCM = 0, 1, 2
 CODEC_NAMES = {C_OPUS: "opus", C_PCM: "pcm"}
@@ -273,7 +278,8 @@ class JitterBuffer:
     def __init__(self, codec: int, channels: int, frame: int, min_ms: float = 5.0,
                  max_ms: float = 120.0, fixed_ms: float | None = None, margin_ms: float = 2.0,
                  max_ppm: float = 500.0, window_s: float = 10.0, drift: bool = True,
-                 fec: bool = True):
+                 fec: bool = True, catchup_ppm: float = 2000.0, drop_ms: float = 30.0,
+                 peak_hold_s: float = 10.0, peak_count: int = 2, peak_min_ms: float = 15.0):
         self.codec, self.ch, self.frame = codec, channels, frame
         self.dec = decoder_for(codec, channels)
         self.has_lbrr = None
@@ -283,6 +289,16 @@ class JitterBuffer:
         self.rs = Resampler(channels)
         self.min_ms, self.max_ms, self.fixed_ms, self.margin_ms = min_ms, max_ms, fixed_ms, margin_ms
         self.max_ppm, self.window_s, self.drift_on, self.use_fec = max_ppm, window_s, drift, fec
+        # catch-up after a late burst: resample up to catchup_ppm (0.2 % = 3.5 cents) instead of
+        # dropping a non-silent frame; a non-silent frame is dropped only if the level stays more
+        # than drop_ms above target for 2 s
+        self.catchup_ppm, self.drop_ms = max(catchup_ppm, max_ppm), drop_ms
+        # optional spike-aware target (NetEq-like peak mode): when >= peak_count delay spikes
+        # (transit above the p97 provision, below SPIKE_MS) happened in the last peak_hold_s
+        # seconds, provision for the highest of them
+        self.peak_hold_s, self.peak_count, self.peak_min_ms = peak_hold_s, peak_count, peak_min_ms
+        self.peaks: collections.deque = collections.deque()  # (time, excess ms)
+        self._jit_cache = 10.0
         self.lock = threading.Lock()
         self.frames: dict[int, Packet] = {}
         self.next_ts: int | None = None  # ts64 of next frame to decode
@@ -308,6 +324,9 @@ class JitterBuffer:
         self.env: list[tuple[float, float]] = []  # per-second (time, min transit) for drift
         self._env_sec = None
         self._env_min = None
+        self.trace: list | None = None  # per pull: (now, level_ms, target_ms, events bitmask)
+        self._tmin: float | None = None
+        self._tmin_t = 0.0
 
     # -------- network side
     def _unwrap(self, ts32: int) -> int:
@@ -330,6 +349,18 @@ class JitterBuffer:
                 self.t_first = p.arrival
             tr = p.arrival - ts / RATE
             self.transit.append((p.arrival, tr))
+            if self.peak_hold_s > 0 and len(self.transit) > 50:
+                if self._tmin is None or p.arrival - self._tmin_t > self.window_s:
+                    self._tmin = min(t for _, t in self.transit)
+                    self._tmin_t = p.arrival
+                self._tmin = min(self._tmin, tr)
+                ex = (tr - self._tmin) * 1000
+                if max(self._jit_cache + 5.0, self.peak_min_ms) < ex < self.SPIKE_MS:
+                    if self.peaks and p.arrival - self.peaks[-1][0] < 0.2:
+                        if ex > self.peaks[-1][1]:
+                            self.peaks[-1] = (self.peaks[-1][0], ex)
+                    else:
+                        self.peaks.append((p.arrival, ex))
             while self.transit and self.transit[0][0] < p.arrival - self.window_s:
                 self.transit.popleft()
             sec = int(p.arrival)
@@ -438,7 +469,13 @@ class JitterBuffer:
         excess = self.level_ms() - self.target_ms
         n = 0
         while excess > self.frame * 1000 / RATE and self.next_ts is not None and self.next_ts < self.max_ts:
-            self.frames.pop(self.next_ts, None)
+            p = self.frames.pop(self.next_ts, None)
+            if p is not None:
+                # decode and discard: the decoder must see every frame the encoder coded, or
+                # its state no longer matches the encoder's and artefacts recur long after
+                # (measured: Opus VOIP 32k, a decoder that skipped one frame keeps adding
+                # pilot glitches after every marker chirp for the rest of the run)
+                self.dec.decode(p.payload, p.nsamp)
             self.next_ts += self.frame
             excess -= self.frame * 1000 / RATE
             n += 1
@@ -451,7 +488,14 @@ class JitterBuffer:
         while self.pulls and self.pulls[0][0] < now - self.window_s:
             self.pulls.popleft()
         if self.fixed_ms is None:
-            t = (self.block * 1000 / RATE + self.frame * 500 / RATE + self._jitter_ms()
+            jit = self._jitter_ms()
+            self._jit_cache = jit
+            if self.peak_hold_s > 0:
+                while self.peaks and self.peaks[0][0] < now - self.peak_hold_s:
+                    self.peaks.popleft()
+                if len(self.peaks) >= self.peak_count:
+                    jit = max(jit, max(e for _, e in self.peaks))
+            t = (self.block * 1000 / RATE + self.frame * 500 / RATE + jit
                  + self._pull_jitter_ms() + self.margin_ms)
             t = min(self.max_ms, max(self.min_ms, t))
             # rise fast, decay slowly
@@ -467,7 +511,10 @@ class JitterBuffer:
             # slow integral = clock drift estimate (crystals: tens of ppm), clamped to +-200 ppm
             # so that expand/drop events cannot wind it up; P term handles level errors
             self.integ = max(-200.0, min(200.0, self.integ + 0.1 * err * block_s))
-            self.ppm = max(-self.max_ppm, min(self.max_ppm, 40.0 * err + self.integ))
+            ppm = max(-self.max_ppm, min(self.max_ppm, 40.0 * err + self.integ))
+            if err > 4.0:  # catch up a late burst (only speeds up: being short is an underrun risk)
+                ppm = min(self.catchup_ppm, max(ppm, 200.0 * (err - 4.0) + 40.0 * 4.0))
+            self.ppm = ppm
         # big excursion: drop a frame; a silent one as soon as the excess exceeds a frame,
         # a non-silent one only after 2 s above max(15 ms, frame)
         fms = self.frame * 1000 / RATE
@@ -478,7 +525,7 @@ class JitterBuffer:
             p = self.frames.get(self.next_ts)
             if p is not None and self.max_ts > self.next_ts:
                 quiet = bool(p.flags & F_SILENCE)
-                if quiet or (elapsed > 2.0 and err > max(15.0, fms)):
+                if quiet or (elapsed > 2.0 and err > max(self.drop_ms, fms)):
                     x = self.dec.decode(self.frames.pop(self.next_ts).payload, p.nsamp)
                     del x  # decoded to keep decoder state continuous, then discarded
                     self.next_ts += p.nsamp
@@ -497,6 +544,9 @@ class JitterBuffer:
             if not self.playing and not self._start_if_ready():
                 self.stats["silent_pulls"] += 1
                 return np.zeros((n, self.ch), np.float32)
+            if self.trace is not None:
+                ev0 = (self.stats["expand"], self.stats["drop"], self.stats["flushed"], self.stats["plc"] + self.stats["fec"])
+                lv0 = self.level_ms()
             self._control(now, n / RATE)
             self.ppm_hist.append(self.ppm)
             step = 1.0 + self.ppm * 1e-6
@@ -506,6 +556,10 @@ class JitterBuffer:
                 self.rs.feed(self._decode_next())
             if self.rs.need(n, step) > 0:
                 self.rs.feed(np.zeros((self.rs.need(n, step), self.ch), np.float32))
+            if self.trace is not None:
+                ev1 = (self.stats["expand"], self.stats["drop"], self.stats["flushed"], self.stats["plc"] + self.stats["fec"])
+                bits = sum((1 << i) for i in range(4) if ev1[i] != ev0[i])
+                self.trace.append((now, time.monotonic(), lv0, self.target_ms, bits))
             # forget frames that can no longer play
             if self.next_ts is not None:
                 for k in [k for k in self.frames if k < self.next_ts]:

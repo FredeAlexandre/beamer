@@ -19,10 +19,13 @@ test signal injected at the source and found again at the sink. Nobody was at ei
 ```
 uv run --python 3.13 --with pynacl --with numpy run.py s3 --duration 75
 ```
-Scenarios: `s1` `s1ac` `s2` `s2noise` `s3` `s4` `s5` `s5loop` `s5loopoff`. PC side:
+Scenarios: `s1` `s1j` (= s1, plus the PC records the jitter buffer's output) `s1ac` `s2` `s2noise` `s3` `s4` `s5` `s5loop` `s5loopoff`. PC side:
 `C:\Users\Alex\audio-proto\scenarios` (`tap.py`, `sig.py`, a copy of `beamer-audio.exe` from
 the `pc/audio-proto` worktree, so a run never locks the worktree's build), transport and venv as in
 `../transport/README.md`. The Mac connects; the PC punches first (no firewall rule).
+Every run also writes the transport's per-packet traces (`pkt.*` on the Mac, `pc/pkt.*` on
+the PC, see `peer.py --pkt-log`). `--mac-extra` / `--pc-extra` pass options to `peer.py`
+(e.g. `--pc-extra "--rr-ms 0"`).
 
 ## Method
 
@@ -59,7 +62,12 @@ rad or the level drops > 6 dB below the 1 s median. Pilots hold 10.25 / 6.25 cyc
 so a lost or repeated 10 ms block steps the phase by 90 degrees. Windows a marker overlaps are
 skipped (the codec spends its bits on the chirp there). Self-test: a 10 ms drop, a 5 ms hole and
 a 10 ms repeat all found, clean signal 0 (a 1-sample slip is not found, and is inaudible).
-Events = runs of bad windows; per minute of judged pilot. They line up with the receiver's
+Events = runs of bad windows; per minute of judged pilot. Episodes = events closer than 0.5 s
+merged (since 2026-11-07 evening): one 30 ms underrun often shows as 2-4 events while the
+pilot's phase settles. **Mic scenarios mix -20 dBFS chirps (were -10 dBFS)**: with -10 dBFS
+chirps, an Opus VOIP decoder that has ever missed a frame adds 9-16 false glitches/min after the
+chirps (`../transport/README.md`, "Mac->PC jitter"). Scenario 1 rows from `s1_before300` on
+use the new level. They line up with the receiver's
 `expand`/`underrun`/`drop` counters (Wi-Fi delay spikes), listed too.
 
 **CPU** = % of one core over the run: transport (`peer.py`, Python) from its per-second stats;
@@ -95,7 +103,7 @@ without FEC; adaptive jitter buffer. Mac `play --buffer-frames 128 --prefill-ms 
 
 | # | Scenario (run) | Works | One-way latency p50 / p95 (n) | Glitches / min (sink) | CPU % of a core |
 |---|---|---|---|---|---|
-| 1 | Mac mic -> PC virtual mic (VB-CABLE) (`s1_b`; real mic `s1ac_a`) | yes | Mac mic delivery -> app reading CABLE Output: **125.6 / 137.4 ms** (70 of 71 markers). Real-mic run (chirps from the Mac speakers, 12 markers, 20 s): write to `play` -> Mac mic delivery 71.0 / 73.5 (same clock), mic delivery -> CABLE Output 112.8 / 123.6, total 185.7 / 193.9 | 61.7 (68 events; PC JB 19 expand, 14 underrun, 17 drop in 72 s; CABLE capture 1 discontinuity, at start) | transport Mac 7.1, PC 4.5; capture-mic Mac 0.9, CABLE Output 0.12; play PC 0.21 |
+| 1 | Mac mic -> PC virtual mic (VB-CABLE) (**`s1_after600`, 10 min**; before: `s1_before300`, 5 min, old settings; first run `s1_b`; real mic `s1ac_a`) | yes | Mac mic delivery -> app reading CABLE Output: **107.7 / 115.8 ms** (595 of 596 markers); before 118.5 / 130.1 (`s1_b` 125.6 / 137.4). Real-mic run (`s1ac_a`, before the fix, chirps from the Mac speakers, 12 markers, 20 s): write to `play` -> Mac mic delivery 71.0 / 73.5 (same clock), mic delivery -> CABLE Output 112.8 / 123.6, total 185.7 / 193.9 | **2.1** (19 events, 0.9 episodes/min; PC JB 8 underruns, 12 expands, 0 drops, 73 frames flushed after one 0.66 s Wi-Fi stall, in 10 min). Before: 50.3 (69 underruns, 65 drops in 5 min); `s1_b` 61.7 | transport Mac 7.3, PC 4.9; capture-mic Mac 0.9, CABLE Output 0.12; play PC 0.2 |
 | 2 | PC mic (Wave:3) -> Mac (`s2_b`) | yes | mic delivery -> Mac jitter-buffer output (file sink): **29.5 / 37.1 ms** (68); -> Mac speaker mix (tap of `play`): **55.4 / 63.2 ms** | 10.2 at JB output (11 events; JB: 4 expand, 3 underrun, 2 drop in 72 s) | transport Mac 11.0, PC 2.4; capture-mic PC 0.14; play Mac 0.4 |
 | 3 | Mac system sound -> PC G733, muted on Mac (`s3_a`) | yes | Mac tap delivery -> G733 loopback: **95.6 / 103.8 ms** (69) | 1.9 (2 events; PC JB 2 expand) | transport Mac 4.1, PC 5.0; capture-system Mac 0.4; play PC 0.10 |
 | 4 | PC system sound -> Mac speakers, muted on PC (`s4_b`; `s4_a`) | yes | PC loopback delivery -> Mac speaker mix: **55.6 / 64.1 ms** (67); `s4_a` 51.1 / 71.4. App write -> PC loopback (local, same clock): 42.5 / 43.3 | 4.0 (4 events; Mac JB 4 expand) | transport Mac 14.9, PC 1.7; capture-system PC 0.19; play Mac 0.4 |
@@ -109,12 +117,16 @@ system paths, >= 0.46 on the mic path through Opus VOIP), none unpaired except a
 - **Mac -> PC is ~40 ms slower than PC -> Mac** (3: 96, 5: 100 vs 4: 56, 5: 62). The PC receiver
   sees 10-15 ms of jitter on packets from the Mac (the Mac sees ~2 ms from the PC: the transport
   README saw the same asymmetry), so its jitter buffer holds 33-37 ms against 20-26 ms on the
-  Mac; add the Mac tap's 512-frame (10.7 ms) delivery, Opus 6.5 ms, framing 10 ms, the PC's
+  Mac. Found later ("Mac->PC jitter" in the transport README): ~10 ms of that "jitter" is the
+  Mac tap's 10.67 ms chunks, and the 20-130 ms spikes come from the PC's Wi-Fi power save while it
+  only receives, now prevented by receiver reports. Rows 2-5 were measured before that fix. Add the Mac tap's 512-frame (10.7 ms) delivery, Opus 6.5 ms, framing 10 ms, the PC's
   2-period render queue (20 ms) and its loopback (~10 ms).
 - Scenario 2's 29.5 ms (mic delivery -> JB output) is the transport alone: framing + Opus +
   network + JB. Mac `play` + its tap add ~26 ms (55.4).
 - Glitches are almost all receiver underruns on Wi-Fi delay spikes (RTT max 14-31 ms in runs with
-  RTT p50 5 ms), concealed by Opus PLC/expansion; no packet was lost in any run.
+  RTT p50 5 ms), concealed by Opus PLC/expansion; no packet was lost in any run. For scenario 1
+  the spikes came from the PC's Wi-Fi dozing while it only receives (53.7 spikes > 10 ms/min
+  before the fix, 1.4/min after); see the transport README, "Mac->PC jitter".
 
 ### Scenario 2, real mic without a test signal (`s2noise_a`, 20 s)
 
@@ -172,12 +184,13 @@ would be heard on the far side of any unmuted path, and sends a constant stream 
 
 ## Open issues
 
-- **Scenario 1 is the slowest path and the glitchiest**: 126 ms, of which VB-CABLE in shared mode is
-  the largest part (registry at the run, 19:11: `VBAudioCableWDM_SR = 48000`,
-  `VBAudioCableWDM_Latency = 7168`, `VBAudioCableWDM_LoopBack = 1`; the tuning agent found no gain
-  from lowering it on the shared-mode path). The PC jitter buffer had ~50 expand/underrun/drop
-  events in 72 s (Mac -> PC jitter), giving 62 glitches/min at CABLE Output. The Windows tool has no
-  WASAPI exclusive mode, so the exclusive cable path (~55 ms per the tuning agent) was not tried.
+- **Scenario 1 is the slowest path**: 108 ms, of which VB-CABLE in shared mode is the largest
+  part (registry at the run, 19:11: `VBAudioCableWDM_SR = 48000`, `VBAudioCableWDM_Latency = 7168`,
+  `VBAudioCableWDM_LoopBack = 1`; the tuning agent found no gain from lowering it on the
+  shared-mode path). The Windows tool has no WASAPI exclusive mode, so the exclusive cable path
+  (~55 ms per the tuning agent) was not tried. Its glitches (62/min) are fixed: 2.1/min over
+  10 min, all at Wi-Fi events (8 short underruns, one 0.66 s stall); the 5-min runs each had one
+  2-3.4 s episode of 45-130 ms delays (cause not identified).
 - **Mic forwarding and acoustic echo:** with the machines on one desk the Wave:3 hears the Mac
   speakers at -11 dB, so PC mic -> Mac speakers howls at unity gain. Beamer needs AEC (or a
   headset / no mic forwarding to a machine whose speakers the mic hears).
@@ -187,8 +200,9 @@ would be heard on the far side of any unmuted path, and sends a constant stream 
   (session mute kills loopback, see `../win/README.md`).
 - **Windows process loopback has one exclusion tree and ignores endpoints**: the PC's "system
   sound" includes audio sent to any device (VB-CABLE included) unless excluded.
-- Mac -> PC jitter (10-15 ms at the PC vs 2 ms the other way) costs ~15 ms of buffer; worth a
-  look at the Mac's Wi-Fi power saving or wired Ethernet.
-- 2-10 glitches/min on Wi-Fi (underruns on delay spikes). Same as the transport README.
+- Scenarios 2-5 were not re-run with the fix. Scenario 3 (PC receive-only, like 1) should
+  gain the most; 2 and 4 (Mac receive-only) send RRs from the Mac too.
+- 2-10 glitches/min on Wi-Fi before the fix (underruns on delay spikes); about 1 episode/min
+  after it on this Wi-Fi.
 - Not covered: device hardware time on the system paths (USB, G733 radio, speaker DSP), the
   Mac mic's own front end except in the acoustic row, hot-plug during a session, runs > 75 s.

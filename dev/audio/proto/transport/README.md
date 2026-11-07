@@ -19,6 +19,7 @@ All numbers below come from 2026-11-07 runs between the MacBook Air (Apple M5, m
 | `devloop.py` | device loop latency (e.g. CABLE Input -> CABLE Output) |
 | `run_pair.sh` | one Mac<->PC session (starts the PC side over ssh) |
 | `report.py` | summary rows, `--drift NAME` per-minute buffer/ppm table |
+| `jprobe.py` | raw UDP one-way-delay probe, both directions at once (no audio, no crypto): `server` / `client` / `analyze` (see "Mac->PC jitter") |
 | `build_opus_win.bat` | builds `opus.dll` on the PC |
 
 Run (no global installs):
@@ -38,7 +39,10 @@ Sources: `tone[:HZ]`, `clicks[:PERIOD_MS]`, `voice` (analysable voiced-speech st
 `beamer-audio play`), `wav:PATH`, `sd:DEVICE`, `analyze` (click latency), `analyze:voice` /
 `analyze:HZ` (glitch detector), `echo`. Options: `--codec opus|pcm --frame-ms 10|20 --app
 voip|audio|lowdelay --[no-]fec --bitrate --loss PCT --burst N --jitter-ms J --jb-min/max/fixed
---max-ppm --transport udp|tcp|auto` (see `--help`).
+--max-ppm --catchup-ppm --drop-ms --jb-peak-hold --rr-ms --pkt-log PREFIX --transport udp|tcp|auto`
+(see `--help`). `--pkt-log PREFIX` writes per-packet traces at the end: `PREFIX.tx.npy` (ts,
+time fed, time sent), `PREFIX.tx.opus` (the encoded frames), `PREFIX.rx.npy` (ts, arrival),
+`PREFIX.pull.npy` (jitter-buffer pulls: time, level, target, events).
 
 ### opus.dll on Windows
 
@@ -65,7 +69,9 @@ also counts control packets). Opus 10 ms mono at 32 kb/s is ~38 B of payload, 78
 
 Session: the Mac sends `hello` every 200 ms from a `connect()`-ed socket until the PC answers
 to the source address; then `ping` every second (RTT and clock offset, NTP-style 4 timestamps),
-`hello` every 3 s as keepalive, `bye` at the end. The PC drops the peer after 3 s of silence.
+`hello` every 3 s as keepalive, `bye` at the end. A side that receives media but sends none sends a
+**receiver report** (`RR`, 6-byte payload: newest ts received, buffer level) every `--rr-ms` (10)
+ms; it exists to keep that machine's Wi-Fi radio out of power save (see "Mac->PC jitter"). The PC drops the peer after 3 s of silence.
 Both directions share one 5-tuple. The PC side sends its per-second stats to the Mac inside
 the flow, so one JSON-lines file holds both sides.
 
@@ -83,10 +89,16 @@ from the playout point to the end of the newest frame received (holes included).
   (LBRR), else PLC. Nothing newer present (late, underrun): PLC **without advancing the
   timeline** (expand); after 3 frames, re-buffer.
 - Too much audio: drop the next frame when it is silent (sender flag) and the level is more than
-  max(5 ms, 0.75 frame) above target; drop a non-silent frame only after 2 s above max(15 ms,
-  frame); if the level exceeds target + max(40 ms, target), flush the oldest frames down to
-  target at once (after a Wi-Fi stall, 1.4 s of late packets otherwise sat in the buffer: seen
-  in the first chain run, fixed).
+  max(5 ms, 0.75 frame) above target; otherwise **catch up by resampling faster**, up to
+  `--catchup-ppm` 2000 (0.2 %, 3.5 cents) when the level is > 4 ms above target (removes a 10 ms
+  expansion in ~5 s); drop a non-silent frame only after 2 s above max(`--drop-ms` 30, frame);
+  if the level exceeds target + max(40 ms, target), flush the oldest frames down to target at once
+  (after a Wi-Fi stall, 1.4 s of late packets otherwise sat in the buffer: seen in the first chain
+  run, fixed). Dropped and flushed frames are **decoded and discarded**, never skipped: an Opus
+  decoder that misses a frame stays out of step with the encoder (see "Mac->PC jitter").
+- Spike-aware target (`--jb-peak-hold` 10 s): when two delay spikes higher than
+  max(15 ms, p97 + 5 ms) (and below 150 ms) arrive within 10 s, the target provisions for the
+  highest until 10 s after the last one (NetEq's "peak mode", shortened).
 - Drift: level EWMA (1 s) minus target -> ppm = 40 ppm/ms x error + integral (0.1 ppm/(ms.s),
   clamped +-200 ppm), total clamped to **+-500 ppm** (0.86 cent, inaudible). The resampler is a
   16-tap Kaiser-windowed sinc with 512 phases: SNR vs ideal fractional delay 89 dB at 440 Hz,
@@ -144,7 +156,8 @@ Tailscale costs nothing measurable here (WireGuard direct over the same Wi-Fi). 
 <= 1000 B (PCM) or ~80-200 B (Opus), so the 1280-byte Tailscale MTU is never hit. Wi-Fi gives
 occasional stalls: RTT max 1.46 s once, 48-119 ms a few times per 15 min; the jitter buffer
 treats > 150 ms as outages (expand, then flush the backlog) instead of provisioning for them.
-Jitter at the PC (receiving from the Mac) is consistently twice that at the Mac.
+Jitter at the PC (receiving from the Mac) is consistently twice that at the Mac: the PC's Wi-Fi
+power save, see "Mac->PC jitter".
 
 ### 3. Opus vs PCM, 10 vs 20 ms
 
@@ -250,6 +263,141 @@ above the p97 provision, not PortAudio. The Windows tool's IAudioClient3 path (`
 had 0 underruns on both sides in its 60 s run. Recommendation: provision playback jitter only
 for callback-driven paths that need it, and accept a few PLC expansions per minute on Wi-Fi
 (inaudible on the test signal) rather than +10 ms of buffer.
+
+## Mac->PC jitter
+
+2026-11-07 evening. Scenario 1 (Mac mic -> PC VB-CABLE) had ~62 glitches/min, the PC jitter
+buffer underran ~50 times in 72 s, and every Mac->PC path looked "jittery" (5-15 ms) and ~40 ms
+slower than PC->Mac. **Root cause: the PC's Wi-Fi adapter (MediaTek RZ616, driver setting
+"Power Saving: Auto") dozes when the PC only receives; the access point then holds the Mac's
+packets for 20-130 ms and releases them in a burst.** It was not the Mac: not AWDL, not Python,
+not the capture. Fix in the transport: the receiving side sends a tiny authenticated receiver
+report every 10 ms (any transmission keeps the radio awake), plus jitter-buffer changes for the
+remaining Wi-Fi spikes. Scenario 1 over 10 min: **2.1 glitches/min (0.9 episodes/min), one-way
+p50 108 ms**, against 50 glitches/min and 118 ms for the old code in the same conditions.
+
+### Method
+
+- **`jprobe.py`**: raw UDP, no audio and no crypto. The Mac and the PC each send 80-byte
+  packets every 10 ms (or not at all: `--interval-ms 0`), stamped with the scheduled and actual
+  send times. The other side logs arrival times; pings give the clock offset (lowest-RTT 30 %,
+  linear fit). Reported per direction: delay relative to the 1st percentile, spikes (runs of
+  packets > 10 ms late) per minute, peak height, spectrum. 60 s per run, LAN unless noted.
+- **`peer.py --pkt-log`** in the real scenario: per frame, the Mac logs when its capture
+  delivered the samples (`tap.py` chunks), when `Sender` got them and when it sent them, and the
+  encoded frame itself. The PC logs each arrival and each jitter-buffer pull (level, target,
+  events). Joined with the ping clock, every frame's delay splits into
+  capture -> send (Mac) / send -> arrival (network + PC receive) / buffer.
+- **Offline replay** (scratch scripts, not kept): the recorded arrival and pull times plus the
+  recorded Opus frames, fed through `JitterBuffer` on the Mac. It reproduces the live run
+  exactly (same expand/drop counts, same detector events), so buffer policies can be compared on
+  identical network traces.
+
+### Evidence
+
+**1. The Mac sends on time.** In the scenario, capture delivery -> `sendto` is 0.58 ms p50 and
+0.85 ms p99 (s1_t1, 7570 frames). There is one > 10 ms event per run, at start-up. The
+`capture-mic` chunks (128 frames) arrive 2.67 ms apart with < 0.1 ms p99 lateness. A paced
+Python sender oversleeps `time.sleep` by a steady 3.0-3.2 ms (max 5.0: timer slack). That is a
+constant offset, not jitter. The transport does not depend on it, because it sends as audio
+arrives. Hypothesis 2 is ruled out.
+
+**2. The delay is added between the Mac's send and the PC's receive, in bursts.** Before
+the fix, 15 spikes/min. Typical pattern: arrivals 10, 10, 10 ms apart, then a **36 ms gap
+followed by 3 packets within 0.1 ms**, delays 29/18/8 ms (s1_t1). Every jitter-buffer expand
+lined up with one of these spikes, and none came from the Mac side.
+
+**3. Dose-response on what the PC transmits** (`jprobe.py`, Mac sends every 10 ms, PC as listed):
+
+| PC transmits | Mac->PC spikes/min | p97 / p99.9 / max (ms) | runs |
+|---|---:|---|---|
+| nothing (receive only, like scenario 1) | 20, 60, 59, 46 | 2.4-26.8 / 27-88 / 30-129 | `rxonly1-4` |
+| to the Mac every 100 ms | 19 | 2.3 / 25.2 / 28.4 | `srv100` |
+| every 50 ms | 8 | 2.3 / 18.2 / 30.3 | `srv50` |
+| every 20 ms | 6 | 2.3 / 9.5 / 18.4 | `srv20` |
+| every 10 ms | 7, 3, 2 | 2.3-2.5 / 6.5-10.7 / 14-29 | `base1-3` |
+| **nothing to the Mac, 16 B every 10 ms to the router** | **1** | 2.3 / 6.3 / 11.4 | `rxonly_ka` |
+
+The last row decides it. The Mac's traffic is identical across rows; the spikes depend only on
+whether the PC transmits, even to a third host. That points to the PC radio's power save,
+which the receive-only scenario triggered. In the other direction (PC->Mac) the Mac receives
+cleanly: p97 1.4-1.6 ms. The Mac sends pings 4/s and its driver does not doze the same way.
+`Get-NetAdapterAdvancedProperty`: "Power Saving: Auto", "U-APSD: off". The setting was **not**
+changed (rule: no system settings; the transport must cope).
+
+**4. Other hypotheses, measured:**
+- *AWDL / Mac radio*: with the PC awake, the residual Mac->PC spikes (0-7/min, mostly 8-15 ms)
+  are not periodic (no peak in the delay spectrum, phase locking R < 0.3 at 0.1-2 s periods).
+  Only the largest (22-29 ms) coincide with a spike in the other direction, i.e. a medium-wide
+  event. AWDL is not a visible contributor here.
+- *WMM voice marking* (Mac `SO_NET_SERVICE_TYPE` = VO, or `IP_TOS` EF 0xb8): 1 and 0 spikes/min
+  vs 2-7 unmarked. That is within run-to-run noise on this uncongested channel (5 GHz ch 52,
+  160 MHz, -52 dBm), so it is not adopted. It is harmless and may matter on a busy network.
+- *Tailscale vs LAN*: receive-only over Tailscale 47 spikes/min (LAN 46-60), 12/min with the
+  PC sending (LAN 2-7). Same mechanism; the path does not matter.
+- *Packet size*: 400 B instead of 80 B, receive-only: 49/min. No effect.
+- *PC receiver*: pull thread on time (p99 1.0 ms late), `play` queue never ran dry, CABLE capture
+  continuous. With the PC awake the same code had 0 expands in 75 s (s1_rr1).
+- *Why scenario 3 (Mac sound -> PC) looked better*: the Mac's 512-frame tap delivers in
+  10.67 ms chunks, which reads as ~10 ms of "jitter" (p97 10.7 ms). The buffer then sat at
+  ~31 ms, which happened to cover most of the 20-30 ms spikes. The "10-15 ms Mac->PC jitter"
+  of the scenario README was mostly tap framing; the extra ~15 ms of buffer was its cost.
+
+**5. A measurement trap found on the way: Opus decoder state.** With every transport event
+removed, the pilot detector still reported 5-11 glitches/min at the jitter-buffer output.
+Offline, the live bitstream decoded from frame 0 gives 0. Decoded from frame 1, 2, 5, 10 or 50,
+or with a single PLC frame at 30 s, it gives **9-16/min for the rest of the run**, right after
+the -10 dBFS marker chirps. A decoder that has missed one frame renders the pilot with 6 dB dips
+after later chirps (encoder mode transitions). The buffer used to skip frames when flushing at
+start-up, so the PC decoder was never in step. Fixes: `_flush_to_target` now decodes the frames
+it discards, and the mic scenarios use -20 dBFS chirps. At that level the out-of-step floor is 0
+and all 66 markers are still found offline. Not a transport fault, but it hid one, so every
+earlier mic-path glitch figure includes some of it. Real speech was not tested.
+
+### Fix (`peer.py`, `media.py`)
+
+1. **Receiver reports (`RR`, `--rr-ms 10`)**: while media arrives and this side has sent
+   nothing for 10 ms, send a 46-byte sealed packet (newest ts, buffer level) to the peer.
+   Cost: 100 packets/s (~60 kb/s on the air), < 0.5 % CPU. Sent only when needed: none when the
+   side already sends media (scenario 5), none over TCP. Effect alone (75 s, s1_rr1): network
+   spikes 15/min -> 4.8/min, jitter-buffer expands 9 -> 0.
+2. **Catch up instead of dropping**: after a late burst, resample up to 2000 ppm instead of
+   dropping a non-silent frame after 2 s (drop only if > 30 ms over target for 2 s). Replayed on
+   the same traces: drops 6 -> 0 (s1_t1) and 2-7 -> 0-2 (5-min runs), same latency.
+3. **Spike-aware target (`--jb-peak-hold 10`)**: after two spikes > 15 ms within 10 s, provision
+   for the highest until 10 s after the last. Replayed: with RR, events 1.4 -> 1.2/min at +1 ms
+   median level. Without RR (the safety net if another adapter dozes anyway), 5.5 -> 1.6/min at
+   +10 ms. A 20 s hold cut no more events and doubled the level p95 after a Wi-Fi episode
+   (100 vs 56 ms).
+4. **Decode, don't skip, flushed frames** (point 5 above).
+
+### Before / after, scenario 1 (Mac mic -> PC CABLE Output), same Wi-Fi, same test signal
+
+| run | settings | length | glitches/min (episodes/min) | one-way p50 / p95 | JB underruns / drops / flushed | network spikes > 10 ms /min | JB level mean |
+|---|---|---:|---|---|---|---:|---:|
+| `s1_b` (W2) | old code, -10 dBFS chirps | 72 s | 61.7 | 125.6 / 137.4 ms | 14 / 17 / 0 | - | 36.0 ms |
+| `s1_before300` | old behaviour (`--rr-ms 0 --catchup-ppm 500 --drop-ms 15 --jb-peak-hold 0`) | 300 s | 50.3 (22.6) | 118.5 / 130.1 ms | 69 / 65 / 0 | 53.7 | 35.8 ms |
+| `s1_after600` | defaults (RR + catch-up + peak hold 10 s) | 600 s | **2.1 (0.9)** | **107.7 / 115.8 ms** | 8 / 0 / 73 | 1.4 | 22.8 ms |
+| `s1_after` | same, peak hold 20 s | 300 s | 2.9 (1.3) | 119.2 / 196.1 ms | 7 / 0 / 14 | 10.0 (one 3.4 s episode) | 32.0 ms |
+
+Episodes = detector events closer than 0.5 s merged. One expand often shows as 2-4 events
+while the pilot settles. All 13-19 events in the "after" runs lie at jitter-buffer events, none
+elsewhere. Latency fell ~11 ms because the buffer no longer carries the expansions (level 36 ->
+23 ms). The remaining events are Wi-Fi weather that no buffer setting short of +50-100 ms would
+cover. s1_after600 had 8 short underruns plus one 0.66 s stall (73 frames flushed). The 5-min
+runs each had one 2-3.4 s episode of 45-130 ms delays, about every 100 ms, with RR still flowing
+(a background scan or radio event; not identified). The new scenario rows are in
+`../scenarios/README.md`.
+
+### Recommendations for Beamer
+
+- Keep the receiver report (or any feedback at the frame rate) in the product whenever a side
+  only receives. It is the main fix and costs nothing in latency. The PC's power-save setting is
+  the user's and may come back with any driver.
+- Send/receive pacing does not matter (the Mac's send path is clean); DSCP/WMM marking is
+  optional.
+- When judging codec-path glitches with a pilot, start the decoder in step with the encoder
+  and keep it there, or the codec's own state mismatch will be counted.
 
 ## Firewalls
 

@@ -3,7 +3,7 @@ PC's recordings into the same run directory and analyse it (analyze.py).
 
     uv run --python 3.13 --with pynacl --with numpy run.py SCENARIO [--name NAME] [--duration S]
 
-Scenarios (see README.md): s1 s1ac s2 s2noise s3 s4 s5 s5loop s5loopoff.
+Scenarios (see README.md): s1 s1j s1ac s2 s2noise s3 s4 s5 s5loop s5loopoff.
 The Mac only ever initiates (peer.py send); the PC answers and punches first (no firewall rule).
 """
 from __future__ import annotations
@@ -43,8 +43,12 @@ PC_PLAY = f"{PCBA} play --channels 2 --live-drop-ms 60 --queue-ms 20 --device "
 # speakers-facing signals are kept quiet: pilot -40 dBFS, chirp peak -26 dBFS
 QUIET = "--pilot-amp 0.01 --marker-amp 0.05"
 # mixed into a live mic stream (never played at unity): loud enough that room noise picked up by
-# the mic (Wave:3 bursts up to -26 dBFS, -30 dBFS in the pilot's lock-in band) cannot fake a glitch
-MIXED = "--pilot-amp 0.2 --marker-amp 0.3"
+# the mic (Wave:3 bursts up to -26 dBFS, -30 dBFS in the pilot's lock-in band) cannot fake a glitch.
+# Chirps at -20 dBFS, not -10: a -10 dBFS chirp makes the Opus VOIP encoder switch modes, and a
+# decoder that ever missed a frame (a PLC, or joining a frame late) then renders the pilot with
+# 6 dB dips after many chirps: 10-16 false glitches/min with no transport fault at all (offline,
+# transport README "Mac->PC jitter"). With -20 dBFS chirps that floor is 0 and every marker is found.
+MIXED = "--pilot-amp 0.2 --marker-amp 0.1"
 
 
 def scenarios(D):
@@ -66,6 +70,14 @@ def scenarios(D):
             pc_serve=f"--channels 1 --sink-channels 2 --source none --sink cmd:{PC_PLAY}{CABLE_IN}",
             pc_helpers=[f"{PCPY} {PCTAP} rec --out @PCRUN@\\sink --channels 1 --seconds {D + 6} -- {PCBA} capture-mic --device {CABLE_OUT} --channels 1"],
             pairs=[("mac/src", "pc/sink", "A")]),
+        "s1j": dict(  # = s1, plus the PC records the jitter buffer's output on its way to `play`
+            desc="Mac mic -> PC virtual mic (VB-CABLE), JB output recorded",
+            mac_send=["--channels", "1", "--source",
+                      f"cmd:{PY} {HERE}/tap.py src --out @RUN@/src --channels 1 --mix A --start 4 {MIXED} -- {BA} capture-mic --channels 1 --buffer-frames 128",
+                      "--sink", "none"],
+            pc_serve=f"--channels 1 --sink-channels 2 --source none --sink cmd:{PCPY} {PCTAP} sink --out @PCRUN@\\jb --channels 2 -- {PC_PLAY}{CABLE_IN}",
+            pc_helpers=[f"{PCPY} {PCTAP} rec --out @PCRUN@\\sink --channels 1 --seconds {D + 6} -- {PCBA} capture-mic --device {CABLE_OUT} --channels 1"],
+            pairs=[("mac/src", "pc/jb", "A"), ("mac/src", "pc/sink", "A")]),
         "s1ac": dict(  # acoustic: quiet chirps from the Mac speakers -> Mac mic -> PC CABLE
             desc="Mac speakers -> air -> Mac mic -> PC virtual mic (real-mic proof)",
             mac_send=["--channels", "1", "--source",
@@ -201,6 +213,8 @@ def main():
     ap.add_argument("--name", default=None)
     ap.add_argument("--duration", type=float, default=75)
     ap.add_argument("--no-analyze", action="store_true")
+    ap.add_argument("--mac-extra", default="", help="extra peer.py send options (Mac)")
+    ap.add_argument("--pc-extra", default="", help="extra peer.py serve options (PC)")
     a = ap.parse_args()
     D = a.duration
     sc_all = scenarios(D)
@@ -218,6 +232,9 @@ def main():
             "loopcheck": sc.get("loopcheck", False), "looptest": sc.get("looptest", False),
             "started": time.strftime("%Y-%m-%d %H:%M:%S")}
     # PC side first: it listens and punches towards the Mac's fixed port
+    sc = dict(sc)
+    sc["pc_serve"] = f"--pkt-log @PCRUN@\\pkt {a.pc_extra} " + sc["pc_serve"]
+    meta["mac_extra"], meta["pc_extra"] = a.mac_extra, a.pc_extra
     pcrun, files = pc_files(name, sc, D)
     os.makedirs(os.path.join(run, "pc_scripts"), exist_ok=True)
     for fn, body in files.items():
@@ -243,6 +260,7 @@ def main():
     send = [PY, os.path.join(HERE, "pair.py"), os.path.join(run, "pings.json"), "send",
             "--to", f"{PC_IP}:24823", "--key-file", os.path.join(TR, "out", "test.key"), "--duration", str(D),
             "--quiet", "--stats", os.path.join(run, "send.jsonl"), "--local-port", str(LPORT), "--ping-s", "0.25"]
+    send += ["--pkt-log", os.path.join(run, "pkt")] + shlex.split(a.mac_extra)
     send += [sub(x) for x in sc["mac_send"]]
     meta["mac_send"] = send
     meta["t_send_start"] = time.monotonic()

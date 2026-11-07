@@ -47,6 +47,7 @@ def log(*a):
 
 class UdpClient:
     kind = "udp"
+    last_tx = 0.0
 
     def __init__(self, host, port, local_port=0):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -57,6 +58,7 @@ class UdpClient:
         self.peer = (host, port)
 
     def send(self, data):
+        self.last_tx = mono()
         try:
             self.sock.send(data)
         except OSError:
@@ -75,6 +77,7 @@ class UdpClient:
 
 class UdpServer:
     kind = "udp"
+    last_tx = 0.0
 
     def __init__(self, bind, port):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -84,6 +87,7 @@ class UdpServer:
 
     def send(self, data):
         if self.peer is not None:
+            self.last_tx = mono()
             try:
                 self.sock.sendto(data, self.peer)
             except OSError:
@@ -103,6 +107,7 @@ class UdpServer:
 class PairEnd:
     """In-process datagram pipe for `local` (no network, no firewall)."""
     kind = "pair"
+    last_tx = 0.0
 
     def __init__(self, sock):
         self.sock, self.peer = sock, "pair"
@@ -126,6 +131,7 @@ class TcpStream:
     """Fallback transport: the same sealed packets, u16 length-prefixed, over one TCP stream
     (stands in for 'audio frames inside the Beamer link')."""
     kind = "tcp"
+    last_tx = 0.0
 
     def __init__(self, sock, peer):
         self.sock, self.peer = sock, peer
@@ -134,6 +140,7 @@ class TcpStream:
         self.buf = b""
 
     def send(self, data):
+        self.last_tx = mono()
         with self.wlock:
             try:
                 self.sock.sendall(struct.pack("!H", len(data)) + data)
@@ -185,6 +192,9 @@ class Sender:
         self.st = {"tx": 0, "tx_bytes": 0, "inj_drop": 0, "enc_s": 0.0, "frames": 0}
         self.heap = []
         self.hcv = threading.Condition()
+        self.trace = [] if getattr(args, "pkt_log", None) else None  # (ts, t_feed, t_sent)
+        self.payloads = []  # encoded frames, same order as trace (for offline decoding)
+        self._t_feed = 0.0
         if self.jitter > 0:
             threading.Thread(target=self._delayer, daemon=True, name="delayer").start()
 
@@ -195,6 +205,7 @@ class Sender:
         if x.shape[1] != self.ch:  # adapt channel count
             x = np.repeat(x.mean(axis=1, keepdims=True), self.ch, axis=1) if self.ch > 1 else x.mean(axis=1, keepdims=True)
         with self.lock:
+            self._t_feed = mono()
             self.pend = np.concatenate([self.pend, x.astype(np.float32, copy=False)])
             while len(self.pend) >= self.frame:
                 fr, self.pend = self.pend[:self.frame], self.pend[self.frame:]
@@ -227,6 +238,9 @@ class Sender:
                 self.hcv.notify()
         else:
             self.t.send(pkt)
+        if self.trace is not None:
+            self.trace.append((ts, self._t_feed, mono()))
+            self.payloads.append(payload)
 
     def _lose(self):
         if self.loss <= 0:
@@ -630,6 +644,51 @@ class Session:
         self.cpu0 = (time.process_time(), mono())
         self.stop_ev = threading.Event()
         self.out = None
+        self.rx_trace = [] if getattr(args, "pkt_log", None) else None  # (ts32, arrival)
+        self.last_jb = None
+        self.last_media = 0.0
+        self.rr_sent = 0
+        self.rr_rx = 0
+
+    def rr_loop(self):
+        """Receiver reports: while media arrives and this side has sent nothing for one
+        interval, send a tiny authenticated RR packet (keeps this machine's Wi-Fi out of
+        power save; see media.RR)."""
+        iv = self.args.rr_ms / 1000
+        if iv <= 0 or self.t.kind == "tcp":
+            return
+        nxt = mono()
+        while not self.stop_ev.is_set():
+            nxt += iv
+            d = nxt - mono()
+            if d > 0:
+                time.sleep(d)
+            else:
+                nxt = mono()
+            now = mono()
+            jb = self.slot.jb
+            if jb is None or now - self.last_media > 1.0 or now - self.t.last_tx < iv * 0.9:
+                continue
+            lv = min(65535, int(jb.level_ms() * 10)) if jb.playing else 0
+            self.t.send(self.sealer.seal(M.RR, struct.pack("!IH", (jb.last_ts32 or 0) & 0xFFFFFFFF, lv)))
+            self.rr_sent += 1
+
+    def dump_trace(self):
+        """--pkt-log PREFIX: PREFIX.tx.npy (ts, t_feed, t_sent), PREFIX.rx.npy (ts, arrival),
+        PREFIX.pull.npy (t_sched, t_now, level_ms, event) -- time.monotonic() of this machine."""
+        pfx = self.args.pkt_log
+        if not pfx:
+            return
+        if self.sender is not None and self.sender.trace:
+            np.save(pfx + ".tx.npy", np.array(self.sender.trace, float))
+            with open(pfx + ".tx.opus", "wb") as f:  # u16 length + payload per frame
+                for b in self.sender.payloads:
+                    f.write(struct.pack("<H", len(b)) + b)
+        if self.rx_trace:
+            np.save(pfx + ".rx.npy", np.array(self.rx_trace, float))
+        jb = self.last_jb
+        if jb is not None and jb.trace:
+            np.save(pfx + ".pull.npy", np.array(jb.trace, float))
 
     # ---- control
     def hello_payload(self):
@@ -663,13 +722,19 @@ class Session:
             if p.ptype == M.MEDIA:
                 if p.stream != self.peer_stream:
                     continue
+                self.last_media = now
+                if self.rx_trace is not None:
+                    self.rx_trace.append((p.ts, now))
                 jb = self.slot.jb
                 if jb is None:
                     a = self.args
                     jb = M.JitterBuffer(p.codec, p.channels, p.nsamp, min_ms=a.jb_min, max_ms=a.jb_max,
                                         fixed_ms=a.jb_fixed, margin_ms=a.jb_margin, max_ppm=a.max_ppm,
-                                        drift=not a.no_drift, fec=a.fec)
-                    self.slot.jb = jb
+                                        drift=not a.no_drift, fec=a.fec, catchup_ppm=a.catchup_ppm,
+                                        drop_ms=a.drop_ms, peak_hold_s=a.jb_peak_hold, peak_count=a.jb_peak_count)
+                    if a.pkt_log:
+                        jb.trace = []
+                    self.slot.jb = self.last_jb = jb
                 jb.push(p)
             elif p.ptype == M.HELLO:
                 h = json.loads(p.payload)
@@ -702,6 +767,8 @@ class Session:
                     self.remote_stats.append(q)
                     if self.out:
                         self.out.write(json.dumps(q) + "\n")
+            elif p.ptype == M.RR:
+                self.rr_rx += 1
             elif p.ptype == M.BYE:
                 if self.role == "server":
                     log(json.dumps({"event": "bye"}))
@@ -727,6 +794,8 @@ class Session:
         if self.pings:
             r = [x[1] * 1000 for x in self.pings[-5:]]
             d["rtt_ms"] = round(float(np.median(r)), 3)
+        if self.rr_sent or self.rr_rx:
+            d["rr_tx"], d["rr_rx"] = self.rr_sent, self.rr_rx
         d["auth_rejected"] = self.opener.rejected
         d["replayed"] = self.opener.replayed
         return d
@@ -876,6 +945,7 @@ def serve_on(tr, key, a, stop=None):
     if sink:
         sink.start()
     threading.Thread(target=sess.rx_loop, daemon=True, name="rx").start()
+    threading.Thread(target=sess.rr_loop, daemon=True, name="rr").start()
     out = open(a.stats, "a") if a.stats else None
     st = threading.Thread(target=run_stats, args=(sess, a, out, True, stop), daemon=True)
     st.start()
@@ -905,6 +975,7 @@ def serve_on(tr, key, a, stop=None):
             src.stop()
         if sink:
             sink.stop()
+        sess.dump_trace()
 
 
 def client_run(tr, key, a, stop_after=None):
@@ -916,6 +987,7 @@ def client_run(tr, key, a, stop_after=None):
         sess.send_ctrl(M.HELLO, sess.hello_payload())
         if mono() - t0 > a.connect_timeout:
             return None, sess
+    threading.Thread(target=sess.rr_loop, daemon=True, name="rr").start()
     log(json.dumps({"event": "connected", "transport": tr.kind, "after_ms": round((mono() - t0) * 1000, 1),
                     "peer": sess.peer_hello}))
     if src is not None:
@@ -948,6 +1020,7 @@ def client_run(tr, key, a, stop_after=None):
         src.stop()
     if sink:
         sink.stop()
+    sess.dump_trace()
     res = {"event": "summary", "local": sess.summary(), "remote": sess.remote_summary,
            "local_agg": aggregate(sess.stats_log), "remote_agg": aggregate(sess.remote_stats)}
     if sess.pings:
@@ -1064,6 +1137,14 @@ def main():
         p.add_argument("--jb-margin", type=float, default=2.0)
         p.add_argument("--max-ppm", type=float, default=500.0)
         p.add_argument("--no-drift", action="store_true")
+        p.add_argument("--catchup-ppm", type=float, default=2000.0,
+                       help="max resampling speed-up to absorb a late burst (500 = old behaviour)")
+        p.add_argument("--drop-ms", type=float, default=30.0,
+                       help="drop a non-silent frame only after 2 s this far above target (old: 15)")
+        p.add_argument("--jb-peak-hold", type=float, default=10.0,
+                       help="spike-aware target: after 2 delay spikes > 15 ms within N s, provision "
+                            "for the highest until N s after the last (0: off, old behaviour)")
+        p.add_argument("--jb-peak-count", type=int, default=2)
         p.add_argument("--loss", type=float, default=0.0, help="inject loss, percent")
         p.add_argument("--burst", type=float, default=1.0, help="mean loss burst length (Gilbert)")
         p.add_argument("--jitter-ms", type=float, default=0.0, help="inject uniform 0..J ms delay")
@@ -1074,6 +1155,9 @@ def main():
         p.add_argument("--ping-s", type=float, default=1.0)
         p.add_argument("--connect-timeout", type=float, default=10.0)
         p.add_argument("--transport", choices=["udp", "tcp", "auto"], default="udp")
+        p.add_argument("--rr-ms", type=float, default=10.0,
+                       help="receiver reports every N ms while receiving and not sending (0: off)")
+        p.add_argument("--pkt-log", default=None, help="PREFIX: per-packet send/receive/pull traces (.npy)")
 
     s = sub.add_parser("serve")
     common(s)

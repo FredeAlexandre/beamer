@@ -114,7 +114,7 @@ def lockin(x: np.ndarray, f: float, W=480):
 
 
 def pilot_glitches(x: np.ndarray, f: float, W=480, phase_thr=0.3, drop_db=-6.0, present_amp=1e-5,
-                   skip_s=2.0, markers=()):
+                   skip_s=2.0, markers=(), post_ms=20.0):
     """Glitch windows of a pilot: phase step > phase_thr rad between consecutive windows, or
     amplitude more than 6 dB below the running median. Only where the pilot is present (running
     median above 30 % of the run's 90th percentile), skipping skip_s after it appears and before it ends."""
@@ -141,12 +141,17 @@ def pilot_glitches(x: np.ndarray, f: float, W=480, phase_thr=0.3, drop_db=-6.0, 
     # windows a marker overlaps (and the next 20 ms) are not judged: the codec spends its bits on
     # the chirp there and the pilot's phase wobbles, which is the test signal, not a glitch
     for j in markers:
-        use[max(0, j // W - 1):min(len(use), (j + int(CHIRP_S * RATE)) // W + 3)] = False
+        use[max(0, j // W - 1):min(len(use), (j + int(CHIRP_S * RATE)) // W + 1 + int(np.ceil(post_ms * RATE / 1000 / W)))] = False
     b = bad & use
     events = int(np.sum(b[1:] & ~b[:-1]) + (1 if b[0] else 0))
     t_ev = (np.nonzero(b[1:] & ~b[:-1])[0] + 1) * W / RATE
+    # episodes: events closer than 0.5 s merged (one transport event, e.g. a 30 ms expand,
+    # often shows as 2-4 detector events while the pilot's phase settles)
+    episodes = int(len(t_ev) and 1 + np.sum(np.diff(t_ev) > 0.5))
     return {"windows": int(use.sum()), "seconds": round(float(use.sum() * W / RATE), 1),
             "glitch_windows": int(b.sum()), "glitch_events": int(events),
+            "glitch_episodes": episodes,
+            "episodes_per_min": round(episodes / max(1e-9, use.sum() * W / RATE / 60), 2),
             "events_per_min": round(events / max(1e-9, use.sum() * W / RATE / 60), 2),
             "pilot_dbfs": round(float(20 * np.log10(np.median(a[use]) + 1e-12)), 1) if use.any() else None,
             "dphi_p99": round(float(np.quantile(dphi[use], 0.99)), 3) if use.any() else None,
