@@ -41,7 +41,7 @@ to the Beamer app).
 | T5 VB-CABLE: verify Microsoft signature, silent install or stop | PC agent (`~\audio-driver`) | **done** 15:10: Pack46 driver 3.5.2.0 installed silently (`VBCABLE_Setup_x64.exe -i -h`), Microsoft WHCP attestation signature verified before install and re-checked independently after (Win32_PnPSignedDriver signer). No prompt, no reboot asked, defaults unchanged. |
 | T6 Transport prototype (UDP media + AEAD, Opus vs PCM, jitter buffer, drift, loss, latency) -> `proto/transport/` | Mac subagent (+ssh) | **done** 16:40 (`7493a56`). Temporary PC firewall rules removed (0 `Beamer-dev-*` left, checked). Numbers to be cross-checked by W2. |
 | W1 Tune VB-CABLE internal latency (`VBAudioCableWDM_Latency`, was 7168), keep lowest glitch-free value, .reg backup | PC agent (`~\audio-cable-tune`) | **ssh session killed at 90 min (my timeout too short); the PC agent keeps running** (PID 14492, started 16:20). Sweep so far: 7168 baseline, 3072 clean p50 147 ms, 2048 clean p50 139 ms, 1536 dirty (glitches in latency runs), 1024 running. Suspicious: measured latency barely moves with the setting -> method to re-check. Backup: `~\audio-cable-tune\cable-backup.reg` (7168). Final report lost with the ssh stdout -> a fresh agent analyses `results.jsonl`/`sweep.log` once 14492 exits. |
-| W2 Four scenarios end to end with the real tools (Mac mic->PC CABLE, PC mic->Mac, Mac sound->PC headset muted locally, PC sound->Mac muted locally, both at once) + `--exclude-pid` against feedback loops; independent latency numbers | Mac subagent (+ssh, PC commits on `pc/audio-proto`) | running (16:45); does the CABLE scenario after W1 |
+| W2 Four scenarios end to end with the real tools + `--exclude-pid` against feedback loops; independent latency numbers -> `proto/scenarios/` | Mac subagent (+ssh) | **scenarios 2-5 done** 18:05 (`ce86760`, PC `2074c88` merged `6055fbc`); **scenario 1 (Mac mic -> PC CABLE) pending** until the cable sweep ends |
 
 ## Decisions
 
@@ -84,6 +84,18 @@ to the Beamer app).
 | UDP blocked -> TCP fallback | switch after 2 s + 207 ms; same 65 ms loop with no loss |
 | Firewall | PC: no rule needed if the PC sends first to the Mac's port (hole punch), LAN and Tailscale. Mac: no dialog, no log entry, even with a freshly re-signed interpreter |
 
+### End-to-end scenarios (W2, Wi-Fi, 75 s runs, latency from per-machine timestamps joined by ping clock offset, error <= 2.3 ms)
+
+| Scenario | One-way p50 / p95 | Glitches/min | CPU (one core) |
+|---|---|---|---|
+| 2 PC mic (Wave:3) -> Mac | 29.5 / 37.1 ms to receiver output; 55.4 / 63.2 ms to the Mac speaker mix | 10.2 | transport Mac 11 %, PC 2.4 %; tools < 0.5 % |
+| 3 Mac sound -> PC G733, Mac muted | 95.6 / 103.8 ms (loopback-observed on the PC) | 1.9 | Mac 4.1 %, PC 5.0 % |
+| 4 PC sound -> Mac speakers, PC muted | 55.6 / 64.1 ms (2nd run 51.1 / 71.4) | 4.0 | Mac 14.9 %, PC 1.7 % |
+| 5 = 3 + 4 at once | Mac->PC 100.1 / 107.0; PC->Mac 62.0 / 71.5 | PC 3.1, Mac 8.0 | Mac 18.8 %, PC 6.1 % |
+
+Cross-check without clocks: a burst round trip Mac->PC->Mac took 146.7 ms = 96.4 + 50.3 (matches 3 and 4). Glitches line up with the receiver running dry during Wi-Fi delay spikes; 0 packets lost. Mac->PC shows 10-15 ms network jitter vs ~2 ms PC->Mac (+~15 ms buffer).
+Loop test: with `--exclude-pid` each burst is seen once, then 96-99 dB down; without it bursts came back every 146.7 ms, 73-88 times, losing only 0.15 dB per lap.
+
 ### PC (T4, WASAPI shared mode, 48 kHz)
 
 | What | Value |
@@ -110,6 +122,10 @@ to the Beamer app).
 | (unused) | CABLE In 16 Ch | VB-CABLE |
 
 ## Open questions
+
+- **Acoustic coupling between the two machines** (W2): the Wave:3 hears the MacBook speakers at about -11 dB; a first mic-forwarding trial howled for ~10 s. Forwarding a mic while the other machine plays through speakers needs echo cancellation (e.g. macOS voice processing IO / Windows AEC on the capture side) or a headset. Product decision for Phase 2.
+- Windows `--exclude-pid` does not follow a venv launcher (`python.exe` shim): exclude the PID of the process that actually opens the player; in Beamer `os.getpid()` of the real process; check the PyInstaller bootloader parent/child split. Only one process tree can be excluded; Windows loopback covers every render device of the endpoint mix.
+- System sound Mac -> PC at ~96 ms one way exceeds the 50 ms hop budget (mic budget); fine for media but worth trimming: where are the extra ~40 ms vs PC -> Mac (Mac->PC Wi-Fi jitter, PC G733 render path)? Phase 2 tuning item.
 
 - PC: while PC sound is redirected away (endpoint muted), sound coming from another machine cannot play on that same endpoint. Options: play it on another endpoint, or per-app routing (undocumented IAudioPolicyConfig), or accept the limitation. To decide in Phase 2 with Alex's typical setup in mind.
 - PC: the API reports muted, but nobody has heard the G733 during `--mute-local` (the Elgato mic can't hear the headset). Human ear check goes into the grouped list of human checks.
