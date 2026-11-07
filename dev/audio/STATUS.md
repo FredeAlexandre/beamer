@@ -41,7 +41,8 @@ to the Beamer app).
 | T5 VB-CABLE: verify Microsoft signature, silent install or stop | PC agent (`~\audio-driver`) | **done** 15:10: Pack46 driver 3.5.2.0 installed silently (`VBCABLE_Setup_x64.exe -i -h`), Microsoft WHCP attestation signature verified before install and re-checked independently after (Win32_PnPSignedDriver signer). No prompt, no reboot asked, defaults unchanged. |
 | T6 Transport prototype (UDP media + AEAD, Opus vs PCM, jitter buffer, drift, loss, latency) -> `proto/transport/` | Mac subagent (+ssh) | **done** 16:40 (`7493a56`). Temporary PC firewall rules removed (0 `Beamer-dev-*` left, checked). Numbers to be cross-checked by W2. |
 | W1/W1b VB-CABLE internal latency (`VBAudioCableWDM_Latency`) | PC agents | **done** 19:10: **restored to 7168** (vendor default). One-process measurement (shared WASAPI duplex, sample-exact, 8 sessions/value, balanced order): shared-mode delay ~100 ms at 7168, 2048 and 512 alike (differences within ~20 ms session noise); the setting only matters to kernel-streaming clients (KS floor 40 ms); exclusive mode ~55 ms at every value. 512 has a reproducible hole under load. W1's flat numbers were real, plus 15-40 ms of its two-process harness. ~60 ms of the cable path is the Windows engine/endpoint buffering, not the driver. Report: PC `~\briefs\pc-cable-analyse.report.md`. |
-| W2 Four scenarios end to end with the real tools + `--exclude-pid` against feedback loops; independent latency numbers -> `proto/scenarios/` | Mac subagent (+ssh) | **scenarios 2-5 done** 18:05 (`ce86760`, PC `2074c88` merged `6055fbc`); **scenario 1 (Mac mic -> PC CABLE) pending** until the cable sweep ends |
+| W2 Four scenarios end to end with the real tools + `--exclude-pid` against feedback loops; independent latency numbers -> `proto/scenarios/` | Mac subagent (+ssh) | **done** 19:20: all four directions + both at once work. Scenario 1 works but glitchy (62/min). |
+| W3 Mac->PC jitter: root cause (AWDL? sender timing? PC JB?) and fix, target <= 2 glitches/min over 5 min | Mac subagent (+ssh) | running (19:25) |
 
 ## Decisions
 
@@ -88,6 +89,7 @@ to the Beamer app).
 
 | Scenario | One-way p50 / p95 | Glitches/min | CPU (one core) |
 |---|---|---|---|
+| 1 Mac mic -> PC virtual mic (CABLE Output) | 125.6 / 137.4 ms; real mic: sound -> PC app 186 / 194 ms (Mac speaker->mic 71 ms) | **61.7** (PC JB underruns, Mac->PC jitter 5-15 ms) | Mac 7.1 %, PC 4.5 % |
 | 2 PC mic (Wave:3) -> Mac | 29.5 / 37.1 ms to receiver output; 55.4 / 63.2 ms to the Mac speaker mix | 10.2 | transport Mac 11 %, PC 2.4 %; tools < 0.5 % |
 | 3 Mac sound -> PC G733, Mac muted | 95.6 / 103.8 ms (loopback-observed on the PC) | 1.9 | Mac 4.1 %, PC 5.0 % |
 | 4 PC sound -> Mac speakers, PC muted | 55.6 / 64.1 ms (2nd run 51.1 / 71.4) | 4.0 | Mac 14.9 %, PC 1.7 % |
@@ -122,6 +124,8 @@ Loop test: with `--exclude-pid` each burst is seen once, then 96-99 dB down; wit
 | (unused) | CABLE In 16 Ch | VB-CABLE |
 
 ## Open questions
+
+- Mac awdl0 (AirDrop/Continuity) is up and active: a known source of periodic Wi-Fi transmit delays on Macs. We may not disable it; the transport must absorb it (W3).
 
 - **Acoustic coupling between the two machines** (W2): the Wave:3 hears the MacBook speakers at about -11 dB; a first mic-forwarding trial howled for ~10 s. Forwarding a mic while the other machine plays through speakers needs echo cancellation (e.g. macOS voice processing IO / Windows AEC on the capture side) or a headset. Product decision for Phase 2.
 - Windows `--exclude-pid` does not follow a venv launcher (`python.exe` shim): exclude the PID of the process that actually opens the player; in Beamer `os.getpid()` of the real process; check the PyInstaller bootloader parent/child split. Only one process tree can be excluded; Windows loopback covers every render device of the endpoint mix.
