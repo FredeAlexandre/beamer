@@ -368,6 +368,7 @@ func installSignalHandlers() {
 struct Args {
     var command: [String] = []
     var options: [String: String] = [:]
+    var multi: [String: [String]] = [:]  // every value of a repeated option, in order
     var flags: Set<String> = []
     static let boolFlags: Set<String> = ["json", "mute-local", "include-self", "muted-always", "verbose", "clocked"]
 
@@ -379,11 +380,16 @@ struct Args {
                 var key = String(a.dropFirst(2))
                 if let eq = key.firstIndex(of: "=") {
                     options[String(key[..<eq])] = String(key[key.index(after: eq)...])
+                    multi[String(key[..<eq]), default: []].append(String(key[key.index(after: eq)...]))
                     i += 1
                     continue
                 }
                 if Args.boolFlags.contains(key) { flags.insert(key); i += 1; continue }
-                if i + 1 < argv.count { options[key] = argv[i + 1]; i += 2 } else { key = ""; i += 1 }
+                if i + 1 < argv.count {
+                    options[key] = argv[i + 1]
+                    multi[key, default: []].append(argv[i + 1])
+                    i += 2
+                } else { key = ""; i += 1 }
             } else {
                 command.append(a)
                 i += 1
@@ -394,4 +400,5 @@ struct Args {
     func double(_ k: String, _ d: Double) -> Double { options[k].flatMap(Double.init) ?? d }
     func int(_ k: String, _ d: Int) -> Int { options[k].flatMap(Int.init) ?? d }
     func has(_ k: String) -> Bool { flags.contains(k) }
+    func all(_ k: String) -> [String] { multi[k] ?? [] }
 }

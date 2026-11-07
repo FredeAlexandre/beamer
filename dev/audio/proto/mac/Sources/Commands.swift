@@ -177,16 +177,24 @@ func cmdCaptureMic(_ args: Args) -> Never {
 func cmdCaptureSystem(_ args: Args) -> Never {
     installSignalHandlers()
     let mute: TapMute = args.has("muted-always") ? .muted : (args.has("mute-local") ? .mutedWhenTapped : .unmuted)
+    var excludePIDs: [pid_t] = []
+    for v in args.all("exclude-pid") {
+        guard let p = pid_t(v), p > 0 else { fail("--exclude-pid needs a process id, got \(v)", code: 2) }
+        if kill(p, 0) != 0 && errno == ESRCH { fail("--exclude-pid: no process \(p)", code: 2) }
+        excludePIDs.append(p)
+    }
     let tap: SystemTap
     do { tap = try makeSystemTap(deviceUID: args.options["device"], mute: mute, includeSelf: args.has("include-self"),
-                                 clockSubdevice: args.has("clocked")) } catch { fail("\(error)") }
+                                 clockSubdevice: args.has("clocked"), excludePIDs: excludePIDs,
+                                 excludeWait: args.double("exclude-wait", 5)) } catch { fail("\(error)") }
     let outRate = args.double("rate", 48000), outCh = args.int("channels", 2)
     let io: IODevice
     do { io = try IODevice(device: tap.aggregateID, isInput: true, ringFrames: Int(max(nominalRate(tap.aggregateID), 48000) * 0.5)) }
     catch { fail("\(error)") }
     startCapture(io, extra: ["mode": "capture-system", "mute": mute.rawValue, "tap_uid": tap.tapUID,
                              "tap_format": asbdDict(tap.format), "clock_device": tap.clockDeviceUID ?? NSNull(),
-                             "aggregate_id": Int(tap.aggregateID)], args: args, outRate: outRate, outCh: outCh)
+                             "aggregate_id": Int(tap.aggregateID), "excluded": tap.excluded,
+                             "exclude_pending": tap.excludePending], args: args, outRate: outRate, outCh: outCh)
 }
 
 // MARK: - play

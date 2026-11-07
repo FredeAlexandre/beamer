@@ -226,26 +226,87 @@ struct SystemTap {
     let tapUID: String
     let format: AudioStreamBasicDescription
     let clockDeviceUID: String?
+    let excluded: [[String: Any]]   // {pid, object} for each --exclude-pid resolved at creation
+    let excludePending: [Int]       // PIDs with no Core Audio process object yet (added when they appear)
 }
 
-func ownProcessObject() -> AudioObjectID {
+/// Core Audio process object of a PID, or 0. A process only has one once it is a HAL client
+/// (it has made a Core Audio call), so a player that has just been spawned may not have one yet.
+func processObject(pid: pid_t) -> AudioObjectID {
     var a = paddr(kAudioHardwarePropertyTranslatePIDToProcessObject)
-    var pid = getpid()
+    var p = pid
     var obj = AudioObjectID(0)
     var size = UInt32(MemoryLayout<AudioObjectID>.size)
-    let st = AudioObjectGetPropertyData(systemObject, &a, UInt32(MemoryLayout<pid_t>.size), &pid, &size, &obj)
+    let st = AudioObjectGetPropertyData(systemObject, &a, UInt32(MemoryLayout<pid_t>.size), &p, &size, &obj)
     return st == noErr ? obj : 0
 }
+
+func ownProcessObject() -> AudioObjectID { processObject(pid: getpid()) }
+
+/// Keeps a tap's exclusion list in step with PIDs that had no process object when the tap was
+/// created: on every change of the system's process list, resolve them again and, if any appeared,
+/// rewrite the tap's description (kAudioTapPropertyDescription is settable on a live tap).
+@available(macOS 14.2, *)
+final class LateExclusions {
+    let tapID: AudioObjectID
+    let desc: CATapDescription
+    var pending: [pid_t]
+    let queue = DispatchQueue(label: "beamer-audio.exclusions")
+    init(tapID: AudioObjectID, desc: CATapDescription, pending: [pid_t]) {
+        self.tapID = tapID; self.desc = desc; self.pending = pending
+        var a = paddr(kAudioHardwarePropertyProcessObjectList)
+        AudioObjectAddPropertyListenerBlock(systemObject, &a, queue) { [weak self] _, _ in self?.refresh() }
+        queue.async { self.refresh() }  // a PID may have appeared between creation and now
+    }
+    func refresh() {
+        var found: [[String: Any]] = []
+        var objs = desc.processes
+        pending = pending.filter { pid in
+            let o = processObject(pid: pid)
+            if o == 0 { return true }
+            if !objs.contains(o) { objs.append(o) }
+            found.append(["pid": Int(pid), "object": Int(o)])
+            return false
+        }
+        guard !found.isEmpty else { return }
+        desc.processes = objs
+        var a = paddr(kAudioTapPropertyDescription)
+        var d: CATapDescription = desc
+        let st = withUnsafeMutablePointer(to: &d) {
+            AudioObjectSetPropertyData(tapID, &a, 0, nil, UInt32(MemoryLayout<CATapDescription>.size), $0)
+        }
+        elog(["event": "exclude_added", "added": found, "status": Int(st), "still_pending": pending.map { Int($0) }])
+    }
+}
+private var lateExclusions: AnyObject?
 
 enum TapMute: String { case unmuted, mutedWhenTapped = "muted_when_tapped", muted }
 
 /// Global (or per-device) process tap wrapped in a private aggregate device. Registers cleanup.
-func makeSystemTap(deviceUID tapDeviceUID: String?, mute: TapMute, includeSelf: Bool, clockSubdevice: Bool = false) throws -> SystemTap {
+/// `excludePIDs`: other processes to leave out of the tap (e.g. Beamer's own player, so received
+/// audio is not captured and sent back). Each is waited for up to `excludeWait` seconds; one still
+/// without a process object after that is added later by `LateExclusions`.
+func makeSystemTap(deviceUID tapDeviceUID: String?, mute: TapMute, includeSelf: Bool, clockSubdevice: Bool = false,
+                   excludePIDs: [pid_t] = [], excludeWait: Double = 5) throws -> SystemTap {
     if #unavailable(macOS 14.2) { throw CAError(what: "process taps need macOS 14.2+", status: -1) }
     var exclude: [AudioObjectID] = []
     if !includeSelf {
         let me = ownProcessObject()
         if me != 0 { exclude.append(me) }
+    }
+    var excluded: [[String: Any]] = []
+    var pending = excludePIDs
+    let waitUntil = wallSeconds() + excludeWait
+    while true {
+        pending = pending.filter { pid in
+            let o = processObject(pid: pid)
+            if o == 0 { return true }
+            if !exclude.contains(o) { exclude.append(o) }
+            excluded.append(["pid": Int(pid), "object": Int(o)])
+            return false
+        }
+        if pending.isEmpty || wallSeconds() >= waitUntil { break }
+        usleep(20_000)
     }
     let desc: CATapDescription
     let clockUID: String
@@ -268,6 +329,9 @@ func makeSystemTap(deviceUID tapDeviceUID: String?, mute: TapMute, includeSelf: 
     var tapID = AudioObjectID(0)
     try check(AudioHardwareCreateProcessTap(desc, &tapID), "AudioHardwareCreateProcessTap")
     Cleanup.shared.add("destroy_tap") { AudioHardwareDestroyProcessTap(tapID) }
+    if !pending.isEmpty, #available(macOS 14.2, *) {
+        lateExclusions = LateExclusions(tapID: tapID, desc: desc, pending: pending)
+    }
     let tapUID = getString(tapID, paddr(kAudioTapPropertyUID)) ?? desc.uuid.uuidString
     let format = getValue(tapID, paddr(kAudioTapPropertyFormat), AudioStreamBasicDescription()) ?? AudioStreamBasicDescription()
 
@@ -295,5 +359,6 @@ func makeSystemTap(deviceUID tapDeviceUID: String?, mute: TapMute, includeSelf: 
     Cleanup.shared.add("destroy_aggregate") { AudioHardwareDestroyAggregateDevice(aggID) }
     // The tap's input stream appears asynchronously on some systems; wait briefly for it.
     for _ in 0..<50 where channelCount(aggID, scopeIn) == 0 { usleep(10_000) }
-    return SystemTap(tapID: tapID, aggregateID: aggID, tapUID: tapUID, format: format, clockDeviceUID: clockSubdevice ? clockUID : nil)
+    return SystemTap(tapID: tapID, aggregateID: aggID, tapUID: tapUID, format: format, clockDeviceUID: clockSubdevice ? clockUID : nil,
+                     excluded: excluded, excludePending: pending.map { Int($0) })
 }

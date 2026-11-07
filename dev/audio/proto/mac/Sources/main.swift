@@ -8,7 +8,7 @@ usage:
   beamer-audio watch
   beamer-audio capture-mic    [--device UID|NAME] [--rate 48000] [--channels 1] [--buffer-frames N] [--stats S]
   beamer-audio capture-system [--device UID] [--mute-local] [--rate 48000] [--channels 2] [--buffer-frames N] [--stats S]
-                              [--clocked] [--include-self] [--muted-always]
+                              [--clocked] [--include-self] [--muted-always] [--exclude-pid PID]... [--exclude-wait 5]
   beamer-audio play           [--device UID|NAME] [--rate 48000] [--channels 2] [--buffer-frames N]
                               [--buffer-ms 80] [--prefill-ms 20] [--stats S]
   beamer-audio measure props|buffers|tap-latency|loop-latency|drift [...]

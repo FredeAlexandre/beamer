@@ -20,6 +20,7 @@ beamer-audio list [--json] [--verbose]
 beamer-audio watch
 beamer-audio capture-mic    [--device UID|NAME] [--rate 48000] [--channels 1]
 beamer-audio capture-system [--device UID] [--mute-local] [--rate 48000] [--channels 2]
+                            [--exclude-pid PID]... [--exclude-wait 5]
 beamer-audio play           [--device UID|NAME] [--rate 48000] [--channels 2]
 beamer-audio measure props|buffers|tap-latency|loop-latency|drift [...]
 ```
@@ -48,6 +49,17 @@ beamer-audio measure props|buffers|tap-latency|loop-latency|drift [...]
   `--mute-local` sets `muteBehavior = .mutedWhenTapped`. Extra flags: `--muted-always`
   (`.muted`), `--include-self`, and `--clocked` (add the output device as clock sub-device; see
   "Tap aggregate" below).
+- `--exclude-pid PID` (repeatable) also leaves those processes out of the tap, e.g. Beamer's own
+  `play`, so received audio is not captured and sent back (the echo loop when both machines share
+  system sound). Each PID is translated with `kAudioHardwarePropertyTranslatePIDToProcessObject` and
+  added to the `CATapDescription` exclusion list. A process only has a Core Audio process object
+  once it has made a Core Audio call, so each PID is waited for up to `--exclude-wait` seconds; one
+  that is still missing is added later: a listener on `kAudioHardwarePropertyProcessObjectList`
+  rewrites the live tap's `kAudioTapPropertyDescription` when it appears (`exclude_added` event).
+  Core Audio has no process trees: every process to exclude must be named. Excluded processes are
+  not muted by `--mute-local` (they are not tapped). Tested with a -40 dBFS tone in `play`: a plain
+  tap read -43 dBFS RMS, the tap excluding the player -200 dBFS (digital zero); with the player
+  started 2 s after the tap, the exclusion was added at 2.07 s, before its first sound.
 - Cleanup: the IOProc is stopped, then the aggregate and the tap are destroyed. This runs on
   SIGINT, SIGTERM, SIGHUP, on stdout EPIPE (for example `| head -c N`) and at stdin EOF for
   `play`. If the process is SIGKILLed, the HAL removes the private tap and aggregate itself.
@@ -214,11 +226,10 @@ the machine.
 
 ## Caveats and open points
 
-- **Feedback:** `capture-system` excludes only its own process. Another `beamer-audio play`
-  process on the same machine is captured, so `capture-system | play` on one Mac loops, even with
-  `--mute-local` (the player gets muted too, and the loop keeps circulating inside the tap).
-  Across machines this is the echo-loop risk to handle in Phase 2: exclude the Beamer player
-  process from the tap.
+- **Feedback:** by default `capture-system` excludes only its own process, so another
+  `beamer-audio play` process on the same machine is captured and `capture-system | play` loops,
+  even with `--mute-local`. `--exclude-pid` of the player closes that loop; the two-machine test is
+  in `../scenarios/README.md` (scenario 5).
 - **TCC:** everything ran without a dialog because the permission is attributed to the parent
   app. If system-audio recording were denied, a tap typically delivers silence instead of an
   error. The `stats` RMS (-200 dBFS = digital zero) is the way to notice. This was not tested.
