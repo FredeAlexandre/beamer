@@ -57,13 +57,15 @@ to the Beamer app).
 | T6 Transport prototype (UDP media + AEAD, Opus vs PCM, jitter buffer, drift, loss, latency) -> `proto/transport/` | Mac subagent (+ssh) | **done** 16:40 (`7493a56`). Temporary PC firewall rules removed (0 `Beamer-dev-*` left, checked). Numbers to be cross-checked by W2. |
 | W1/W1b VB-CABLE internal latency (`VBAudioCableWDM_Latency`) | PC agents | **done** 19:10: **restored to 7168** (vendor default). One-process measurement (shared WASAPI duplex, sample-exact, 8 sessions/value, balanced order): shared-mode delay ~100 ms at 7168, 2048 and 512 alike (differences within ~20 ms session noise); the setting only matters to kernel-streaming clients (KS floor 40 ms); exclusive mode ~55 ms at every value. 512 has a reproducible hole under load. W1's flat numbers were real, plus 15-40 ms of its two-process harness. ~60 ms of the cable path is the Windows engine/endpoint buffering, not the driver. Report: PC `~\briefs\pc-cable-analyse.report.md`. |
 | W2 Four scenarios end to end with the real tools + `--exclude-pid` against feedback loops; independent latency numbers -> `proto/scenarios/` | Mac subagent (+ssh) | **done** 19:20: all four directions + both at once work. Scenario 1 works but glitchy (62/min). |
-| W3 Mac->PC jitter: root cause (AWDL? sender timing? PC JB?) and fix, target <= 2 glitches/min over 5 min | Mac subagent (+ssh) | running (19:25) |
+| W3 Mac->PC jitter: root cause and fix | Mac subagent (+ssh) | **done** 20:50 (`60f6b4d`): cause = **PC Wi-Fi power save while it only receives** (MediaTek RZ616, Power Saving Auto: AP buffers the Mac's packets 20-130 ms then bursts). Raw probe: Mac->PC spikes/min 20-60 when the PC sends nothing, 2-7 when it sends every 10 ms, 1 when it sends 16 B/10 ms to the router only. Not AWDL, not the Mac sender (capture->send 0.6/0.85 ms p50/p99), DSCP EF no effect. Fix: 46-byte sealed receiver report every 10 ms from a receive-only side, catch-up by +0.2 % playback instead of drops, spike-aware JB target hold, decoder kept in step. Scenario 1, 10 min: **2.1 glitches/min** (was 50), one-way 108/116 ms (was 119/130). Under blind re-check (V3). |
+| V3 Blind check: does Mac->PC jitter depend on the PC transmitting? | Mac subagent (blind) | running |
 
 ## Decisions
 
 - **Media config** (from T6): mic = Opus mono VOIP 32 kb/s, 10 ms frames, in-band FEC on, DTX off; system sound = Opus stereo AUDIO 96-128 kb/s, 10 ms, FEC off (FEC forces speech mode). Jitter buffer adaptive: target = playback period + half a frame + p97 jitter + 2 ms, clamp 10-120 ms. Drift: buffer-level controller steering a resampler, driven from the playback device callback (in process), not from a pipe.
 - **Latency budget**: Beamer's hop <= 50 ms one way (G.114: 150 ms mouth-to-ear comfortable; the call app itself adds 50-100 ms). Transport meets it (~33 ms); VB-CABLE at 7168 does not -> W1.
 - **VB-CABLE latency setting left at its default 7168** (19:10): tuning it was tried (operator decision 16:45, reversible) and brings no gain on the shared-mode path apps use. To cut the PC virtual-mic latency, work on the ~60 ms outside the driver (e.g. Beamer rendering into CABLE Input in exclusive mode / smaller periods), not on this setting.
+- **Receive-only peers send receiver reports every 10 ms** (W3): keeps a power-saving Wi-Fi radio awake (PC: MediaTek RZ616), costs 46 B/10 ms, no latency; doubles as the RTCP-like feedback channel (loss, jitter, buffer level) for the sender. We do not change the PC's adapter power setting (system setting, and users won't).
 - **PC system-sound redirect = process loopback excluding Beamer's process tree + endpoint mute** (2026-11-07, confirmed by V2). In Beamer: keep the mute journal and replay `restore-endpoint` at every Beamer start, so a crash of both the helper and its guard never leaves the PC muted. Why: endpoint mute keeps loopback intact (session mute does not); excluding Beamer avoids sending remote audio back. Cost: endpoint mute also silences anything Beamer plays to that same endpoint (see open questions); a crash guard must restore the mute.
 
 - **Common stdio contract for both prototypes** (2026-11-07): `beamer-audio list|watch|capture-mic|capture-system [--mute-local]|play|measure`, raw f32le interleaved, 48 kHz, mic mono / system stereo, diagnostics as JSON lines on stderr. Why: the transport prototype pipes any capture into any player on either OS without caring which side it runs.
@@ -104,7 +106,7 @@ to the Beamer app).
 
 | Scenario | One-way p50 / p95 | Glitches/min | CPU (one core) |
 |---|---|---|---|
-| 1 Mac mic -> PC virtual mic (CABLE Output) | 125.6 / 137.4 ms; real mic: sound -> PC app 186 / 194 ms (Mac speaker->mic 71 ms) | **61.7** (PC JB underruns, Mac->PC jitter 5-15 ms) | Mac 7.1 %, PC 4.5 % |
+| 1 Mac mic -> PC virtual mic (CABLE Output) | before W3: 125.6 / 137.4 ms, 61.7 glitches/min; **after W3 (10 min): 107.7 / 115.8 ms, 2.1 glitches/min** (all at real Wi-Fi events); real mic: sound -> PC app 186 / 194 ms before W3 (Mac speaker->mic 71 ms) | 2.1 | Mac 7.1 %, PC 4.5 % |
 | 2 PC mic (Wave:3) -> Mac | 29.5 / 37.1 ms to receiver output; 55.4 / 63.2 ms to the Mac speaker mix | 10.2 | transport Mac 11 %, PC 2.4 %; tools < 0.5 % |
 | 3 Mac sound -> PC G733, Mac muted | 95.6 / 103.8 ms (loopback-observed on the PC) | 1.9 | Mac 4.1 %, PC 5.0 % |
 | 4 PC sound -> Mac speakers, PC muted | 55.6 / 64.1 ms (2nd run 51.1 / 71.4) | 4.0 | Mac 14.9 %, PC 1.7 % |
@@ -140,7 +142,8 @@ Loop test: with `--exclude-pid` each burst is seen once, then 96-99 dB down; wit
 
 ## Open questions
 
-- Mac awdl0 (AirDrop/Continuity) is up and active: a known source of periodic Wi-Fi transmit delays on Macs. We may not disable it; the transport must absorb it (W3).
+- Mac awdl0 is active but W3 found it is not the cause of the Mac->PC jitter.
+- Remaining Wi-Fi events: one 0.66 s stall and 2-3.4 s episodes of 45-130 ms delays once per 5 min, cause unknown. Scenarios 2-5 not re-run with the W3 fixes. Opus decoder after a lost frame gives false glitch detections on loud chirps: earlier mic-path glitch counts are slightly pessimistic.
 
 - **Acoustic coupling between the two machines** (W2): the Wave:3 hears the MacBook speakers at about -11 dB; a first mic-forwarding trial howled for ~10 s. Forwarding a mic while the other machine plays through speakers needs echo cancellation (e.g. macOS voice processing IO / Windows AEC on the capture side) or a headset. Product decision for Phase 2.
 - Windows `--exclude-pid` does not follow a venv launcher (`python.exe` shim): exclude the PID of the process that actually opens the player; in Beamer `os.getpid()` of the real process; check the PyInstaller bootloader parent/child split. Only one process tree can be excluded; Windows loopback covers every render device of the endpoint mix.
