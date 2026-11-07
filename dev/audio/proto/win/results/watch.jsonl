@@ -1,0 +1,13 @@
+{"event":"watching","t":15012.4}
+{"event":"property_changed","t":15471.8,"id":"{0.0.1.00000000}.{ddc7e301-3260-4ed3-8389-0938254820e0}","name":"CABLE Output (VB-Audio Virtual Cable)","property":"{9855C4CD-DF8C-449C}/0"}
+{"event":"property_changed","t":15709.1,"id":"{0.0.1.00000000}.{ddc7e301-3260-4ed3-8389-0938254820e0}","name":"CABLE Output (VB-Audio Virtual Cable)","property":"{9855C4CD-DF8C-449C}/0"}
+{"event":"property_changed","t":15724.5,"id":"{0.0.1.00000000}.{ddc7e301-3260-4ed3-8389-0938254820e0}","name":"CABLE Output (VB-Audio Virtual Cable)","property":"{9855C4CD-DF8C-449C}/0"}
+{"event":"property_changed","t":15739.8,"id":"{0.0.1.00000000}.{ddc7e301-3260-4ed3-8389-0938254820e0}","name":"CABLE Output (VB-Audio Virtual Cable)","property":"{9855C4CD-DF8C-449C}/0"}
+{"event":"property_changed","t":15772.3,"id":"{0.0.1.00000000}.{ddc7e301-3260-4ed3-8389-0938254820e0}","name":"CABLE Output (VB-Audio Virtual Cable)","property":"{9855C4CD-DF8C-449C}/0"}
+{"event":"default_changed","t":15881.3,"id":"{0.0.0.00000000}.{29dbf8ab-8ba2-461a-921d-46410ced382c}","name":"Haut-parleurs (Logitech G733 Gaming Headset)","flow":"render","role":"communications"}
+{"event":"default_changed","t":15882.8,"id":"{0.0.0.00000000}.{b7a92ad5-9ab1-4053-ba34-b8ffa4b8384c}","name":"Haut-parleurs (DualSense Wireless Controller)","flow":"render","role":"communications"}
+{"event":"default_changed","t":15882.8,"id":"{0.0.0.00000000}.{29dbf8ab-8ba2-461a-921d-46410ced382c}","name":"Haut-parleurs (Logitech G733 Gaming Headset)","flow":"render","role":"multimedia"}
+{"event":"default_changed","t":15882.8,"id":"{0.0.0.00000000}.{29dbf8ab-8ba2-461a-921d-46410ced382c}","name":"Haut-parleurs (Logitech G733 Gaming Headset)","flow":"render","role":"console"}
+{"event":"property_changed","t":15919.1,"id":"{0.0.1.00000000}.{ddc7e301-3260-4ed3-8389-0938254820e0}","name":"CABLE Output (VB-Audio Virtual Cable)","property":"{9855C4CD-DF8C-449C}/0"}
+{"event":"property_changed","t":16146.7,"id":"{0.0.1.00000000}.{5ae58b7f-3b48-436b-a75c-a2aec9c01add}","name":"Microphone (Logitech G733 Gaming Headset)","property":"{BA8CAF9F-6B5A-4DDE}/2"}
+{"event":"property_changed","t":16146.7,"id":"{0.0.1.00000000}.{5ae58b7f-3b48-436b-a75c-a2aec9c01add}","name":"Microphone (Logitech G733 Gaming Headset)","property":"{BA8CAF9F-6B5A-4DDE}/1"}

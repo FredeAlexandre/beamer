@@ -1,0 +1,71 @@
+
+=== glitch detector negative control (expect holes > 0)
+{"event":"glitch_result","pad_periods":2,"seconds":21,"frames_checked":984480,"holes":4,"jumps":5,"discontinuities":0,"render_wakes_with_empty_buffer":5}
+
+=== gen | play, capture-system stereo through own fold-down (expect tone -20 dBFS on both channels)
+{"label":"capture_system_48k_stereo","frames":144480,"seconds":3.01,"trailing_bytes":0,"channels":[{"rms_dbfs":-23.0104,"peak_dbfs":-19.9958,"tone_dbfs":-20.0001},{"rms_dbfs":-23.0104,"peak_dbfs":-19.9972,"tone_dbfs":-20.0001}]}
+{"event":"end","elapsed_s":6.00797,"frames":288000,"silent_frames":0,"underruns":0,"received_bytes":2304000,"dropped_bytes":0,"wakes":599,"cpu_pct_of_core":0.098524}
+
+=== capture-system at 16 kHz mono through WASAPI SRC (expect tone -20 dBFS)
+{"label":"capture_system_16k_mono","frames":48129,"seconds":3.00806,"trailing_bytes":0,"channels":[{"rms_dbfs":-23.0103,"peak_dbfs":-19.9973,"tone_dbfs":-20}]}
+
+=== play 44.1 kHz mono: gen is unpaced so elapsed must match duration (backpressure)
+{"label":"loopback_of_44k_mono_play","frames":144480,"seconds":3.01,"trailing_bytes":0,"channels":[{"rms_dbfs":-23.0103,"peak_dbfs":-19.9974,"tone_dbfs":-19.9999},{"rms_dbfs":-23.0103,"peak_dbfs":-19.9974,"tone_dbfs":-19.9999}]}
+{"event":"play","device":"Haut-parleurs (Logitech G733 Gaming Headset)","id":"{0.0.0.00000000}.{29dbf8ab-8ba2-461a-921d-46410ced382c}","stream":{"path":"IAudioClient+AUTOCONVERTPCM","rate":44100,"channels":1,"mix_rate":48000,"mix_channels":8,"mix_bits":32,"wasapi_src":true,"buffer_frames":1036,"period_frames":441,"period_ms":10,"device_period_default_ms":10,"device_period_min_ms":3,"stream_latency_ms":0,"engine_default_frames":480,"engine_fundamental_frames":480,"engine_min_frames":480,"engine_max_frames":480,"engine_current_frames":480}}
+{"event":"end","elapsed_s":5.00848,"frames":220500,"silent_frames":0,"underruns":0,"received_bytes":882000,"dropped_bytes":0,"wakes":499,"cpu_pct_of_core":0.0855247}
+
+=== capture-mic: formats
+{"label":"mic_48000_1","frames":144480,"seconds":3.01,"trailing_bytes":0,"channels":[{"rms_dbfs":-49.8026,"peak_dbfs":-30.8217,"tone_dbfs":-95.4868}]}
+{"label":"mic_48000_2","frames":144480,"seconds":3.01,"trailing_bytes":0,"channels":[{"rms_dbfs":-55.2969,"peak_dbfs":-32.7004,"tone_dbfs":-86.8619},{"rms_dbfs":-55.2969,"peak_dbfs":-32.7004,"tone_dbfs":-86.8619}]}
+{"label":"mic_44100_1","frames":132710,"seconds":3.0093,"trailing_bytes":0,"channels":[{"rms_dbfs":-53.4156,"peak_dbfs":-34.4449,"tone_dbfs":-98.4402}]}
+{"label":"mic_16000_1","frames":48160,"seconds":3.01,"trailing_bytes":0,"channels":[{"rms_dbfs":-57.9363,"peak_dbfs":-41.4469,"tone_dbfs":-81.7079}]}
+
+=== capture-system --process-loopback exclude (self): a foreign tone must come through
+{"label":"process_loopback_exclude_self","frames":144000,"seconds":3,"trailing_bytes":0,"channels":[{"rms_dbfs":-23.0103,"peak_dbfs":-19.9966,"tone_dbfs":-20},{"rms_dbfs":-23.0103,"peak_dbfs":-19.9971,"tone_dbfs":-20}]}
+
+=== --mute-local: signal stays, endpoint muted during, restored after
+before: mute=False volume=0.8
+during: mute=True volume=0.8
+{"label":"mute_local","frames":192480,"seconds":4.01,"trailing_bytes":0,"channels":[{"rms_dbfs":-23.0103,"peak_dbfs":-19.9963,"tone_dbfs":-20},{"rms_dbfs":-23.0103,"peak_dbfs":-19.9967,"tone_dbfs":-20}]}
+{"event":"end","elapsed_s":4.0089,"frames":192480,"rate_hz":48013.1,"packets":401,"silent_packets":0,"discontinuities":1,"overrun_bytes":0,"packet_age_mean_ms":-9.81822,"packet_age_max_ms":0,"cpu_pct_of_core":0.205516}
+{"event":"endpoint_restored","mute":false,"scalar":0.8}
+after: mute=False volume=0.8
+
+=== --mute-local, process killed with taskkill /F: guard process must restore
+before: mute=False volume=0.8
+during: mute=True volume=0.8
+1 s after kill: mute=False volume=0.8
+journal left: False
+
+=== --mute-local, capture and guard both killed: restore-endpoint must recover
+before: mute=False volume=0.8
+during: mute=True volume=0.8
+both dead: mute=True volume=0.8  journal left: True
+powershell : 
+{"event":"endpoint_restored","device":"{0.0.0.00000000}.{29dbf8ab-8ba2-461a-921d-46410ced382c}","mute":0,"scalar":0.8}
+Au caractère Ligne:1 : 437
++ ... Out-String; powershell -NoProfile -ExecutionPolicy Bypass -File resul ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ({"event":"endpo...0,"scalar":0.8}:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+after restore-endpoint: mute=False volume=0.8
+
+=== default-device change (communications role, render), seen by the watch log
+{"event":"default_set","to":"{0.0.0.00000000}.{29dbf8ab-8ba2-461a-921d-46410ced382c}","hr":"0x00000000"}
+{"event":"default_restored","to":"{0.0.0.00000000}.{b7a92ad5-9ab1-4053-ba34-b8ffa4b8384c}","hr":"0x00000000","verified"
+:true}
+{"event":"default_changed","t":15881.3,"id":"{0.0.0.00000000}.{29dbf8ab-8ba2-461a-921d-46410ced382c}","name":"Haut-parleurs (Logitech G733 Gaming Headset)","flow":"render","role":"communications"}
+{"event":"default_changed","t":15882.8,"id":"{0.0.0.00000000}.{b7a92ad5-9ab1-4053-ba34-b8ffa4b8384c}","name":"Haut-parleurs (DualSense Wireless Controller)","flow":"render","role":"communications"}
+{"event":"default_changed","t":15882.8,"id":"{0.0.0.00000000}.{29dbf8ab-8ba2-461a-921d-46410ced382c}","name":"Haut-parleurs (Logitech G733 Gaming Headset)","flow":"render","role":"multimedia"}
+{"event":"default_changed","t":15882.8,"id":"{0.0.0.00000000}.{29dbf8ab-8ba2-461a-921d-46410ced382c}","name":"Haut-parleurs (Logitech G733 Gaming Headset)","flow":"render","role":"console"}
+
+=== CPU (cycles): 30 s each, % of one logical core
+{"event":"end","elapsed_s":30.0053,"frames":1440480,"rate_hz":48007.5,"packets":3001,"silent_packets":0,"discontinuities":1,"overrun_bytes":0,"packet_age_mean_ms":10.1742,"packet_age_max_ms":10.3335,"cpu_pct_of_core":0.087071}
+{"event":"end","elapsed_s":30.0089,"frames":1440480,"rate_hz":48001.8,"packets":3001,"silent_packets":0,"discontinuities":1,"overrun_bytes":0,"packet_age_mean_ms":-9.84603,"packet_age_max_ms":0,"cpu_pct_of_core":0.153747}
+{"event":"end","elapsed_s":30.0101,"frames":1440000,"silent_frames":0,"underruns":0,"received_bytes":11520000,"dropped_bytes":0,"wakes":2999,"cpu_pct_of_core":0.0963873}
+
+=== latency through the stdio tools
+{"event":"latency_stdio_result","clicks_sent":60,"clicks_seen":60,"chunk_ms":5,"queue_ms":40,"capture_stopped_on_broken_pipe":true,"stdin_to_stdout_ms":{"n":60,"min":52.178,"median":52.9789,"p95":53.5709,"max":54.049}}
+{"event":"latency_stdio_result","clicks_sent":60,"clicks_seen":60,"chunk_ms":5,"queue_ms":40,"capture_stopped_on_broken_pipe":true,"stdin_to_stdout_ms":{"n":60,"min":34.4818,"median":36.4463,"p95":37.1608,"max":37.3175}}
+{"event":"latency_stdio_result","clicks_sent":60,"clicks_seen":60,"chunk_ms":5,"queue_ms":15,"capture_stopped_on_broken_pipe":true,"stdin_to_stdout_ms":{"n":60,"min":40.7029,"median":42.1697,"p95":42.4919,"max":42.9819}}

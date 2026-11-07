@@ -1,0 +1,32 @@
+
+=== periods, event cadence, packet age
+{"test":"render_default","device":"Haut-parleurs (Logitech G733 Gaming Headset)","opened":true,"stream":{"path":"IAudioClient","rate":48000,"channels":8,"mix_rate":48000,"mix_channels":8,"mix_bits":32,"wasapi_src":false,"buffer_frames":1056,"period_frames":480,"period_ms":10,"device_period_default_ms":10,"device_period_min_ms":3,"stream_latency_ms":0,"engine_default_frames":480,"engine_fundamental_frames":480,"engine_min_frames":480,"engine_max_frames":480,"engine_current_frames":480},"event_interval_mean_ms":10.0002,"event_interval_sd_ms":0.244686,"event_interval_max_ms":10.6699,"frames_per_s":48352,"cpu_pct_of_core":0.067447}
+{"test":"render_lowest","device":"Haut-parleurs (Logitech G733 Gaming Headset)","opened":true,"stream":{"path":"IAudioClient3","rate":48000,"channels":8,"mix_rate":48000,"mix_channels":8,"mix_bits":32,"wasapi_src":false,"buffer_frames":1056,"period_frames":480,"period_ms":10,"device_period_default_ms":10,"device_period_min_ms":3,"stream_latency_ms":0,"engine_default_frames":480,"engine_fundamental_frames":480,"engine_min_frames":480,"engine_max_frames":480,"engine_current_frames":480},"event_interval_mean_ms":10.0002,"event_interval_sd_ms":0.240819,"event_interval_max_ms":10.6358,"frames_per_s":48352,"cpu_pct_of_core":0.0658343}
+{"test":"mic_default","device":"Mic In (2- Elgato Wave:3)","opened":true,"stream":{"path":"IAudioClient","rate":48000,"channels":2,"mix_rate":48000,"mix_channels":2,"mix_bits":32,"wasapi_src":false,"buffer_frames":1056,"period_frames":480,"period_ms":10,"device_period_default_ms":10,"device_period_min_ms":3,"stream_latency_ms":0,"engine_default_frames":480,"engine_fundamental_frames":480,"engine_min_frames":480,"engine_max_frames":480,"engine_current_frames":480},"event_interval_mean_ms":10.0003,"event_interval_sd_ms":0.0732766,"event_interval_max_ms":10.3872,"frames_per_s":48160,"cpu_pct_of_core":0.0545003,"packet_age_mean_ms":10.1777,"packet_age_max_ms":10.2815,"packet_frames_mean":480}
+{"test":"mic_lowest","device":"Mic In (2- Elgato Wave:3)","opened":true,"stream":{"path":"IAudioClient3","rate":48000,"channels":2,"mix_rate":48000,"mix_channels":2,"mix_bits":32,"wasapi_src":false,"buffer_frames":1056,"period_frames":480,"period_ms":10,"device_period_default_ms":10,"device_period_min_ms":3,"stream_latency_ms":0,"engine_default_frames":480,"engine_fundamental_frames":480,"engine_min_frames":480,"engine_max_frames":480,"engine_current_frames":480},"event_interval_mean_ms":10.0001,"event_interval_sd_ms":0.0601684,"event_interval_max_ms":10.2945,"frames_per_s":48160,"cpu_pct_of_core":0.051621,"packet_age_mean_ms":10.1707,"packet_age_max_ms":10.2588,"packet_frames_mean":480}
+{"test":"loopback_default","device":"Haut-parleurs (Logitech G733 Gaming Headset)","opened":true,"stream":{"path":"IAudioClient","rate":48000,"channels":8,"mix_rate":48000,"mix_channels":8,"mix_bits":32,"wasapi_src":false,"buffer_frames":1056,"period_frames":480,"period_ms":10,"device_period_default_ms":10,"device_period_min_ms":3,"stream_latency_ms":0,"engine_default_frames":480,"engine_fundamental_frames":480,"engine_min_frames":480,"engine_max_frames":480,"engine_current_frames":480},"event_interval_mean_ms":10.0005,"event_interval_sd_ms":0.243296,"event_interval_max_ms":10.6331,"frames_per_s":48160,"cpu_pct_of_core":0.115344,"packet_age_mean_ms":-9.886,"packet_age_max_ms":0,"packet_frames_mean":480}
+
+=== in-process latency, render write to loopback
+{"event":"latency_result","clicks_sent":60,"clicks_seen":60,"write_to_app_ms":{"n":60,"min":39.387,"median":40.003,"p95":40.608,"max":40.6187},"write_to_loopback_timestamp_ms":{"n":60,"min":52.6266,"median":53.2258,"p95":53.8285,"max":53.8362},"loopback_packet_age_ms":{"n":1529,"min":-9.9197,"median":-9.8895,"p95":-9.8599,"max":-9.6216},"cpu_pct_of_core":0.0962704}
+{"event":"latency_result","clicks_sent":60,"clicks_seen":60,"write_to_app_ms":{"n":60,"min":29.38,"median":30.0033,"p95":30.5893,"max":30.6178},"write_to_loopback_timestamp_ms":{"n":60,"min":42.6067,"median":43.2239,"p95":43.8111,"max":43.8364},"loopback_packet_age_ms":{"n":1529,"min":-9.9232,"median":-9.886,"p95":-9.8425,"max":-9.6312},"cpu_pct_of_core":0.0965302}
+
+=== glitch test idle, 60 s
+{"event":"glitch_result","pad_periods":2,"seconds":60,"frames_checked":2856480,"holes":0,"jumps":0,"discontinuities":0,"render_wakes_with_empty_buffer":1}
+{"event":"glitch_result","pad_periods":1,"seconds":60,"frames_checked":2856480,"holes":0,"jumps":0,"discontinuities":0,"render_wakes_with_empty_buffer":6053}
+
+=== glitch test with every logical core spinning, 60 s each
+{"event":"glitch_result","pad_periods":2,"seconds":60,"frames_checked":2856480,"holes":0,"jumps":0,"discontinuities":0,"render_wakes_with_empty_buffer":1}
+{"event":"glitch_result","pad_periods":1,"seconds":60,"frames_checked":2856480,"holes":0,"jumps":0,"discontinuities":0,"render_wakes_with_empty_buffer":6052}
+
+=== keepalive: frames in 3 s from an endpoint nothing renders to (DualSense)
+without keepalive:
+{"label":"no_keepalive","frames":0,"seconds":0,"trailing_bytes":0,"channels":[{"rms_dbfs":-200,"peak_dbfs":-200,"tone_dbfs":-200},{"rms_dbfs":-200,"peak_dbfs":-200,"tone_dbfs":-200}]}
+with keepalive:
+{"label":"keepalive","frames":144000,"seconds":3,"trailing_bytes":0,"channels":[{"rms_dbfs":-200,"peak_dbfs":-200,"tone_dbfs":-200},{"rms_dbfs":-200,"peak_dbfs":-200,"tone_dbfs":-200}]}
+
+=== capture-mic | play, 5 s, all through pipes
+{"event":"end","elapsed_s":5.05876,"frames":240480,"silent_frames":1440,"underruns":0,"received_bytes":961920,"dropped_bytes":0,"wakes":503,"cpu_pct_of_core":0.0888357}
+
+=== bad device spec
+{"level":"error","what":"device not found","spec":"NoSuchDevice"}
+exit 2

@@ -1,0 +1,5 @@
+{"label":"direct_8ch_amp0.2","stream_channels":8,"loopback":{"opened":true,"frames":96480,"packets":231,"silent_packets":0,"discontinuities":1,"rms_dbfs":-20.9683,"peak_dbfs":-17.9546,"tone_dbfs":-17.958}}
+{"label":"direct_8ch_amp0.05","stream_channels":8,"loopback":{"opened":true,"frames":96480,"packets":231,"silent_packets":0,"discontinuities":1,"rms_dbfs":-33.0096,"peak_dbfs":-29.9958,"tone_dbfs":-29.9993}}
+{"label":"direct_8ch_amp0.5","stream_channels":8,"loopback":{"opened":true,"frames":96480,"packets":231,"silent_packets":0,"discontinuities":1,"rms_dbfs":-13.0096,"peak_dbfs":-9.99593,"tone_dbfs":-9.99937}}
+{"label":"wasapi_src_amp0.2","stream_channels":8,"loopback":{"opened":true,"frames":96480,"packets":231,"silent_packets":0,"discontinuities":1,"rms_dbfs":-16.9898,"peak_dbfs":-13.9753,"tone_dbfs":-13.9795}}
+{"label":"wasapi_src_amp0.05","stream_channels":8,"loopback":{"opened":true,"frames":96480,"packets":231,"silent_packets":0,"discontinuities":1,"rms_dbfs":-29.031,"peak_dbfs":-26.0172,"tone_dbfs":-26.0207}}
