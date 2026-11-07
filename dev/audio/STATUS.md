@@ -36,7 +36,7 @@ to the Beamer app).
 | T2 Mac CLI `beamer-audio` (inventory, mic, process tap + local mute, play, measures) -> `proto/mac/` | Mac subagent | running |
 | T3 `BeamerAudio.driver` HAL plug-in, built + tested out of process (install blocked, see above) -> `proto/mac-driver/` | Mac subagent | running |
 | T4 Windows CLI `beamer-audio` (WASAPI inventory, mic, loopback + local-mute experiments, play, measures) -> `proto/win/` | PC agent, branch `pc/audio-proto` (worktree `beamer-audio-proto`) | running |
-| T5 VB-CABLE: verify Microsoft signature, silent install or stop | PC agent (`~\audio-driver`) | running |
+| T5 VB-CABLE: verify Microsoft signature, silent install or stop | PC agent (`~\audio-driver`) | **done** 15:10: Pack46 driver 3.5.2.0 installed silently (`VBCABLE_Setup_x64.exe -i -h`), Microsoft WHCP attestation signature verified before install and re-checked independently after (Win32_PnPSignedDriver signer). No prompt, no reboot asked, defaults unchanged. |
 | T6 Transport prototype (UDP vs TCP, PCM vs Opus, jitter buffer, drift, loss, latency) | - | waiting for T1 (design), T2/T4 (endpoints) |
 
 ## Decisions
@@ -46,5 +46,17 @@ to the Beamer app).
 - **PC virtual mic = VB-CABLE** (CABLE Input fed by Beamer, apps record CABLE Output). Only one cable is allowed, so it is reserved for the mic; muting redirected PC system sound must come from another mechanism (T4 tests endpoint mute vs process loopback).
 
 ## Measurements
+
+## PC audio endpoints (2026-11-07)
+
+| Role | Endpoint | Notes |
+|---|---|---|
+| Default playback (console, multimedia) | Logitech G733 | |
+| Default playback (communications) | DualSense | Zoom/Discord may follow the communications role |
+| Default recording (console, multimedia) | Elgato Wave:3 Mic In | |
+| Default recording (communications) | DualSense | |
+| Virtual mic sink (Beamer plays into it) | CABLE Input "Haut-parleurs (VB-Audio Virtual Cable)" `{0.0.0.00000000}.{53EE99D1-271D-45C8-B798-D304F02687BA}` | VB-CABLE |
+| Virtual mic (apps record it) | CABLE Output `{0.0.1.00000000}.{DDC7E301-3260-4ED3-8389-0938254820E0}` | VB-CABLE |
+| (unused) | CABLE In 16 Ch | VB-CABLE |
 
 ## Open questions
