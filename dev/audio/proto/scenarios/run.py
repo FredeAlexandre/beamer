@@ -35,7 +35,7 @@ PCBA = PCD + r"\beamer-audio.exe"
 PCTAP = PCD + r"\tap.py"
 G733 = "{0.0.0.00000000}.{29dbf8ab-8ba2-461a-921d-46410ced382c}"
 WAVE = "{0.0.1.00000000}.{184e5798-6f57-401d-95eb-23205bf52581}"
-CABLE_IN = "{0.0.0.00000000}.{53ee99d1-62a2-4e7b-a83c-b7453e28e2ff}"
+CABLE_IN = "{0.0.0.00000000}.{53ee99d1-271d-45c8-b798-d304f02687ba}"
 CABLE_OUT = "{0.0.1.00000000}.{ddc7e301-3260-4ed3-8389-0938254820e0}"
 
 MAC_PLAY = f"{BA} play --channels 2 --buffer-frames 128 --prefill-ms 15"

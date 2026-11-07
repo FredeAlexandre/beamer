@@ -86,14 +86,16 @@ without FEC; adaptive jitter buffer. Mac `play --buffer-frames 128 --prefill-ms 
 - **Windows process loopback ignores endpoints**: it captures every non-excluded process on every
   render device. Here it also picked up the tone another agent was playing into VB-CABLE.
 - **A Python venv launcher breaks Windows' process tree** (see scenario 5).
-- During the runs another agent was sweeping VB-CABLE on the PC (its tool at times in a CPU-load
-  test); scenario 1 waited until it had finished.
+- During scenarios 2-5 another agent was sweeping VB-CABLE on the PC (its tool at times in a
+  CPU-load test); scenario 1 ran after it had finished (19:11 PC time, cable restarted 19:05, ids
+  unchanged). A first scenario-1 attempt (`s1_a`) failed because of a mistyped CABLE Input id in
+  `run.py`, now fixed.
 
 ## Results
 
 | # | Scenario (run) | Works | One-way latency p50 / p95 (n) | Glitches / min (sink) | CPU % of a core |
 |---|---|---|---|---|---|
-| 1 | Mac mic -> PC virtual mic (VB-CABLE) | **pending** | not run yet: it is the only scenario on the cable, and the VB-CABLE tuning agent (PC PID 14492) was still sweeping the cable latency; `run.py s1` (75 s, real mic + mixed-in A) and `run.py s1ac` (20 s, quiet chirps from the Mac speakers through the real mic) are ready | | |
+| 1 | Mac mic -> PC virtual mic (VB-CABLE) (`s1_b`; real mic `s1ac_a`) | yes | Mac mic delivery -> app reading CABLE Output: **125.6 / 137.4 ms** (70 of 71 markers). Real-mic run (chirps from the Mac speakers, 12 markers, 20 s): write to `play` -> Mac mic delivery 71.0 / 73.5 (same clock), mic delivery -> CABLE Output 112.8 / 123.6, total 185.7 / 193.9 | 61.7 (68 events; PC JB 19 expand, 14 underrun, 17 drop in 72 s; CABLE capture 1 discontinuity, at start) | transport Mac 7.1, PC 4.5; capture-mic Mac 0.9, CABLE Output 0.12; play PC 0.21 |
 | 2 | PC mic (Wave:3) -> Mac (`s2_b`) | yes | mic delivery -> Mac jitter-buffer output (file sink): **29.5 / 37.1 ms** (68); -> Mac speaker mix (tap of `play`): **55.4 / 63.2 ms** | 10.2 at JB output (11 events; JB: 4 expand, 3 underrun, 2 drop in 72 s) | transport Mac 11.0, PC 2.4; capture-mic PC 0.14; play Mac 0.4 |
 | 3 | Mac system sound -> PC G733, muted on Mac (`s3_a`) | yes | Mac tap delivery -> G733 loopback: **95.6 / 103.8 ms** (69) | 1.9 (2 events; PC JB 2 expand) | transport Mac 4.1, PC 5.0; capture-system Mac 0.4; play PC 0.10 |
 | 4 | PC system sound -> Mac speakers, muted on PC (`s4_b`; `s4_a`) | yes | PC loopback delivery -> Mac speaker mix: **55.6 / 64.1 ms** (67); `s4_a` 51.1 / 71.4. App write -> PC loopback (local, same clock): 42.5 / 43.3 | 4.0 (4 events; Mac JB 4 expand) | transport Mac 14.9, PC 1.7; capture-system PC 0.19; play Mac 0.4 |
@@ -170,9 +172,12 @@ would be heard on the far side of any unmuted path, and sends a constant stream 
 
 ## Open issues
 
-- **Scenario 1 not run yet** (waiting for the VB-CABLE tuning to finish). Before running it: check
-  `Get-Process claude` (PID 14492 gone), re-read the CABLE endpoint ids (`run.py` has them as
-  `CABLE_IN`/`CABLE_OUT`) and record `HKLM\SOFTWARE\VB-Audio\Cable`.
+- **Scenario 1 is the slowest path and the glitchiest**: 126 ms, of which VB-CABLE in shared mode is
+  the largest part (registry at the run, 19:11: `VBAudioCableWDM_SR = 48000`,
+  `VBAudioCableWDM_Latency = 7168`, `VBAudioCableWDM_LoopBack = 1`; the tuning agent found no gain
+  from lowering it on the shared-mode path). The PC jitter buffer had ~50 expand/underrun/drop
+  events in 72 s (Mac -> PC jitter), giving 62 glitches/min at CABLE Output. The Windows tool has no
+  WASAPI exclusive mode, so the exclusive cable path (~55 ms per the tuning agent) was not tried.
 - **Mic forwarding and acoustic echo:** with the machines on one desk the Wave:3 hears the Mac
   speakers at -11 dB, so PC mic -> Mac speakers howls at unity gain. Beamer needs AEC (or a
   headset / no mic forwarding to a machine whose speakers the mic hears).
