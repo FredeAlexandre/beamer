@@ -32,8 +32,18 @@ to the Beamer app).
 
 | Task | Owner | State |
 |---|---|---|
+| T1 Beamer link/pairing/protocol review -> `dev/audio/notes/beamer-link.md` | Mac subagent | running (started 15:00) |
+| T2 Mac CLI `beamer-audio` (inventory, mic, process tap + local mute, play, measures) -> `proto/mac/` | Mac subagent | running |
+| T3 `BeamerAudio.driver` HAL plug-in, built + tested out of process (install blocked, see above) -> `proto/mac-driver/` | Mac subagent | running |
+| T4 Windows CLI `beamer-audio` (WASAPI inventory, mic, loopback + local-mute experiments, play, measures) -> `proto/win/` | PC agent, branch `pc/audio-proto` (worktree `beamer-audio-proto`) | running |
+| T5 VB-CABLE: verify Microsoft signature, silent install or stop | PC agent (`~\audio-driver`) | running |
+| T6 Transport prototype (UDP vs TCP, PCM vs Opus, jitter buffer, drift, loss, latency) | - | waiting for T1 (design), T2/T4 (endpoints) |
 
 ## Decisions
+
+- **Common stdio contract for both prototypes** (2026-11-07): `beamer-audio list|watch|capture-mic|capture-system [--mute-local]|play|measure`, raw f32le interleaved, 48 kHz, mic mono / system stereo, diagnostics as JSON lines on stderr. Why: the transport prototype pipes any capture into any player on either OS without caring which side it runs.
+- **Mac virtual mic = one plug-in, two devices** (visible input "Beamer Microphone", hidden output "Beamer Mic Feed", shared ring buffer). Why: Beamer just plays into a device by fixed UID, no custom IPC into coreaudiod; the hidden feed keeps output menus clean.
+- **PC virtual mic = VB-CABLE** (CABLE Input fed by Beamer, apps record CABLE Output). Only one cable is allowed, so it is reserved for the mic; muting redirected PC system sound must come from another mechanism (T4 tests endpoint mute vs process loopback).
 
 ## Measurements
 
