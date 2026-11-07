@@ -34,7 +34,7 @@ to the Beamer app).
 |---|---|---|
 | T1 Beamer link/pairing/protocol review -> `dev/audio/notes/beamer-link.md` | Mac subagent | **done** 15:06 (caps limit and caps count re-checked by operator) |
 | T2 Mac CLI `beamer-audio` (inventory, mic, process tap + local mute, play, measures) -> `proto/mac/` | Mac subagent | running |
-| T3 `BeamerAudio.driver` HAL plug-in, built + tested out of process (install blocked, see above) -> `proto/mac-driver/` | Mac subagent | running |
+| T3 `BeamerAudio.driver` HAL plug-in, built + tested out of process -> `proto/mac-driver/` | Mac subagent | **done** 15:28: universal bundle signed Beamer Dev, staged in `~/Developer/beamer-hal-staging/`; `test.sh` (plain + ASan/UBSan + TSan) 1526 checks pass, re-run by operator. **Install blocked** (beamer-hal). After install: 9 checks listed in its README (coreaudiod accepts the self-signed identity, hidden feed found by UID, latency/safety offsets, coreaudiod restart). Gaps: no volume/mute control yet, x86_64 slice untested. |
 | T4 Windows CLI `beamer-audio` (WASAPI inventory, mic, loopback + local-mute experiments, play, measures) -> `proto/win/` | PC agent, branch `pc/audio-proto` (worktree `beamer-audio-proto`) | running |
 | T5 VB-CABLE: verify Microsoft signature, silent install or stop | PC agent (`~\audio-driver`) | **done** 15:10: Pack46 driver 3.5.2.0 installed silently (`VBCABLE_Setup_x64.exe -i -h`), Microsoft WHCP attestation signature verified before install and re-checked independently after (Win32_PnPSignedDriver signer). No prompt, no reboot asked, defaults unchanged. |
 | T6 Transport prototype (UDP media + AEAD, Opus vs PCM, jitter buffer, drift, loss, latency) -> `proto/transport/` | Mac subagent (+ssh) | running (started 15:20; synthetic signals until T2/T4 land) |
@@ -63,3 +63,5 @@ to the Beamer app).
 | (unused) | CABLE In 16 Ch | VB-CABLE |
 
 ## Open questions
+
+- Mac virtual mic: add an input volume + mute control to BeamerAudio (Zoom auto-level, macOS input slider) — after the first real install.
