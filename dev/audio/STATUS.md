@@ -32,18 +32,21 @@ to the Beamer app).
 
 | Task | Owner | State |
 |---|---|---|
-| T1 Beamer link/pairing/protocol review -> `dev/audio/notes/beamer-link.md` | Mac subagent | running (started 15:00) |
+| T1 Beamer link/pairing/protocol review -> `dev/audio/notes/beamer-link.md` | Mac subagent | **done** 15:06 (caps limit and caps count re-checked by operator) |
 | T2 Mac CLI `beamer-audio` (inventory, mic, process tap + local mute, play, measures) -> `proto/mac/` | Mac subagent | running |
 | T3 `BeamerAudio.driver` HAL plug-in, built + tested out of process (install blocked, see above) -> `proto/mac-driver/` | Mac subagent | running |
 | T4 Windows CLI `beamer-audio` (WASAPI inventory, mic, loopback + local-mute experiments, play, measures) -> `proto/win/` | PC agent, branch `pc/audio-proto` (worktree `beamer-audio-proto`) | running |
 | T5 VB-CABLE: verify Microsoft signature, silent install or stop | PC agent (`~\audio-driver`) | **done** 15:10: Pack46 driver 3.5.2.0 installed silently (`VBCABLE_Setup_x64.exe -i -h`), Microsoft WHCP attestation signature verified before install and re-checked independently after (Win32_PnPSignedDriver signer). No prompt, no reboot asked, defaults unchanged. |
-| T6 Transport prototype (UDP vs TCP, PCM vs Opus, jitter buffer, drift, loss, latency) | - | waiting for T1 (design), T2/T4 (endpoints) |
+| T6 Transport prototype (UDP media + AEAD, Opus vs PCM, jitter buffer, drift, loss, latency) -> `proto/transport/` | Mac subagent (+ssh) | running (started 15:20; synthetic signals until T2/T4 land) |
 
 ## Decisions
 
 - **Common stdio contract for both prototypes** (2026-11-07): `beamer-audio list|watch|capture-mic|capture-system [--mute-local]|play|measure`, raw f32le interleaved, 48 kHz, mic mono / system stereo, diagnostics as JSON lines on stderr. Why: the transport prototype pipes any capture into any player on either OS without caring which side it runs.
 - **Mac virtual mic = one plug-in, two devices** (visible input "Beamer Microphone", hidden output "Beamer Mic Feed", shared ring buffer). Why: Beamer just plays into a device by fixed UID, no custom IPC into coreaudiod; the hidden feed keeps output menus clean.
 - **PC virtual mic = VB-CABLE** (CABLE Input fed by Beamer, apps record CABLE Output). Only one cable is allowed, so it is reserved for the mic; muting redirected PC system sound must come from another mechanism (T4 tests endpoint mute vs process loopback).
+
+- **Transport = option B** (2026-11-07): control over the existing encrypted link behind one new capability `audio` (new `audio_*` JSON types, < 64 KiB, sent only to peers advertising it); media as Opus over a separate UDP socket (port 24823 proposed), per-packet ChaCha20-Poly1305 with a per-stream random key handed over the link; fallback to Opus frames over the link (<= 32 kb/s) if UDP fails. Why: the link has one FIFO per direction with no priority, and the accepting side processes one message at a time, so audio on it would delay input (and a lost TCP segment would stall both). Not C: a second TCP link from the same peer is closed by the receiver. Compat: wire version byte must never change (would cut asusrog); unknown message types are ignored by all 1.5.x; caps max 16, Mac already sends 13 (`mac_app/bridge.py:102`, `core/protocol.py:446`), so `audio` is the 14th.
+- **Cluster view**: no hub, links are pairwise. Each machine announces its own devices to direct peers and forwards newer lists (like the shared screen layout). Audio streams only over a direct pairing.
 
 ## Measurements
 
