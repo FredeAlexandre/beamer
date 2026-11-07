@@ -1,0 +1,8 @@
+# measurement outputs, keys and local builds stay out of git
+out/
+*.key
+opus.dll
+libopus.dylib
+__pycache__/
+.venv/
+venv/
