@@ -52,7 +52,22 @@ dev/deploy.sh pc
 ```
 
 Only committed work is deployed, so both machines always run the same commit. Build logs land in
-`dev/.logs/`.
+`dev/.logs/`. The Windows build skips its test suite (`BEAMER_SKIP_TESTS=1`) unless you pass
+`--test`, because the suite takes about 20 minutes and has failures in this setup that are not
+ours (below).
+
+## Known Windows test failures here (not caused by the fork)
+
+Running the suite on the PC (`--test`) gives 1 failure and 6 errors, all environmental:
+
+- `test_profiles_migration` and `test_tile_resize` (4 errors) `git archive` commits `be9661d1` and
+  `2dbe44ab`, which exist only in the maintainer's private history, not in the public repository.
+- `test_admin_mode` and `test_admin_mode_ui` (2 errors) fail to import `core` under
+  `unittest discover -s tests`.
+- `test_a_shifted_digit_gives_the_symbol_the_layout_prints` assumes a US layout; the PC is French
+  AZERTY, where VK_1 types `&`.
+
+Treat anything else as a real failure.
 
 ## Branches
 

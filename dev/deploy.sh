@@ -4,6 +4,8 @@
 #   dev/deploy.sh            both machines
 #   dev/deploy.sh mac        this Mac only
 #   dev/deploy.sh pc         the PC only
+#   dev/deploy.sh --test ... also run the Windows test suite first (about 20 minutes; the Mac
+#                            build runs none). Without it the PC build skips the suite.
 #
 # Assumes the two-machine setup in dev/README.md: the PC is reachable as `ssh $BEAMER_PC`
 # (default lebig), its clone is ~/Developer/beamer with receive.denyCurrentBranch=updateInstead, and
@@ -11,6 +13,8 @@
 # always run the exact same commit.
 set -euo pipefail
 
+RUN_TESTS=0
+if [ "${1:-}" = --test ]; then RUN_TESTS=1; shift; fi
 TARGET="${1:-both}"
 PC="${BEAMER_PC:-lebig}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -40,7 +44,10 @@ deploy_pc() {
     # dirty PC working tree also refuses the push (updateInstead), so nothing there is overwritten.
     git push -q pc "HEAD:refs/heads/$BRANCH"
     ssh "$PC" "Set-Location \$HOME\\Developer\\beamer; git switch -q '$BRANCH'; if ((git rev-parse --short HEAD) -ne '$COMMIT') { 'PC clone is not at $COMMIT'; exit 1 }"
-    ssh "$PC" 'Set-Location $HOME\Developer\beamer\win_app
+    local skip=1
+    [ "$RUN_TESTS" -eq 1 ] && skip=0
+    ssh "$PC" "\$env:BEAMER_SKIP_TESTS='$skip'"'
+        Set-Location $HOME\Developer\beamer\win_app
         powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-Beamer.ps1 *>&1
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         # Over SSH the installer cannot start Beamer: anything launched here lands in session 0.

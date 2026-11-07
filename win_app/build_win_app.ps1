@@ -72,8 +72,13 @@ if (-not (Test-Path .venv\Scripts\python.exe)) {
 Invoke-Native { & .\.venv\Scripts\python.exe -m pip install -r requirements-win.txt }
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
 
-Invoke-Native { & .\.venv\Scripts\python.exe -m unittest discover -s tests -v }
-if ($LASTEXITCODE -ne 0) { throw 'Windows tests failed' }
+# BEAMER_SKIP_TESTS=1 skips the suite for a quick dev deploy (dev/deploy.sh). A release never skips.
+if ($env:BEAMER_SKIP_TESTS -eq '1' -and -not $Release) {
+    Write-Host 'BEAMER_SKIP_TESTS=1: Windows tests skipped for this dev build' -ForegroundColor Yellow
+} else {
+    Invoke-Native { & .\.venv\Scripts\python.exe -m unittest discover -s tests -v }
+    if ($LASTEXITCODE -ne 0) { throw 'Windows tests failed' }
+}
 
 Invoke-Native { & .\.venv\Scripts\python.exe -m PyInstaller --clean --noconfirm --distpath dist --workpath build build.spec }
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed' }
