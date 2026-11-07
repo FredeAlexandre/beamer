@@ -82,8 +82,8 @@ The last two rows differ by about 6 ms for no reason the queue setting explains,
 that size between runs are probably start-up phase, not an effect.
 
 **Not measured: acoustic end to end.** Loopback taps the engine, so USB, radio and DAC time are
-outside every number above. The mic does not hear the headset (tone at -80 to -116 dBFS, the noise
-floor, whether muted or not), so there is no acoustic path to time. The estimate for mic -> engine
+outside every number above. The mic does not hear the headset (tone at -72 to -117 dBFS across runs,
+with no relation to whether the endpoint was muted), so there is no acoustic path to time. The estimate for mic -> engine
 output on this machine is about 30-40 ms: 10 ms mic packet age plus 20-30 ms of render queue and
 engine, plus unknown device time. A person with a click and a microphone can close this gap.
 
@@ -130,8 +130,8 @@ Cycle counts scaled by the nominal clock, 30 s, % of one logical core of a Ryzen
   against QPC here, would be 94 ms per hour, so the network path needs its own drift handling and
   the Mac-to-PC figure still has to be measured.
 
-Single 30 s windows are noisy (mic -35 to +10 ppm, render -692 to -6 ppm in the first windows), so
-use the whole-run fit and not a short window.
+Single 30 s windows are noisy (mic -35 to +10 ppm, render -692 to -6 ppm, the -692 being the first
+window), so use the whole-run fit and not a short window.
 
 ### Can system sound be silenced locally while still being captured?
 
@@ -149,6 +149,9 @@ different hardware-mute drivers (`results\mute-matrix*.jsonl`).
 | Session volume 0 | silent (< -170) | silent | not run |
 
 Excluding the tone's own process also gave silence, which confirms exclude mode does what it claims.
+Exclusion covers the target's process tree, so Beamer should exclude Beamer.exe's PID to cover a `play`
+helper. Excluding a helper's parent was not tested as such: the first matrix run hit it by accident,
+when excluding the harness also silenced its child tone.
 
 **Options compared:**
 
@@ -167,7 +170,7 @@ mute and volume to a journal and starts a guard process. Tested:
 |---|---|
 | Normal end | Restored |
 | `Stop-Process -Force` of the capture | Guard restored it within 1 s |
-| Capture and guard both killed | Stays muted until the next `--mute-local` run or `restore-endpoint`, which restored it |
+| Capture and guard both killed | Stays muted. `restore-endpoint` restored it (tested). The next `--mute-local` run also restores from the journal first (in the code, not tested). |
 
 **Still open on muting:**
 
