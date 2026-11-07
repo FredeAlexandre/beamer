@@ -158,17 +158,26 @@ if [ "$RELEASE" -eq 1 ]; then TIMESTAMP="--timestamp"; else TIMESTAMP="--timesta
 # PyNaCl's _sodium, the helper python) is signed on its own, then the framework, then the bundle,
 # whose signature seals the lot. --identifier pins the bundle id, which must never change - the
 # privacy grants are keyed to it.
+# Only an Apple-issued certificate carries a Team ID, as the OU of its subject. A self-signed local
+# identity (BEAMER_SIGN_IDENTITY, kept so privacy grants survive rebuilds) has none.
+identity_has_team() {
+    [ "$1" != - ] && security find-certificate -c "$1" -p 2>/dev/null \
+        | /usr/bin/openssl x509 -noout -subject 2>/dev/null | grep -F 'OU' >/dev/null
+}
+
 sign_app() {
     local identity="$1" app="${2:-$APP}" bundle_id="${3:-uk.co.kalkman.beamer}" binary
     local entitlements="$SCRIPT_DIR/entitlements.plist"
-    # Library validation admits only code with the process's own Team ID, and ad-hoc code has none,
-    # so an ad-hoc python under the hardened runtime cannot load its own Python.framework. A local
-    # ad-hoc build turns it off; a Developer ID build, and so every release, keeps it on.
-    if [ "$identity" = - ]; then
+    # Library validation admits only code with the process's own Team ID, and ad-hoc or self-signed
+    # code has none, so such a python under the hardened runtime cannot load its own
+    # Python.framework. A local build without a Team ID turns it off; a Developer ID build, and so
+    # every release, keeps it on.
+    if ! identity_has_team "$identity"; then
+        [ "$RELEASE" -eq 1 ] && { echo "$identity has no Team ID; a release needs Developer ID" >&2; return 1; }
         entitlements="$STAGING_DIR/entitlements-adhoc.plist"
         cp "$SCRIPT_DIR/entitlements.plist" "$entitlements"
         /usr/libexec/PlistBuddy -c "Add :com.apple.security.cs.disable-library-validation bool true" "$entitlements"
-        echo "ad-hoc signature: library validation is off in this build, which has no Team ID"
+        echo "signature without a Team ID ($identity): library validation is off in this build"
     fi
     find "$app/Contents" -type f ! -path "$app/Contents/MacOS/Beamer" -print0 \
         | xargs -0 file | grep 'Mach-O' | grep -v '(for architecture' | cut -d: -f1 > "$STAGING_DIR/nested.txt"
