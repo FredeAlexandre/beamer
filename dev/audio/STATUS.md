@@ -39,10 +39,15 @@ to the Beamer app).
 | T4 Windows CLI `beamer-audio` (WASAPI inventory, mic, loopback + local-mute experiments, play, measures) -> `proto/win/` | PC agent, branch `pc/audio-proto` (worktree `beamer-audio-proto`) | **done** 16:05, merged (`cb1029a`). Static C++ exe 470 KB. Local mute result under blind re-check (V2) |
 | V2 Independent check: PC loopback captured while endpoint muted / volume 0; state restored after kill | PC agent (blind, `~\audio-verify`) | **confirmed** 16:25: -40/-50 dBFS in -> exactly -40.00/-50.00 out, unmuted, muted (tool and own script) and volume 0; capture killed -> unmuted within 0.2 s; capture + guard both killed -> stays muted until `restore-endpoint` (journal in %TEMP% correct); volume 0 also zeroes channel volumes (restore those too). All 14 active endpoints restored exactly. |
 | T5 VB-CABLE: verify Microsoft signature, silent install or stop | PC agent (`~\audio-driver`) | **done** 15:10: Pack46 driver 3.5.2.0 installed silently (`VBCABLE_Setup_x64.exe -i -h`), Microsoft WHCP attestation signature verified before install and re-checked independently after (Win32_PnPSignedDriver signer). No prompt, no reboot asked, defaults unchanged. |
-| T6 Transport prototype (UDP media + AEAD, Opus vs PCM, jitter buffer, drift, loss, latency) -> `proto/transport/` | Mac subagent (+ssh) | running (started 15:20; synthetic signals until T2/T4 land) |
+| T6 Transport prototype (UDP media + AEAD, Opus vs PCM, jitter buffer, drift, loss, latency) -> `proto/transport/` | Mac subagent (+ssh) | **done** 16:40 (`7493a56`). Temporary PC firewall rules removed (0 `Beamer-dev-*` left, checked). Numbers to be cross-checked by W2. |
+| W1 Tune VB-CABLE internal latency (`VBAudioCableWDM_Latency`, was 7168), keep lowest glitch-free value, .reg backup | PC agent (`~\audio-cable-tune`) | running (16:45) |
+| W2 Four scenarios end to end with the real tools (Mac mic->PC CABLE, PC mic->Mac, Mac sound->PC headset muted locally, PC sound->Mac muted locally, both at once) + `--exclude-pid` against feedback loops; independent latency numbers | Mac subagent (+ssh, PC commits on `pc/audio-proto`) | running (16:45); does the CABLE scenario after W1 |
 
 ## Decisions
 
+- **Media config** (from T6): mic = Opus mono VOIP 32 kb/s, 10 ms frames, in-band FEC on, DTX off; system sound = Opus stereo AUDIO 96-128 kb/s, 10 ms, FEC off (FEC forces speech mode). Jitter buffer adaptive: target = playback period + half a frame + p97 jitter + 2 ms, clamp 10-120 ms. Drift: buffer-level controller steering a resampler, driven from the playback device callback (in process), not from a pipe.
+- **Latency budget**: Beamer's hop <= 50 ms one way (G.114: 150 ms mouth-to-ear comfortable; the call app itself adds 50-100 ms). Transport meets it (~33 ms); VB-CABLE at 7168 does not -> W1.
+- **VB-CABLE latency setting is tuned by us** (operator decision 16:45): it is the cable's own parameter (set by its control panel), reversible from a .reg backup, needs only a device restart, no prompt.
 - **PC system-sound redirect = process loopback excluding Beamer's process tree + endpoint mute** (2026-11-07, confirmed by V2). In Beamer: keep the mute journal and replay `restore-endpoint` at every Beamer start, so a crash of both the helper and its guard never leaves the PC muted. Why: endpoint mute keeps loopback intact (session mute does not); excluding Beamer avoids sending remote audio back. Cost: endpoint mute also silences anything Beamer plays to that same endpoint (see open questions); a crash guard must restore the mute.
 
 - **Common stdio contract for both prototypes** (2026-11-07): `beamer-audio list|watch|capture-mic|capture-system [--mute-local]|play|measure`, raw f32le interleaved, 48 kHz, mic mono / system stereo, diagnostics as JSON lines on stderr. Why: the transport prototype pipes any capture into any player on either OS without caring which side it runs.
@@ -65,6 +70,19 @@ to the Beamer app).
 | Clock drift mic vs speakers | 0.000 ppm over 330 s (same clock); both +2.07 ppm vs host clock |
 | CPU | tool 0.3-0.5 %; tap aggregate without the speakers as clock: coreaudiod 0.1-0.4 % (with them: ~11 %) |
 | Local mute with process tap (`.mutedWhenTapped`) | tap level unchanged (-24.2 dBFS); mic hears -43 dBFS unmuted vs -91..-96 dBFS (floor) muted; unmutes within 1 s of kill -9 |
+
+### Transport (T6, Mac<->PC over Wi-Fi, Opus 10 ms, adaptive JB)
+
+| What | Value |
+|---|---|
+| Network RTT | p50 5.1-5.7 ms, p95 6.6-8.9 ms; Tailscale = LAN; Wi-Fi stalls up to 1.46 s once, 48-119 ms a few times per 15 min |
+| Transport one way (no devices) | 30-34 ms = network 2.7 + JB 20-24 + Opus 6.5 (PCM 27 ms, Opus RESTRICTED_LOWDELAY 26 ms; 20 ms frames 44 ms) |
+| Full chain via VB-CABLE (Mac->PC CABLE->Mac round trip) | 152-164 ms (60 s), 176 ms p50 over 15 min; VB-CABLE alone 90-110 ms at its 7168-sample setting |
+| Opus CPU | < 1 % of a core per stream (prototype Python total 10-17 % Mac, 4-7 % PC) |
+| Loss, FEC on / off (glitch 10 ms windows per 45 s) | 1 %: 4 / 13; 5 %: 48 / 60; 10 %: 73 / 87; FEC useless on bursts; PCM+repeat ~2x worse than Opus |
+| Clock drift Mac vs PC | host clocks +17.9 ppm (~64 ms/h); sample-clock estimates -18.1 / +15.7 ppm; buffers bounded over 15 min and 10 min |
+| UDP blocked -> TCP fallback | switch after 2 s + 207 ms; same 65 ms loop with no loss |
+| Firewall | PC: no rule needed if the PC sends first to the Mac's port (hole punch), LAN and Tailscale. Mac: no dialog, no log entry, even with a freshly re-signed interpreter |
 
 ### PC (T4, WASAPI shared mode, 48 kHz)
 
