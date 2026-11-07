@@ -36,11 +36,14 @@ to the Beamer app).
 | T2 Mac CLI `beamer-audio` (inventory, mic, process tap + local mute, play, measures) -> `proto/mac/` | Mac subagent | **done** 15:45; local-mute result under independent re-check (V1) |
 | V1 Independent check of Mac `capture-system --mute-local` (signal kept, speakers silent, restored on kill) | Mac subagent (blind) | **confirmed** 15:55: 5 runs each; tap = source level (-44.1 dBFS) muted or not; mic hears tone +30 dB unmuted, nothing above room noise muted; back 0.5 s after SIGTERM and SIGKILL |
 | T3 `BeamerAudio.driver` HAL plug-in, built + tested out of process -> `proto/mac-driver/` | Mac subagent | **done** 15:28: universal bundle signed Beamer Dev, staged in `~/Developer/beamer-hal-staging/`; `test.sh` (plain + ASan/UBSan + TSan) 1526 checks pass, re-run by operator. **Install blocked** (beamer-hal). After install: 9 checks listed in its README (coreaudiod accepts the self-signed identity, hidden feed found by UID, latency/safety offsets, coreaudiod restart). Gaps: no volume/mute control yet, x86_64 slice untested. |
-| T4 Windows CLI `beamer-audio` (WASAPI inventory, mic, loopback + local-mute experiments, play, measures) -> `proto/win/` | PC agent, branch `pc/audio-proto` (worktree `beamer-audio-proto`) | running |
+| T4 Windows CLI `beamer-audio` (WASAPI inventory, mic, loopback + local-mute experiments, play, measures) -> `proto/win/` | PC agent, branch `pc/audio-proto` (worktree `beamer-audio-proto`) | **done** 16:05, merged (`cb1029a`). Static C++ exe 470 KB. Local mute result under blind re-check (V2) |
+| V2 Independent check: PC loopback captured while endpoint muted / volume 0; state restored after kill | PC agent (blind, `~\audio-verify`) | running |
 | T5 VB-CABLE: verify Microsoft signature, silent install or stop | PC agent (`~\audio-driver`) | **done** 15:10: Pack46 driver 3.5.2.0 installed silently (`VBCABLE_Setup_x64.exe -i -h`), Microsoft WHCP attestation signature verified before install and re-checked independently after (Win32_PnPSignedDriver signer). No prompt, no reboot asked, defaults unchanged. |
 | T6 Transport prototype (UDP media + AEAD, Opus vs PCM, jitter buffer, drift, loss, latency) -> `proto/transport/` | Mac subagent (+ssh) | running (started 15:20; synthetic signals until T2/T4 land) |
 
 ## Decisions
+
+- **PC system-sound redirect = process loopback excluding Beamer's process tree + endpoint mute** (2026-11-07, pending V2). Why: endpoint mute keeps loopback intact (session mute does not); excluding Beamer avoids sending remote audio back. Cost: endpoint mute also silences anything Beamer plays to that same endpoint (see open questions); a crash guard must restore the mute.
 
 - **Common stdio contract for both prototypes** (2026-11-07): `beamer-audio list|watch|capture-mic|capture-system [--mute-local]|play|measure`, raw f32le interleaved, 48 kHz, mic mono / system stereo, diagnostics as JSON lines on stderr. Why: the transport prototype pipes any capture into any player on either OS without caring which side it runs.
 - **Mac virtual mic = one plug-in, two devices** (visible input "Beamer Microphone", hidden output "Beamer Mic Feed", shared ring buffer). Why: Beamer just plays into a device by fixed UID, no custom IPC into coreaudiod; the hidden feed keeps output menus clean.
@@ -63,6 +66,19 @@ to the Beamer app).
 | CPU | tool 0.3-0.5 %; tap aggregate without the speakers as clock: coreaudiod 0.1-0.4 % (with them: ~11 %) |
 | Local mute with process tap (`.mutedWhenTapped`) | tap level unchanged (-24.2 dBFS); mic hears -43 dBFS unmuted vs -91..-96 dBFS (floor) muted; unmutes within 1 s of kill -9 |
 
+### PC (T4, WASAPI shared mode, 48 kHz)
+
+| What | Value |
+|---|---|
+| Period granted | 10 ms on mic and render (IAudioClient3 offers only 480 frames); buffer 1056 frames |
+| `GetStreamLatency` | reports 0, unusable |
+| Render write -> loopback | 40 ms (2-period queue), 30 ms (1 period) |
+| `play` stdin -> `capture-system` stdout | 53 ms (2 periods), 36-42 ms (1 period) |
+| Clock drift vs QPC over 360 s | mic -25.98 ppm, render -26.24 ppm (difference within error) -> expect tens of ppm Mac<->PC (26 ppm = 94 ms/h) |
+| CPU (% of one core) | mic 0.09, system 0.15, play 0.10; no glitch in 60 s idle or with 12 cores busy |
+| Local mute | endpoint mute or endpoint volume 0: loopback (endpoint and process) keeps the full signal (-13.98 dBFS in = out), on G733 and DualSense. Session mute/volume 0: loopback silent (unusable). Mute guard restores within 1 s after kill of the tool. |
+| Fixes | own 7.1->stereo fold-down (WASAPI downmix lost 13.5 dB); `play` uses WASAPI conversion (unity gain) |
+
 ## PC audio endpoints (2026-11-07)
 
 | Role | Endpoint | Notes |
@@ -76,6 +92,10 @@ to the Beamer app).
 | (unused) | CABLE In 16 Ch | VB-CABLE |
 
 ## Open questions
+
+- PC: while PC sound is redirected away (endpoint muted), sound coming from another machine cannot play on that same endpoint. Options: play it on another endpoint, or per-app routing (undocumented IAudioPolicyConfig), or accept the limitation. To decide in Phase 2 with Alex's typical setup in mind.
+- PC: the API reports muted, but nobody has heard the G733 during `--mute-local` (the Elgato mic can't hear the headset). Human ear check goes into the grouped list of human checks.
+- PC communications default is the DualSense (in and out): picking "the active mic" on the PC may mean setting CABLE Output as the communications default (IPolicyConfig is undocumented) or telling Alex to select CABLE Output in each app.
 
 - Mac feedback loop: a tap excluding only its own pid re-captures what Beamer plays (e.g. PC sound played on the Mac would be sent back). In Beamer the tap must exclude Beamer's own process (and any helper that plays).
 - `play` (both OSes) needs drift compensation against a remote clock: done in the transport receiver (T6), not in the device tool.
