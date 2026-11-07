@@ -30,8 +30,7 @@ Grouped; nothing else is blocked. Ordered by what it unblocks.
 
 ## Phase
 
-**Phase 1: prototyping and technical proof** (`dev/audio/proto/`, standalone programs, no change
-to the Beamer app).
+**Phase 1: prototyping and technical proof — conclusions written in `dev/audio/PHASE1.md`** (2026-11-07 22:20). All mission questions answered with measurements; the only Phase 1 item not proven on real hardware is the Mac virtual mic install (blocked on `beamer-hal`). Next: Phase 2 integration into Beamer, per the architecture in PHASE1.md.
 
 ## Start checks (2026-11-07)
 
