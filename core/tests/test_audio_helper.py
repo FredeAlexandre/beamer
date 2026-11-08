@@ -3,7 +3,6 @@
 backoff, giving up, Retry, and the stderr rate limit."""
 
 import json
-import logging
 import os
 import queue
 import shutil
