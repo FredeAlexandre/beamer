@@ -136,6 +136,27 @@ class PairTests(unittest.TestCase):
         self.assertEqual(len(types(self.mac.host.posted, wire.OPEN)), opens + 1)
         self.assertEqual(self.mac.snapshot().mic_status.state, "streaming")
 
+    def test_mic_waiting_for_permission_opens_once_granted(self):
+        self.link()
+        self.mac.helper.engine.mic_error = "permission"
+        self.mac.service.set_mic(self.mac.id, None)
+        self.pc.helper.set_in_use(True)
+        self.net.settle()
+        snap = self.mac.snapshot()
+        self.assertEqual((snap.mic_status.state, snap.mic_status.reason), ("error", "permission"))
+        sends = len(self.mac.helper.commands("send"))
+        self.net.round()
+        self.net.settle()
+        self.assertEqual(len(self.mac.helper.commands("send")), sends)  # no retry loop while waiting
+        self.mac.helper.engine.mic_error = None
+        self.mac.helper.emit({"ev": "permission", "mic": "undetermined", "system_audio": "unknown"})
+        self.net.settle()
+        self.assertEqual(len(self.mac.helper.commands("send")), sends)  # nothing answered yet
+        self.mac.helper.emit({"ev": "permission", "mic": "granted", "system_audio": "unknown"})
+        self.net.settle()
+        self.assertEqual(len(self.mac.helper.commands("send")), sends + 1)
+        self.assertEqual(self.mac.snapshot().mic_status.state, "streaming")
+
     def test_receiver_refuses_its_muted_endpoint(self):
         self.link()
         self.pc.service.set_output(self.pc.id, self.mac.id, None)

@@ -55,6 +55,7 @@ class FakeEngine:
         self.meter = False
         self.commands = []
         self.next_port = 50000
+        self.mic_error = None  # tests: an error code every mic `send`/`loop` gets (e.g. "permission")
 
     def ready(self):
         return [{"ev": "ready", "proto": 1, "version": VERSION, "platform": self.platform,
@@ -154,6 +155,8 @@ class FakeEngine:
         if command["flow"] not in self.flows:
             return [], "unknown_flow"
         if command["kind"] == "mic":
+            if self.mic_error:
+                return [], self.mic_error
             source = command["source"]
             device = "test" if "test" in source else self._device_for("inputs", source)
             if device is None:

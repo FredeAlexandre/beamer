@@ -897,9 +897,18 @@ class AudioService:
                 self._stats = {int(key): value for key, value in streams.items()
                                if str(key).isdigit() and isinstance(value, dict)}
         elif name == "permission":
+            before = dict(self._permission)
             for what in ("mic", "system_audio"):
                 if isinstance(event.get(what), str):
                     self._permission[what] = event[what]
+            if self._permission.get("mic") == "granted" and before.get("mic") not in (None, "granted"):
+                # A prompt was answered: streams that failed waiting for it open again (§6.4 rule 4 retry).
+                for send in self._sends.values():
+                    if send.spec.kind == "mic" and send.state == "failed":
+                        send.retry_token = None
+                if self._loop is not None and self._loop.state == "failed":
+                    self._helper_send({"cmd": "stop", "stream": self._loop.stream})
+                    self._loop = None
 
     def _helper_gone(self, state):
         """The helper process is (re)starting or failed: its flows and streams are gone (§5.4)."""

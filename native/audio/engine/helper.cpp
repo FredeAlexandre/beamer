@@ -105,8 +105,7 @@ class Helper : public BackendListener {
     ev_->emit(Json{{"ev", "ready"}, {"proto", kControlProto}, {"version", kEngineVersion},
                    {"platform", kPlatform}, {"features", backend_.features()}, {"restored", restored}});
     emit_devices(true);
-    ev_->emit(Json{{"ev", "permission"}, {"mic", backend_.permission("mic")},
-                   {"system_audio", backend_.permission("system_audio")}});
+    emit_permission(true);
     last_stats_ns_ = now_ns();
 
     // stdin reader (may outlive this object when detached: it posts through ReaderState only)
@@ -174,7 +173,10 @@ class Helper : public BackendListener {
 
   // BackendListener (any backend thread)
   void devices_changed() override {
-    post([this] { emit_devices(false); });
+    post([this] {
+      emit_devices(false);
+      emit_permission(false);
+    });
   }
   void stream_lost(StreamHandle* h, const std::string& why) override {
     post([this, h, why] { on_stream_lost(h, why); });
@@ -568,6 +570,15 @@ class Helper : public BackendListener {
 
   // ---------------------------------------------------------------- devices
 
+  // `permission` after ready and whenever a backend notification finds it changed (a prompt answered).
+  void emit_permission(bool force) {
+    const std::string mic = backend_.permission("mic"), sys = backend_.permission("system_audio");
+    if (!force && mic == last_perm_mic_ && sys == last_perm_sys_) return;
+    last_perm_mic_ = mic;
+    last_perm_sys_ = sys;
+    ev_->emit(Json{{"ev", "permission"}, {"mic", mic}, {"system_audio", sys}});
+  }
+
   void emit_devices(bool force) {
     DeviceSnapshot s = backend_.snapshot();
     const int64_t now = now_ns();
@@ -770,6 +781,7 @@ class Helper : public BackendListener {
   bool meter_on_ = false;
   int64_t meter_period_ns_ = 100'000'000, next_levels_ns_ = 0, last_stats_ns_ = 0;
   double last_cpu_s_ = 0;
+  std::string last_perm_mic_, last_perm_sys_;
 };
 
 // ------------------------------------------------------------------ command line
