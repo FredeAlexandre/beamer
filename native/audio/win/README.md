@@ -19,6 +19,10 @@ Behaviour worth knowing:
   default output's mix channel count, folded down here. It is not tied to an endpoint. `CaptureSpec.device` names
   the endpoint to **mute** (`""` = default output, followed). Process loopback keeps a steady 48 kHz clock when
   idle, so it needs no keep-alive. **Reference** (AEC) = endpoint loopback + keep-alive.
+  It reports a 480-frame buffer (the 20 ms asked for is ignored) and hands out 480-frame packets at irregular times
+  (QPC steps up to 19 ms), one per wake, even with 12 busy threads (WP14). `backend_check loss-test` checks it
+  sample by sample (a ramp rendered here, decoded from the capture): 0 samples lost in 10 min, idle and loaded. Each capture stream logs its counters when it closes (packets, wake gaps,
+  discontinuity/silent/timestamp-error flags) and warns on a discontinuity flag, the only loss WASAPI reports.
 - **Mute**: journal on disk before `SetMute`; mute, master and per-channel volumes are put back exactly at stop,
   by the guard within ~30 ms of a kill, by `restore_journal()` at the next start (entries of dead owners only),
   and after a device change when an endpoint unplugged while muted comes back.

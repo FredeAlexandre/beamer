@@ -43,6 +43,10 @@ class WinStream : public StreamHandle {
     bool start(std::string* err);
     void inject_invalidation() { inject_ = true; SetEvent(wake_); }
     void wake() { SetEvent(wake_); }
+    CaptureStats stats() const {
+        std::lock_guard<std::mutex> g(m_);
+        return stats_;
+    }
 
     // configuration (set before start)
     std::string want_device;       // "" = follow the default
@@ -75,6 +79,7 @@ class WinStream : public StreamHandle {
     std::vector<float> scratch_;
     uint64_t gen_seen_ = 0;
     uint64_t starved_ = 0;         // render wakes that found the device buffer empty
+    CaptureStats stats_;           // capture streams: counters (under m_; WP14)
     HANDLE thread_ = nullptr, wake_ = nullptr, opened_ = nullptr;
     std::atomic<bool> stop_{false}, inject_{false};
     std::string open_err_;
@@ -474,11 +479,23 @@ WinStream::End WinStream::pump_capture() {
     HANDLE waits[2] = {c.event, wake_};
     const int ic = c.channels, oc = channels;
     const size_t cap_frames = scratch_.size() / std::max(ic, oc);
+    const uint64_t buffer_ns = (uint64_t)c.buffer_frames * 1000000000ull / kRate;
+    CaptureStats st = stats();
+    uint64_t last_wake = 0, prev_wake = 0, last_qpc = 0, next_pos = UINT64_MAX, last_discont_log = 0;
     while (!stop_) {
         WaitForMultipleObjects(2, waits, FALSE, 100);
         if (stop_) break;
         if (inject_.exchange(false)) return End::Invalidated;
         if (follows_default() && b_->default_gen(flow()) != gen_seen_) return End::DefaultChanged;
+        const uint64_t wake = now_ns();
+        if (last_wake) {
+            st.max_wake_gap_us = std::max(st.max_wake_gap_us, (wake - last_wake) / 1000);
+            if (wake - last_wake > buffer_ns) st.late_wakes++;
+        }
+        prev_wake = last_wake ? last_wake : wake;
+        last_wake = wake;
+        st.wakes++;
+        uint64_t got = 0;
         UINT32 pk = 0;
         while (SUCCEEDED(hr = c.capture->GetNextPacketSize(&pk)) && pk) {
             BYTE* data;
@@ -487,6 +504,31 @@ WinStream::End WinStream::pump_capture() {
             UINT64 pos, qpc;
             hr = c.capture->GetBuffer(&data, &n, &flags, &pos, &qpc);
             if (FAILED(hr)) break;
+            if (hr == AUDCLNT_S_BUFFER_EMPTY) { hr = S_OK; break; }
+            got++;
+            st.packets++;
+            st.min_packet = st.min_packet ? std::min<uint64_t>(st.min_packet, n) : n;
+            st.max_packet = std::max<uint64_t>(st.max_packet, n);
+            if (flags & AUDCLNT_BUFFERFLAGS_SILENT) st.silent++;
+            if (flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY) {
+                // WASAPI dropped data before this packet (it is the only loss the capture side can see): leave a
+                // trace, at most every 10 s, so live runs in the user's session show it (WP14).
+                if (!st.discontinuity || wake - last_discont_log > 10000000000ull) {
+                    BLOG_W("%s capture: discontinuity flag (%llu so far, last wake gap %.1f ms)", kind_name(kind_),
+                           (unsigned long long)st.discontinuity + 1, st.wakes > 1 ? (wake - prev_wake) / 1e6 : 0.0);
+                    last_discont_log = wake;
+                }
+                st.discontinuity++;
+            }
+            if (flags & AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR) st.ts_error++;
+            if (next_pos != UINT64_MAX && pos != next_pos) {
+                if (pos > next_pos) { st.pos_gaps++; st.pos_gap_frames += pos - next_pos; }
+                else st.pos_back++;
+            }
+            next_pos = pos + n;
+            if (qpc && last_qpc && qpc > last_qpc) st.max_qpc_gap_us = std::max(st.max_qpc_gap_us, (qpc - last_qpc) / 10);
+            if (qpc) last_qpc = qpc;
+            st.frames += n;
             uint64_t t0 = qpc ? qpc100_to_ns(qpc) : now_ns();
             const float* in = reinterpret_cast<const float*>(data);
             for (UINT32 done = 0; done < n;) {
@@ -497,6 +539,12 @@ WinStream::End WinStream::pump_capture() {
                 done += chunk;
             }
             c.capture->ReleaseBuffer(n);
+        }
+        if (!got) st.empty_wakes++;
+        st.max_packets_per_wake = std::max(st.max_packets_per_wake, got);
+        {
+            std::lock_guard<std::mutex> g(m_);
+            stats_ = st;
         }
         if (hr == AUDCLNT_E_DEVICE_INVALIDATED) return End::Invalidated;
         if (FAILED(hr)) { BLOG_W("%s capture: %s", kind_name(kind_), hr_text(hr).c_str()); return End::Failed; }
@@ -642,6 +690,7 @@ void WinStream::run() {
         if (!back) { lost_why = end == End::Invalidated ? "device_invalidated" : "device_failed"; if (!err.empty()) lost_why += " (" + err + ")"; break; }
     }
     close_device();
+    if (kind_ != StreamKind::Render) BLOG_I("%s stream: %s", kind_name(kind_), capture_stats_text(stats()).c_str());
     if (starved_) BLOG_I("%s stream: %llu render wake(s) found the device buffer empty", kind_name(kind_), (unsigned long long)starved_);
     // The capture is over: give the sound back to the speakers before anything else.
     if (!muted_.empty()) { b_->mutes().release(muted_); muted_.clear(); }
@@ -652,6 +701,21 @@ void WinStream::run() {
 
 void inject_invalidation(StreamHandle* stream) {
     if (auto* s = dynamic_cast<WinStream*>(stream)) s->inject_invalidation();
+}
+CaptureStats capture_stats(StreamHandle* stream) {
+    auto* s = dynamic_cast<WinStream*>(stream);
+    return s ? s->stats() : CaptureStats{};
+}
+std::string capture_stats_text(const CaptureStats& s) {
+    char b[512];
+    snprintf(b, sizeof b,
+             "%llu packets (%llu..%llu frames, up to %llu per wake), %llu frames, %llu wakes (%llu empty, %llu late, max gap %.1f ms), "
+             "flags: %llu silent %llu discontinuity %llu timestamp-error, position gaps %llu (%llu frames) back %llu, max QPC step %.1f ms",
+             (unsigned long long)s.packets, (unsigned long long)s.min_packet, (unsigned long long)s.max_packet, (unsigned long long)s.max_packets_per_wake,
+             (unsigned long long)s.frames, (unsigned long long)s.wakes, (unsigned long long)s.empty_wakes, (unsigned long long)s.late_wakes,
+             s.max_wake_gap_us / 1000.0, (unsigned long long)s.silent, (unsigned long long)s.discontinuity, (unsigned long long)s.ts_error,
+             (unsigned long long)s.pos_gaps, (unsigned long long)s.pos_gap_frames, (unsigned long long)s.pos_back, s.max_qpc_gap_us / 1000.0);
+    return b;
 }
 int held_mutes(Backend* backend) {
     auto* b = dynamic_cast<WinBackend*>(backend);
