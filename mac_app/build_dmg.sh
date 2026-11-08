@@ -97,6 +97,32 @@ for ours in $(find "$APP/Contents" -name '_cffi_backend*.so'); do
     fi
 done
 
+# Audio (PHASE2 §10.1): native/audio/build-mac.sh builds the helper (universal) and the virtual
+# microphone driver, and stages the driver for the dev root helper beamer-hal. The helper goes beside
+# Beamer's own executable, where core/audio/helper.py looks for it; the driver and the script that
+# installs it as root go to Resources/audio. A tree without the native build still makes a working
+# Beamer, without audio, and says so.
+AUDIO_NATIVE="$PROJECT_DIR/native/audio"
+AUDIO_BUILT="$AUDIO_NATIVE/build/mac"
+AUDIO_RESOURCES="$APP/Contents/Resources/audio"
+if [ -f "$AUDIO_NATIVE/build-mac.sh" ]; then
+    bash "$AUDIO_NATIVE/build-mac.sh"
+    [ -f "$AUDIO_BUILT/beamer-audio" ] || { echo "build-mac.sh did not produce $AUDIO_BUILT/beamer-audio" >&2; exit 1; }
+    ditto "$AUDIO_BUILT/beamer-audio" "$APP/Contents/MacOS/beamer-audio"
+    chmod 755 "$APP/Contents/MacOS/beamer-audio"
+    if [ -d "$AUDIO_BUILT/BeamerAudio.driver" ]; then
+        mkdir -p "$AUDIO_RESOURCES"
+        ditto --norsrc "$AUDIO_BUILT/BeamerAudio.driver" "$AUDIO_RESOURCES/BeamerAudio.driver"
+        install -m 755 "$AUDIO_NATIVE/mac-driver/install-driver.sh" "$AUDIO_RESOURCES/install-driver.sh"
+        echo "Audio: helper and BeamerAudio.driver $(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' \
+            "$AUDIO_RESOURCES/BeamerAudio.driver/Contents/Info.plist") bundled"
+    else
+        echo "WARNING: build-mac.sh made no BeamerAudio.driver: this Beamer.app carries no Beamer Microphone driver" >&2
+    fi
+else
+    echo "WARNING: no native/audio/build-mac.sh in this tree: Beamer.app is built without the audio helper and driver" >&2
+fi
+
 xattr -cr "$APP"
 
 # PyObjC's wheels carry dSYM debug symbols, which py2app copies into the zipped stdlib. They are
@@ -179,15 +205,28 @@ sign_app() {
         /usr/libexec/PlistBuddy -c "Add :com.apple.security.cs.disable-library-validation bool true" "$entitlements"
         echo "signature without a Team ID ($identity): library validation is off in this build"
     fi
-    find "$app/Contents" -type f ! -path "$app/Contents/MacOS/Beamer" -print0 \
+    # The audio driver is a bundle of its own: its Mach-O is sealed by the bundle signature below,
+    # not signed on its own.
+    find "$app/Contents" -type f ! -path "$app/Contents/MacOS/Beamer" \
+        ! -path "$app/Contents/Resources/audio/BeamerAudio.driver/*" -print0 \
         | xargs -0 file | grep 'Mach-O' | grep -v '(for architecture' | cut -d: -f1 > "$STAGING_DIR/nested.txt"
     while IFS= read -r binary; do
         local entitle=()
         [ "$binary" = "$app/Contents/MacOS/python" ] && entitle=(--entitlements "$entitlements")
+        # The audio helper gets the microphone entitlement only, and an identifier of Beamer's
+        # family rather than its file name.
+        [ "$binary" = "$app/Contents/MacOS/beamer-audio" ] \
+            && entitle=(--entitlements "$SCRIPT_DIR/entitlements-audio.plist" --identifier "$bundle_id.audio")
         codesign --force --sign "$identity" --options runtime $TIMESTAMP ${entitle[@]+"${entitle[@]}"} "$binary" || return 1
     done < "$STAGING_DIR/nested.txt"
     codesign --force --sign "$identity" --options runtime $TIMESTAMP \
         "$app/Contents/Frameworks/Python.framework/Versions/"[0-9]* || return 1
+    # coreaudiod loads the driver and asks nothing of its runtime flags; it is signed as a bundle so
+    # beamer-hal and install-driver.sh can check its identifier, and before the app that seals it.
+    if [ -d "$app/Contents/Resources/audio/BeamerAudio.driver" ]; then
+        codesign --force --sign "$identity" --options runtime $TIMESTAMP \
+            "$app/Contents/Resources/audio/BeamerAudio.driver" || return 1
+    fi
     codesign --force --sign "$identity" --options runtime $TIMESTAMP \
         --entitlements "$entitlements" --identifier "$bundle_id" "$app" || return 1
 }
@@ -216,6 +255,15 @@ else
 fi
 codesign --verify --deep --strict --verbose=2 "$APP"
 codesign -dvv "$APP" 2>&1 | grep -E '^(Identifier|Signature|Authority|Timestamp|CodeDirectory)' || true
+if [ -f "$APP/Contents/MacOS/beamer-audio" ]; then
+    codesign -d --entitlements - --xml "$APP/Contents/MacOS/beamer-audio" 2>/dev/null \
+        | grep -F com.apple.security.device.audio-input >/dev/null \
+        || { echo "beamer-audio is signed without com.apple.security.device.audio-input" >&2; exit 1; }
+fi
+# The same checks the installer makes as root, run here so a bundle it would refuse never ships.
+if [ -d "$AUDIO_RESOURCES/BeamerAudio.driver" ]; then
+    /bin/bash "$AUDIO_RESOURCES/install-driver.sh" --check
+fi
 
 # The bundle's own python runs under the same hardened runtime as the app, so code that needs an
 # entitlement fails here rather than at a user's first launch. The probe lives with the project's

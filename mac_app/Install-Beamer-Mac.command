@@ -27,7 +27,9 @@ xattr -cr "$DEST_APP"
 # and never blocks the install: a first install on a clean machine has nothing to revoke.
 BUNDLE_ID="uk.co.kalkman.beamer"
 if codesign -dv "$DEST_APP" 2>&1 | grep -q "Signature=adhoc"; then
-    for service in Accessibility ListenEvent LocalNetwork; do
+    # Microphone and AudioCapture (System Audio Recording) are the audio helper's, asked at its
+    # first capture under Beamer's name (PHASE2 §10.1).
+    for service in Accessibility ListenEvent LocalNetwork Microphone AudioCapture; do
         if tccutil reset "$service" "$BUNDLE_ID" >/dev/null 2>&1; then
             echo "Revoked $service"
         else
@@ -47,7 +49,7 @@ rm -rf "$SCRIPT_DIR/build" "$SCRIPT_DIR/dist"
 
 echo "Beamer is installed at $DEST_APP"
 if [ "$REVOKED" -eq 1 ]; then
-    echo "This build is ad-hoc signed, so its privacy permissions were revoked on install. Grant Accessibility and Input Monitoring again, one at a time, inside the app."
+    echo "This build is ad-hoc signed, so its privacy permissions were revoked on install. Grant Accessibility and Input Monitoring again, one at a time, inside the app; Microphone and System Audio Recording are asked again at first use."
 else
     echo "Signed with a stable identity, so Accessibility and Input Monitoring carry over. Grant them inside the app only if it asks."
 fi

@@ -6,5 +6,10 @@
          runtime without this, and `import Foundation` never finishes. Native arm64 needs nothing. -->
     <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
     <true/>
+    <!-- Audio: the hardened runtime silently denies microphone capture without it. The helper
+         (Contents/MacOS/beamer-audio, entitlements-audio.plist) captures; macOS attributes it to
+         Beamer as the responsible process, so the app carries it too. -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
 </dict>
 </plist>

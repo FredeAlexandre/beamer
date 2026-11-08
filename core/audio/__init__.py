@@ -7,6 +7,7 @@ its own worker thread and talks to the native helper (`helper.HelperProcess`).
 
 from core.audio.model import (AudioSnapshot, Device, DeviceRef, FormEntry, MachineAudio, MicRoute,
                               OutputRoute, Route, RouteStatus, Stamp, StreamView, VirtualMic)
+from core.audio.service import AudioHost, AudioService
 
-__all__ = ["AudioSnapshot", "Device", "DeviceRef", "FormEntry", "MachineAudio", "MicRoute", "OutputRoute",
-           "Route", "RouteStatus", "Stamp", "StreamView", "VirtualMic"]
+__all__ = ["AudioHost", "AudioService", "AudioSnapshot", "Device", "DeviceRef", "FormEntry", "MachineAudio",
+           "MicRoute", "OutputRoute", "Route", "RouteStatus", "Stamp", "StreamView", "VirtualMic"]
