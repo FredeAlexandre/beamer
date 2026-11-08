@@ -174,7 +174,8 @@ latency) in **both** directions while adding it, even the direction without a st
 answered only its own direction, the HAL got `'who?'` and dropped both devices ("Caught exception
 trying to add device"). Fixed by answering 0 in input and output scopes; `test_host` now checks it.
 
-`test/live_check.py` drives the real devices with the prototype tool `beamer-audio` (`../mac`): a
+`test/live_check.py` drives the real devices with the prototype tool `beamer-audio` (`dev/audio/proto/mac`;
+`--feeder native` feeds through the helper's Mac backend, `native/audio/build/mac/backend_check`): a
 feeder plays a 1025 Hz pilot (-20 dBFS) with chirp markers into the hidden feed, a recorder
 captures "Beamer Microphone" (both 48 kHz mono, 512-frame buffers). Results (all PASS):
 

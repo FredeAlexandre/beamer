@@ -45,11 +45,18 @@ bool create_tap(const TapSpec& spec, Tap* out, std::string* err) {
   if (@available(macOS 14.2, *)) {
     *out = Tap{};
     NSArray<NSNumber*>* exclude = exclusion_list(spec.exclude, spec.exclude_self, &out->pending);
+    // Looked up by name: a direct class reference would be a strong symbol and stop the helper from
+    // loading on a macOS without the class (the header marks it 12.0, the API needs 14.2).
+    Class cls = NSClassFromString(@"CATapDescription");
+    if (!cls) {
+      if (err) *err = "unsupported: CATapDescription missing";
+      return false;
+    }
     CATapDescription* desc;
     if (spec.global) {
-      desc = [[CATapDescription alloc] initStereoGlobalTapButExcludeProcesses:exclude];
+      desc = [[cls alloc] initStereoGlobalTapButExcludeProcesses:exclude];
     } else {
-      desc = [[CATapDescription alloc] initExcludingProcesses:exclude
+      desc = [[cls alloc] initExcludingProcesses:exclude
                                                  andDeviceUID:[NSString stringWithUTF8String:spec.device_uid.c_str()]
                                                    withStream:0];
     }
