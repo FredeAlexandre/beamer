@@ -13,11 +13,13 @@ import traceback
 import types
 import dataclasses
 from dataclasses import dataclass
+from pathlib import Path
 
 import objc
 import Quartz
 from PyObjCTools import AppHelper
 
+import audio_mac
 import clipboard_mac
 import config as config_module
 import crossing
@@ -100,6 +102,8 @@ ROUND_TRIP_MAX_AGE_SECONDS = 5.0
 LET_GO_WAIT_SECONDS = 1.3
 OWN_PLATFORM = "macos"
 CAPABILITIES = ("clipboard", "clipboard_image", "gestures", "media_keys", "text", "settings", "design_sync", "layout", "profiles", "displays", "ping_rtt", "identify_screens", "motion_path")
+# `audio` (the 14th) only when this Mac can run the audio helper (dev/audio/PHASE2.md §5.1).
+AUDIO_CAPABILITY = "audio"
 MEDIA_KEY_NAMES = frozenset({"volume_mute", "volume_down", "volume_up", "media_next", "media_prev", "media_stop", "media_play_pause", "brightness_up", "brightness_down"})
 
 # Why input came home, in words, for the alert. A why that is not here comes home quietly.
@@ -507,12 +511,17 @@ def links_from_store(settings_store, app_version):
         logging.getLogger("Beamer").exception("the links start from the defaults, as the settings could not be read")
         return None, None
 
+    # Audio's files sit next to settings.json; whether this Mac announces `audio` is decided once.
+    audio_dir = Path(settings_store.path).parent
+    caps = list(CAPABILITIES) + ([AUDIO_CAPABILITY] if audio_mac.available(audio_dir) else [])
+
     def identity():
         settings = settings_store.current()
         name = (settings.get("name") or socket.gethostname().split(".")[0] or "Mac")[:48]
         return {"id": protocol.read_id(settings["machine_id"]), "name": name, "platform": OWN_PLATFORM, "app": app_version,
-                "caps": list(CAPABILITIES), "port": settings["port"]}
+                "caps": list(caps), "port": settings["port"]}
 
+    identity.audio_state_dir = audio_dir
     return settings_store.book(), identity
 
 
@@ -760,8 +769,44 @@ class KVMController:
         self._letting_go = False
         # The machine this Mac's input was last on, which the shortcut goes back to.
         self._last_peer = None
+        # Audio (dev/audio/PHASE2.md §8.1): made before any link is up, run from start(). `audio` is
+        # the AudioService the Audio page reads, None when this Mac does not announce `audio`.
+        self._audio = self.audio = None
+        if AUDIO_CAPABILITY in (self.identity().get("caps") or ()):
+            try:
+                self._audio = audio_mac.MacAudio(self, getattr(identity, "audio_state_dir", None) or audio_mac.STATE_DIR,
+                                                 logger=logging.getLogger("beamer.audio"))
+                self.audio = self._audio.service
+            except Exception:
+                self.logger.exception("audio could not be set up; Beamer runs without it")
         self._sync_links()
         self.crossing = self._crossing_engine()
+
+    # Audio: per-link events and messages for the service, from the link threads (enqueue only)
+
+    @property
+    def responder(self):
+        return self.__dict__.get("_responder")
+
+    @responder.setter
+    def responder(self, server):
+        """The responder, once WindowsInput has made it: its links' audio events reach the service."""
+        self._responder = server
+        if server is not None and isinstance(server, receiver.LinkResponder):
+            server.set_audio(self._audio_inbound_message, self._audio_inbound_link)
+
+    def _audio_link(self, peer, kind, up, caps=()):
+        audio = self.__dict__.get("_audio")
+        if audio is not None:
+            audio.link(peer, kind, up, caps)
+
+    def _audio_inbound_link(self, peer, up, caps):
+        self._audio_link(protocol.id_text(peer), "in", up, caps)
+
+    def _audio_inbound_message(self, peer, message):
+        audio = self.__dict__.get("_audio")
+        if audio is not None:
+            audio.message(protocol.id_text(peer), message)
 
     # The machines, and which one a shortcut or a status means
 
@@ -1237,6 +1282,8 @@ class KVMController:
         if self.started:
             return
         self.started = True
+        if self.__dict__.get("_audio") is not None:
+            self._audio.start()
         workers = (
             ("connection", self._connection_worker),
             ("outbound", self._outbound_worker),
@@ -1294,6 +1341,9 @@ class KVMController:
         deadline = time.monotonic() + 1.0
         while (self._clip_wait or self._pasteboard_busy) and time.monotonic() < deadline:
             time.sleep(0.01)
+        # Audio first: its closing `audio_close` messages are queued before the links flush.
+        if self.__dict__.get("_audio") is not None:
+            self._audio.stop()
         for link in list(self.links.values()):
             link.flush(0.3)
         self.stop_event.set()
@@ -2408,6 +2458,7 @@ class KVMController:
         peer = link.peer_id
         if peer and self._peers_up.get(peer) is link:
             self._peers_up.pop(peer, None)
+            self._audio_link(peer, "out", False)
             self.reset_desk_peer(peer)
             self._forget_held(peer)
             self._step(lambda owner: owner.link_down(peer))
@@ -2477,6 +2528,9 @@ class KVMController:
             self._forget_held(peer)
             self._step(lambda owner: owner.link_down(peer))
             return
+        self._audio_link(peer, "out", True, link.caps)
+        if self._peers_up.get(peer) is not link:
+            self._audio_link(peer, "out", False)    # dropped by `_sync_links` meanwhile
         self.logger.info("connected to %s", fields["name"])
         # The handshake may have just given a migrated machine its id, and its zones with it.
         self.zones_changed()
@@ -2588,6 +2642,11 @@ class KVMController:
                     self.book.store_paired(peer, texts)
                     if self.on_paired is not None:
                         self.on_paired(peer, texts)
+            elif isinstance(kind, str) and kind.startswith("audio_"):
+                # Only enqueued: the audio service's worker deals with it (dev/audio/PHASE2.md §5.1).
+                audio = self.__dict__.get("_audio")
+                if audio is not None and AUDIO_CAPABILITY in link.caps:
+                    audio.message(peer, message)
             else:
                 self.logger.debug("ignoring inbound message of type %r", kind)
         except Exception:

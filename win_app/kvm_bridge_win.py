@@ -104,6 +104,7 @@ from core import settings_sync
 from core import ways, crossing_state, profiles
 from core.identify_screens import display_numbers
 from sender import OWN_PLATFORM, LinkSender
+import audio_win
 from shake_stroke import shake_stroke
 import theme
 import tray_glyph
@@ -624,6 +625,9 @@ class WindowsApplication(QWidget):
             lambda settings: app_config.write_settings(self.config_path, settings),
             app_config.SETTINGS_LOCK,
         )
+        # Audio (dev/audio/PHASE2.md §8.1): `audio` is the AudioService the Audio page reads, None when
+        # this machine does not announce `audio`; made once the settings are read, before any link.
+        self._audio = self.audio = None
         self.server = LinkResponder(
             self.book,
             self._identity,
@@ -650,6 +654,8 @@ class WindowsApplication(QWidget):
             hardware=hardware_win.hardware_address_towards,
             desktop=platform_parts.desktop,
             injector=platform_parts.injector,
+            audio_callback=self._audio_inbound_message,
+            audio_link_callback=self._audio_inbound_link,
         )
         # The links outwards: this PC's keyboard and mouse on its peers.
         self.sender = LinkSender(
@@ -688,6 +694,8 @@ class WindowsApplication(QWidget):
             protocol.id_text(read["way_back_by"]) if read.get("way_back_by") else None
         )
         self.sender.link_callback = lambda peer, up: self.bridge.peers_changed.emit()
+        self.sender.audio_callback = self._audio_outbound_message
+        self.sender.audio_link_callback = self._audio_outbound_link
         self.sender.paired_callback = self._store_paired
         self.sender.hw_learned = self._learn_peer_hardware
         self.sender.announce = self._announce
@@ -781,6 +789,7 @@ class WindowsApplication(QWidget):
         self._settings_port, self._kept_hide = self._read_kept()
         self.pairing = self._make_pairing()
         self.sender.machines = self.pairing.machines if self.pairing is not None else (lambda: [])
+        self._make_audio()
 
         # Before any widget is built: every control takes its colours from the palette in use.
         appearance = self._config.appearance if self._config is not None else "system"
@@ -2040,7 +2049,9 @@ class WindowsApplication(QWidget):
             "app": VERSION[:32] if VERSION.isascii() and VERSION.isprintable() else "dev",
             # A swipe has no shortcut every Linux desktop shares, so Linux does not offer gestures.
             "caps": [cap for cap in ("clipboard", "clipboard_image", "gestures", "media_keys", "text", "settings", "design_sync", "layout", "profiles", "displays", "identify_screens", "ping_rtt", "motion_path")
-                     if not (cap == "gestures" and OWN_PLATFORM == "linux")],
+                     if not (cap == "gestures" and OWN_PLATFORM == "linux")]
+                    # `audio` (the 14th) only with an audio service, never on Linux (dev/audio/PHASE2.md §5.1).
+                    + (["audio"] if getattr(self, "audio", None) is not None and OWN_PLATFORM != "linux" else []),
             "port": self._settings_port,
         }
 
@@ -5205,7 +5216,42 @@ class WindowsApplication(QWidget):
 
     def start(self) -> None:
         self.update_checker.start()
+        if getattr(self, "_audio", None) is not None:
+            self._audio.start()
         self._listen()
+
+    # Audio: the service and the per-link events and messages it is fed, from the link threads
+    # (enqueue only)
+
+    def _make_audio(self) -> None:
+        """The audio service, when this PC can announce `audio` and has a machine id to run it under."""
+        if self._config is None or OWN_PLATFORM == "linux" or not audio_win.available(self.config_path.parent):
+            return
+        try:
+            self._audio = audio_win.PcAudio(
+                self.server, self.sender, self._identity, self.config_path.parent, name_of=self._audio_peer_name,
+                logger=logging.getLogger("beamer.audio"))
+            self.audio = self._audio.service
+        except Exception:
+            LOGGER.exception("Audio could not be set up; Beamer runs without it")
+            self._audio = self.audio = None
+
+    def _audio_peer_name(self, peer: str) -> str:
+        return next((entry.get("name") or "" for entry in self._peer_entries if entry.get("id") == peer), "")
+
+    def _audio_inbound_link(self, peer: bytes, up: bool, caps) -> None:
+        if self._audio is not None:
+            self._audio.link(peer, "in", up, caps)
+
+    def _audio_outbound_link(self, peer: bytes, up: bool, caps) -> None:
+        if self._audio is not None:
+            self._audio.link(peer, "out", up, caps)
+
+    def _audio_inbound_message(self, peer: bytes, message: dict) -> None:
+        if self._audio is not None:
+            self._audio.message(peer, message)
+
+    _audio_outbound_message = _audio_inbound_message
 
     def _listen(self) -> None:
         if self._closing:
@@ -5544,6 +5590,9 @@ class WindowsApplication(QWidget):
         if self.pairing is not None:
             self.pairing.cancel_nearby()
             self.pairing.stop()
+        # Audio first: its closing `audio_close` messages are queued while the links are still up.
+        if getattr(self, "_audio", None) is not None:
+            self._audio.stop()
         self.server.stop()
         self._stop_sending()
         shortcut = getattr(self, "global_shortcut", None)

@@ -249,6 +249,11 @@ class LinkSender:
         self.identify_callback: Optional[Callable] = None
         self.paired_callback: Optional[Callable] = None
         self.link_callback: Optional[Callable[[bytes, bool], None]] = None
+        # Audio (capability `audio`, fork; dev/audio/PHASE2.md §5.1): `audio_callback(peer, message)` for
+        # an `audio_*` message, `audio_link_callback(peer, up, caps)` as a link begins or ends; both
+        # on the link's thread, and both only enqueue.
+        self.audio_callback: Optional[Callable[[bytes, dict], None]] = None
+        self.audio_link_callback: Optional[Callable[[bytes, bool, frozenset], None]] = None
 
         self.links = links(self) if links is not None else _default_links(self)
 
@@ -1012,6 +1017,9 @@ class LinkSender:
         self._report_status()
         if up and self.hw_learned is not None:
             threading.Thread(target=self._learn_hardware, args=(peer,), name="Beamer-links-hw", daemon=True).start()
+        audio = self.audio_link_callback
+        if audio is not None:
+            self._call(audio, peer, up, self.links.caps(peer) if up else frozenset())
         callback = self.link_callback
         if callback is not None:
             self._call(callback, peer, up)
@@ -1075,6 +1083,9 @@ class LinkSender:
             read = protocol.read_paired(message)
             if read is not None and self.paired_callback is not None:
                 self._call(self.paired_callback, peer, read)
+        elif isinstance(kind, str) and kind.startswith("audio_"):
+            if self.audio_callback is not None and "audio" in self.links.caps(peer):
+                self._call(self.audio_callback, peer, message)
 
     def on_status(self, key, up: bool, detail: str) -> None:
         """A link's status text, for the peer the UI shows."""
@@ -1897,6 +1908,14 @@ class LinkSet:
     def pending(self, peer) -> int:
         link = self._link(peer)
         return link.pending() if link is not None else 0
+
+    def host(self, peer) -> Optional[str]:
+        """The address the live link to `peer` dialled, or None (none up, or through a tunnel)."""
+        link = self._link(peer)
+        if link is None or not link.live() or getattr(link, "via_tunnel", False):
+            return None
+        dialled = getattr(link, "dialled", None)
+        return dialled[0] if dialled else None
 
     def round_trip_ms(self, peer) -> Optional[int]:
         """The upper median of the last few trips, with the time the peer held each ACK taken off, or
