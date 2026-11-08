@@ -44,11 +44,11 @@ Grouped; nothing else is blocked. Ordered by what it unblocks.
 
 ## Phase
 
-**Phase 2: integration into Beamer — started 2026-11-08.** Alex confirmed the driver and the defaults
-(echo: AEC + headset warning; PC: apps pick CABLE Output). Design and work packages: `dev/audio/PHASE2.md`.
+**Phase 2: delivered for Alex's own test (2026-11-08 23:18), optimisation stopped at his request.** Both
+machines run `feat/audio` @ `7b83e71`. Test guide, user steps, what works and what does not:
+`dev/audio/TEST-ALEX.md`. Next: Alex's feedback, then the open items listed there.
 
-Phase 1 (prototyping and technical proof) closed 2026-11-07 22:20, conclusions in `dev/audio/PHASE1.md`;
-Mac virtual mic validated live 2026-11-08.
+Phase 1 closed 2026-11-07 (`PHASE1.md`); Phase 2 design `PHASE2.md`.
 
 ## Phase 2 decisions (operator)
 
@@ -87,8 +87,8 @@ Mac virtual mic validated live 2026-11-08.
 | WP14 PC capture loss | PC agent, `beamer-wp14` / `pc/wp14` | **done**, merged: the PC capture loses **0 samples** (10 min sample-exact ramp, idle and 12 threads busy; encoded frames within ±17 ppm of QPC). WP11's '4-174 ppm lost' were source events (the test player's own underrun inserting 10 ms, other sound on the PC for 300 ms). Added capture-loss counters to the helper log and a `loss-test` |
 | WP15 Low-latency vmic setting + E2E harness race fix | Mac `beamer-wp15` / `audio/wp15` | **done**, merged: local per-machine `vmic_exclusive` (never synced), helper restarted with `--vmic-exclusive`, switch on the PC's own panel when VB-CABLE is present (shown regardless of the helper's feature list, which only names it once on; a missing feature is reported in the note); harness waits for the PC test source, DualSense only needed for the `both` case |
 | WP16 Final E2E + soak with everything merged | Mac `beamer-wp16` / `audio/wp16` (+ ssh) | **done** (`8d203ed`, report `reports/wp16.md`). p50 one way: PC mic -> Mac app 41-56 ms; PC sound -> Mac 65 ms (soak); Mac sound -> PC G733 69.5 ms; Mac mic -> PC CABLE 172 ms shared / 120 ms low-latency. All recovery cases pass; drift integral within 0.5 ppm of true; PC capture 0 loss over 89 M frames; memory flat; firewall unchanged. Misses: WP12's low-latency period refused live (mono stream vs stereo CABLE -> autoconvert); AEC injected PC sound into the forwarded mic and cut it up to 12.8 dB (glitches 2 -> 22/min); howl guard false-triggers on room voice (23x at 300-500 Hz); JB held 38-55 ms in short runs for an unknown reason (watch); TCC polled every 50 ms while undetermined (tccd 3.6 % CPU); user's G733 volume change overwritten at restore |
-| WP17 PC fixes: mono up-mix for low-latency CABLE render; user volume change during a redirect wins | PC agent, `beamer-wp17` / `pc/wp17` | running |
-| WP18 Mac/engine fixes: AEC injecting reference, AEC policy, howl guard vs voice, TCC polling, System Audio status | Mac `beamer-wp18` / `audio/wp18` | running |
+| WP17 PC fixes | PC agent, `pc/wp17` | **done**, merged (`7ba2d22`): mono vmic up-mixed so the low-latency period applies (log `render+upmix(low-latency period 128)`, 70-80 ms click-to-app, 0 holes 4x60 s + 300 s); user volume/unmute during a redirect wins (journal follows it), 15/15 tests |
+| WP18 Mac/engine fixes | Mac `audio/wp18` | **stopped at Alex's request, partial merge** (`7b83e71`): AEC never injects the reference + test sources bypass it, no AEC while the mic machine's speakers play nothing, neutral howl notice, TCC poll 2 s, System Audio reported granted once a tap runs. Not done: howl guard vs voice, live re-check of AEC |
 
 Coordination: deploys serialized with the lock dir `~/Developer/.beamer-deploy.lock`, live audio tests with `~/Developer/.beamer-audio-lab.lock` (Mac) and `C:\Users\Alex\briefs\lab-lock.txt` (PC); each WP commits its
 report as `dev/audio/reports/<wp>.md`; the operator merges into `feat/audio`.
