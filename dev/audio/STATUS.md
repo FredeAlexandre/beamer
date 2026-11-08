@@ -35,6 +35,25 @@ Grouped; nothing else is blocked. Ordered by what it unblocks.
 Phase 1 (prototyping and technical proof) closed 2026-11-07 22:20, conclusions in `dev/audio/PHASE1.md`;
 Mac virtual mic validated live 2026-11-08.
 
+## Phase 2 tasks (design: `PHASE2.md` §13)
+
+| WP | Where | State |
+|---|---|---|
+| Design `PHASE2.md` | Mac subagent | **done** 2026-11-08 (`03c8066`) |
+| WP1 Python control plane (`core/audio`) | Mac, worktree `beamer-wp1`, branch `audio/wp1` | running (started 2026-11-08) |
+| WP2 Portable C++ media engine (`native/audio/engine`) | Mac `beamer-wp2` / `audio/wp2` (+ PC build) | running |
+| WP3 Mac backend + helper, driver moved to `native/audio/mac-driver` | Mac `beamer-wp3` / `audio/wp3` | running |
+| WP4 Windows backend + helper | PC agent, worktree `C:\Users\Alex\Developer\beamer-wp4`, branch `pc/wp4` | running |
+| WP8 Packaging and permissions | Mac `beamer-wp8` / `audio/wp8` (+ PC via deploy) | running |
+| WP5 Link integration | Mac | waits for WP1 |
+| WP6 Page model + Mac Audio page | Mac | waits for WP1 milestone 1 (`model.py`) |
+| WP7 Qt Audio page | PC | waits for WP1 m1 + WP6 m1 |
+| WP9 Echo cancellation | Mac + PC | waits for WP2, WP3, WP4 |
+| WP10 Two-machine E2E + soak | Mac + ssh | waits for WP1-5, WP8 (WP9) |
+
+Coordination: deploys serialized with the lock dir `~/Developer/.beamer-deploy.lock`; each WP commits its
+report as `dev/audio/reports/<wp>.md`; the operator merges into `feat/audio`.
+
 ## Start checks (2026-11-07)
 
 | # | Check | Result |
