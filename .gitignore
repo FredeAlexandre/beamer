@@ -14,6 +14,7 @@ win_app/Output/
 win_app/build/
 win_app/dist/
 mac_app/build/
+native/audio/build/
 mac_app/dist/
 
 
