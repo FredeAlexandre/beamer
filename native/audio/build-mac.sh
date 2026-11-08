@@ -28,7 +28,10 @@ JSON="$TP/nlohmann-json-3.11.3"
 FRAMEWORKS=(-framework CoreAudio -framework AudioToolbox -framework CoreFoundation -framework Foundation
             -framework AVFoundation)
 
-COMMON=(-O2 -g -mmacosx-version-min=$MIN -fvisibility=hidden -Wall -Wextra)
+ROOT="$(cd "$HERE/../.." && pwd)"
+# No home-folder path may end up in a binary (the app build refuses them): __FILE__ and debug info
+# are made repo-relative, and the link strips the debug map (-Wl,-S).
+COMMON=(-O2 -g -ffile-prefix-map="$ROOT/"= -mmacosx-version-min=$MIN -fvisibility=hidden -Wall -Wextra)
 OPUS_FLAGS=(-std=c11 -w -DOPUS_BUILD -DUSE_ALLOCA -DHAVE_LRINTF -I"$OPUS/include" -I"$OPUS/celt" -I"$OPUS/silk"
             -I"$OPUS/silk/float" -I"$OPUS/src" -I"$OPUS")
 C_FLAGS=(-std=c11 -I"$MONO/src")
@@ -155,10 +158,13 @@ link() {  # name objs-for-all-archs...
     for arch in "${ARCHS[@]}"; do
         local mine=()
         for o in "$@"; do case "$o" in "$OBJ/$arch/"*) mine+=("$o") ;; esac; done
-        clang++ -arch "$arch" -mmacosx-version-min=$MIN "${mine[@]}" "${FRAMEWORKS[@]}" -o "$OBJ/$arch/$name"
+        clang++ -arch "$arch" -mmacosx-version-min=$MIN -Wl,-S "${mine[@]}" "${FRAMEWORKS[@]}" -o "$OBJ/$arch/$name"
         slices+=("$OBJ/$arch/$name")
     done
     lipo -create -output "$OUT/$name" "${slices[@]}"
+    if strings -a "$OUT/$name" | grep -q "$HOME"; then
+        echo "error: $OUT/$name embeds a path under $HOME" >&2; exit 1
+    fi
     codesign --force --sign - "$OUT/$name" 2>/dev/null || true
     echo "built  $OUT/$name ($(lipo -archs "$OUT/$name"))"
 }
