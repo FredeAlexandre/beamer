@@ -105,12 +105,19 @@ def helper_environment(base=None):
     return environment
 
 
-def command_line(base, state_dir, *, parent_pid=None, exclude_pid=None, dev=False, log_level="info"):
+VMIC_EXCLUSIVE_ARG = "--vmic-exclusive"
+
+
+def command_line(base, state_dir, *, parent_pid=None, exclude_pid=None, dev=False, log_level="info",
+                 vmic_exclusive=False):
+    """`vmic_exclusive`: the Windows helper renders exclusively into CABLE Input (§8.4 `local`)."""
     pid = os.getpid()
     argv = list(base) + ["--control", "--parent-pid", str(parent_pid or pid), "--state-dir", str(state_dir),
                          "--exclude-pid", str(exclude_pid or pid), "--log-level", log_level]
     if dev:
         argv.append("--dev")
+    if vmic_exclusive:
+        argv.append(VMIC_EXCLUSIVE_ARG)
     return argv
 
 

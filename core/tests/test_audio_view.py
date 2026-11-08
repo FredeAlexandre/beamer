@@ -486,6 +486,74 @@ class Actions(unittest.TestCase):
         self.assertEqual([c.key for c in one.mic_choices], [c.key for c in two.mic_choices])
 
 
+class LowLatencyVirtualMic(unittest.TestCase):
+    """The PC's own "Low-latency virtual microphone" switch (§8.4 `local.vmic_exclusive`)."""
+
+    def setUp(self):
+        i18n.install("en")
+
+    def exclusive(self, fixture, on=True, features=True):
+        snap = fixture.snapshot
+        own = snap.machines[snap.own]
+        own = replace(own, features=own.features | {"vmic_exclusive"} if features else own.features)
+        return replace(fixture, snapshot=replace(snap, vmic_exclusive=on, machines={**snap.machines, snap.own: own}))
+
+    def test_on_the_pcs_own_panel(self):
+        panel = build(fx.no_peers_pc()).panel
+        self.assertTrue(panel.vmic_exclusive_shown)
+        self.assertFalse(panel.vmic_exclusive_on)
+        self.assertEqual(panel.vmic_exclusive_label, "Low-latency virtual microphone")
+        self.assertEqual(panel.vmic_exclusive_note,
+                         "About 35 ms instead of 70 ms, but no other app can play into CABLE Input meanwhile.")
+        panel = build(self.exclusive(fx.no_peers_pc())).panel
+        self.assertTrue(panel.vmic_exclusive_on)
+        self.assertNotIn("cannot", panel.vmic_exclusive_note)
+        # Asked for, but the helper did not name it after its restart: it cannot do it.
+        panel = build(self.exclusive(fx.no_peers_pc(), features=False)).panel
+        self.assertTrue(panel.vmic_exclusive_on)
+        self.assertTrue(panel.vmic_exclusive_note.endswith("This version of the audio helper cannot do it."))
+
+    def test_nowhere_else(self):
+        cases = {
+            "the Mac's own panel": fx.mic_streaming(),
+            "the PC seen from the Mac": replace(fx.mic_streaming(), selected=fx.PC),
+            "the Mac seen from the PC": replace(fx.FIXTURES_PC["mic_streaming"](), selected=fx.MAC),
+            "a PC without VB-CABLE": fx.vbcable_missing(),
+            "the Mac's own, set on": self.exclusive(fx.mic_streaming()),
+        }
+        for name, fixture in cases.items():
+            with self.subTest(name):
+                panel = build(fixture).panel
+                self.assertFalse(panel.vmic_exclusive_shown)
+                self.assertEqual((panel.vmic_exclusive_label, panel.vmic_exclusive_note), ("", ""))
+        self.assertEqual(build(replace(fx.FIXTURES_PC["mic_streaming"](), selected=fx.PC)).panel.machine, fx.PC)
+        self.assertTrue(build(replace(fx.FIXTURES_PC["mic_streaming"](), selected=fx.PC)).panel.vmic_exclusive_shown)
+
+    def test_the_switch_calls_the_service(self):
+        fixture = fx.no_peers_pc()
+        service = fx.FakeService(fixture.snapshot)
+        view.apply_vmic_exclusive(service, build(fixture).panel, True)
+        view.apply_vmic_exclusive(service, build(fx.mic_streaming()).panel, True)   # not shown: nothing
+        self.assertEqual(service.calls, [("set_vmic_exclusive", (True,))])
+
+    def test_through_the_service(self):
+        from core.tests.audio_cluster_harness import Net
+        net = Net()
+        self.addCleanup(net.close)
+        mac, pc = net.add(1, "MacBook Air", "macos"), net.add(2, "lebig", "windows")
+        net.link(mac, pc)
+        net.settle()
+        page = view.page_model(pc.snapshot(), {}, None, "This PC")
+        self.assertTrue(page.panel.vmic_exclusive_shown)
+        view.apply_vmic_exclusive(pc.service, page.panel, True)
+        net.settle()
+        panel = view.page_model(pc.snapshot(), {}, None, "This PC").panel
+        self.assertTrue(panel.vmic_exclusive_on)
+        self.assertNotIn("cannot", panel.vmic_exclusive_note)
+        self.assertIn("--vmic-exclusive", pc.helper.cmd)
+        self.assertFalse(view.page_model(mac.snapshot(), {}, pc.id, "This Mac").panel.vmic_exclusive_shown)
+
+
 class WithTheService(unittest.TestCase):
     """The model over real AudioService snapshots (core/tests/audio_cluster_harness.py), and the
     page's actions reaching the other machine through the service."""

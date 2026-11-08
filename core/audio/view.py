@@ -130,6 +130,12 @@ class MachinePanel:
     outputs: tuple
     inputs_empty: str
     outputs_empty: str
+    # This PC's own "Low-latency virtual microphone" switch (§8.4 `local.vmic_exclusive`): only on a
+    # Windows machine's own panel with VB-CABLE present; each machine sets its own, never a peer's.
+    vmic_exclusive_shown: bool = False
+    vmic_exclusive_on: bool = False
+    vmic_exclusive_label: str = ""
+    vmic_exclusive_note: str = ""
 
 
 @dataclass(frozen=True)
@@ -529,6 +535,21 @@ def _rows(snap: AudioSnapshot, names: _Names, machine: str):
     return tuple(inputs), tuple(outputs)
 
 
+def _vmic_exclusive(snap: AudioSnapshot, machine: str) -> dict:
+    """The low-latency switch of this machine's panel: a Windows machine renders the shared mic into
+    CABLE Input shared (~70 ms) unless this local choice asks its helper for exclusive (~35 ms, WP12).
+    The helper names `vmic_exclusive` in its features only while started with it, so a helper that
+    was asked and does not name it cannot do it."""
+    held = snap.machines.get(machine)
+    if machine != snap.own or held is None or held.platform != "windows" or not held.virtual_mic.present:
+        return {}
+    note = tr("About 35 ms instead of 70 ms, but no other app can play into CABLE Input meanwhile.")
+    if snap.vmic_exclusive and held.status == "ok" and "vmic_exclusive" not in held.features:
+        note += " " + tr("This version of the audio helper cannot do it.")
+    return dict(vmic_exclusive_shown=True, vmic_exclusive_on=snap.vmic_exclusive,
+                vmic_exclusive_label=tr("Low-latency virtual microphone"), vmic_exclusive_note=note)
+
+
 def _panel(snap: AudioSnapshot, names: _Names, machine: str, order) -> MachinePanel:
     name = names(machine)
     choices, selected, can_send = _output_choices(snap, names, machine, order)
@@ -552,7 +573,8 @@ def _panel(snap: AudioSnapshot, names: _Names, machine: str, order) -> MachinePa
         mute_note=(tr("Muted on {machine} while it plays elsewhere.").format(machine=name) if entry.to is not None else ""),
         output_line=line, output_tone=tone, inputs=inputs, outputs=outputs,
         inputs_empty=empty or (tr("No microphones.") if not inputs else ""),
-        outputs_empty=empty or (tr("No outputs.") if not outputs else ""))
+        outputs_empty=empty or (tr("No outputs.") if not outputs else ""),
+        **_vmic_exclusive(snap, machine))
 
 
 # The map.
@@ -878,6 +900,13 @@ def apply_headset(service, row: DeviceRow, on: bool) -> None:
     """The Headset switch of an output: an explicit form either way, so the switch always shows
     what was set, whatever the system says about the device."""
     service.set_form(row.machine, row.key, "headset" if on else "speakers")
+
+
+def apply_vmic_exclusive(service, panel: MachinePanel, on: bool) -> None:
+    """The low-latency virtual microphone switch: this machine's own, so only from its own panel.
+    The service restarts the helper; streams drop for about a second."""
+    if panel.vmic_exclusive_shown:
+        service.set_vmic_exclusive(on)
 
 
 def apply_test(service, row: DeviceRow) -> None:

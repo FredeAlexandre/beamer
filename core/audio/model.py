@@ -146,6 +146,7 @@ class AudioSnapshot:
     aec_mode: str
     aec_active: bool
     howls: tuple[HowlView, ...] = ()
+    vmic_exclusive: bool = False    # this machine's local choice (Windows): exclusive render into CABLE Input
 
 
 ZERO = Stamp(0, "")

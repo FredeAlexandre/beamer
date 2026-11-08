@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """`<state_dir>/audio.json` (dev/audio/PHASE2.md §8.4): the route, this machine's last device-list
-revision, the device lists held for every machine, and local-only choices.
+revision, the device lists held for every machine, and local-only choices (`local`: the AEC mode and,
+on Windows, the low-latency virtual microphone), never sent to another machine.
 
 A file of its own, so `settings.json`, its schema, migrations and the PeerBook lock stay untouched.
 Written atomically (a temporary file, then `os.replace`). A missing, unreadable or malformed file
@@ -30,6 +31,7 @@ class Stored:
     own_rev: int = 0
     machines: Mapping[str, model.MachineAudio] = field(default_factory=dict)
     aec: str = "auto"
+    vmic_exclusive: bool = False    # Windows: render exclusively into CABLE Input (helper --vmic-exclusive)
 
 
 def path_in(state_dir) -> Path:
@@ -59,14 +61,15 @@ def load(state_dir, now=None) -> Stored:
     local = data.get("local") if isinstance(data.get("local"), dict) else {}
     return Stored(route=route or model.empty_route(),
                   own_rev=own_rev if type(own_rev) is int and own_rev >= 0 else 0,
-                  machines=machines, aec=local.get("aec") if local.get("aec") in AEC_MODES else "auto")
+                  machines=machines, aec=local.get("aec") if local.get("aec") in AEC_MODES else "auto",
+                  vmic_exclusive=local.get("vmic_exclusive") is True)
 
 
 def save(state_dir, stored: Stored) -> None:
     path = path_in(state_dir)
     data = {"version": VERSION, "route": model.route_data(stored.route), "own_rev": stored.own_rev,
             "machines": {ident: model.machine_data(machine) for ident, machine in sorted(stored.machines.items())},
-            "local": {"aec": stored.aec}}
+            "local": {"aec": stored.aec, "vmic_exclusive": bool(stored.vmic_exclusive)}}
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{FILE_NAME}.{os.getpid()}.tmp")
     with open(temporary, "w", encoding="utf-8") as handle:

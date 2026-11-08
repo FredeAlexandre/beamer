@@ -277,6 +277,9 @@ class FakeService:
     def set_aec(self, mode):
         self._record("set_aec", mode)
 
+    def set_vmic_exclusive(self, on):
+        self._record("set_vmic_exclusive", on)
+
     def watch(self, on):
         self._record("watch", on)
 

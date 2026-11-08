@@ -1312,6 +1312,10 @@ msgid "its default output"
 msgstr ""
 
 #: core/audio/view.py
+msgid "About 35 ms instead of 70 ms, but no other app can play into CABLE Input meanwhile."
+msgstr ""
+
+#: core/audio/view.py
 msgid "Every app on this Mac goes quiet for about a second while it installs."
 msgstr ""
 
@@ -1377,6 +1381,14 @@ msgstr ""
 
 #: core/audio/view.py mac_app/machines.py win_app/peers_view.py
 msgid "Other"
+msgstr ""
+
+#: core/audio/view.py
+msgid "This version of the audio helper cannot do it."
+msgstr ""
+
+#: core/audio/view.py mac_app/audio_page.py win_app/audio_page_win.py
+msgid "Low-latency virtual microphone"
 msgstr ""
 
 #: core/audio/view.py

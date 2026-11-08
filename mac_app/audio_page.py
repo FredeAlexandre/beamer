@@ -870,6 +870,17 @@ class AudioPage:
         line, self.output_dot = _dot_line(self.output_status)
         self.output_line = line
         panel.add(line)
+        # A Windows machine's own low-latency switch: the model never shows it on a Mac (each
+        # machine sets its own), kept here so both apps render the same panel model.
+        self.vmic_exclusive = widgets.Switch(tr("Low-latency virtual microphone"),
+                                             on_change=self._vmic_exclusive_changed)
+        self.vmic_exclusive_note = widgets.note(ink="ink_3")
+        self.vmic_exclusive_box = widgets.stack(spacing=2)
+        self.vmic_exclusive_box.setAlignment_(AppKit.NSLayoutAttributeWidth)
+        widgets.add(self.vmic_exclusive_box, self.vmic_exclusive.view)
+        widgets.add(self.vmic_exclusive_box, self.vmic_exclusive_note.view)
+        self.vmic_exclusive_box.setHidden_(True)
+        panel.add(self.vmic_exclusive_box)
         # One stack of device rows per machine, kept while its devices stay, so going back to a
         # machine shows its rows at once; only the selected one is in the panel.
         self.rows_host = widgets.stack(spacing=0)
@@ -1039,6 +1050,12 @@ class AudioPage:
         self.output_status.set(panel.output_line, ink="ink" if panel.output_tone == view.LIVE else panel.output_tone)
         widgets.paint(self.output_dot, panel.output_tone)
         self.output_line.setHidden_(not panel.output_line)
+        self.vmic_exclusive_box.setHidden_(not panel.vmic_exclusive_shown)
+        if panel.vmic_exclusive_shown:
+            self.vmic_exclusive.value = panel.vmic_exclusive_on
+            self.vmic_exclusive.words.set(panel.vmic_exclusive_label)
+            self.vmic_exclusive.view.setAccessibilityLabel_(panel.vmic_exclusive_label)
+            self.vmic_exclusive_note.set(panel.vmic_exclusive_note)
         shown_machines = {tile.machine for tile in page.tiles}
         for machine in [machine for machine in self.row_sets if machine not in shown_machines]:
             _signature, host, _views = self.row_sets.pop(machine)
@@ -1178,6 +1195,10 @@ class AudioPage:
     def _headset(self, row, on):
         if self.service is not None:
             view.apply_headset(self.service, row, on)
+
+    def _vmic_exclusive_changed(self, on):
+        if self.service is not None and self.page is not None:
+            view.apply_vmic_exclusive(self.service, self.page.panel, on)
 
     def _test(self, row):
         if self.service is not None:
