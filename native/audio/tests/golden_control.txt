@@ -1,0 +1,105 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Golden control-protocol session (§3.2/§3.3) over the null backend, run by engine_tests
+# (golden_control). Two helpers A and B in one process, --dev, A without a virtual mic
+# ("vmic=absent"; B has the defaults).
+#   X-> line  : command sent to helper X ($NAME substituted from captured/predefined values)
+#   X<- line  : the next event of X matching this pattern (waits up to 4 s); events in between are
+#               skipped, order is kept. "*" = any value, "$NAME" = capture (first use) or compare,
+#               "...": "*" in an object allows extra fields.
+# Predefined: $FK (flow key), $SK1, $SK2 (stream keys).
+A<- {"ev":"ready","proto":1,"version":"0.1.0","platform":"*","features":["system_capture","mic_demand","virtual_mic"],"restored":0}
+A<- {"ev":"devices","inputs":[{"key":"null-mic","name":"Null Microphone","transport":"builtin","channels":1,"form":"microphone"}],"outputs":[{"key":"null-out","name":"Null Speakers","transport":"builtin","channels":2,"form":"speakers"}],"default_input":"null-mic","default_output":"null-out","virtual_mic":{"kind":null,"present":false,"in_use":false}}
+A<- {"ev":"permission","mic":"granted","system_audio":"granted"}
+B<- {"ev":"ready","proto":1,"version":"0.1.0","platform":"*","features":"*","restored":0}
+# ping, devices
+A-> {"cmd":"ping","req":1}
+A<- {"ev":"pong","req":1}
+A-> {"cmd":"devices","req":2}
+A<- {"ev":"devices","inputs":"*","outputs":"*","default_input":"null-mic","default_output":"null-out","virtual_mic":"*"}
+A<- {"ev":"ok","req":2}
+# flow: A offers (peer host known, no bind), B answers on 24823 (or the next free port)
+A-> {"cmd":"flow_open","req":3,"flow":"9f2c01aa","peer":"B","role":"offer","port":0,"host":"127.0.0.1","remote":null,"key":"$FK","rr_ms":10}
+A<- {"ev":"flow_bound","flow":"9f2c01aa","port":"$PA"}
+A<- {"ev":"flow_state","flow":"9f2c01aa","state":"probing","rtt_ms":null}
+A<- {"ev":"ok","req":3}
+B-> {"cmd":"flow_open","req":1,"flow":"9f2c01aa","peer":"A","role":"answer","port":24823,"remote":{"host":"127.0.0.1","port":"$PA"},"key":"$FK","rr_ms":10}
+B<- {"ev":"flow_bound","flow":"9f2c01aa","port":"$PB"}
+B<- {"ev":"ok","req":1}
+A-> {"cmd":"flow_remote","req":4,"flow":"9f2c01aa","host":"127.0.0.1","port":"$PB"}
+A<- {"ev":"ok","req":4}
+A<- {"ev":"flow_state","flow":"9f2c01aa","state":"up","rtt_ms":"*"}
+B<- {"ev":"flow_state","flow":"9f2c01aa","state":"up","rtt_ms":"*"}
+# A sends its mic to B's virtual mic, B sends its system sound to A's output
+A-> {"cmd":"send","req":5,"stream":2882400018,"flow":"9f2c01aa","kind":"mic","source":{"device":"null-mic"},"codec":{"name":"opus","app":"voip","channels":1,"bitrate":32000,"frame_ms":10,"fec":true},"key":"$SK1","mute_local":false,"aec":{"reference":null}}
+A<- {"ev":"error","req":5,"code":"bad_args","msg":"stream"}
+A-> {"cmd":"send","req":6,"stream":1001,"flow":"9f2c01aa","kind":"mic","source":{"device":"null-mic"},"codec":{"name":"opus","app":"voip","channels":1,"bitrate":32000,"frame_ms":10,"fec":true},"key":"$SK1","mute_local":false,"aec":{"reference":null}}
+A<- {"ev":"ok","req":6}
+A<- {"ev":"stream_state","stream":1001,"state":"running","device":"null-mic"}
+B-> {"cmd":"recv","req":2,"stream":1001,"flow":"9f2c01aa","kind":"mic","codec":{"name":"opus","app":"voip","channels":1,"bitrate":32000,"frame_ms":10,"fec":true},"key":"$SK1","sink":{"virtual_mic":true}}
+B<- {"ev":"ok","req":2}
+B<- {"ev":"stream_state","stream":1001,"state":"running","device":"null-vmic"}
+B-> {"cmd":"send","req":3,"stream":2002,"flow":"9f2c01aa","kind":"system","source":{"system":true},"codec":{"name":"opus","app":"audio","channels":2,"bitrate":96000,"frame_ms":10,"fec":false},"key":"$SK2","mute_local":true,"aec":null}
+B<- {"ev":"ok","req":3}
+B<- {"ev":"stream_state","stream":2002,"state":"running","device":"null-system"}
+A-> {"cmd":"recv","req":7,"stream":2002,"flow":"9f2c01aa","kind":"system","codec":{"name":"opus","app":"audio","channels":2,"bitrate":96000,"frame_ms":10,"fec":false},"key":"$SK2","sink":{"device":null}}
+A<- {"ev":"ok","req":7}
+A<- {"ev":"stream_state","stream":2002,"state":"running","device":"null-out"}
+# stats: B plays A's mic
+B<- {"ev":"stats","t":"*","cpu_pct":"*","streams":{"1001":{"dir":"recv","kind":"mic","path":"udp","playing":true,"dec_err":0,"...":"*"},"2002":{"dir":"send","kind":"system","path":"udp","...":"*"}}}
+# local loop (needs a virtual mic: A has none -> error), on B the vmic is taken by 1001's sink too
+A-> {"cmd":"loop","req":8,"stream":3001,"source":{"device":null},"sink":{"virtual_mic":true}}
+A<- {"ev":"stream_state","stream":3001,"state":"failed","device":null,"error":"no_virtual_mic"}
+A<- {"ev":"error","req":8,"code":"no_virtual_mic","msg":"*"}
+B-> {"cmd":"loop","req":4,"stream":3001,"source":{"device":"null-mic"},"sink":{"virtual_mic":true}}
+B<- {"ev":"ok","req":4}
+B<- {"ev":"stream_state","stream":3001,"state":"running","device":"null-mic"}
+B-> {"cmd":"stop","req":5,"stream":3001}
+B<- {"ev":"stream_state","stream":3001,"state":"stopped","device":null}
+B<- {"ev":"ok","req":5}
+# meters and an idle input test
+A-> {"cmd":"meter","req":9,"on":true,"period_ms":100}
+A<- {"ev":"ok","req":9}
+A<- {"ev":"levels","t":"*","in":{"null-mic":[-15.1,-12.0]},"out":{"null-out":"*"},"streams":{"1001":[-15.1,-12.0],"2002":"*"}}
+A-> {"cmd":"meter","req":10,"on":true,"period_ms":20}
+A<- {"ev":"error","req":10,"code":"bad_args","msg":"*"}
+A-> {"cmd":"test_input","req":11,"device":"null-mic","seconds":1}
+A<- {"ev":"ok","req":11}
+A-> {"cmd":"test_input","req":12,"device":"nope","seconds":1}
+A<- {"ev":"error","req":12,"code":"no_device","msg":"*"}
+A-> {"cmd":"meter","req":13,"on":false}
+A<- {"ev":"ok","req":13}
+# packets from the link: junk is dropped silently (counted), the command succeeds
+A-> {"cmd":"link_in","req":14,"flow":"9f2c01aa","p":["AQEBAQAAA+kAAAAAAAAAAQAAAAAB4AEAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]}
+A<- {"ev":"ok","req":14}
+A-> {"cmd":"link_in","req":15,"flow":"00000000","p":[]}
+A<- {"ev":"error","req":15,"code":"unknown_flow","msg":"00000000"}
+# errors
+A-> {"cmd":"stop","req":16,"stream":999}
+A<- {"ev":"error","req":16,"code":"unknown_stream","msg":"999"}
+A-> {"cmd":"bogus","req":17}
+A<- {"ev":"error","req":17,"code":"unknown_cmd","msg":"bogus"}
+A-> {"cmd":"send","req":18,"stream":1003,"flow":"9f2c01aa","kind":"mic","key":"c2hvcnQ="}
+A<- {"ev":"error","req":18,"code":"bad_args","msg":"*"}
+A-> {"cmd":"send","req":19,"stream":1004,"flow":"9f2c01aa","kind":"mic","source":{"device":"elsewhere"},"key":"$SK1"}
+A<- {"ev":"stream_state","stream":1004,"state":"failed","device":null,"error":"no_device"}
+A<- {"ev":"error","req":19,"code":"no_device","msg":"*"}
+A-> {"cmd":"recv","req":20,"stream":1005,"flow":"9f2c01aa","kind":"mic","codec":{"name":"pcm"},"key":"$SK1","sink":{"device":null}}
+A<- {"ev":"error","req":20,"code":"unsupported","msg":"*"}
+A-> {"cmd":"flow_open","req":21,"flow":"xyz","role":"offer","key":"$FK"}
+A<- {"ev":"error","req":21,"code":"bad_args","msg":"*"}
+A-> not json
+A<- {"ev":"error","code":"bad_args","msg":"not a JSON object"}
+# dev switches (only with --dev): the null backend's vmic in_use reaches the devices event
+B-> {"cmd":"dev","req":6,"null":{"vmic_in_use":true}}
+B<- {"ev":"ok","req":6}
+B<- {"ev":"devices","inputs":"*","outputs":"*","default_input":"*","default_output":"*","virtual_mic":{"kind":"beamer","present":true,"in_use":true}}
+# closing the flow stops its streams
+A-> {"cmd":"flow_close","req":22,"flow":"9f2c01aa"}
+A<- {"ev":"stream_state","stream":1001,"state":"stopped","device":null}
+A<- {"ev":"stream_state","stream":2002,"state":"stopped","device":null}
+A<- {"ev":"flow_state","flow":"9f2c01aa","state":"closed","rtt_ms":null}
+A<- {"ev":"ok","req":22}
+A-> {"cmd":"quit","req":23}
+A<- {"ev":"ok","req":23}
+B-> {"cmd":"quit","req":7}
+B<- {"ev":"ok","req":7}
