@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Engine sources, relative to native/audio/engine/. One per line; '#' starts a comment.
+# .cpp = C++17, .c = C (vendored Monocypher; listing it tells build-mac/build-win not to add it again).
+# Include paths: engine/, third_party/opus-1.6.1/include, third_party/monocypher-4.0.2/src,
+# third_party/nlohmann-json-3.11.3/single_include. Link with libopus built from its .mk lists.
+codec.cpp
+crypto.cpp
+flow.cpp
+helper.cpp
+jitter.cpp
+net.cpp
+null_backend.cpp
+packet.cpp
+resampler.cpp
+streams.cpp
+test_signal.cpp
+util.cpp
+../third_party/monocypher-4.0.2/src/monocypher.c
