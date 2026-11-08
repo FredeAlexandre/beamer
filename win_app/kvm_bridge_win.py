@@ -880,6 +880,7 @@ class WindowsApplication(QWidget):
         builders = {
             "overview": self._overview_page,
             "crossing": self._crossing_page,
+            "audio": self._audio_page,
             "design": self._design_page,
             "keyboard": self._keyboard_page,
             "connection": self._connection_page,
@@ -952,6 +953,21 @@ class WindowsApplication(QWidget):
             self.trigger_recorder.cancel()
             self.crossing_ledger.cancel_recording()
         self._run_previews()
+
+    # -- Audio ------------------------------------------------------------------------------
+
+    def _audio_page(self, layout, current) -> None:
+        """The Audio page (dev/audio/PHASE2.md §9.2). It finds the AudioService as
+        `self.audio_service` once the app has one, and draws the machines on the Crossing layout."""
+        import audio_page_win
+        from core.audio import view as audio_view
+
+        def tiles():
+            return audio_view.layout_tiles(ways.derive_layout(self._crossing_settings(), gap=0))
+
+        self.audio_page = audio_page_win.AudioPageWidget(
+            lambda: getattr(self, "audio_service", None), own_label=tr("This PC"), tiles=tiles)
+        layout.addWidget(self.audio_page)
 
     # -- Overview ---------------------------------------------------------------------------
 

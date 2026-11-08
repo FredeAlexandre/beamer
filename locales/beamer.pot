@@ -1255,7 +1255,7 @@ msgstr ""
 msgid "Beamer wants to install Beamer Microphone, the microphone your apps hear from your other machines."
 msgstr ""
 
-#: mac_app/audio_page.py
+#: mac_app/audio_page.py win_app/audio_page_win.py
 msgid "Level"
 msgstr ""
 
@@ -1263,7 +1263,7 @@ msgstr ""
 msgid "Machines and where their sound goes"
 msgstr ""
 
-#: mac_app/audio_page.py
+#: mac_app/audio_page.py win_app/audio_page_win.py
 msgid "Microphone"
 msgstr ""
 
@@ -1275,7 +1275,7 @@ msgstr ""
 msgid "Shared microphone level"
 msgstr ""
 
-#: mac_app/audio_page.py mac_app/kvm_bridge_app.py mac_app/machines_panel.py win_app/machines_win.py
+#: mac_app/audio_page.py mac_app/kvm_bridge_app.py mac_app/machines_panel.py win_app/audio_page_win.py win_app/machines_win.py
 msgid "Machines"
 msgstr ""
 
@@ -1287,19 +1287,19 @@ msgstr ""
 msgid "Inputs"
 msgstr ""
 
-#: mac_app/audio_page.py
+#: mac_app/audio_page.py win_app/audio_page_win.py
 msgid "Outputs"
 msgstr ""
 
-#: mac_app/audio_page.py
+#: mac_app/audio_page.py win_app/audio_page_win.py
 msgid "Sound"
 msgstr ""
 
-#: mac_app/audio_page.py mac_app/link_state.py mac_app/machines.py win_app/kvm_bridge_win.py win_app/peers_view.py
+#: mac_app/audio_page.py mac_app/link_state.py mac_app/machines.py win_app/audio_page_win.py win_app/kvm_bridge_win.py win_app/peers_view.py
 msgid "Waiting"
 msgstr ""
 
-#: mac_app/audio_page.py
+#: mac_app/audio_page.py win_app/audio_page_win.py
 msgid "Test"
 msgstr ""
 
@@ -1307,7 +1307,7 @@ msgstr ""
 msgid "Show this microphone's level for ten seconds."
 msgstr ""
 
-#: mac_app/audio_page.py
+#: mac_app/audio_page.py win_app/audio_page_win.py
 msgid "Headset"
 msgstr ""
 
@@ -3931,11 +3931,11 @@ msgstr ""
 msgid "With only the notch or a corner on, input arrives by the notch's or corner's own side, so this choice does nothing on this Mac; {name}'s own push still follows it."
 msgstr ""
 
-#: mac_app/pages.py
+#: mac_app/pages.py win_app/audio_page_win.py win_app/pages_win.py
 msgid "Audio"
 msgstr ""
 
-#: mac_app/pages.py
+#: mac_app/pages.py win_app/pages_win.py
 msgid "Every machine's microphones and speakers. Choose the microphone your apps hear and where each machine's sound plays."
 msgstr ""
 
@@ -4101,6 +4101,32 @@ msgstr ""
 
 #: win_app/admin_mode.py
 msgid "Administrator permission was cancelled. Your previous setting has been kept."
+msgstr ""
+
+#: win_app/audio_page_win.py
+msgid "Audio is not running in this Beamer yet. Microphones and speakers show here once it is."
+msgstr ""
+
+#: win_app/audio_page_win.py
+msgid "Click a machine, or use the arrow keys, to see its devices and choose where its sound plays."
+msgstr ""
+
+#: win_app/audio_page_win.py
+msgid "An app here is recording Beamer's microphone."
+msgstr ""
+
+#: win_app/audio_page_win.py
+msgid "Microphones"
+msgstr ""
+
+#: win_app/audio_page_win.py
+#, python-brace-format
+msgid "Test {device}"
+msgstr ""
+
+#: win_app/audio_page_win.py
+#, python-brace-format
+msgid "{device} is a headset"
 msgstr ""
 
 #: win_app/crossing_ledger.py

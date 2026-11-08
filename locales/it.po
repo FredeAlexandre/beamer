@@ -1746,7 +1746,7 @@ msgstr "Opzione-clic su uno schermo per dividerlo o raggrupparlo · trascina per
 msgid "Switching moves every machine to this profile's places and ways."
 msgstr "Passare a questo profilo applica a tutti i computer le sue posizioni e vie."
 
-#: mac_app/kvm_bridge_app.py mac_app/machines_panel.py win_app/machines_win.py
+#: mac_app/kvm_bridge_app.py mac_app/machines_panel.py win_app/audio_page_win.py win_app/machines_win.py
 msgid "Machines"
 msgstr "Computer"
 
@@ -3172,7 +3172,7 @@ msgstr "Non in ascolto"
 msgid "No receiver"
 msgstr "Nessun ricevitore"
 
-#: mac_app/link_state.py mac_app/machines.py win_app/kvm_bridge_win.py win_app/peers_view.py
+#: mac_app/link_state.py mac_app/machines.py win_app/audio_page_win.py win_app/kvm_bridge_win.py win_app/peers_view.py
 msgid "Waiting"
 msgstr "In attesa"
 
@@ -4073,6 +4073,60 @@ msgstr "Windows non ha trovato la shell del desktop. Avvia Esplora file e riprov
 #: win_app/admin_mode.py
 msgid "Administrator permission was cancelled. Your previous setting has been kept."
 msgstr "La richiesta dei privilegi di amministratore è stata annullata. L'impostazione precedente è stata mantenuta."
+
+#: win_app/audio_page_win.py
+msgid "Audio is not running in this Beamer yet. Microphones and speakers show here once it is."
+msgstr ""
+
+#: win_app/audio_page_win.py
+msgid "Click a machine, or use the arrow keys, to see its devices and choose where its sound plays."
+msgstr ""
+
+#: win_app/audio_page_win.py
+msgid "An app here is recording Beamer's microphone."
+msgstr ""
+
+#: win_app/audio_page_win.py
+msgid "Sound"
+msgstr ""
+
+#: win_app/audio_page_win.py
+msgid "Microphone"
+msgstr ""
+
+#: win_app/audio_page_win.py
+msgid "Level"
+msgstr ""
+
+#: win_app/audio_page_win.py win_app/pages_win.py
+msgid "Audio"
+msgstr ""
+
+#: win_app/audio_page_win.py
+msgid "Microphones"
+msgstr ""
+
+#: win_app/audio_page_win.py
+msgid "Outputs"
+msgstr ""
+
+#: win_app/audio_page_win.py
+msgid "Test"
+msgstr ""
+
+#: win_app/audio_page_win.py
+msgid "Headset"
+msgstr ""
+
+#: win_app/audio_page_win.py
+#, python-brace-format
+msgid "Test {device}"
+msgstr ""
+
+#: win_app/audio_page_win.py
+#, python-brace-format
+msgid "{device} is a headset"
+msgstr ""
 
 #: win_app/crossing_ledger.py
 msgid "Return saves, Escape cancels · Only on this PC"
@@ -5181,6 +5235,10 @@ msgstr "I computer abbinati a questo PC, dove si trova ora l'input, e i controll
 #: win_app/pages_win.py
 msgid "Choose how the pointer or a key moves input to each machine, and how hard the edge pushes back first."
 msgstr "Scegli come il puntatore o un tasto sposta l'input verso ogni computer, e quanto resiste prima il bordo."
+
+#: win_app/pages_win.py
+msgid "Every machine's microphones and speakers. Choose the microphone your apps hear and where each machine's sound plays."
+msgstr ""
 
 #: win_app/pages_win.py
 msgid "How this PC's Ctrl and Windows keys arrive on another machine, the keys and buttons that stay here, and how fast another machine's pointer moves here."

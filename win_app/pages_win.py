@@ -22,6 +22,9 @@ PAGES = (
     ("crossing", N_("Crossing"),
      N_("Choose how the pointer or a key moves input to each machine, and how hard the edge "
      "pushes back first.")),
+    ("audio", N_("Audio"),
+     N_("Every machine's microphones and speakers. Choose the microphone your apps hear and where each "
+     "machine's sound plays.")),
     ("keyboard", N_("Keyboard"),
      N_("How this PC's Ctrl and Windows keys arrive on another machine, the keys and buttons that stay "
      "here, and how fast another machine's pointer moves here.")),
