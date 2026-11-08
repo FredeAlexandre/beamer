@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""The Audio page (dev/audio/PHASE2.md §9.2): the microphone your apps hear, the machines on the
-Crossing map with their routes and levels, the selected machine's output and devices, and notices.
+"""The Audio page (dev/audio/PHASE2.md §9.2): the microphone your apps hear, notices, the machines on
+the Crossing map with their routes and levels, and the selected machine's output and devices.
 
 Everything shown comes from `core.audio.view.page_model`; this file only lays it out in AppKit.
 The service's callbacks arrive on its worker thread and hop here with `AppHelper.callAfter`. A
@@ -833,6 +833,18 @@ class AudioPage:
         mic.add(self.mic_hint.view)
         mic.body.setCustomSpacing_afterView_(14, row)
 
+        # Notices right under the microphone, where a missing driver or a denied permission is
+        # seen without scrolling.
+        self.notices_module = widgets.Module(spacing=0)
+        widgets.add(body, self.notices_module.view)
+        self.notices_host = widgets.stack(spacing=0)
+        self.notices_host.setAlignment_(AppKit.NSLayoutAttributeWidth)
+        self.notices_module.add(self.notices_host)
+        self.install_note = widgets.note(ink="fault")
+        self.install_note.view.setHidden_(True)
+        self.notices_module.add(self.install_note.view)
+        self.notice_buttons = []
+
         machines, _ = self._module(body, tr("Machines"))
         self.map = AudioMap.alloc().init().setup()
         self.map.on_select = self._select
@@ -866,15 +878,6 @@ class AudioPage:
         panel.add(self.rows_host)
         panel.body.setCustomSpacing_afterView_(16, line)
 
-        self.notices_module = widgets.Module(spacing=0)
-        widgets.add(body, self.notices_module.view)
-        self.notices_host = widgets.stack(spacing=0)
-        self.notices_host.setAlignment_(AppKit.NSLayoutAttributeWidth)
-        self.notices_module.add(self.notices_host)
-        self.install_note = widgets.note(ink="fault")
-        self.install_note.view.setHidden_(True)
-        self.notices_module.add(self.install_note.view)
-        self.notice_buttons = []
 
     def _row_set(self, panel):
         """(signature, stack, row views) of `panel`'s machine: updated in place while its devices

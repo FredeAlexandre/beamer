@@ -17,7 +17,7 @@ implementation agents. Section numbers (§) are referenced by the work packages 
 | 5 | Routing | Cluster-wide route document: one **active mic** (machine + device, or off) and per machine an **output** (play here, or send to machine T's device, muted here). The active mic feeds the Beamer virtual mic of **every machine where an app is recording it, and only while it is** (on demand). No pointer-focus rule. Per-entry last-writer-wins stamps. Persisted in `audio.json`. Spec §6. |
 | 6 | UDP | One UDP flow per directly linked pair, carrying all streams both ways. The side that must not listen (Mac) offers; the other answers on 24823 (24824-24830, then any). Both send first (hole punch), so no firewall rule anywhere. TCP fallback over the link after 2 s of UDP silence. Spec §4. |
 | 7 | AEC | Vendored speexdsp echo canceller (MDF + residual echo suppression) in the engine, on the machine that captures the active mic, reference = loopback/tap of that machine's output device; on when that mic is forwarded and the output is not a headset. Headset warning computed in the UI model. Spec §7. |
-| 8 | UI | "Audio" page after Crossing on both apps: active-mic selector, a read-only machine map drawn like the Crossing map (tiles, route arrows, meters), a detail panel for the selected machine, notices. Pure page model `core/audio/view.py` shared by both UIs. Spec §9. |
+| 8 | UI | "Audio" page after Crossing on both apps: active-mic selector, notices, a read-only machine map drawn like the Crossing map (tiles, route arrows, meters), a detail panel for the selected machine. Pure page model `core/audio/view.py` shared by both UIs. Spec §9. |
 | 9 | Packaging | Mac: helper at `Beamer.app/Contents/MacOS/beamer-audio` (universal, hardened runtime, own entitlements), driver bundle at `Contents/Resources/audio/BeamerAudio.driver`; Info.plist usage strings; entitlement `com.apple.security.device.audio-input`. Windows: `beamer-audio.exe` next to `Beamer.exe`. VB-CABLE never bundled. Spec §10. |
 | 10 | Tests | `unittest` for `core/audio` with an in-process fake helper and an N-machine cluster harness; a C++ test binary for the engine on both OSes; a null device backend so the real helper runs in CI-like tests; a two-machine E2E harness driven through dev-only command files. Spec §11. |
 
@@ -663,15 +663,16 @@ Page "Audio" after "Crossing" (Mac SF Symbol `speaker.wave.2`; purpose: "Every m
 speakers. Choose the microphone your apps hear and where each machine's sound plays.").
 1. **Microphone** module: selector "Microphone your apps hear" + level meter + status line + one-line hint
    ("Apps use 'Beamer Microphone' on a Mac and 'CABLE Output' on a PC").
-2. **Machines** module: `AudioMap`, read-only, drawn like the Crossing map (same tile shapes, colours,
+2. **Notices** strip, right under the Microphone module (hidden when empty), so a missing driver, a denied
+   permission or an echo warning is seen without scrolling.
+3. **Machines** module: `AudioMap`, read-only, drawn like the Crossing map (same tile shapes, colours,
    fonts and theme tokens: Mac `theme`/`tokens`, Qt `win_app/theme`/`tokens`), Core Animation layers on the
    Mac (like `diagram.AtlasCanvas`), `QPainter` on Qt; each tile: name, mic glyph when it holds the active mic,
    output line, a thin level bar; arrows for active routes (sound solid, mic dashed, grey when waiting).
    Click a tile = select it (keyboard: arrows/Tab as on the Crossing map).
-3. **Selected machine** module (ledger-like rows): "Sound from <M> plays on" selector; note "Muted on <M>
+4. **Selected machine** module (ledger-like rows): "Sound from <M> plays on" selector; note "Muted on <M>
    while it plays elsewhere"; status; Inputs rows (name, meter, Test); Outputs rows (name, meter,
    "Headset" switch).
-4. Notices strip.
 Meters: a `LevelMeter` widget (horizontal bar, RMS fill + peak tick, -60..0 dBFS), only for devices with a
 level key in the levels map. While the page is visible the app calls `service.watch(True)`.
 
