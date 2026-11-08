@@ -399,8 +399,14 @@ void JitterBuffer::control(double now, double block_s) {
     // The integral term is the clock difference. Once measured from the timestamps it is taken from
     // there: integrating the level error also integrates the level that expansions add (a late frame
     // played after its concealment), which pinned the integral at +200 ppm live (WP11).
-    drift_.hold_integ = cfg_.drift_est && est_valid_;
-    if (drift_.hold_integ) drift_.integ = std::max(-200.0, std::min(200.0, est_ppm_));
+    // Moved towards the estimate at <= 2 ppm/s, so no single estimate can jump it. While the
+    // estimate restarts (after a step) the integral keeps the value it had: the clocks did not change.
+    if (est_valid_) est_ever_ = true;
+    drift_.hold_integ = cfg_.drift_est && est_ever_;
+    if (drift_.hold_integ && est_valid_) {
+      const double want = std::max(-200.0, std::min(200.0, est_ppm_)), step = 2.0 * block_s;
+      drift_.integ += std::max(-step, std::min(step, want - drift_.integ));
+    }
     drift_.update(err, block_s);
   }
   // big excursion: drop a frame; a silent one as soon as the excess exceeds max(5 ms, 0.75 frame),
@@ -430,8 +436,7 @@ void JitterBuffer::control(double now, double block_s) {
 }
 
 void JitterBuffer::est_reset() {
-  est_has_bucket_ = est_has_tr_ = est_has_pl_ = est_valid_ = est_has_fit_ = false;
-  est_ppm_ = 0;
+  est_has_bucket_ = est_has_tr_ = est_has_pl_ = est_valid_ = est_has_fit_ = false;  // est_ppm_ stays (stats)
   est_head_ = est_n_ = est_miss_ = 0;
 }
 
@@ -475,11 +480,14 @@ void JitterBuffer::est_pull(double now, int n) {
 }
 
 // Least squares of (lag - transit) over time, twice: the second pass leaves out the seconds whose
-// minimum was itself late (a whole second inside a Wi-Fi episode).
+// minimum was itself late (a whole second inside a Wi-Fi episode). The estimate counts only once it
+// spans 60 s and its slope is known to +-kEstMaxSePpm (standard error): a sender that stalls or a
+// path that keeps getting slower for a while is no clock, and must not steer the integral (seen live
+// in WP11's first run: -977 ppm after 20 s that included a 30 ms excursion).
 void JitterBuffer::est_fit() {
   if (est_n_ < 20) return;
   const double t0 = est_t_[est_head_], d0 = est_d_[est_head_];
-  double slope = 0, icpt = 0, clip = 1e9;
+  double slope = 0, icpt = 0, clip = 1e9, rms = 0, stt_c = 0;
   for (int pass = 0; pass < 2; ++pass) {
     double st = 0, sd = 0, stt = 0, std_ = 0, m = 0;
     for (int k = 0; k < est_n_; ++k) {
@@ -494,24 +502,30 @@ void JitterBuffer::est_fit() {
     }
     const double den = m * stt - st * st;
     if (m < 20 || den <= 0) return;
+    const double prev_slope = slope, prev_icpt = icpt;
     slope = (m * std_ - st * sd) / den;
     icpt = (sd - slope * st) / m;
-    double ss = 0;
+    stt_c = den / m;  // sum of (t - mean t)^2
+    double ss = 0, used = 0;
     for (int k = 0; k < est_n_; ++k) {
       const int i = (est_head_ + k) % kEstCap;
-      const double r = (est_d_[i] - d0) - (icpt + slope * (est_t_[i] - t0));
+      const double t = est_t_[i] - t0, d = est_d_[i] - d0;
+      if (pass && std::fabs(d - (prev_icpt + prev_slope * t)) > clip) continue;
+      const double r = d - (icpt + slope * t);
       ss += r * r;
+      used += 1;
     }
-    clip = std::max(0.001, 3.0 * std::sqrt(ss / est_n_));
+    rms = std::sqrt(ss / std::max(1.0, used - 2));
+    clip = std::max(0.001, 3.0 * rms);
   }
   est_has_fit_ = true;
   est_t0_ = t0;
   est_d0_ = d0;
   est_slope_ = slope;
   est_icpt_ = icpt;
-  if (est_t_[(est_head_ + est_n_ - 1) % kEstCap] - t0 < 19.5) return;
+  est_se_ppm_ = stt_c > 0 ? rms / std::sqrt(stt_c) * 1e6 : 1e9;
   est_ppm_ = slope * 1e6;
-  est_valid_ = true;
+  est_valid_ = est_t_[(est_head_ + est_n_ - 1) % kEstCap] - t0 >= kEstMinSpanS - 0.5 && est_se_ppm_ <= kEstMaxSePpm;
 }
 
 void JitterBuffer::pull(float* out, int n, double now) {

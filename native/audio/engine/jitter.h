@@ -58,7 +58,7 @@ struct JbConfig {
   // as media.py). It moves by one sample in ~1000 per packet; 20 ms saves most of the IO-thread CPU.
   double jitter_recalc_ms = 20.0;
   // Engine addition (WP11): once the clock ratio has been measured from the timestamps
-  // (drift_est_ppm, >= 20 s of data), it is the drift integral instead of the integrated level error.
+  // (drift_est_ppm, valid after 60 s), it is the drift integral instead of the integrated level error.
   // The level also rises by a frame at each expansion whose late frame then plays; integrating that
   // pinned the integral at +200 ppm live (WP10 soak) for clocks ~20 ppm apart. false = media.py.
   bool drift_est = true;
@@ -91,9 +91,11 @@ class JitterBuffer {
   double integ_ppm() const { return drift_.integ; }
   double last_level_ms() const { return last_level_; }  // level measured before the last pull
   // Clock ratio measured from timestamps alone (sender ts vs arrival, frames pulled vs pull time):
-  // the long-run resampling ppm the drift control has to apply. 0 until 20 s of data (est_valid()).
+  // the long-run resampling ppm the drift control has to apply. Valid (and then followed by the drift
+  // integral) once it spans 60 s with a standard error <= 5 ppm.
   double drift_est_ppm() const { return est_ppm_; }
   bool drift_est_valid() const { return est_valid_; }
+  double drift_est_se_ppm() const { return est_se_ppm_; }
   bool playing() const { return playing_; }
   int channels() const { return cfg_.channels; }
   int frame() const { return frame_; }
@@ -183,6 +185,9 @@ class JitterBuffer {
   // last fit (relative to the first point) for the step check, and how many points in a row
   // missed it by more than kEstStep
   static constexpr double kEstStep = 0.015;
+  static constexpr double kEstMinSpanS = 60.0, kEstMaxSePpm = 5.0;
+  double est_se_ppm_ = 1e9;
+  bool est_ever_ = false;  // a valid estimate was seen: the integral is held from then on
   bool est_has_fit_ = false;
   double est_t0_ = 0, est_d0_ = 0, est_slope_ = 0, est_icpt_ = 0;
   int est_miss_ = 0;

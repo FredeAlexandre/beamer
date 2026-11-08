@@ -642,7 +642,7 @@ static void test_jb_drift_estimate_step() {
   SimOut o = simulate(sp);
   check_tracking(o, "+60 ms step at 100 s", 30, 10, 99, 110);
   double worst_e = 0, worst_i = 0;
-  for (size_t s = 140; s < o.sec_est.size(); ++s) {
+  for (size_t s = 180; s < o.sec_est.size(); ++s) {  // valid again 60 s after the restart
     worst_e = std::max(worst_e, std::fabs(o.sec_est[s] - 30));
     worst_i = std::max(worst_i, std::fabs(o.sec_integ[s] - 30));
   }

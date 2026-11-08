@@ -367,6 +367,7 @@ void RecvStream::publish() {
   integ_.store(jb_.integ_ppm(), R);
   est_.store(jb_.drift_est_ppm(), R);
   est_valid_.store(jb_.drift_est_valid(), R);
+  est_se_.store(jb_.drift_est_se_ppm(), R);
   playing_.store(jb_.playing(), R);
   c_late_.store(c.late, R);
   c_expand_.store(c.expand, R);
@@ -444,6 +445,8 @@ Json RecvStream::stats(double dt) {
   j["ppm_i"] = round1(integ_.load());
   // clock ratio sender/render measured from timestamps (the integral follows it once valid)
   j["ppm_est"] = est_valid_.load() ? Json(round1(est_.load())) : Json(nullptr);
+  j["ppm_est_raw"] = round1(est_.load());  // the current fit, valid or not, and its standard error
+  j["ppm_est_se"] = round1(std::min(999.0, est_se_.load()));
   double rtt = flow_->rtt_ms();
   j["rtt_ms"] = rtt >= 0 ? Json(round1(rtt)) : Json(nullptr);
   j["kbps"] = round1(kbps);
