@@ -12,6 +12,9 @@
 //   backend_check invalidate-test               injected AUDCLNT_E_DEVICE_INVALIDATED: streams recover
 //   backend_check exclusive-test                exclusive open of CABLE Input by another process vs our shared stream
 //   backend_check vmic-latency [--vmic-exclusive] click latency CABLE Input -> an app's capture of CABLE Output
+//   backend_check render-latency [--device K]  the same for a render to a (muted) endpoint, via process loopback
+//   backend_check periods                       shared-mode engine periods each endpoint allows (IAudioClient3)
+//   (latency tests take --vmic-period N --vmic-queue Q --render-period N --render-queue Q --seconds S --tone A)
 //   backend_check restore                       restore_journal() (as `beamer-audio restore`)
 // Child modes (spawned by the tests): record, sleeper, hold-mute, exclusive.
 // Every command takes --state-dir D (default: %TEMP%\beamer-wp4-check) so the real Beamer journal is never touched.
@@ -82,11 +85,18 @@ static double secs() { return now_ns() / 1e9; }
 
 static std::wstring g_state_dir;
 static bool g_vmic_exclusive = false;
+static const Args* g_args = nullptr;
 static WinOptions options() {
     WinOptions o;
     o.state_dir = g_state_dir;
     o.log_level = "info";
     o.vmic_exclusive = g_vmic_exclusive;
+    // WP12 tuning: override the shared render period (frames) / queue (periods) for a measurement.
+    if (g_args->has("vmic-period")) o.vmic_period = (unsigned)g_args->num("vmic-period", 0);
+    if (g_args->has("vmic-queue")) o.vmic_queue = g_args->num("vmic-queue", o.vmic_queue);
+    if (g_args->has("render-period")) o.render_period = (unsigned)g_args->num("render-period", 0);
+    if (g_args->has("mic-period")) o.mic_period = (unsigned)g_args->num("mic-period", 0);
+    if (g_args->has("render-queue")) o.render_queue = g_args->num("render-queue", o.render_queue);
     return o;
 }
 
@@ -154,6 +164,21 @@ struct Clicks : RenderSource {
             for (int c = 0; c < ch; c++) x[(size_t)i * ch + c] = v;
         }
         pos += n;
+    }
+};
+
+// A continuous tone (for holes) with Clicks' bursts on top (for latency).
+struct ToneClicks : Clicks {
+    double amp = 0.05, ph = 0;
+    void on_render(float* x, int n, int ch, uint64_t t) override {
+        Clicks::on_render(x, n, ch, t);
+        const double d = 2 * kPi * 997 / kRate;
+        for (int i = 0; i < n; i++) {
+            float v = (float)(amp * std::sin(ph));
+            ph += d;
+            if (ph > 2 * kPi) ph -= 2 * kPi;
+            for (int c = 0; c < ch; c++) x[(size_t)i * ch + c] += v;
+        }
     }
 };
 
@@ -308,10 +333,15 @@ static std::vector<DWORD> children_of(DWORD parent) {
 static int child_record(const Args& a) {
     ComScope com;
     auto e = make_enumerator();
-    auto d = device_by_id(e.Get(), a.get("device"));
-    if (!d) { out("error no device"); return 2; }
     Client c;
-    HRESULT hr = open_endpoint_client(d.Get(), ClientKind::Capture, 2, &c);
+    HRESULT hr;
+    if (a.has("include-pid")) {  // what that process tree plays, before the endpoint (WP12: render to a muted endpoint)
+        hr = open_process_loopback((DWORD)a.num("include-pid", 0), true, 2, &c);
+    } else {
+        auto d = device_by_id(e.Get(), a.get("device"));
+        if (!d) { out("error no device"); return 2; }
+        hr = open_endpoint_client(d.Get(), ClientKind::Capture, 2, &c);
+    }
     if (FAILED(hr)) { out("error open %s", hr_text(hr).c_str()); return 1; }
     Sleep((DWORD)(a.num("delay", 0) * 1000));
     c.client->Start();
@@ -380,8 +410,10 @@ static int child_exclusive(const Args& a) {
     REFERENCE_TIME def = 0, mn = 0;
     c->GetDevicePeriod(&def, &mn);
     // Exclusive mode: try the mix format, then 16-bit stereo 48 kHz.
-    HRESULT hr = c->Initialize(AUDCLNT_SHAREMODE_EXCLUSIVE, 0, def, def, mix, nullptr);
+    // --s16: one open in 16-bit stereo only (an app that checked the format first); otherwise mix format, then 16-bit.
+    HRESULT hr = a.has("s16") ? AUDCLNT_E_UNSUPPORTED_FORMAT : c->Initialize(AUDCLNT_SHAREMODE_EXCLUSIVE, 0, def, def, mix, nullptr);
     if (FAILED(hr)) {
+        out("exclusive-first %s", hr_text(hr).c_str());
         WAVEFORMATEX f{WAVE_FORMAT_PCM, 2, 48000, 48000 * 4, 4, 16, 0};
         c.Reset();
         d->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, &c);
@@ -801,20 +833,31 @@ static int cmd_exclusive_test(const Args&) {
 
 // Latency of the virtual-mic path as an app sees it: our render callback writes a click into CABLE Input -> an app's
 // shared-mode capture of CABLE Output delivers it (the metric of devloop.py, "as the transport sees it").
-static int cmd_vmic_latency(const Args& a) {
+// `render-latency`: the same through a render to an endpoint (default output, or --device), heard by a process
+// loopback of this process only (other apps' sound left out) while the endpoint is muted (journalled, restored).
+// A 997 Hz tone runs under the clicks: holes = runs of >= 8 near-zero samples at the recorder.
+static int cmd_vmic_latency(const Args& a, bool endpoint) {
     ComScope com;
+    auto before = read_all_levels();
     auto b = make_win_backend(options());
     auto s = b->snapshot();
-    std::string cable_out;
+    std::string cable_out, err;
     for (auto& d : s.devices) if (d.role == Role::VirtualMic) cable_out = d.key;
-    Clicks clk;
-    std::string err;
-    auto r = b->open_render(RenderSpec{"", true, 2}, &clk, &err);
-    if (!r) { check(false, "virtual-mic render opens", err); return 1; }
+    std::unique_ptr<StreamHandle> holder;
+    std::string dev = a.get("device", s.default_output);
+    Meter mute_sink;  // the endpoint stays muted while this system capture is open, so nobody hears the test
+    if (endpoint) holder = b->open_capture(CaptureSpec{CaptureKind::System, dev, 2, true, {}}, &mute_sink, &err);
+    if (endpoint && !holder) { check(false, "mute holder opens", err); return 1; }
+    ToneClicks clk;
+    clk.amp = a.num("tone", 0.05);
+    auto r = b->open_render(endpoint ? RenderSpec{dev, false, 2} : RenderSpec{"", true, 2}, &clk, &err);
+    if (!r) { check(false, "render opens", err); return 1; }
     double sec = a.num("seconds", 10);
     Child rec;
-    rec.start("record --clicks --device " + cable_out + " --seconds " + std::to_string((int)sec));
+    std::string src = endpoint ? "--include-pid " + std::to_string(GetCurrentProcessId()) : "--device " + cable_out;
+    rec.start("record --clicks " + src + " --seconds " + std::to_string((int)sec) + " --hole-amp " + std::to_string(clk.amp));
     std::vector<double> lat;
+    std::string result;
     double end = secs() + sec + 5;
     while (secs() < end) {
         std::string l = rec.line(end - secs());
@@ -825,14 +868,55 @@ static int cmd_vmic_latency(const Args& a) {
             for (uint64_t w : clk.written) if (w <= t) best = w;
             if (best) lat.push_back((t - best) / 1e6);
         }
-        if (l.rfind("result", 0) == 0) break;
+        if (l.rfind("result", 0) == 0) { result = l; break; }
     }
+    rec.wait(5000);
     r.reset();
+    holder.reset();
+    b.reset();
+    if (endpoint) check(compare_levels(before, "after render-latency") == 0, "all active endpoints back to their state");
     std::sort(lat.begin(), lat.end());
     if (lat.size() < 3) { check(false, "clicks detected", std::to_string(lat.size())); return 1; }
+    auto h = result.find("holes=");
+    long holes = h == std::string::npos ? -1 : atol(result.c_str() + h + 6);
     double med = lat[lat.size() / 2], p95 = lat[std::min(lat.size() - 1, lat.size() * 95 / 100)];
-    out("vmic latency (%s): %u clicks, min %.1f ms, median %.1f ms, p95 %.1f ms, max %.1f ms", g_vmic_exclusive ? "exclusive" : "shared",
-        (unsigned)lat.size(), lat.front(), med, p95, lat.back());
+    out("%s latency (%s): %u clicks, min %.1f ms, median %.1f ms, p95 %.1f ms, max %.1f ms, holes %ld in %d s", endpoint ? "render" : "vmic",
+        g_vmic_exclusive && !endpoint ? "exclusive" : "shared", (unsigned)lat.size(), lat.front(), med, p95, lat.back(), holes, (int)sec);
+    return holes == 0 ? 0 : 3;
+}
+
+// What each usable endpoint (and process loopback) offers for shared-mode periods: IAudioClient3's engine period
+// range for the mix format. Activates clients only (never initializes or starts them); Elgato endpoints are skipped.
+static int cmd_periods(const Args&) {
+    ComScope com;
+    auto e = make_enumerator();
+    for (auto& ep : enumerate_endpoints(e.Get(), DEVICE_STATE_ACTIVE, false)) {
+        if (ep.blocked || lower(ep.name + ep.adapter + ep.manufacturer).find("elgato") != std::string::npos) continue;
+        auto d = device_by_id(e.Get(), ep.id);
+        ComPtr<IAudioClient3> ac;
+        if (!d || FAILED(d->Activate(__uuidof(IAudioClient3), CLSCTX_ALL, nullptr, &ac))) { out("%-55s no IAudioClient3", ep.name.c_str()); continue; }
+        WAVEFORMATEX* mix = nullptr;
+        ac->GetMixFormat(&mix);
+        UINT32 def = 0, fund = 0, mn = 0, mx = 0, cur = 0;
+        HRESULT hr = ac->GetSharedModeEnginePeriod(mix, &def, &fund, &mn, &mx);
+        WAVEFORMATEX* cf = nullptr;
+        ac->GetCurrentSharedModeEnginePeriod(&cf, &cur);
+        REFERENCE_TIME dp = 0, mp = 0;
+        ac->GetDevicePeriod(&dp, &mp);
+        out("%-3s %-55s mix %uch %u Hz | engine period %s default %u fundamental %u min %u max %u, current %u | exclusive min %.2f ms",
+            ep.render ? "out" : "in", ep.name.c_str(), mix ? mix->nChannels : 0, mix ? mix->nSamplesPerSec : 0,
+            FAILED(hr) ? hr_text(hr).c_str() : "", def, fund, mn, mx, cur, mp / 10000.0);
+        CoTaskMemFree(mix);
+        CoTaskMemFree(cf);
+    }
+    Client c;
+    HRESULT hr = open_process_loopback(GetCurrentProcessId(), false, 2, &c);
+    REFERENCE_TIME dp = 0;
+    if (SUCCEEDED(hr)) c.client->GetDevicePeriod(&dp, nullptr);
+    ComPtr<IAudioClient3> c3;
+    bool has3 = SUCCEEDED(hr) && SUCCEEDED(c.client.As(&c3));
+    out("process loopback: %s, buffer %u frames, device period %.2f ms, IAudioClient3 %s", hr_text(hr).c_str(), c.buffer_frames, dp / 10000.0,
+        has3 ? "yes" : "no");
     return 0;
 }
 
@@ -847,6 +931,7 @@ int main(int argc, char** argv) {
     if (run_guard_if_requested(argc, argv, &rc)) return rc;
     auto argv8 = wargs();
     Args a = parse(argv8);
+    g_args = &a;
     g_vmic_exclusive = a.has("vmic-exclusive");
     if (a.has("state-dir")) g_state_dir = wide(a.get("state-dir"));
     else {
@@ -868,8 +953,10 @@ int main(int argc, char** argv) {
     if (cmd == "journal-test") return cmd_journal_test(a);
     if (cmd == "invalidate-test") return cmd_invalidate_test(a);
     if (cmd == "exclusive-test") return cmd_exclusive_test(a);
-    if (cmd == "vmic-latency") return cmd_vmic_latency(a);
+    if (cmd == "vmic-latency") return cmd_vmic_latency(a, false);
+    if (cmd == "render-latency") return cmd_vmic_latency(a, true);
     if (cmd == "restore") return cmd_restore(a);
+    if (cmd == "periods") return cmd_periods(a);
     if (cmd == "record") return child_record(a);
     if (cmd == "sleeper") return child_sleeper(a);
     if (cmd == "hold-mute") return child_hold_mute(a);

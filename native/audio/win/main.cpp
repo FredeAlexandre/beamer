@@ -2,7 +2,7 @@
 // beamer-audio.exe: the Windows audio helper (PHASE2 §3). The engine's run_helper() is the control loop; this file
 // only builds the WASAPI backend. Beyond §2.4's "three lines" it (1) runs the mute guard when started as one,
 // (2) hands run_helper a UTF-8 argv (main's argv is in the ANSI code page), (3) puts stdio in binary mode so
-// JSON lines end in "\n", not "\r\n".
+// JSON lines end in "\n", not "\r\n", (4) keeps backend-only options (--vmic-exclusive) away from the engine.
 #include "backend_win.h"
 
 #include <fcntl.h>
@@ -18,7 +18,11 @@ int main(int argc, char** argv) {
     std::vector<std::string> args;
     int wn = 0;
     if (LPWSTR* w = CommandLineToArgvW(GetCommandLineW(), &wn)) {
-        for (int i = 0; i < wn; i++) args.push_back(beamer::audio::win::utf8(w[i]));
+        for (int i = 0; i < wn; i++) {
+            std::string a = beamer::audio::win::utf8(w[i]);
+            if (a == "--vmic-exclusive") continue;  // backend-only option (WinOptions), unknown to the engine
+            args.push_back(a);
+        }
         LocalFree(w);
     }
     std::vector<char*> uargv;

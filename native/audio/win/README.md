@@ -22,10 +22,16 @@ Behaviour worth knowing:
 - **Mute**: journal on disk before `SetMute`; mute, master and per-channel volumes are put back exactly at stop,
   by the guard within ~30 ms of a kill, by `restore_journal()` at the next start (entries of dead owners only),
   and after a device change when an endpoint unplugged while muted comes back.
-- **Virtual mic**: render into "CABLE Input". Shared mode queues 3 periods: 2 periods gave 1 hole per 60 s in
-  3 runs out of 4; 3 periods gave 0 in 3x60 s + 300 s. Click latency to an app's capture of CABLE Output: 103-111 ms.
-  `--vmic-exclusive` (helper command line) renders exclusively, 16-bit, 2 ms period: 43-45 ms, 0 holes in
-  4x60 s but 1 in a 300 s soak. Off by default because it takes CABLE Input away from other apps.
+- **Virtual mic**: render into "CABLE Input", shared, at a 128-frame engine period (IAudioClient3; VB-CABLE allows
+  128..480) with 3 periods (8 ms) queued: 59-72 ms click latency to an app's capture of CABLE Output, 0 holes in
+  4x60 s + 300 s (WP12; the old 480 x 3 measured 102-117 ms, 128 x 2 gave holes). When another stream already runs
+  CABLE Input's engine at another period, the open falls back to the default period (logged). After a preemption
+  (another app's exclusive open) the stream waits 250 ms before reopening, so that app's format retries succeed.
+  `--vmic-exclusive` (helper command line; reported as feature `vmic_exclusive`) renders exclusively, 16-bit, 2 ms
+  period: 36-45 ms, but takes CABLE Input away from other apps, so it is opt-in per machine.
+- **Endpoint render** keeps 1.5 periods (15 ms) queued (WP12: 0 holes on the G733 in 4x60 s + 300 s). USB
+  endpoints here (G733, DualSense) and capture (mics, process loopback) have a fixed 480-frame period: 10 ms packets.
+  Mic and endpoint render still ask for 128 frames, which only matters on a driver that reports a period range.
 - **Defaults** that are blocked or VB-CABLE are reported as `""`. Opening a blocked endpoint, or using CABLE Output
   or CABLE In 16ch as a source, fails with `blocked_device`.
 - Errors in `*err` are `"<§3.3 code>: <message>"`.
