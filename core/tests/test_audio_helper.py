@@ -64,7 +64,7 @@ class HelperProcessTests(unittest.TestCase):
         self.assertEqual(process.state, "ok")
         events.wait(is_ev("devices"))
         self.assertTrue(process.send({"cmd": "flow_open", "req": 7, "flow": "9f2c01aa", "peer": "x", "role": "offer",
-                                      "port": 0, "remote": None, "key": "k", "rr_ms": 10}))
+                                      "host": "127.0.0.1", "port": 0, "remote": None, "key": "k", "rr_ms": 10}))
         bound = events.wait(is_ev("flow_bound"))
         self.assertEqual(bound["flow"], "9f2c01aa")
         events.wait(is_ev("ok", req=7))

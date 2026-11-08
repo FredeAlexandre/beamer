@@ -103,11 +103,15 @@ class FakeEngine:
         flow, role = command["flow"], command["role"]
         if role not in ("offer", "answer") or not isinstance(command["key"], str):
             return [], "bad_args"
+        host = command.get("host")
+        if host is not None and not isinstance(host, str):
+            return [], "bad_args"
         port = command.get("port") or 0
         if port == 0:
             self.next_port += 1
             port = self.next_port
         self.flows[flow] = {"peer": command.get("peer"), "role": role, "port": port, "remote": command.get("remote"),
+                            "host": host,
                             "state": "probing"}
         events = [{"ev": "flow_bound", "flow": flow, "port": port}]
         if command.get("remote"):
