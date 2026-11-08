@@ -76,12 +76,11 @@ int add_late_exclusions(Tap* t);  // resolves pending pids; returns how many wer
 std::string mic_permission();  // granted | denied | undetermined | unknown
 
 // Watches kAudioDevicePropertyDeviceIsRunningSomewhere of "Beamer Microphone" (PHASE2 §6.3). The
-// driver counts IO per device, so Beamer's own feed does not set it. Rising edges are reported at
-// once, falling edges after kOffHoldMs without a recorder. All methods (and the destructor) run on
-// `queue`.
+// driver counts IO per device, so Beamer's own feed does not set it. Changes are reported at once in
+// both directions: the engine's helper loop holds "off" for 3 s (§3.3), one hold for every backend.
+// All methods (and the destructor) run on `queue`.
 class DemandWatcher {
  public:
-  static constexpr int kOffHoldMs = 3000;
   DemandWatcher(dispatch_queue_t queue, std::function<void(bool)> on_change);
   ~DemandWatcher();
   void refresh();  // (re)attach to the current device (after a device change or coreaudiod restart)
@@ -96,8 +95,7 @@ class DemandWatcher {
   AudioObjectPropertyListenerBlock block_ = nil;
   std::atomic<bool> held_{false};
   bool raw_ = false;
-  uint64_t off_gen_ = 0;
-  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);  // pending hold timers check it
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);  // queued listener blocks check it
 };
 
 }  // namespace beamer::audio::mac

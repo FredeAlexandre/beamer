@@ -11,8 +11,9 @@ Tests (default: all but `restart`):
   kill     the local mute lifts <= 1 s after the capturing process is SIGKILLed (AUDIBLE, 6 s)
   selftap  a tone rendered by the backend's own process is not in its system tap (<= -90 dBFS); the
            same tone from another process is (silent: rendered into the hidden virtual-mic feed)
-  demand   virtual_mic.in_use true <= 200 ms after an app opens "Beamer Microphone", false 3 s after it
-           closes, never set by the feed alone
+  demand   the helper's virtual_mic.in_use: true <= 200 ms after an app opens "Beamer Microphone", false
+           3 s after it closes, never set by the helper's own feed (needs the engine)
+  feed     a mic stream received by the helper reaches an app recording "Beamer Microphone"
   restart  feed IO resumes <= 3 s after `sudo -n beamer-hal restart` and an app hears it again
   cpu      `beamer-audio` sending the built-in mic to a null peer: < 1 % of a core (needs the engine)
 
@@ -227,34 +228,88 @@ def recorder() -> subprocess.Popen:
                              "--rate", "48000", "--stats", "0"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
 
+def helper_pair():
+    """A: null backend sending the --dev test signature A as a mic stream; B: the real helper (Mac
+    backend) receiving it into "Beamer Microphone", i.e. Beamer's own feed."""
+    a, b = Helper("--dev", "--backend", "null:mic=silence"), Helper()
+    if not (a.wait_ev("ready") and b.wait_ev("ready")):
+        raise RuntimeError("helpers not ready")
+    key = base64.b64encode(os.urandom(32)).decode()
+    skey = base64.b64encode(os.urandom(32)).decode()
+    b.send({"cmd": "flow_open", "flow": "0000000c", "peer": "QQ==", "role": "answer", "port": 0, "remote": None,
+            "key": key, "rr_ms": 10})
+    pb = b.wait_ev("flow_bound")["port"]
+    a.send({"cmd": "flow_open", "flow": "0000000c", "peer": "Qg==", "role": "offer", "port": 0,
+            "remote": {"host": "127.0.0.1", "port": pb}, "key": key, "rr_ms": 10})
+    pa = a.wait_ev("flow_bound")["port"]
+    b.send({"cmd": "flow_remote", "flow": "0000000c", "host": "127.0.0.1", "port": pa})
+    codec = {"name": "opus", "app": "voip", "channels": 1, "bitrate": 32000, "frame_ms": 10, "fec": True}
+    b.send({"cmd": "recv", "stream": 9, "flow": "0000000c", "kind": "mic", "codec": codec, "key": skey,
+            "sink": {"virtual_mic": True}})
+    a.send({"cmd": "send", "stream": 9, "flow": "0000000c", "kind": "mic", "source": {"test": "A"}, "codec": codec,
+            "key": skey, "mute_local": False, "aec": None})
+    return a, b
+
+
 def t_demand():
-    ev: list = []
-    w = bc("watch", "--seconds", "16")
-    lines_of(w, ev)
-    time.sleep(1.0)
-    feed = bc("play", "--vmic", "--tone", "440", "--level", "-30", "--seconds", "14")  # Beamer's feed alone
-    time.sleep(2.5)
-    feed_only = [e for e in ev if e.get("ev") == "vmic_in_use"]
-    rec = recorder()
-    t_open = time.time()
-    first = rec.stdout.read(4)  # first audio from "Beamer Microphone" = the device is running
-    t_audio = time.time()
-    time.sleep(3.0)
-    rec.send_signal(signal.SIGINT)
-    rec.wait()
-    t_close = time.time()
-    time.sleep(4.5)
-    stop(feed)
-    stop(w)
-    on = next((e for e in ev if e.get("ev") == "vmic_in_use" and e["in_use"] and e["_wall"] > t_open), None)
-    off = next((e for e in ev if e.get("ev") == "vmic_in_use" and not e["in_use"] and e["_wall"] > t_close), None)
-    on_ms = None if on is None else round((on["wall"] - t_open) * 1000)
-    on_after_audio_ms = None if on is None else round((on["wall"] - t_audio) * 1000)
-    off_ms = None if off is None else round((off["wall"] - t_close) * 1000)
-    check("vmic_demand", not feed_only and on_ms is not None and on_ms <= 200 and off_ms is not None
-          and 2900 <= off_ms <= 3600 and len(first) == 4,
-          feed_alone_events=len(feed_only), on_ms_after_recorder_spawn=on_ms, on_ms_after_first_audio=on_after_audio_ms,
-          off_ms_after_recorder_exit=off_ms)
+    """virtual_mic.in_use in the helper's devices events while it feeds Beamer Microphone itself."""
+    if not HELPER.exists():
+        check("vmic_demand", False, error="beamer-audio not built")
+        return
+    a, b = helper_pair()
+    try:
+        time.sleep(2.5)
+        feed_running = any(e.get("ev") == "stream_state" and e.get("state") == "running" for e in b.ev)
+        rec = recorder()
+        t_open = time.time()
+        first = rec.stdout.read(4)
+        t_audio = time.time()
+        time.sleep(3.0)
+        rec.send_signal(signal.SIGINT)
+        rec.wait()
+        t_close = time.time()
+        time.sleep(4.5)
+        ev = [(e["_wall"], e["virtual_mic"]["in_use"]) for e in b.ev if e.get("ev") == "devices"]
+        before = [u for w, u in ev if w < t_open]
+        on = next((w for w, u in ev if u and w > t_open), None)
+        off = next((w for w, u in ev if not u and w > t_close), None)
+        on_ms = None if on is None else round((on - t_open) * 1000)
+        off_ms = None if off is None else round((off - t_close) * 1000)
+        check("vmic_demand", feed_running and not any(before) and on_ms is not None and on_ms <= 200
+              and off_ms is not None and 2900 <= off_ms <= 3600 and len(first) == 4,
+              own_feed_running=feed_running, in_use_before_recorder=any(before),
+              on_ms_after_recorder_spawn=on_ms, on_ms_after_first_audio=None if on is None else round((on - t_audio) * 1000),
+              off_ms_after_recorder_exit=off_ms)
+    finally:
+        a.close()
+        b.close()
+
+
+def t_feed():
+    """The helper renders a received mic stream into the feed; an app recording "Beamer Microphone"
+    gets signature A's pilot."""
+    sys.path.insert(0, str(ROOT / "dev/audio/proto/scenarios"))
+    import sig
+    a, b = helper_pair()
+    try:
+        time.sleep(2.0)
+        rec = recorder()
+        buf = b""
+        while len(buf) < 4 * RATE * 10:
+            chunk = rec.stdout.read(65536)
+            if not chunk:
+                break
+            buf += chunk
+        stop(rec)
+        x = np.frombuffer(buf[: len(buf) // 4 * 4], dtype="<f4").astype(np.float64)
+        g = sig.pilot_glitches(x, sig.SIGS["A"]["pilot"], skip_s=1.0)
+        stats = [e for e in b.ev if e.get("ev") == "stats"][-1:]
+        check("helper_feed_reaches_vmic", g.get("pilot_dbfs") is not None and g["pilot_dbfs"] > -60,
+              **{k: g.get(k) for k in ("seconds", "glitch_events", "pilot_dbfs", "glitch_at_s")},
+              receiver_stats=stats)
+    finally:
+        a.close()
+        b.close()
 
 
 def t_restart():
@@ -382,7 +437,7 @@ def main():
     ap.add_argument("tests", nargs="*")
     ap.add_argument("--json")
     args = ap.parse_args()
-    tests = args.tests or ["list", "selftap", "demand", "mute", "kill", "cpu"]
+    tests = args.tests or ["list", "selftap", "demand", "feed", "mute", "kill", "cpu"]
     for p in (BC, PROTO):
         if not p.exists():
             sys.exit(f"missing {p}")

@@ -60,16 +60,8 @@ void DemandWatcher::update() {
   bool raw = dev_ && get_u32(dev_, addr(kAudioDevicePropertyDeviceIsRunningSomewhere), &v) && v != 0;
   if (raw == raw_) return;
   raw_ = raw;
-  const uint64_t gen = ++off_gen_;
-  if (raw) {
-    if (!held_.exchange(true)) on_change_(true);
-    return;
-  }
-  std::shared_ptr<bool> alive = alive_;
-  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, int64_t(kOffHoldMs) * NSEC_PER_MSEC), queue_, ^{
-    if (!*alive || gen != off_gen_ || raw_) return;
-    if (held_.exchange(false)) on_change_(false);
-  });
+  held_.store(raw);
+  on_change_(raw);  // the engine holds "off" for 3 s (PHASE2 §3.3), so report the raw state at once
 }
 
 }  // namespace beamer::audio::mac
