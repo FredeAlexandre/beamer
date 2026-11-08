@@ -1400,16 +1400,6 @@ msgid "No audio"
 msgstr ""
 
 #: core/audio/view.py
-#, python-brace-format
-msgid "Beamer heard feedback between {target}'s speakers and a microphone on {source}, and turned down {source}'s sound on {target}. Use headphones on {target}, or turn off Wave Link's monitor to the system output on {source}."
-msgstr ""
-
-#: core/audio/view.py
-#, python-brace-format
-msgid "Beamer heard feedback between {target}'s speakers and a microphone on {source}, and turned down {source}'s sound on {target}. Use headphones on {target}, or stop {source} from playing that microphone through its own sound."
-msgstr ""
-
-#: core/audio/view.py
 msgid "Beamer may not use this Mac's microphones. Allow it in System Settings, Privacy & Security, Microphone."
 msgstr ""
 
@@ -1501,6 +1491,26 @@ msgstr ""
 #: core/audio/view.py
 #, python-brace-format
 msgid "{machine}, {state}."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Beamer heard what sounds like feedback in {source}'s sound playing on {target}, and turned it down. If Wave Link's monitor plays a microphone into the system output on {source}, turn it off."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Beamer heard what sounds like feedback in {source}'s sound playing on {target}, and turned it down. If {source} plays a microphone through its own sound, stop it."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Beamer heard what sounds like feedback in {source}'s sound playing on {target}, and turned it down. If a microphone on {source} can hear {target}'s speakers, use headphones on {target}, or turn off Wave Link's monitor to the system output on {source}."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Beamer heard what sounds like feedback in {source}'s sound playing on {target}, and turned it down. If a microphone on {source} can hear {target}'s speakers, use headphones on {target}, or stop {source} from playing that microphone through its own sound."
 msgstr ""
 
 #: core/audio/view.py

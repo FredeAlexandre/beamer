@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Mapping, Optional
 
-from core.audio import model
+from core.audio import model, planner
 from core.audio.model import AudioSnapshot, DeviceRef, MachineAudio, RouteStatus
 from core.i18n import N_, joined, tr, trn
 
@@ -717,20 +717,33 @@ def _wave_link(machine: Optional[MachineAudio]) -> bool:
 
 def _howl_notices(snap: AudioSnapshot, names: _Names) -> list:
     """Feedback the howl guard caught (§3.3 `howl`): one notice per sound stream, while ducked and
-    for a while after."""
+    for a while after. Beamer cannot see whether the target's speakers are muted or turned down, and
+    the guard can mistake a sound for feedback, so the notice says what Beamer did and gives the
+    likely cause as a condition, never as a fact; it does not mention speakers when the sound plays
+    on headphones."""
     notices, seen = [], set()
     for howl in snap.howls:
         if (howl.source, howl.target) in seen:
             continue
         seen.add((howl.source, howl.target))
-        if _wave_link(snap.machines.get(howl.source)):
-            text = tr("Beamer heard feedback between {target}'s speakers and a microphone on {source}, and turned "
-                      "down {source}'s sound on {target}. Use headphones on {target}, or turn off Wave Link's "
-                      "monitor to the system output on {source}.")
+        wave_link = _wave_link(snap.machines.get(howl.source))
+        held = snap.machines.get(howl.target)
+        sink = (_device_named(held.outputs, model.output_of(snap.route, howl.source).device, held.default_output)
+                if held is not None else None)
+        if sink is not None and _headset(sink.form):
+            text = (tr("Beamer heard what sounds like feedback in {source}'s sound playing on {target}, and turned it "
+                       "down. If Wave Link's monitor plays a microphone into the system output on {source}, turn it "
+                       "off.") if wave_link else
+                    tr("Beamer heard what sounds like feedback in {source}'s sound playing on {target}, and turned it "
+                       "down. If {source} plays a microphone through its own sound, stop it."))
+        elif wave_link:
+            text = tr("Beamer heard what sounds like feedback in {source}'s sound playing on {target}, and turned it "
+                      "down. If a microphone on {source} can hear {target}'s speakers, use headphones on {target}, or "
+                      "turn off Wave Link's monitor to the system output on {source}.")
         else:
-            text = tr("Beamer heard feedback between {target}'s speakers and a microphone on {source}, and turned "
-                      "down {source}'s sound on {target}. Use headphones on {target}, or stop {source} from playing "
-                      "that microphone through its own sound.")
+            text = tr("Beamer heard what sounds like feedback in {source}'s sound playing on {target}, and turned it "
+                      "down. If a microphone on {source} can hear {target}'s speakers, use headphones on {target}, or "
+                      "stop {source} from playing that microphone through its own sound.")
         notices.append(Notice("howl", text.format(source=names(howl.source), target=names(howl.target)), WAIT,
                               machine=howl.source, target=howl.target))
     return notices
@@ -790,11 +803,13 @@ def _notices(snap: AudioSnapshot, names: _Names, platform: str, without_audio, d
     notices += _howl_notices(snap, names)
     source = snap.route.mic.machine
     targets = [target for target in _mic_targets(snap) if target != source] if snap.mic_status.state == "streaming" else []
-    # Beamer cancels echo only where the helper can (`aec` in its features) and it is not turned off
-    # (this machine's own setting; another machine's is not known here): the planner's rule (§6.4).
+    # Beamer cancels echo only where the helper can (`aec` in its features), it is not turned off
+    # (this machine's own setting; another machine's is not known here) and the default output plays
+    # something: the planner's rule (§6.4).
     held_source = snap.machines.get(source) if source is not None else None
     cancels = (held_source is not None and "aec" in held_source.features
-               and (source != snap.own or snap.aec_mode == "auto"))
+               and (source != snap.own or snap.aec_mode == "auto")
+               and not planner.speakers_idle(snap.route, held_source, snap.output_status))
     if source is not None and targets and _speaker_devices(snap, source):
         if cancels:
             notices.append(Notice("echo_aec", tr("Beamer cancels the echo of {machine}'s speakers. A headset on "

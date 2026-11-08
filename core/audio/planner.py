@@ -95,7 +95,24 @@ def sink_problem(route: Route, own: MachineAudio, sink: Mapping) -> Optional[str
     return None
 
 
-def _mic(own, machines, route, direct, online, aec_mode, now, demand_hold, sends):
+def speakers_idle(route: Route, holder: MachineAudio, output_status: Mapping[str, RouteStatus]) -> bool:
+    """Nothing plays on `holder`'s default output (the echo reference): its own sound streams to another
+    machine (muted here), and no other machine's sound streams to that output. Its mic then hears no
+    speakers, and an echo canceller would only risk altering it (WP16)."""
+    if model.output_of(route, holder.id).to is None or output_status.get(holder.id, RouteStatus("off")).state != "streaming":
+        return False
+    for machine, entry in route.outputs.items():
+        if machine == holder.id or entry.to != holder.id:
+            continue
+        if output_status.get(machine, RouteStatus("off")).state != "streaming":
+            continue
+        device, _missing = resolve_output(holder, entry.device)
+        if device is not None and device.key == holder.default_output:
+            return False
+    return True
+
+
+def _mic(own, machines, route, direct, online, aec_mode, now, demand_hold, sends, output_status):
     mic = route.mic
     source = mic.machine
     if source is None:
@@ -113,7 +130,9 @@ def _mic(own, machines, route, direct, online, aec_mode, now, demand_hold, sends
             return RouteStatus("waiting_device", None, {"machine": source, "device": mic.device.name}), None
         source_key = device.key
     # Only a helper that lists `aec` cancels echo (§3.3 `ready`); an older one would ignore the field.
-    aec = aec_mode == "auto" and "aec" in holder.features and output_form(route, holder) not in HEADSET_FORMS
+    # No echo to cancel from a headset, or from speakers that play nothing (speakers_idle).
+    aec = (aec_mode == "auto" and "aec" in holder.features and output_form(route, holder) not in HEADSET_FORMS
+           and not speakers_idle(route, holder, output_status))
     reference = holder.default_output if aec else None
     reachable = peers_of(own, source, direct, machines)
     streaming, problems = [], {}
@@ -171,8 +190,8 @@ def _output(own, machine, machines, route, direct, online, sends):
 def plan(own: str, machines: Mapping[str, MachineAudio], route: Route, direct: frozenset, online: frozenset,
          aec_mode: str, now: float, demand_hold: Mapping[str, float]) -> Plan:
     sends = {}
-    mic_status, loop = _mic(own, machines, route, direct, online, aec_mode, now, demand_hold, sends)
     output_status = {machine: _output(own, machine, machines, route, direct, online, sends)
                      for machine in sorted(machines)}
+    mic_status, loop = _mic(own, machines, route, direct, online, aec_mode, now, demand_hold, sends, output_status)
     pending = [until for until in demand_hold.values() if until > now]
     return Plan(sends, loop, mic_status, output_status, min(pending) if pending else None)
