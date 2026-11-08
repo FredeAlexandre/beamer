@@ -8,7 +8,8 @@ only lays it out and draws it in the Crossing page's style:
 - `AudioMap`: the machines on the Crossing layout's tiles, read only, with the mic and sound routes as
   arrows (sound solid, mic dashed, grey while waiting); click or arrow keys select a machine;
 - `MenuSelect`: a button that opens a menu of `view.Choice`s, grouped under machine headers;
-- `AudioPageWidget`: the four modules (Microphone, Machines, the selected machine, notices).
+- `AudioPageWidget`: the Microphone module, the notices right under it (both apps), Machines and
+  the selected machine.
 
 Threads (§9.3): the service calls `subscribe`/`subscribe_levels` callbacks on its worker thread. They
 only store what arrived and post one queued signal (coalesced); the page reads the snapshot, builds the
@@ -51,7 +52,6 @@ NOTE_ROLES = {view.QUIET: "note-quiet", view.PLAIN: "note", view.LIVE: "note-liv
 LEGEND = (("sound", N_("Sound")), ("mic", N_("Microphone")), ("waiting", N_("Waiting")))
 UNAVAILABLE = N_("Audio is not running in this Beamer yet. Microphones and speakers show here once it is.")
 MAP_HINT = N_("Click a machine, or use the arrow keys, to see its devices and choose where its sound plays.")
-RECORDING = N_("An app here is recording Beamer's microphone.")
 # The app's own notice actions that this platform can carry out.
 OWN_ACTIONS = {"win32": {"open_mic_settings": "ms-settings:privacy-microphone"}}
 
@@ -265,7 +265,52 @@ class LevelMeter(QWidget):
 
 
 def _spoken(tile: view.TileView) -> str:
-    return tile.description + (" " + tr(RECORDING) if tile.recording else "")
+    # The model's description already ends with the tile's recording_line while an app records.
+    return tile.description
+
+
+def paint_speaker_glyph(painter: QPainter, x: float, y: float, colour: QColor, size: float = 12.0) -> None:
+    """A loudspeaker with one sound wave, `size` tall, top left at (x, y)."""
+    unit = size / 12.0
+    painter.save()
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(colour)
+    painter.drawPolygon(QPolygonF([QPointF(x, y + 4 * unit), QPointF(x + 3 * unit, y + 4 * unit),
+                                   QPointF(x + 7 * unit, y + 0.5 * unit), QPointF(x + 7 * unit, y + 11.5 * unit),
+                                   QPointF(x + 3 * unit, y + 8 * unit), QPointF(x, y + 8 * unit)]))
+    pen = QPen(colour, 1.3)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    painter.setPen(pen)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    painter.drawArc(QRectF(x + 5 * unit, y + 3 * unit, 6 * unit, 6 * unit), -60 * 16, 120 * 16)
+    painter.restore()
+
+
+def tile_mic_text(tile: view.TileView) -> tuple:
+    """(text, ink, important) of a tile's microphone line, as on the Mac page: the shared mic on its
+    machine, else who hears it, else the machine's own default mic (quiet)."""
+    if tile.mic_line:
+        return tile.mic_line, "ink", True
+    if tile.listen_line:
+        return tile.listen_line, view.LIVE, True
+    return tile.input_line, view.QUIET, False
+
+
+def linked_without_audio(app) -> tuple:
+    """The names of the machines linked to `app` (kvm_bridge_win's window) whose Beamer announces no
+    `audio`, from the capabilities of their links as audio_win.PcAudio holds them. Empty when this
+    Beamer runs without audio itself (it then does not track the links' capabilities)."""
+    audio = getattr(app, "_audio", None)
+    peers = getattr(audio, "peers", None)
+    if peers is None:
+        return ()
+    names = []
+    for peer, caps in sorted(peers.peers().items()):
+        if caps is None or "audio" in caps:
+            continue
+        name = audio.host.peer_name(peer)
+        names.append(name if name and name != peer else "")
+    return tuple(names)
 
 
 class AudioMap(QWidget):
@@ -349,11 +394,22 @@ class AudioMap(QWidget):
         hover = self._tile_at(event.position())
         if hover != self._hover:
             self._hover = hover
-            tile = next((tile for tile in self.tiles if tile.machine == hover), None)
-            self.setToolTip(_spoken(tile) if tile is not None else "")
             self.setCursor(Qt.CursorShape.PointingHandCursor if hover else Qt.CursorShape.ArrowCursor)
             self.update()
+        text = self.tooltip_at(event.position())
+        if text != self.toolTip():
+            self.setToolTip(text)
         super().mouseMoveEvent(event)
+
+    def tooltip_at(self, point) -> str:
+        """Over a tile's recording mark, its recording_line; elsewhere on a tile, its description."""
+        tile = next((tile for tile in self.tiles if tile.machine == self._tile_at(point)), None)
+        if tile is None:
+            return ""
+        rect = self.tile_rect(tile.machine)
+        if tile.recording_line and QRectF(rect.right() - 26, rect.top(), 26, 26).contains(point):
+            return tile.recording_line
+        return _spoken(tile)
 
     def leaveEvent(self, event) -> None:
         if self._hover is not None:
@@ -447,7 +503,13 @@ class AudioMap(QWidget):
             painter.drawEllipse(centre, 6, 6)
             painter.setBrush(_colour("signal"))
             painter.drawEllipse(centre, 3, 3)
-        if tall >= 56:
+        # The microphone and the output in two lines over the level bar, as on the Mac page; short of
+        # room the shared mic (or who hears it) beats the platform line, which beats the own default mic.
+        mic_text, mic_ink, important = tile_mic_text(tile)
+        out_y = rect.bottom() - 33
+        mic_y = out_y - 19
+        show_mic = bool(mic_text) and (mic_y >= rect.top() + 48 or (important and mic_y >= rect.top() + 30))
+        if tall >= 56 and not (show_mic and mic_y < rect.top() + 48):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(_colour("signal" if tile.online else "ink_3"))
             painter.drawEllipse(QPointF(rect.left() + 15, rect.top() + 39), 3, 3)
@@ -457,23 +519,23 @@ class AudioMap(QWidget):
             painter.drawText(detail, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft,
                              painter.fontMetrics().elidedText(tile.subtitle, Qt.TextElideMode.ElideRight,
                                                               max(1, round(detail.width()))))
-        if tile.has_active_mic and tall >= 78:
-            tone = self.mic_tone if tile.online else view.QUIET
-            painter.setFont(theme.font(tokens.TYPE["note"], 600))
-            metrics = painter.fontMetrics()
-            room = max(1, round(rect.width() - 20 - 16))
-            text = metrics.elidedText(tile.mic_line, Qt.TextElideMode.ElideRight, room)
-            paint_mic_glyph(painter, rect.left() + 10, rect.top() + 53, _colour(tone), 11.0)
-            painter.setPen(_colour(tone))
-            painter.drawText(QRectF(rect.left() + 26, rect.top() + 50, room, 18),
-                             Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, text)
+        room = max(1, round(rect.width() - 28 - 10))
+        if show_mic:
+            glyph = view.LIVE if tile.has_active_mic or tile.listen_line else view.QUIET
+            if not tile.online:
+                glyph = mic_ink = view.QUIET
+            paint_mic_glyph(painter, rect.left() + 10, mic_y + 2, _colour(glyph), 11.0)
+            painter.setPen(_colour(mic_ink))
+            painter.setFont(theme.font(tokens.TYPE["note"], 600 if tile.has_active_mic else 400))
+            painter.drawText(QRectF(rect.left() + 28, mic_y, room, 16), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+                             painter.fontMetrics().elidedText(mic_text, Qt.TextElideMode.ElideRight, room))
         if tall >= 64:
-            painter.setPen(_colour(tile.output_tone))
+            tone = tile.output_tone
+            paint_speaker_glyph(painter, rect.left() + 9, out_y + 2, _colour(tone if tone != view.PLAIN else view.QUIET), 12.0)
+            painter.setPen(_colour(tone))
             painter.setFont(theme.font(tokens.TYPE["note"]))
-            foot = QRectF(rect.left() + 8, rect.bottom() - 30, max(1.0, rect.width() - 16), 16)
-            painter.drawText(foot, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter,
-                             painter.fontMetrics().elidedText(tile.output_line, Qt.TextElideMode.ElideRight,
-                                                              max(1, round(foot.width()))))
+            painter.drawText(QRectF(rect.left() + 28, out_y, room, 16), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+                             painter.fontMetrics().elidedText(tile.output_line, Qt.TextElideMode.ElideRight, room))
         if tile.meter and tall >= 56:
             paint_meter(painter, QRectF(rect.left() + 12, rect.bottom() - 10, rect.width() - 24, 3),
                         view.meter_reading(self.levels, tile.meter))
@@ -657,15 +719,20 @@ def _clear(layout) -> None:
 class AudioPageWidget(QWidget):
     """The Audio page's modules. `service` is the AudioService (§8.1), or a callable returning it or
     None while the app has none; `tiles()` the Crossing layout as view.page_model takes it;
-    `peers_without_audio()` the names of linked machines whose Beamer has no audio."""
+    `peers_without_audio()` the names of linked machines whose Beamer has no audio; `driver()` the
+    Mac driver's state for view.page_model (None here: the PC's virtual mic is VB-CABLE, which the
+    snapshot reports). Without a service or `peers_without_audio`, the page reads its window's
+    (kvm_bridge_win's `audio` and, through `_audio`, the links' capabilities)."""
 
     def __init__(self, service=None, *, own_label: str, tiles: Callable[[], dict] = dict,
-                 peers_without_audio: Callable[[], tuple] = tuple, parent: QWidget | None = None) -> None:
+                 peers_without_audio: Optional[Callable[[], tuple]] = None,
+                 driver: Callable[[], Optional[str]] = lambda: None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setProperty("vernier", "plain")
         self.own_label = own_label
         self._tiles = tiles
-        self._peers_without_audio = peers_without_audio
+        self._peers_without_audio = peers_without_audio or (lambda: linked_without_audio(self.window()))
+        self._driver = driver
         self._lookup = service if callable(service) and not hasattr(service, "snapshot") else None
         self.service = None
         self.page = None
@@ -724,6 +791,12 @@ class AudioPageWidget(QWidget):
         self.mic_module.body.addWidget(self.mic_row)
         outer.addWidget(self.mic_module)
 
+        # The notices right under the Microphone module, so a missing driver or an echo is seen
+        # without scrolling (the same place on the Mac page).
+        self.notices_box = QVBoxLayout()
+        self.notices_box.setSpacing(8)
+        outer.addLayout(self.notices_box)
+
         self.map_module = widgets.Module(tr("Machines"))
         self.map = AudioMap(self._machine_chosen)
         self.map_module.body.addWidget(self.map)
@@ -772,9 +845,6 @@ class AudioPageWidget(QWidget):
         self.panel_module.body.addLayout(self.outputs_box)
         outer.addWidget(self.panel_module)
 
-        self.notices_box = QVBoxLayout()
-        self.notices_box.setSpacing(8)
-        outer.addLayout(self.notices_box)
 
     # -- the service --------------------------------------------------------------------------------
 
@@ -797,6 +867,9 @@ class AudioPageWidget(QWidget):
     def _find_service(self) -> None:
         if self.service is None and self._lookup is not None:
             found = self._lookup()
+            if found is None and self.window() is not self:
+                # The app's own service, as kvm_bridge_win holds it.
+                found = getattr(self.window(), "audio", None)
             if found is not None:
                 self.set_service(found)
 
@@ -880,8 +953,12 @@ class AudioPageWidget(QWidget):
             tiles = self._tiles() or {}
         except Exception:  # noqa: BLE001 - a layout being rewritten; the next refresh has it
             tiles = {}
+        try:
+            without_audio = tuple(self._peers_without_audio() or ())
+        except Exception:  # noqa: BLE001 - links changing under us; the next refresh has them
+            without_audio = ()
         page = view.page_model(self.service.snapshot(), tiles, self.selected, self.own_label,
-                               tuple(self._peers_without_audio() or ()))
+                               without_audio, self._driver())
         self.show_page(page)
 
     def _menu_closed(self) -> None:

@@ -2,7 +2,7 @@
 """The Qt Audio page (dev/audio/PHASE2.md §9.2, §13 WP7), on the shared fixtures and a fake service.
 
 Also renders the acceptance shots: `python win_app/tests/test_audio_page_win.py --render <dir>` writes
-the four fixture states in light and dark, each as the window shows it, plus the Crossing page.
+the four states as this PC's window shows them (`FIXTURES_PC`), light and dark, plus the Crossing page.
 """
 
 from __future__ import annotations
@@ -51,26 +51,6 @@ def settle(application, rounds=6):
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         QCoreApplication.sendPostedEvents(None, QEvent.Type.LayoutRequest)
         application.processEvents()
-
-
-def as_pc(fixture):
-    """The same state seen from lebig: this PC is `own`, the Mac a linked peer. In driver_missing
-    it is this PC that lacks its virtual mic (VB-CABLE), as the Mac lacks Beamer Microphone there."""
-    snap = fixture.snapshot
-    if fixture.name == "driver_missing":
-        bare = fx.pc()
-        snap = replace(snap, machines={**snap.machines, fx.PC: replace(
-            bare, virtual_mic=model.VirtualMic(None, False, False), features=bare.features - {"virtual_mic"})})
-    direct = frozenset({fx.MAC}) if fx.MAC in snap.machines and len(snap.machines) > 1 else frozenset()
-    machines = dict(snap.machines)
-    if fx.PC not in machines:
-        machines[fx.PC] = fx.pc(links=())
-        direct = frozenset()
-    snap = replace(snap, own=fx.PC, direct=direct, machines=machines,
-                   online=model.online(fx.PC, direct, machines))
-    tiles = dict(fixture.tiles)
-    tiles.setdefault(fx.PC, fx.TILES[fx.PC])
-    return replace(fixture, snapshot=snap, tiles=tiles, own_label="This PC")
 
 
 class Host(QWidget):
@@ -152,19 +132,20 @@ class Page(unittest.TestCase):
         self.assertTrue(page.mic_module.isHidden())
 
     def test_every_fixture_shows_its_model(self):
-        for name, make in list(fx.FIXTURES.items()) + [("three_machines", fx.three_machines)]:
-            for fixture in (make(), as_pc(make())):
-                with self.subTest(name, own=fixture.own_label):
-                    page, _service = make_page(fixture)
-                    model_page = page.page
-                    self.assertEqual(page.mic_select.text(),
-                                     view.choice_by_key(model_page.mic_choices, model_page.mic_selected).title)
-                    self.assertEqual(page.mic_line.text(), model_page.mic_line)
-                    self.assertEqual(len(page.map.tiles), len(model_page.tiles))
-                    self.assertEqual(len(page.rows), len(model_page.panel.inputs) + len(model_page.panel.outputs))
-                    self.assertEqual([widget.notice.code for widget in page.notices],
-                                     [notice.code for notice in model_page.notices])
-                    page.deleteLater()
+        makers = list(fx.FIXTURES.items()) + list(fx.FIXTURES_PC.items()) + [("three_machines", fx.three_machines)]
+        for name, make in makers:
+            fixture = make()
+            with self.subTest(name, own=fixture.own_label):
+                page, _service = make_page(fixture)
+                model_page = page.page
+                self.assertEqual(page.mic_select.text(),
+                                 view.choice_by_key(model_page.mic_choices, model_page.mic_selected).title)
+                self.assertEqual(page.mic_line.text(), model_page.mic_line)
+                self.assertEqual(len(page.map.tiles), len(model_page.tiles))
+                self.assertEqual(len(page.rows), len(model_page.panel.inputs) + len(model_page.panel.outputs))
+                self.assertEqual([widget.notice.code for widget in page.notices],
+                                 [notice.code for notice in model_page.notices])
+                page.deleteLater()
 
     def test_mic_choice_calls_set_mic(self):
         fixture = fx.mic_streaming()
@@ -325,6 +306,87 @@ class Page(unittest.TestCase):
         host.deleteLater()
 
 
+    def test_tiles_carry_the_model_lines(self):
+        """The shared mic, who hears it and the own default mic come from the model, as on the Mac."""
+        page, _service = make_page(fx.FIXTURES_PC["mic_streaming"]())
+        tiles = {tile.machine: tile for tile in page.map.tiles}
+        self.assertEqual(audio_page_win.tile_mic_text(tiles[fx.MAC]), (fx.MAC_MIC.name, "ink", True))
+        self.assertEqual(audio_page_win.tile_mic_text(tiles[fx.PC]), ("Hears MacBook Air", view.LIVE, True))
+        page, _service = make_page(fx.FIXTURES_PC["no_peers"]())
+        self.assertEqual(audio_page_win.tile_mic_text(page.map.tiles[0]), (fx.WAVE.name, view.QUIET, False))
+
+    def test_the_recording_mark_says_the_models_sentence(self):
+        page, _service = make_page(fx.FIXTURES_PC["mic_streaming"]())
+        host = Host(page)
+        host.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
+        host.show()
+        settle(self.app)
+        own = next(tile for tile in page.map.tiles if tile.machine == fx.PC)
+        self.assertTrue(own.recording_line)
+        rect = page.map.tile_rect(fx.PC)
+        self.assertEqual(page.map.tooltip_at(QPointF(rect.right() - 13, rect.top() + 13)), own.recording_line)
+        self.assertEqual(page.map.tooltip_at(rect.center()), own.description)
+        # Spoken once: the description already holds the sentence.
+        self.assertEqual(own.description.count(own.recording_line), 1)
+        host.deleteLater()
+
+    def test_notices_sit_right_under_the_microphone(self):
+        page, _service = make_page(fx.FIXTURES_PC["vbcable_missing"]())
+        outer = page.layout()
+        order = [outer.itemAt(index) for index in range(outer.count())]
+        mic = next(index for index, item in enumerate(order) if item.widget() is page.mic_module)
+        self.assertIs(order[mic + 1].layout(), page.notices_box)
+        self.assertEqual([widget.notice.code for widget in page.notices][0], "vbcable_missing")
+
+    def test_the_driver_state_reaches_the_model(self):
+        """The Mac-only outdated notice, here without its action (only the Mac app installs it)."""
+        fixture = fx.no_peers()
+        service = fx.FakeService(fixture.snapshot)
+        page = audio_page_win.AudioPageWidget(service, own_label="This Mac", tiles=lambda: fixture.tiles,
+                                              peers_without_audio=tuple, driver=lambda: "outdated")
+        notice = next(widget for widget in page.notices if widget.notice.code == "driver_outdated")
+        self.assertIsNone(notice.action)
+
+    def test_peers_without_audio_are_named(self):
+        fixture = fx.FIXTURES_PC["mic_streaming"]()
+        page, _service = make_page(replace(fixture, peers_without_audio=("asusrog",)))
+        notice = next(widget for widget in page.notices if widget.notice.code == "peer_no_audio")
+        self.assertIn("asusrog", notice.notice.text)
+
+
+class _Links:
+    def __init__(self, caps):
+        self.caps = caps
+
+    def peers(self):
+        return dict(self.caps)
+
+
+class _Host:
+    names = {fx.ROG: "asusrog", fx.MAC: "MacBook Air"}
+
+    def peer_name(self, peer):
+        return self.names.get(peer, peer)
+
+
+class _PcAudio:
+    def __init__(self, caps):
+        self.peers = _Links(caps)
+        self.host = _Host()
+
+
+class LinkedWithoutAudio(unittest.TestCase):
+    def test_names_the_links_without_audio(self):
+        app = type("App", (), {})()
+        app._audio = _PcAudio({fx.MAC: frozenset({"audio", "clipboard"}), fx.ROG: frozenset({"clipboard"}),
+                               "unnamed": frozenset()})
+        self.assertEqual(sorted(audio_page_win.linked_without_audio(app)), ["", "asusrog"])
+
+    def test_nothing_known_without_audio_here(self):
+        self.assertEqual(audio_page_win.linked_without_audio(type("App", (), {"_audio": None})()), ())
+        self.assertEqual(audio_page_win.linked_without_audio(None), ())
+
+
 class InTheWindow(unittest.TestCase):
     """The page in the settings window: after Crossing in the sidebar, opened with Ctrl+<n>."""
 
@@ -361,8 +423,9 @@ class InTheWindow(unittest.TestCase):
         settle(self.app)
         self.assertIsNone(page.service)
         self.assertFalse(page.unavailable.isHidden())
-        service = fx.FakeService(as_pc(fx.mic_streaming()).snapshot)
-        self.window.audio_service = service
+        service = fx.FakeService(fx.FIXTURES_PC["mic_streaming"]().snapshot)
+        # kvm_bridge_win holds its AudioService as `audio`.
+        self.window.audio = service
         page._find_service()
         settle(self.app)
         self.assertIs(page.service, service)
@@ -370,6 +433,17 @@ class InTheWindow(unittest.TestCase):
         self.window._select_page("crossing")
         settle(self.app)
         self.assertEqual(service.calls[-1], ("watch", (False,)))
+
+    def test_the_page_reads_the_links_of_the_window(self):
+        self.window._audio = _PcAudio({fx.MAC: frozenset({"audio"}), fx.ROG: frozenset()})
+        self.window.audio = fx.FakeService(fx.FIXTURES_PC["mic_streaming"]().snapshot)
+        page = self.window.audio_page
+        self.window._select_page("audio")
+        settle(self.app)
+        page.refresh()
+        notice = next(widget for widget in page.notices if widget.notice.code == "peer_no_audio")
+        self.assertIn("asusrog", notice.notice.text)
+        self.window._audio = self.window.audio = None
 
 
 def open_window():
@@ -422,12 +496,12 @@ def render_page_only(out: Path, names=None, views=("mac", "pc")):
     application = app()
     i18n.install("en")
     out.mkdir(parents=True, exist_ok=True)
-    for name, make in fx.FIXTURES.items():
-        if names and name not in names:
-            continue
-        for label, fixture in (("mac", make()), ("pc", as_pc(make()))):
-            if label not in views:
+    sets = {"mac": fx.FIXTURES, "pc": fx.FIXTURES_PC}
+    for label in views:
+        for name, make in sets[label].items():
+            if names and name not in names:
                 continue
+            fixture = make()
             for dark in (False, True):
                 page, _service = make_page(fixture)
                 host = Host(page)
@@ -471,8 +545,8 @@ def render_window(out: Path):
     window, folder = open_window()
     try:
         page = window.audio_page
-        for name, make in fx.FIXTURES.items():
-            fixture = as_pc(make())
+        for name, make in fx.FIXTURES_PC.items():
+            fixture = make()
             page._tiles = lambda tiles=fixture.tiles: tiles
             page.selected = fixture.selected
             page.set_service(fx.FakeService(fixture.snapshot))
