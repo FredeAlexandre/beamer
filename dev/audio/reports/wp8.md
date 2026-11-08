@@ -39,4 +39,4 @@ an ad-hoc fallback build revokes them on install (script, by design). Driver: th
 - WP4: `build-win.cmd` must set up MSVC itself (plain PowerShell over ssh) and exit non-zero on failure; `beamer-audio.exe restore` must default to `%LOCALAPPDATA%\Beamer`, exit 0 with nothing to restore, finish in < 15 s, and fail cleanly in an ssh (session 0) run.
 - WP2: `.gitignore` for `native/audio/build/` is not on this branch yet. WP6: driver UI words + prompt text, call `install` on a worker.
 
-Commits: 9ab2fc1 (packaging), this report.
+Commits: 9ab2fc1 (packaging), a3e93d5 (report).
