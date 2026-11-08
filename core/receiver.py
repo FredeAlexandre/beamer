@@ -87,6 +87,12 @@ class InputScale:
         return dy * self.scroll * sign, dx * self.scroll * sign
 
 
+def _is_audio(message) -> bool:
+    """An `audio_*` message (capability `audio`, fork; dev/audio/PHASE2.md §5)."""
+    kind = message.get("type") if isinstance(message, dict) else None
+    return isinstance(kind, str) and kind.startswith("audio_")
+
+
 def _close_socket(sock: Optional[socket.socket]) -> None:
     if sock is None:
         return
@@ -422,6 +428,8 @@ class _Link:
                 return False
             if message.get("type") == protocol.MSG_IDENTIFY_SCREENS and "identify_screens" not in self.caps:
                 return True
+            if _is_audio(message) and "audio" not in self.caps:
+                return True
             if len(self.outbox) >= OUTBOX_LIMIT:
                 LOGGER.warning("%s stopped reading; closing its link", self.name)
                 self._close_locked()
@@ -545,6 +553,8 @@ class LinkResponder:
         link_callback=None,
         announce=None,
         listener=None,
+        audio_callback=None,
+        audio_link_callback=None,
     ) -> None:
         self._book = book
         self._identity = identity
@@ -562,6 +572,7 @@ class LinkResponder:
             "arrangement": arrangement_callback, "settings": settings_callback, "paired": paired_callback,
             "identify": identify_callback,
             "link": link_callback,
+            "audio": audio_callback, "audio_link": audio_link_callback,
         }
         self._announce = announce or (lambda peer: [])
         self._prebound_listener = listener
@@ -647,6 +658,28 @@ class LinkResponder:
         with self._lock:
             link = self._links.get(peer)
         return link.caps if link is not None else None
+
+    def set_audio(self, message_callback, link_callback) -> None:
+        """The audio callbacks, for an app that builds the responder before its audio service:
+        `message_callback(peer, message)` for an `audio_*` message both ends announced `audio` for,
+        and `link_callback(peer, up, caps)` as a link begins or ends, both on that link's thread."""
+        self._callbacks["audio"] = message_callback
+        self._callbacks["audio_link"] = link_callback
+
+    def host_of(self, peer: bytes) -> Optional[str]:
+        """The address the peer's link to this machine comes from, or None when it has none."""
+        with self._lock:
+            link = self._links.get(peer)
+        return link.host if link is not None else None
+
+    def outbox_depth(self, peer: bytes) -> int:
+        """Messages queued on the peer's link to this machine and not yet written."""
+        with self._lock:
+            link = self._links.get(peer)
+        if link is None:
+            return 0
+        with link.cond:
+            return len(link.outbox)
 
     def response_time_ms(self, peer_id) -> Optional[int]:
         """A fresh local round-trip sample for this linked peer, or None."""
@@ -921,6 +954,7 @@ class LinkResponder:
             # A peer removed, or its allow_drive changed, between the handshake's read of the book
             # and this link joining the others was missed by the app's peers_changed(): look again.
             self.peers_changed()
+            self._callback("audio_link", link.peer_id, True, link.caps)
             self._callback("link", link.peer_id, True)
             self._report()
             try:
@@ -963,6 +997,7 @@ class LinkResponder:
                 writer.join(timeout=1.0)
             link.timing.flush(force=True, ping_ms=link.response_time_ms)
             if current:
+                self._callback("audio_link", link.peer_id, False, link.caps)
                 self._callback("link", link.peer_id, False)
                 self._report()
 
@@ -1068,6 +1103,11 @@ class LinkResponder:
                 ids = protocol.read_paired(message)
                 if ids is not None:
                     self._callback("paired", link.peer_id, ids)
+            elif _is_audio(message):
+                # The audio control plane (capability `audio`, fork): handed over only when both
+                # ends announced it; the callback only enqueues (dev/audio/PHASE2.md §5.1).
+                if "audio" in link.caps and "audio" in link.own_caps:
+                    self._callback("audio", link.peer_id, message)
         except Exception:
             LOGGER.exception("A %r from %s could not be dealt with", kind, link.name)
 

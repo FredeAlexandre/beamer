@@ -52,6 +52,9 @@ FOLLOW_EVERY_SECONDS = 30.0
 SEND_CHUNK = 65536
 _CAP_FOR = {protocol.MSG_GESTURE: "gestures", protocol.MSG_TEXT: "text", protocol.MSG_SETTINGS: "settings",
             protocol.MSG_IDENTIFY_SCREENS: "identify_screens"}
+# The audio control plane (fork; dev/audio/PHASE2.md §5): every `audio_*` type needs `audio`.
+_CAP_FOR.update(dict.fromkeys(("audio_hello", "audio_devices", "audio_route", "audio_flow", "audio_open", "audio_opened",
+                               "audio_close", "audio_frame", "audio_watch", "audio_stats", "audio_test"), "audio"))
 
 
 class LinkEnded(Exception):

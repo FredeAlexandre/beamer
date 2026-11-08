@@ -487,6 +487,7 @@ Capabilities say what a machine does with a message it receives:
 | `layout` | with `settings`, it sends and receives the shared tile picture (`settings.data.layout`) |
 | `displays` | with `layout`, it sends and receives each machine's logical display rectangles and display-targeted edges |
 | `ping_rtt` | it sends and answers response-time probes on `ping` in both directions |
+| `audio` | (fork) it runs the audio control plane: it sends and receives the `audio_*` messages (section 11) |
 
 A sender does not send a message its peer's capabilities do not cover. A receiver that gets one
 anyway drops it, and still acknowledges it when it carries a `seq`.
@@ -1550,6 +1551,91 @@ keep the display grouped, and dragging the machine moves the group together. A r
 malformed `layout` as a whole. Peers without `displays` receive the same machine tiles without the
 nested display map or its offsets.
 Beamer 1.5.0 to 1.5.2 ignore this unknown optional member and keep their existing Crossing page.
+
+## 11. Audio (capability `audio`, fork)
+
+This fork carries every microphone and every sound output of the linked machines (design:
+`dev/audio/PHASE2.md`). The control plane rides on the links as `audio_*` messages; the sound itself
+goes over a separate UDP flow between two directly linked machines, keyed over the link, and falls
+back to the link when UDP does not get through. Wire version 6 is unchanged, and so are machines
+without the capability (Beamer 1.5.x upstream, Linux builds of this fork).
+
+### Rules
+
+- `audio` is in `hello`/`welcome` `caps` (14 of the 16) only when the machine runs the audio helper:
+  macOS and Windows, never Linux.
+- `audio_*` messages go only to a peer whose caps list `audio`, and are handled only when both ends
+  list it. They never carry `seq` and are not input. A malformed one is ignored; it never ends the link.
+- Each message is under 16 KiB, except `audio_devices` and `audio_route` (under 32 KiB). Limits: 32
+  inputs and 32 outputs per machine, `key` up to 200 characters, `name` up to 128, 33 machines in a
+  route, 64 `forms` entries, media keys base64 of exactly 32 bytes, stamps as in `settings`.
+- Which link: the one this machine opened when it is up, else the peer's (section 3). A machine counts a
+  peer as linked while either link is up.
+- `audio_hello.v` is 1 and `min_v` 1; a peer whose `min_v` is above our `v` is treated as without
+  audio. New behaviour is announced by words in `features`, never by new capabilities. Unknown
+  fields are ignored.
+
+### Messages
+
+| type | data | scope |
+|---|---|---|
+| `audio_hello` | `{"v":1,"min_v":1,"platform":"macos","helper":"ok"\|"starting"\|"failed","udp":{"listen":false},"codecs":["opus"],"features":[...]}` | direct; on link up, and when `helper` changes |
+| `audio_devices` | `{"machine":id,"rev":int,"name","platform","status","helper":"0.1.0","inputs":[Device],"outputs":[Device],"default_input":key\|null,"default_output":key\|null,"virtual_mic":{"kind","present","in_use"},"features":[...],"links":[id,...]}`, Device = `{"key","name","transport","channels","form"}` | flooded |
+| `audio_route` | the route document below | flooded, merged entry by entry |
+| `audio_flow` | `{"flow":"9f2c01aa","phase":"offer","port":52114,"key":b64}`; `{"flow","phase":"answer","port":24823}`; `{"phase":"want"}`; `{"flow","phase":"close"}` | direct |
+| `audio_open` | `{"stream":u32,"flow","kind":"mic"\|"system","codec":{...},"key":b64,"sink":{"virtual_mic":true}\|{"device":{"key","name"}\|null},"for":{"set_at","by"}}` | direct, sender to receiver |
+| `audio_opened` | `{"stream","ok":bool,"error":"no_device"\|"no_virtual_mic"\|"conflict"\|"helper"\|"unsupported"\|null}` | direct, receiver to sender |
+| `audio_close` | `{"stream","reason":"route"\|"demand"\|"device_gone"\|"helper"\|"shutdown"\|"error"}` | direct, either side |
+| `audio_frame` | `{"flow","p":[b64,...]}` (up to 4 sealed packets) | direct, fallback only |
+| `audio_watch` | `{"on":bool}` (the sender's Audio page is on screen) | direct |
+| `audio_stats` | `{"t":ms,"levels":{"in:<key>":[rms,peak],...},"streams":{"<id>":{"path","jb_ms","loss_pct","rtt_ms"}}}` | direct, 4 a second, to watching peers only |
+| `audio_test` | `{"device":key,"seconds":10}` (meter one idle input of the receiver) | direct |
+
+The route document (`audio_route`):
+
+```json
+{"mic":    {"machine":"<id>|null","device":{"key":"...","name":"..."}|null,"set_at":1793000000,"by":"<id>"},
+ "outputs":{"<M id>":{"to":"<T id>|null","device":{"key":"...","name":"..."}|null,"set_at":1793000100,"by":"<id>"}},
+ "forms":  {"<machine id> <device key>":{"form":"headset|speakers|null","set_at":1793000200,"by":"<id>"}}}
+```
+
+Each entry carries its own stamp (newer = higher `set_at`, a tie goes to the larger `by` as bytes) and
+entries are never deleted.
+
+### Across the cluster
+
+- Each machine is the only author of its `audio_devices`; `rev` only goes up. A receiver keeps a list
+  whose `rev` is higher than the one it holds (or that came from that machine itself) and forwards it
+  unchanged to every other direct peer. On link up each side sends its `audio_hello`, its own list,
+  every list it holds, and its route. A machine republishes its list when its devices, defaults,
+  `in_use`, status, forms or linked peers (`links`) change.
+- Machine X is online for Y when X is reachable from Y over `links` that both ends list; a dropped link
+  republishes smaller `links`, so no timer is needed.
+- `audio_route` is merged entry by entry; a change is forwarded to every other direct peer, and a sender
+  that lacked a newer entry is answered with the merged route.
+- Link down with P: every stream and the flow with P stop at once, so sound sent to P plays locally
+  again. Helper restart: its streams are closed with `audio_close {"reason":"helper"}`, status
+  `starting` is published, then `ok` and everything is planned again.
+
+### The media flow
+
+- One UDP flow per pair of directly linked machines, open while they are linked, carrying every stream
+  both ways. `audio_hello.udp.listen` says whether a machine may receive unsolicited UDP (false on
+  macOS). The offerer is the side with `listen` false, else the smaller machine id; it draws the flow
+  key, binds, and sends `audio_flow` `offer`. The answerer binds 24823 (24824 to 24830, then any),
+  sends first towards the offerer (its own stateful firewall opens), and answers with its port; then
+  the offerer sends too. No firewall rule is needed on either side.
+- The UDP address is the peer's link address; a loopback link (the Mac's tunnel) has no UDP and the
+  flow starts on the link.
+- Packets: a 24-byte clear header (`version 1, ptype, flags, codec, stream u32, seq u64, ts u32, nsamp
+  u16, channels, reserved`, big endian) as associated data, then ChaCha20-Poly1305 (RFC 8439) with nonce
+  `dir_stream u32 || seq u64`. Flow control packets (stream 0) are sealed with the flow key, media
+  with the stream key of `audio_open`. 128-packet replay window per key and direction.
+- Codec: Opus at 48 kHz, 10 ms frames; mic mono 32 kb/s with FEC, system sound stereo 96 kb/s.
+- Fallback: a flow that received no valid UDP packet for 2 s goes to the link: its sealed packets
+  travel as `audio_frame` (at most 32 kb/s mic, 48 kb/s system), dropped while the link's queue holds
+  more than 64 messages so input is never held up; UDP is probed every second and taken back after
+  1 s of UDP.
 
 ## Versions
 
