@@ -26,7 +26,7 @@ Grouped; nothing else is blocked. Ordered by what it unblocks.
    (System Settings > Privacy > Microphone > Beamer if the dialog is gone). Unblocks: the real Mac mic
    forwarded to the PC (all other paths work). System Audio Recording was granted around 16:40, and a
    Windows firewall prompt for `beamer-audio.exe` was answered Allow (Private) in your session — thanks.
-6. **Howling through Wave Link's monitor (decision, default applies if you don't answer).** When the PC's
+6. **Howling through Wave Link's monitor (default implemented 2026-11-08, WP13: howl guard + notice; tell me if you prefer otherwise).** When the PC's
    sound plays on the Mac speakers, the Wave:3 hears them and Wave Link's monitor puts the mic back into the
    PC's sound: it howled at 7.1 kHz in WP10's first run. Windows lets Beamer exclude only one process tree
    from capture (Beamer's own). My default: a howl guard in Beamer (detects the build-up, ducks the stream,
@@ -73,7 +73,7 @@ Mac virtual mic validated live 2026-11-08.
 | WP10 Two-machine E2E + soak, first live run with real helpers in Beamer | Mac `beamer-wp10` / `audio/wp10` (+ ssh) | **done**, merged (`4552504`). Real helpers in Beamer on both machines. p50 one way: PC mic -> Mac app 43 ms (0 glitch); PC sound -> Mac 81 ms (**+25 vs Phase 1**); Mac sound -> PC G733 80-88 ms; Mac test mic -> PC app via CABLE 152-156 ms (**+45**, shared render 3 periods), 2.2 glitches/min over a 31 min soak; both ways without loop. Recovery: UDP block -> link 2.0 s, helper kill -> unmute 0.06-0.3 s, device unplug/replug, app restart all pass; asusrog untouched. CPU helper 4.6 % Mac / 2.6 % PC; memory flat. Fixed live: helper froze on macOS permission prompts (3 commits). Open: drift integral at its +200 ppm limit for PC sound on the Mac; mic+output change opens the mic twice |
 | WP11 Mac side: PC sound -> Mac latency (+25 ms) and drift integral pinned at +200 ppm | Mac `beamer-wp11` / `audio/wp11` | running |
 | WP12 PC side: shared-mode render into CABLE Input (+45 ms) and capture periods | PC agent, `beamer-wp12` / `pc/wp12` | running |
-| WP13 Howl guard (Wave Link monitor loop) + mic stream opened twice on a combined route change | Mac `beamer-wp13` / `audio/wp13` | running |
+| WP13 Howl guard + AEC feature gate | Mac `beamer-wp13` / `audio/wp13` | **done**, merged (`fb38392`): guard on system-sound sends (narrow line rising >= 6 dB at a stable frequency -> duck 20 dB, hold 2-30 s), simulated loops caught in 0.45-6.5 s at about -45 dBFS, no false trigger on chords, sweeps, held notes, voice; bit-exact when idle; notice on both machines (mentions Wave Link only when present). Planner sets AEC only if the helper can. The 'mic opened twice' was the E2E harness racing its own dev command (planner verified). Not live-tested (needs a real loop) |
 
 Coordination: deploys serialized with the lock dir `~/Developer/.beamer-deploy.lock`, live audio tests with `~/Developer/.beamer-audio-lab.lock` (Mac) and `C:\Users\Alex\briefs\lab-lock.txt` (PC); each WP commits its
 report as `dev/audio/reports/<wp>.md`; the operator merges into `feat/audio`.
