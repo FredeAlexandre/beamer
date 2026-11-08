@@ -575,9 +575,12 @@ class AudioService:
         self._drop_flow(peer)
         flow = _Flow(secrets.token_hex(4), "offer", _key())
         state.flow = flow
+        # `host`: the peer's address on the Beamer link, so the helper binds towards it instead of
+        # listening on every interface (an unsigned listener on the Mac's LAN side prompts the firewall).
+        host = self._host.peer_host(peer)
         self._helper_send({"cmd": "flow_open", "flow": flow.id, "peer": peer, "role": "offer",
-                           "port": ANSWER_PORT if self._listen() else 0, "remote": None, "key": flow.key,
-                           "rr_ms": RR_MS}, lambda event, flow=flow: self._flow_reply(peer, flow, event))
+                           "port": ANSWER_PORT if self._listen() else 0, "remote": None,
+                           "host": host if _usable_host(host) else None, "key": flow.key, "rr_ms": RR_MS}, lambda event, flow=flow: self._flow_reply(peer, flow, event))
 
     def _flow_reply(self, peer, flow, event):
         if event.get("ev") == "error":

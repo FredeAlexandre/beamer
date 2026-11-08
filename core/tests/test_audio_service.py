@@ -43,6 +43,8 @@ class PairTests(unittest.TestCase):
         offer = self.mac.helper.commands("flow_open")[0]
         answer = self.pc.helper.commands("flow_open")[0]
         self.assertEqual((offer["role"], offer["port"], offer["remote"]), ("offer", 0, None))
+        self.assertEqual(offer["host"], self.pc.address)  # bind towards the peer, never INADDR_ANY
+        self.assertEqual(self.mac.helper.engine.flows[offer["flow"]]["host"], self.pc.address)
         self.assertEqual((answer["role"], answer["port"]), ("answer", service_module.ANSWER_PORT))
         self.assertEqual(answer["remote"], {"host": self.mac.address, "port": 50001})
         self.assertEqual(answer["key"], offer["key"])
@@ -57,6 +59,7 @@ class PairTests(unittest.TestCase):
         self.pc.address = None
         self.link()
         self.assertIsNone(self.pc.helper.commands("flow_open")[0]["remote"])
+        self.assertIsNone(self.mac.helper.commands("flow_open")[0]["host"])
         self.assertEqual(self.mac.helper.commands("flow_remote"), [])
 
     def test_mic_on_demand_open_and_close(self):

@@ -26,3 +26,5 @@ The service covers flows (§4.2: offerer/answerer, want, close), streams (open/o
 - WP5: `feature_flags.AUDIO`; call `link_up` once per peer (see 4); pass `helper.locate(state_dir)` as `helper_cmd`.
 
 **Commits:** 4e8efa2 model (milestone 1) · 5ccd888 wire/planner/store/helper/service/fake helper/harness + tests · b958178 helper tests · e8770c5 exports · b5a82ac stream-consistency check · (this report).
+
+**Follow-up (§4.2 risk accepted):** the offering side's `flow_open` now carries `host` = `AudioHost.peer_host(peer)` (the peer's link IPv4, already in the protocol; null when that is None/loopback), so the helper binds towards the peer instead of `INADDR_ANY`. No AudioHost change. Fake helper and tests updated; all `test_audio_*` green.

@@ -109,10 +109,10 @@ class NativeHelperTests(unittest.TestCase):
         a_events.wait(is_ev("ready"))
         b_events.wait(is_ev("ready"))
         flow, flow_key = secrets.token_hex(4), key()
-        # The offer side is pointed at loopback at once (port 9 until the answer), so no socket of a
-        # test helper ever binds towards the LAN.
+        # The offer names the peer's address in `host`, so it binds towards loopback; the provisional
+        # `remote` (port 9 until the answer) keeps a helper that ignores `host` off the LAN as well.
         a.send({"cmd": "flow_open", "req": 1, "flow": flow, "peer": "b", "role": "offer", "port": 0,
-                "remote": {"host": "127.0.0.1", "port": 9}, "key": flow_key, "rr_ms": 10})
+                "host": "127.0.0.1", "remote": {"host": "127.0.0.1", "port": 9}, "key": flow_key, "rr_ms": 10})
         a_port = a_events.wait(is_ev("flow_bound", flow=flow))["port"]
         a_events.wait(is_ev("ok", req=1))
         b.send({"cmd": "flow_open", "req": 1, "flow": flow, "peer": "a", "role": "answer", "port": 0,
