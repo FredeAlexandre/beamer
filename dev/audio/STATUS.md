@@ -53,7 +53,7 @@ Mac virtual mic validated live 2026-11-08.
 | WP8 Packaging and permissions | Mac `beamer-wp8` / `audio/wp8` | **done**, merged (`c45a500`): plist usage strings, audio-input entitlement, helper/driver bundling + signing (skipped until build scripts exist), driver install via beamer-hal (dev) or admin prompt (designed, mock-tested), Windows helper install + `restore`. Deployed both. Beamer had been found stopped on the Mac since 13:53 (no crash report) |
 | WP5 Link integration | Mac `beamer-wp5` / `audio/wp5` (+ PC via deploy) | running |
 | WP6 Page model + Mac Audio page | Mac `beamer-wp6` / `audio/wp6` | running; milestone 1 (`view.py`) committed `8102be9` |
-| WP7 Qt Audio page | PC agent, worktree `beamer-wp7`, branch `pc/wp7` | running |
+| WP7 Qt Audio page | PC agent, `beamer-wp7` / `pc/wp7` | **done**, merged (`58f1ff7`): page after Crossing (Ctrl+3), map in the Crossing tile style with sound/mic arrows and meters, device rows with Test / Headset, notices; 19 tests, win_app suite = known failures only; renders `reports/wp7-shots/` reviewed by operator (consistent; nit: title renders upper-case in the offscreen shot, check in the live app) |
 | WP9 Echo cancellation | Mac + PC | waits for WP2, WP3, WP4 |
 | WP10 Two-machine E2E + soak | Mac + ssh | waits for WP1-5, WP8 (WP9) |
 
