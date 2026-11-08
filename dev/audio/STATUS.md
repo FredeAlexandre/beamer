@@ -22,7 +22,17 @@ Grouped; nothing else is blocked. Ordered by what it unblocks.
 3. ~~Decision: how the PC's active mic reaches apps~~ **decided by Alex 2026-11-08**: pick "CABLE Output"
    once in the apps; Beamer does not switch Windows default devices.
 4. **Optional: PC Wi-Fi adapter power saving.** The MediaTek RZ616's "Power Saving" is Auto; it is the root cause of the Mac->PC jitter (W3, V3). Beamer works around it, but setting it to Off (Device Manager > adapter > Advanced) would remove most of the remaining spikes. A system setting, so yours to decide; also on DFS channel 52 at 160 MHz (radar events can stall the channel).
-5. **Ear checks, 2 minutes, whenever you are at the machines** (not blocking): (a) PC: during a
+5. **Mac: Beamer's Microphone permission prompt is pending since 2026-11-08 16:19** — click Allow
+   (System Settings > Privacy > Microphone > Beamer if the dialog is gone). Unblocks: the real Mac mic
+   forwarded to the PC (all other paths work). System Audio Recording was granted around 16:40, and a
+   Windows firewall prompt for `beamer-audio.exe` was answered Allow (Private) in your session — thanks.
+6. **Howling through Wave Link's monitor (decision, default applies if you don't answer).** When the PC's
+   sound plays on the Mac speakers, the Wave:3 hears them and Wave Link's monitor puts the mic back into the
+   PC's sound: it howled at 7.1 kHz in WP10's first run. Windows lets Beamer exclude only one process tree
+   from capture (Beamer's own). My default: a howl guard in Beamer (detects the build-up, ducks the stream,
+   shows a notice suggesting headphones or turning off Wave Link's monitor to the system output). Your call
+   if you prefer to change the Wave Link monitor routing yourself.
+7. **Ear checks, 2 minutes, whenever you are at the machines** (not blocking): (a) PC: during a
    `--mute-local` run the G733 is really silent (the API says muted, no microphone can hear the headset);
    (b) plug/unplug a USB or Bluetooth audio device on each machine while `beamer-audio watch` runs (real
    hot-plug events were never seen, only simulated).
@@ -60,7 +70,7 @@ Mac virtual mic validated live 2026-11-08.
 | WP7 Qt Audio page | PC agent, `beamer-wp7` / `pc/wp7` | **done**, merged (`58f1ff7`): page after Crossing (Ctrl+3), map in the Crossing tile style with sound/mic arrows and meters, device rows with Test / Headset, notices; 19 tests, win_app suite = known failures only; renders `reports/wp7-shots/` reviewed by operator (consistent; nit: title renders upper-case in the offscreen shot, check in the live app) |
 | WP7b Qt page follow-up | PC agent, `beamer-wp7b` / `pc/wp7b` | **done**, merged (`df0b8b0`): model tile lines, PC fixtures, notices under Microphone (Mac too, `d8d05d5`); 27 page tests, win_app suite = known failures; upper-case titles are the app's own style for every page but Crossing (no change). Operator wired `self.audio` + peers without audio (`a39e03a`) |
 | WP9 Echo cancellation | Mac `beamer-wp9` / `audio/wp9` (+ PC build) | running |
-| WP10 Two-machine E2E + soak, first live run with real helpers in Beamer | Mac `beamer-wp10` / `audio/wp10` (+ ssh) | running |
+| WP10 Two-machine E2E + soak, first live run with real helpers in Beamer | Mac `beamer-wp10` / `audio/wp10` (+ ssh) | **done**, merged (`4552504`). Real helpers in Beamer on both machines. p50 one way: PC mic -> Mac app 43 ms (0 glitch); PC sound -> Mac 81 ms (**+25 vs Phase 1**); Mac sound -> PC G733 80-88 ms; Mac test mic -> PC app via CABLE 152-156 ms (**+45**, shared render 3 periods), 2.2 glitches/min over a 31 min soak; both ways without loop. Recovery: UDP block -> link 2.0 s, helper kill -> unmute 0.06-0.3 s, device unplug/replug, app restart all pass; asusrog untouched. CPU helper 4.6 % Mac / 2.6 % PC; memory flat. Fixed live: helper froze on macOS permission prompts (3 commits). Open: drift integral at its +200 ppm limit for PC sound on the Mac; mic+output change opens the mic twice |
 
 Coordination: deploys serialized with the lock dir `~/Developer/.beamer-deploy.lock`, live audio tests with `~/Developer/.beamer-audio-lab.lock`; each WP commits its
 report as `dev/audio/reports/<wp>.md`; the operator merges into `feat/audio`.
