@@ -35,6 +35,12 @@ Grouped; nothing else is blocked. Ordered by what it unblocks.
 Phase 1 (prototyping and technical proof) closed 2026-11-07 22:20, conclusions in `dev/audio/PHASE1.md`;
 Mac virtual mic validated live 2026-11-08.
 
+## Phase 2 decisions (operator)
+
+- PC virtual mic render mode: **shared by default** (0 holes in 4x60 s + 300 s), exclusive render into CABLE
+  Input (~45 ms instead of ~105 ms, measured by WP4) as an opt-in "low latency" setting, because exclusive
+  takes CABLE Input from any other app and showed 1 hole in 5 min. Revisit after the E2E soak.
+
 ## Phase 2 tasks (design: `PHASE2.md` §13)
 
 | WP | Where | State |
@@ -43,8 +49,8 @@ Mac virtual mic validated live 2026-11-08.
 | WP1 Python control plane (`core/audio`) | Mac, worktree `beamer-wp1`, branch `audio/wp1` | **done**, merged (`6321e5a`, `76734fe`): 81 tests pass Mac + PC, cluster convergence ≤ 5 rounds over 3,200 seeds; offer carries `host` (no LAN bind on the Mac) |
 | WP2 Portable C++ media engine (`native/audio/engine`) | Mac `beamer-wp2` / `audio/wp2` (+ PC build) | running |
 | WP3 Mac backend + helper, driver moved to `native/audio/mac-driver` | Mac `beamer-wp3` / `audio/wp3` | running |
-| WP4 Windows backend + helper | PC agent, worktree `C:\Users\Alex\Developer\beamer-wp4`, branch `pc/wp4` | running |
-| WP8 Packaging and permissions | Mac `beamer-wp8` / `audio/wp8` (+ PC via deploy) | running |
+| WP4 Windows backend + helper | PC agent, `beamer-wp4` / `pc/wp4` | **done**, merged (`1f7ea66`): Elgato virtual endpoints blocklisted (physical Wave:3 kept); loopback with endpoint muted -13.98 dBFS exact; self-exclusion digital zero; journal restore exact (14 endpoints); demand on CABLE Output 20-26 ms; exclusive render into CABLE Input 43-45 ms vs 103-111 ms shared (opt-in). Full helper not linked yet (needs WP2 engine); firewall prompt in the user session still to test via Beamer |
+| WP8 Packaging and permissions | Mac `beamer-wp8` / `audio/wp8` | **done**, merged (`c45a500`): plist usage strings, audio-input entitlement, helper/driver bundling + signing (skipped until build scripts exist), driver install via beamer-hal (dev) or admin prompt (designed, mock-tested), Windows helper install + `restore`. Deployed both. Beamer had been found stopped on the Mac since 13:53 (no crash report) |
 | WP5 Link integration | Mac `beamer-wp5` / `audio/wp5` (+ PC via deploy) | running |
 | WP6 Page model + Mac Audio page | Mac `beamer-wp6` / `audio/wp6` | running; milestone 1 (`view.py`) committed `8102be9` |
 | WP7 Qt Audio page | PC agent, worktree `beamer-wp7`, branch `pc/wp7` | running |
