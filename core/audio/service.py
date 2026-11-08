@@ -901,11 +901,16 @@ class AudioService:
             for what in ("mic", "system_audio"):
                 if isinstance(event.get(what), str):
                     self._permission[what] = event[what]
+            # A prompt was answered: streams that failed waiting for it open again (§6.4 rule 4 retry).
+            answered = set()
             if self._permission.get("mic") == "granted" and before.get("mic") not in (None, "granted"):
-                # A prompt was answered: streams that failed waiting for it open again (§6.4 rule 4 retry).
-                for send in self._sends.values():
-                    if send.spec.kind == "mic" and send.state == "failed":
-                        send.retry_token = None
+                answered.add("mic")
+            if before.get("system_audio") == "undetermined" and self._permission.get("system_audio") != "undetermined":
+                answered.add("system")
+            for send in self._sends.values():
+                if send.spec.kind in answered and send.state == "failed":
+                    send.retry_token = None
+            if "mic" in answered:
                 if self._loop is not None and self._loop.state == "failed":
                     self._helper_send({"cmd": "stop", "stream": self._loop.stream})
                     self._loop = None
@@ -1112,6 +1117,8 @@ class AudioService:
                 value = item["test_source"]
                 signal = value.get("signal") if isinstance(value, dict) else None
                 self._test_source = signal if signal in ("A", "B") else None
+            if item.get("retry_helper"):
+                self._retry_helper()
             if "helper_dev" in item and isinstance(item["helper_dev"], dict):
                 # the helper's own dev switches (drop_udp, loss_pct, reset_stats); needs `--dev`
                 self._helper_send(dict(item["helper_dev"], cmd="dev"))

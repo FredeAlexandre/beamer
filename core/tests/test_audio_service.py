@@ -157,6 +157,20 @@ class PairTests(unittest.TestCase):
         self.assertEqual(len(self.mac.helper.commands("send")), sends + 1)
         self.assertEqual(self.mac.snapshot().mic_status.state, "streaming")
 
+    def test_system_sound_waiting_for_its_prompt_opens_once_answered(self):
+        self.link()
+        self.mac.helper.engine.system_error = "permission"
+        self.mac.helper.emit({"ev": "permission", "mic": "granted", "system_audio": "undetermined"})
+        self.mac.service.set_output(self.mac.id, self.pc.id, None)
+        self.net.settle()
+        self.assertEqual(self.mac.snapshot().output_status[self.mac.id].reason, "permission")
+        sends = len(self.mac.helper.commands("send"))
+        self.mac.helper.engine.system_error = None
+        self.mac.helper.emit({"ev": "permission", "mic": "granted", "system_audio": "unknown"})
+        self.net.settle()
+        self.assertEqual(len(self.mac.helper.commands("send")), sends + 1)
+        self.assertEqual(self.mac.snapshot().output_status[self.mac.id].state, "streaming")
+
     def test_receiver_refuses_its_muted_endpoint(self):
         self.link()
         self.pc.service.set_output(self.pc.id, self.mac.id, None)
