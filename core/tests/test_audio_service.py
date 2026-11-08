@@ -416,6 +416,108 @@ class RestartTests(unittest.TestCase):
         self.assertEqual(status["test_source"], "B")
 
 
+class VmicExclusiveTests(unittest.TestCase):
+    """The PC's local "low-latency virtual microphone" (§8.4 `local.vmic_exclusive`): the helper's
+    command line, a restart when it changes, persisted, never sent to another machine."""
+
+    def setUp(self):
+        self.net = Net()
+        self.addCleanup(self.net.close)
+        self.mac = self.net.add(1, "mac", "macos")
+        self.pc = self.net.add(2, "lebig", "windows")
+        self.net.link(self.mac, self.pc)
+        self.net.settle()
+
+    def saved_local(self, node):
+        self.net.clock.advance(0.6)
+        self.net.pump()
+        return json.loads((Path(node.state_dir) / store.FILE_NAME).read_text())["local"]
+
+    def test_turning_it_on_restarts_the_helper_with_the_flag(self):
+        self.assertNotIn("--vmic-exclusive", self.pc.helper.cmd)
+        self.assertNotIn("vmic_exclusive", self.pc.snapshot().machines[self.pc.id].features)
+        self.assertFalse(self.pc.snapshot().vmic_exclusive)
+        # The Mac's mic plays into the PC's CABLE Input while it changes.
+        self.mac.service.set_mic(self.mac.id, None)
+        self.pc.helper.set_in_use(True)
+        self.net.settle()
+        recv = self.pc.helper.commands("recv")[-1]["stream"]
+        starts = self.pc.helper.starts
+        self.pc.service.set_vmic_exclusive(True)
+        self.net.settle()
+        self.assertEqual(self.pc.helper.starts, starts + 1)
+        self.assertEqual(self.pc.helper.cmd[-1], "--vmic-exclusive")
+        self.assertIn("--control", self.pc.helper.cmd)
+        snap = self.pc.snapshot()
+        self.assertTrue(snap.vmic_exclusive)
+        self.assertEqual(snap.helper, "ok")
+        self.assertIn("vmic_exclusive", snap.machines[self.pc.id].features)
+        self.assertIn({"stream": recv, "reason": "helper"}, types(self.pc.host.posted, wire.CLOSE))
+        # The stream comes back on the new helper (drops for about a second on a real one).
+        self.assertNotEqual(self.pc.helper.commands("recv")[-1]["stream"], recv)
+        self.assertEqual([(v.kind, v.state) for v in self.pc.snapshot().streams], [("mic", "running")])
+        self.assertEqual(self.saved_local(self.pc), {"aec": "auto", "vmic_exclusive": True})
+        # The same value again changes nothing.
+        self.pc.service.set_vmic_exclusive(True)
+        self.net.settle()
+        self.assertEqual(self.pc.helper.starts, starts + 1)
+
+    def test_kept_across_a_restart_and_turned_off(self):
+        self.pc.service.set_vmic_exclusive(True)
+        self.net.settle()
+        self.saved_local(self.pc)
+        self.pc.restart()
+        self.assertIn("--vmic-exclusive", self.pc.helper.cmd)
+        self.assertTrue(self.pc.snapshot().vmic_exclusive)
+        self.pc.service.set_vmic_exclusive(False)
+        self.net.settle()
+        self.assertNotIn("--vmic-exclusive", self.pc.helper.cmd)
+        self.assertEqual(self.pc.helper.starts, 2)
+        self.assertNotIn("vmic_exclusive", self.pc.snapshot().machines[self.pc.id].features)
+        self.assertEqual(self.saved_local(self.pc), {"aec": "auto", "vmic_exclusive": False})
+
+    def test_local_only_and_windows_only(self):
+        self.pc.service.set_vmic_exclusive(True)
+        self.mac.service.set_vmic_exclusive(True)
+        self.net.settle()
+        # Never on the wire as a setting (the PC's helper features name it, as they name `aec`).
+        def keys(value):
+            if isinstance(value, dict):
+                return set(value) | set().union(*(keys(item) for item in value.values()))
+            if isinstance(value, list):
+                return set().union(*(keys(item) for item in value))
+            return set()
+        for _peer, message in self.pc.host.posted:
+            self.assertNotIn("vmic_exclusive", keys(message))
+        self.assertTrue(self.mac.snapshot().vmic_exclusive)        # the Mac's own (meaningless) value
+        self.assertEqual(self.mac.helper.starts, 1)                 # no restart, no flag on a Mac
+        self.assertNotIn("--vmic-exclusive", self.mac.helper.cmd)
+        self.pc.service.set_vmic_exclusive(False)
+        self.net.settle()
+        self.assertTrue(self.mac.snapshot().vmic_exclusive)
+
+    def test_a_replaced_helpers_late_events_are_dropped(self):
+        old = self.pc.service._helper_gen
+        self.pc.service.set_vmic_exclusive(True)
+        self.net.settle()
+        self.pc.service._queue.put(("helper", {"ev": "_state", "state": "failed", "why": "exited"}, old))
+        self.net.settle()
+        self.assertEqual(self.pc.snapshot().helper, "ok")
+
+    def test_dev_command(self):
+        Path(self.pc.state_dir, "audio-dev.enabled").write_text("{}")
+        self.pc.restart()
+        Path(self.pc.state_dir, service_module.DEV_CMD).write_text(json.dumps({"set_vmic_exclusive": True}))
+        self.net.clock.advance(1.1)
+        self.net.settle()
+        self.assertIn("--vmic-exclusive", self.pc.helper.cmd)
+        self.assertIn("--dev", self.pc.helper.cmd)
+        self.net.clock.advance(1.1)
+        self.net.settle()
+        status = json.loads(Path(self.pc.state_dir, service_module.DEV_STATUS).read_text())
+        self.assertTrue(status["snapshot"]["vmic_exclusive"])
+
+
 class HowlTests(unittest.TestCase):
     """The howl guard's `howl` event (§3.3): in the sender's snapshot, and in a watching peer's."""
 
@@ -499,7 +601,7 @@ class StoreTests(unittest.TestCase):
         data = json.loads(path.read_text())
         self.assertEqual(data["version"], 1)
         self.assertEqual(data["route"]["mic"]["machine"], b.id)
-        self.assertEqual(data["local"], {"aec": "off"})
+        self.assertEqual(data["local"], {"aec": "off", "vmic_exclusive": False})
         self.assertIn(b.id, data["machines"])
         self.assertGreater(data["own_rev"], 0)
         loaded = store.load(a.state_dir)

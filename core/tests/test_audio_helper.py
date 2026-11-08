@@ -59,6 +59,14 @@ class HelperProcessTests(unittest.TestCase):
         self.folder = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.folder)
 
+    def test_the_vmic_exclusive_flag_reaches_the_process(self):
+        events = Events()
+        argv = helper_module.command_line(FAKE + ["--platform", "windows"], self.folder, vmic_exclusive=True)
+        process = HelperProcess(argv, events)
+        self.addCleanup(process.stop)
+        process.start()
+        self.assertIn("vmic_exclusive", events.wait(is_ev("ready"))["features"])
+
     def test_spawn_ready_and_commands(self):
         process, events = self.make()
         process.start()
@@ -192,6 +200,10 @@ class LocateTests(unittest.TestCase):
         self.assertIn("--dev", argv)
         self.assertEqual(argv[argv.index("--exclude-pid") + 1], str(os.getpid()))
         self.assertEqual(argv[argv.index("--state-dir") + 1], "/state")
+        self.assertNotIn("--vmic-exclusive", argv)
+        argv = helper_module.command_line(["beamer-audio"], "/state", vmic_exclusive=True)
+        self.assertEqual(argv[-1], "--vmic-exclusive")
+        self.assertNotIn("--dev", argv)
 
 
 if __name__ == "__main__":

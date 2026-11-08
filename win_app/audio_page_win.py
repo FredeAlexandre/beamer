@@ -827,6 +827,14 @@ class AudioPageWidget(QWidget):
         self.output_line = widgets.label("", "note", wrap=True)
         self.output_row = widgets.FormRow(self.output_label, output, (self.output_line, self.mute_note))
         self.panel_module.body.addWidget(self.output_row)
+        # This PC's own low-latency switch (§8.4 `local.vmic_exclusive`), shown only on its own panel.
+        self.vmic_exclusive = widgets.Switch(tr("Low-latency virtual microphone"))
+        self.vmic_exclusive.toggled.connect(self._vmic_exclusive_toggled)
+        self.vmic_exclusive_note = widgets.label("", "note-quiet", wrap=True)
+        self.panel_module.body.addWidget(self.vmic_exclusive)
+        self.panel_module.body.addWidget(self.vmic_exclusive_note)
+        self.vmic_exclusive.hide()
+        self.vmic_exclusive_note.hide()
         self.inputs_heading = widgets.Eyebrow(tr("Microphones"))
         self.panel_module.body.addSpacing(4)
         self.panel_module.body.addWidget(self.inputs_heading)
@@ -996,9 +1004,25 @@ class AudioPageWidget(QWidget):
         widgets.set_role(self.output_line, note_role(panel.output_tone))
         self._text(self.mute_note, panel.mute_note)
         self.mute_note.setVisible(bool(panel.mute_note))
+        self._show_vmic_exclusive(panel)
         self._show_rows(panel)
         self._show_notices(page.notices)
         self.apply_levels(self.levels)
+
+    def _show_vmic_exclusive(self, panel: view.MachinePanel) -> None:
+        shown = panel.vmic_exclusive_shown
+        self.vmic_exclusive.setVisible(shown)
+        self.vmic_exclusive_note.setVisible(shown)
+        if not shown:
+            return
+        if self.vmic_exclusive.text() != panel.vmic_exclusive_label:
+            self.vmic_exclusive.setText(panel.vmic_exclusive_label)
+        self.vmic_exclusive.setAccessibleName(panel.vmic_exclusive_label)
+        self.vmic_exclusive.setAccessibleDescription(panel.vmic_exclusive_note)
+        self.vmic_exclusive.blockSignals(True)
+        self.vmic_exclusive.setChecked(panel.vmic_exclusive_on)
+        self.vmic_exclusive.blockSignals(False)
+        self._text(self.vmic_exclusive_note, panel.vmic_exclusive_note)
 
     @staticmethod
     def _text(label: QLabel, text: str) -> None:
@@ -1065,6 +1089,10 @@ class AudioPageWidget(QWidget):
     def _output_chosen(self, choice: view.Choice) -> None:
         if self.service is not None and self.page is not None:
             view.apply_output(self.service, self.page.panel.machine, choice)
+
+    def _vmic_exclusive_toggled(self, on: bool) -> None:
+        if self.service is not None and self.page is not None:
+            view.apply_vmic_exclusive(self.service, self.page.panel, on)
 
     def _test(self, row: view.DeviceRow) -> None:
         if self.service is not None:

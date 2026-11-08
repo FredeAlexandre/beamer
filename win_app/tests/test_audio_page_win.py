@@ -186,6 +186,40 @@ class Page(unittest.TestCase):
         speakers.control.click()
         self.assertEqual(service.calls[-1], ("set_form", (fx.MAC, fx.MAC_SPEAKERS.key, "headset")))
 
+    def test_low_latency_switch_on_this_pcs_own_panel(self):
+        page, service = make_page(fx.no_peers_pc())
+        self.assertFalse(page.vmic_exclusive.isHidden())
+        self.assertFalse(page.vmic_exclusive_note.isHidden())
+        self.assertEqual(page.vmic_exclusive.text(), "Low-latency virtual microphone")
+        self.assertEqual(page.vmic_exclusive_note.text(), page.page.panel.vmic_exclusive_note)
+        self.assertIn("35 ms", page.vmic_exclusive_note.text())
+        self.assertFalse(page.vmic_exclusive.isChecked())
+        page.vmic_exclusive.click()
+        self.assertEqual(service.calls, [("set_vmic_exclusive", (True,))])
+        # The service's snapshot then says so; showing it calls nothing again.
+        own = service.snapshot().machines[fx.PC]
+        service.push(replace(service.snapshot(), vmic_exclusive=True, machines={
+            fx.PC: replace(own, features=own.features | {"vmic_exclusive"})}))
+        settle(self.app)
+        self.assertTrue(page.vmic_exclusive.isChecked())
+        self.assertEqual(len(service.calls), 1)
+        page.vmic_exclusive.click()
+        self.assertEqual(service.calls[-1], ("set_vmic_exclusive", (False,)))
+        page.deleteLater()
+
+    def test_no_low_latency_switch_elsewhere(self):
+        for fixture in (fx.mic_streaming(), fx.vbcable_missing(),
+                        replace(fx.FIXTURES_PC["mic_streaming"](), selected=fx.MAC)):
+            page, service = make_page(fixture)
+            with self.subTest(fixture.name, panel=page.page.panel.machine):
+                self.assertTrue(page.vmic_exclusive.isHidden())
+                self.assertTrue(page.vmic_exclusive_note.isHidden())
+            page.map.on_select(fx.PC)
+            if fixture.snapshot.own == fx.MAC:     # the PC seen from the Mac: still none
+                self.assertTrue(page.vmic_exclusive.isHidden())
+            self.assertEqual([call for call in service.calls if call[0] == "set_vmic_exclusive"], [])
+            page.deleteLater()
+
     def test_notice_actions_go_through_the_service(self):
         fixture = fx.no_peers()
         fixture = replace(fixture, snapshot=replace(fixture.snapshot, helper="failed"))

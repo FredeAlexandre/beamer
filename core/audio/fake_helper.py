@@ -49,6 +49,7 @@ class FakeEngine:
         self.devices = copy.deepcopy(devices or default_devices(platform))
         self.features = list(FEATURES.get(platform, []) if features is None else features)
         self.restored = restored
+        self.vmic_exclusive = False
         self.flows = {}
         self.streams = {}
         self.link_in = 0
@@ -59,8 +60,11 @@ class FakeEngine:
         self.system_error = None  # tests: the same for system sends
 
     def ready(self):
+        features = list(self.features)
+        if self.vmic_exclusive and self.platform == "windows" and "vmic_exclusive" not in features:
+            features.append("vmic_exclusive")
         return [{"ev": "ready", "proto": 1, "version": VERSION, "platform": self.platform,
-                 "features": list(self.features), "restored": self.restored}, self.devices_event()]
+                 "features": features, "restored": self.restored}, self.devices_event()]
 
     def devices_event(self):
         return dict({"ev": "devices"}, **copy.deepcopy(self.devices))
@@ -251,6 +255,8 @@ class FakeHelper:
 
     def start(self):
         self.starts += 1
+        # The Windows helper reports `vmic_exclusive` when started with --vmic-exclusive (WP12).
+        self.engine.vmic_exclusive = bool(self.cmd) and "--vmic-exclusive" in self.cmd
         self._state = "starting"
         self._deliver({"ev": "_state", "state": "starting", "why": "start"})
         if self.auto_ready:
@@ -269,6 +275,8 @@ class FakeHelper:
 
     def stop(self, timeout=2.0):
         self._state = "stopped"
+        self.engine.flows.clear()
+        self.engine.streams.clear()
 
     def retry(self):
         if self._state == "failed":
@@ -315,6 +323,7 @@ def _parse(argv):
     parser.add_argument("--state-dir")
     parser.add_argument("--exclude-pid", type=int)
     parser.add_argument("--dev", action="store_true")
+    parser.add_argument("--vmic-exclusive", action="store_true")
     parser.add_argument("--log-level", default="info")
     parser.add_argument("--platform", default="macos")
     parser.add_argument("--no-pong-after", type=int, default=-1, help="stop answering pings after N")
@@ -327,6 +336,7 @@ def _parse(argv):
 def main(argv=None):
     args = _parse(sys.argv[1:] if argv is None else argv)
     engine = FakeEngine(args.platform)
+    engine.vmic_exclusive = args.vmic_exclusive
     out_lock = threading.Lock()
 
     def write(event):

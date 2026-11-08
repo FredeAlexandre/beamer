@@ -90,7 +90,10 @@ class Ctx:
         s = sm
         self.wave = beamer.device(s, self.pc_id, "inputs", "Wave:3")
         self.g733 = beamer.device(s, self.pc_id, "outputs", "G733")
-        self.dualsense = beamer.device(s, self.pc_id, "outputs", "DualSense")
+        try:  # only the cases that play on it need it; the controller is often off
+            self.dualsense = beamer.device(s, self.pc_id, "outputs", "DualSense")
+        except KeyError:
+            self.dualsense = None
         self.mac_mic = beamer.device(s, self.mac_id, "inputs", "BuiltInMicrophoneDevice")
         self.mac_spk = beamer.device(s, self.mac_id, "outputs", "BuiltInSpeakerDevice")
         sp_m = sp["snapshot"]["machines"][self.pc_id]
@@ -127,7 +130,6 @@ def cases(c: Ctx, D: float):
     mic_mac = {"set_mic": {"machine": c.mac_id, "device": c.mac_mic}}
     pc_to_mac = {"set_output": {"machine": c.pc_id, "to": c.mac_id, "device": None}}
     mac_to_g733 = {"set_output": {"machine": c.mac_id, "to": c.pc_id, "device": c.g733}}
-    mac_to_ds = {"set_output": {"machine": c.mac_id, "to": c.pc_id, "device": c.dualsense}}
     vmic_rec = mac_rec("vmic", R - 4, 'capture-mic --device "Beamer Microphone" --channels 1 --buffer-frames 128', 1)
     cable_rec = pc_rec("cable", R - 4, f"capture-mic --device {CABLE_OUT} --channels 1", 1)
     g733_loop = pc_rec("g733", R, f"capture-system --device {c.g733['key']} --channels 2", 2)
@@ -165,16 +167,23 @@ def cases(c: Ctx, D: float):
         route=[("mac", mic_mac)],
         mac=[(0.5, "macmic", mac_rec("macmic", R, "capture-mic --channels 1", 1))],
         pc=[(5.0, "cable", cable_rec)], pairs=[], poll=None, demand="pc/cable", envelope=("mac/macmic", "pc/cable"))
-    S["both"] = dict(
-        desc="(e) Mac sound (A) -> PC DualSense and PC sound (B, on the G733) -> Mac speakers at once; "
-             "first 6 s Mac -> G733 (expected: conflict)",
-        route=[("mac", pc_to_mac), ("mac", mac_to_g733)],
-        actions=[(8.0, "mac", "command", mac_to_ds)],
-        mac=[(0.5, "tap", mac_tap), (1.0, "gen", mac_gen("A", R - 1.5))],
-        pc=[(0.5, "g733", g733_loop), (0.5, "ds", pc_rec("ds", R, f"capture-system --device {c.dualsense['key']} --channels 2", 2)),
-            (1.0, "gen", pc_gen("B", R - 1.5, c.g733["key"]))],
-        pairs=[("mac/inj", "mac/tap", "A"), ("mac/tap", "pc/ds", "A"), ("pc/inj", "pc/g733", "B"), ("pc/g733", "mac/tap", "B")],
-        poll=poll_g733, loopcheck=True, mac_mute=True)
+    if c.dualsense is None:
+        S["both"] = dict(desc="(e) needs the PC's DualSense", missing="the PC's DualSense output (turn the controller "
+                                                                     "on and plug it in, then run again)")
+    else:
+        mac_to_ds = {"set_output": {"machine": c.mac_id, "to": c.pc_id, "device": c.dualsense}}
+        S["both"] = dict(
+            desc="(e) Mac sound (A) -> PC DualSense and PC sound (B, on the G733) -> Mac speakers at once; "
+                 "first 6 s Mac -> G733 (expected: conflict)",
+            route=[("mac", pc_to_mac), ("mac", mac_to_g733)],
+            actions=[(8.0, "mac", "command", mac_to_ds)],
+            mac=[(0.5, "tap", mac_tap), (1.0, "gen", mac_gen("A", R - 1.5))],
+            pc=[(0.5, "g733", g733_loop),
+                (0.5, "ds", pc_rec("ds", R, f"capture-system --device {c.dualsense['key']} --channels 2", 2)),
+                (1.0, "gen", pc_gen("B", R - 1.5, c.g733["key"]))],
+            pairs=[("mac/inj", "mac/tap", "A"), ("mac/tap", "pc/ds", "A"), ("pc/inj", "pc/g733", "B"),
+                   ("pc/g733", "mac/tap", "B")],
+            poll=poll_g733, loopcheck=True, mac_mute=True)
     # Recovery cases carry PC mic (test B) -> Mac "Beamer Microphone" and PC sound -> Mac speakers at
     # once: the vmic recording times the outage without a Mac tap (taps wait on TCC while a Beamer
     # prompt is pending), the G733 mute timeline shows the PC's local sound coming back.
@@ -226,6 +235,29 @@ def cases(c: Ctx, D: float):
 CABLE_OUT = "{0.0.1.00000000}.{ddc7e301-3260-4ed3-8389-0938254820e0}"
 AGG_UID = "com.beamer.e2e.unplug"
 T_ROUTE = 2.0
+TEST_SOURCE_WAIT = 15.0  # s: the PC's 1 s dev poll + its status write + scp/ssh round trips (~1.5 s seen)
+
+
+def set_pc_test_source(cmds, notes, timeout=TEST_SOURCE_WAIT):
+    """Writes the PC's `test_source` command(s) and waits until its audio-dev-status.json names the
+    source in force, so the route set next opens the PC's stream on it at once. Without the wait the
+    route could reach the PC first: its mic opened on the real device, then again on the test source
+    (WP13, the double mic open)."""
+    want = [c["test_source"].get("signal") for c in cmds if "test_source" in c][-1]
+    started = time.monotonic()
+    pc.command(cmds)
+    seen = None
+    while time.monotonic() - started < timeout:
+        status = pc.status()
+        seen = status.get("test_source") if status else None
+        if status is not None and seen == want:
+            notes.append({"t": time.monotonic(), "event": "pc_test_source", "signal": want,
+                          "waited_s": round(time.monotonic() - started, 2)})
+            return
+        time.sleep(0.2)
+    raise RuntimeError(f"the PC did not report test_source {want!r} within {timeout:.0f} s (its "
+                       f"audio-dev-status.json says {seen!r}): is Beamer running there in dev mode "
+                       f"(audio-dev.enabled) with a build that writes `test_source`?")
 
 
 # ---------------------------------------------------------------- one run
@@ -300,6 +332,10 @@ def _run_case(name, spec, D, run_dir, notes):
     plan = {"dir": pcrun, "duration": D + 4,
             "procs": [_pc_proc(n, c, d, pcrun) for d, n, c in spec["pc"]],
             "poll": spec.get("poll"), "resources_every": spec.get("resources_every", 0)}
+    # The PC's test source first, confirmed by its status file, before anything else starts.
+    test_sources = [cmd for m, cmd in spec["route"] if m == "pc" and "test_source" in cmd]
+    if test_sources:
+        set_pc_test_source(test_sources, notes)
     (run_dir / "pc_plan.json").write_text(json.dumps(plan, indent=1))
     beamer.ssh(f"New-Item -ItemType Directory -Force {pcrun} | Out-Null")
     beamer.scp_to(run_dir / "pc_plan.json", pcrun + "\\plan.json")
@@ -318,11 +354,12 @@ def _run_case(name, spec, D, run_dir, notes):
     timeline = [(d, "spawn", n, c) for d, n, c in spec["mac"]]
     # One command file per machine: the app reads the file once a second, so a second write before
     # that would replace the first (seen in WP10's first mic_mac_pc run: the test source was lost).
+    # The PC's test source is already in force (set_pc_test_source above); the rest of its part goes
+    # a little before the Mac's, as before.
     per_machine = {}
     for m, cmd in spec["route"]:
-        per_machine.setdefault(m, []).append(cmd)
-    # The PC's part (its test source) goes first, so the route never opens a stream that the test
-    # source then replaces.
+        if not (m == "pc" and "test_source" in cmd):
+            per_machine.setdefault(m, []).append(cmd)
     timeline += [(T_ROUTE - (1.2 if m == "pc" else 0.0), "route", m, cmds) for m, cmds in sorted(per_machine.items())]
     timeline += [(t, "action", (m, what), arg) for t, m, what, arg in spec.get("actions", [])]
     timeline += [(D, "idle", None, None)]
@@ -478,6 +515,8 @@ def main():
     D = a.duration or {"soak": 1860, "linkloss": 150}.get(a.case, 75)
     ctx = Ctx()
     spec = cases(ctx, D)[a.case]
+    if spec.get("missing"):
+        sys.exit(f"{a.case} needs {spec['missing']}")
     if not beamer.is_idle(ctx.mac_status):
         mac.command(beamer.idle_commands(ctx.mac_status))
         time.sleep(3)

@@ -149,7 +149,7 @@ def snapshot_data(snap: AudioSnapshot) -> dict:
             "output_status": {ident: status(value) for ident, value in snap.output_status.items()},
             "streams": [dataclasses.asdict(stream) for stream in snap.streams], "helper": snap.helper,
             "permission": dict(snap.permission), "aec_mode": snap.aec_mode, "aec_active": snap.aec_active,
-            "howls": [dataclasses.asdict(howl) for howl in snap.howls]}
+            "howls": [dataclasses.asdict(howl) for howl in snap.howls], "vmic_exclusive": snap.vmic_exclusive}
 
 
 class AudioService:
@@ -179,7 +179,9 @@ class AudioService:
         self._machines = {}
         self._own_rev = 0
         self._aec = "auto"
+        self._vmic_exclusive = False
         self._helper = None
+        self._helper_gen = 0        # events of a helper replaced by a restart are dropped
         self._helper_state = "starting" if self._helper_cmd else "no_helper"
         self._helper_info = {}
         self._devices_event = None
@@ -272,6 +274,11 @@ class AudioService:
     def set_aec(self, mode: str) -> None:
         self._queue.put(("call", "_set_aec", (mode,)))
 
+    def set_vmic_exclusive(self, on: bool) -> None:
+        """Windows, this machine only: render exclusively into CABLE Input (about 35 ms instead of 70,
+        but no other app can play into it meanwhile). Restarts the helper: streams drop for ~1 s."""
+        self._queue.put(("call", "_set_vmic_exclusive", (bool(on),)))
+
     def watch(self, on: bool) -> None:
         self._queue.put(("call", "_watch", (bool(on),)))
 
@@ -327,6 +334,7 @@ class AudioService:
         self._began = True
         stored = store.load(self._state_dir, now=self._wall())
         self._route, self._own_rev, self._aec = stored.route, stored.own_rev, stored.aec
+        self._vmic_exclusive = stored.vmic_exclusive
         self._machines = {ident: machine for ident, machine in stored.machines.items() if ident != self._own}
         self._dev = helper_module.dev_config(self._state_dir)
         self._dev_at = self._clock()
@@ -334,16 +342,41 @@ class AudioService:
         if self._helper_cmd and dev_helper:
             self._helper_cmd = helper_module.locate(self._state_dir) or self._helper_cmd
         if self._helper_cmd:
-            cmd = self._helper_cmd
-            if "--control" not in cmd:
-                cmd = helper_module.command_line(cmd, self._state_dir, dev=self._dev is not None)
-            self._helper = self._helper_factory(cmd, self._deliver)
-            self._helper.start()
+            self._start_helper()
         self._dirty = True
         self._tick()
 
-    def _deliver(self, event):
-        self._queue.put(("helper", event))
+    def _helper_command(self):
+        exclusive = self._vmic_exclusive and self._platform == "windows"
+        cmd = list(self._helper_cmd)
+        if "--control" not in cmd:
+            return helper_module.command_line(cmd, self._state_dir, dev=self._dev is not None,
+                                              vmic_exclusive=exclusive)
+        if exclusive and helper_module.VMIC_EXCLUSIVE_ARG not in cmd:
+            cmd.append(helper_module.VMIC_EXCLUSIVE_ARG)
+        return cmd
+
+    def _start_helper(self):
+        self._helper_gen += 1
+        generation = self._helper_gen
+
+        def deliver(event):
+            self._queue.put(("helper", event, generation))
+        self._helper = self._helper_factory(self._helper_command(), deliver)
+        self._helper.start()
+
+    def _restart_helper(self):
+        """A new helper with a new command line: the old one quits first (it may hold CABLE Input
+        or a muted endpoint), its streams and flows are gone, and `ready` opens them again."""
+        old = self._helper
+        if old is None:
+            return
+        self._helper_gen += 1       # whatever the old one still says is dropped
+        old.stop()
+        self._log.info("audio: restarting the helper (low-latency virtual microphone %s)",
+                       "on" if self._vmic_exclusive else "off")
+        self._helper_gone("starting")
+        self._start_helper()
 
     def _handle(self, item):
         if self._dev is not None:
@@ -357,7 +390,8 @@ class AudioService:
             elif kind == "link":
                 self._on_link_message(item[1], item[2])
             elif kind == "helper":
-                self._on_helper(item[1])
+                if len(item) < 3 or item[2] == self._helper_gen:
+                    self._on_helper(item[1])
             elif kind == "call":
                 getattr(self, item[1])(*item[2])
         except Exception:  # never let one bad event end the worker
@@ -476,7 +510,8 @@ class AudioService:
         self._save_at = None
         machines = dict(self._machines)
         try:
-            store.save(self._state_dir, store.Stored(self._route, self._own_rev, machines, self._aec))
+            store.save(self._state_dir, store.Stored(self._route, self._own_rev, machines, self._aec,
+                                                     self._vmic_exclusive))
         except OSError as error:
             self._log.warning("audio: could not save %s: %s", store.FILE_NAME, error)
 
@@ -1080,6 +1115,14 @@ class AudioService:
             self._aec = mode
             self._schedule_save()
 
+    def _set_vmic_exclusive(self, on):
+        if on == self._vmic_exclusive:
+            return
+        self._vmic_exclusive = on
+        self._schedule_save()
+        if self._platform == "windows":
+            self._restart_helper()
+
     def _watch(self, on):
         if on == self._watching:
             return
@@ -1170,6 +1213,8 @@ class AudioService:
                 self._set_form(value["machine"], value["key"], value.get("form"))
             if "set_aec" in item:
                 self._set_aec(item["set_aec"])
+            if "set_vmic_exclusive" in item:
+                self._set_vmic_exclusive(item["set_vmic_exclusive"] is True)
             if "test_source" in item:
                 value = item["test_source"]
                 signal = value.get("signal") if isinstance(value, dict) else None
@@ -1293,4 +1338,5 @@ class AudioService:
         return AudioSnapshot(own=self._own, machines=dict(self._machines), online=online, direct=direct,
                              route=self._route, mic_status=mic_status, output_status=output_status,
                              streams=tuple(views), helper=self._helper_state, permission=dict(self._permission),
-                             aec_mode=self._aec, aec_active=aec_active, howls=howls)
+                             aec_mode=self._aec, aec_active=aec_active, howls=howls,
+                             vmic_exclusive=self._vmic_exclusive)

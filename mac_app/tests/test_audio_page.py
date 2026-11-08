@@ -143,6 +143,26 @@ class AudioPageTests(unittest.TestCase):
             ("set_form", (fx.MAC, fx.MAC_SPEAKERS.key, "headset")),
         ])
 
+    def test_low_latency_switch_never_on_a_mac(self):
+        # Each machine sets its own: the Mac's panel and the PC's panel seen from the Mac have none.
+        _control, page, service = build(fx.mic_streaming())
+        self.assertTrue(page.vmic_exclusive_box.isHidden())
+        page.map.select(fx.PC)
+        self.assertEqual(page.page.panel.machine, fx.PC)
+        self.assertTrue(page.vmic_exclusive_box.isHidden())
+        page._vmic_exclusive_changed(True)      # a stray call from a hidden switch does nothing
+        self.assertEqual(service.calls, [])
+
+    def test_low_latency_switch_renders_a_windows_panel(self):
+        # The page renders whatever the shared model says; only a Windows machine's own model has it.
+        _control, page, service = build(fx.no_peers_pc())
+        self.assertFalse(page.vmic_exclusive_box.isHidden())
+        self.assertEqual(page.vmic_exclusive.words.text, "Low-latency virtual microphone")
+        self.assertIn("35 ms", page.vmic_exclusive_note.text)
+        self.assertFalse(page.vmic_exclusive.value)
+        page.vmic_exclusive._toggle()
+        self.assertEqual(service.calls[-1], ("set_vmic_exclusive", (True,)))
+
     def test_selecting_a_machine_on_the_map(self):
         _control, page, service = build(fx.mic_streaming())
         self.assertEqual(page.page.panel.machine, fx.MAC)
