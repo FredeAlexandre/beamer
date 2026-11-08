@@ -722,9 +722,12 @@ class MacBackend final : public Backend {
   void tick() {
     if (!alive_) return;
     const double now = seconds();
-    if (const std::string perm = mic_permission(); perm != last_mic_perm_) {
-      last_mic_perm_ = perm;  // answered (or changed in System Settings): the engine re-reads permission()
-      notify_devices_changed();
+    // Only while the answer is pending: each read is a synchronous XPC round trip to tccd.
+    if (last_mic_perm_ == "undetermined") {
+      if (const std::string perm = mic_permission(); perm != last_mic_perm_) {
+        last_mic_perm_ = perm;  // answered: the engine re-reads permission()
+        notify_devices_changed();
+      }
     }
     for (MacStream* s : streams_) {
       if (s->lost) continue;
