@@ -1357,6 +1357,7 @@ class ControlWindow(AppKit.NSObject):
         builders = {
             "overview": self._overview_page,
             "crossing": self._crossing_page,
+            "audio": self._audio_page,
             "design": self._design_page,
             "keyboard": self._keyboard_page,
             "connection": self._connection_page,
@@ -3088,6 +3089,21 @@ class ControlWindow(AppKit.NSObject):
         for constraint in body.constraints():
             if constraint.firstItem() == machines.view and constraint.firstAttribute() == AppKit.NSLayoutAttributeWidth:
                 constraint.setPriority_(499)
+
+    @objc.python_method
+    def _audio_page(self, body):
+        """The Audio page (core/audio/view.py, mac_app/audio_page.py); the service is the
+        controller's `audio` once the app has one."""
+        import audio_page
+
+        def without_audio():
+            caps = self._design_peer_caps() if getattr(self.controller, "audio", None) is not None else {}
+            names = {entry.get("id"): entry.get("name", "") for entry in peerlist.desktops(self.controller.book.peers())}
+            return [names.get(peer, "") for peer, values in caps.items() if "audio" not in values]
+
+        self.audio_page = audio_page.AudioPage(
+            body, lambda: getattr(self.controller, "audio", None),
+            lambda: self.settings_store.current().get("layout", {}), self.own_id, tr("This Mac"), without_audio)
 
     @objc.python_method
     def _design_page(self, body):

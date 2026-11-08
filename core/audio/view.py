@@ -32,6 +32,7 @@ VIRTUAL_INPUTS = ("Beamer Microphone", "CABLE Output")
 PLATFORMS = {"macos": N_("macOS"), "windows": N_("Windows"), "linux": N_("Linux")}
 OFF = "off"
 HERE = "here"
+STREAMS_RUNNING = ("opening", "starting", "running")
 
 # Inks: what a line or a mark is drawn in, by what it says.
 QUIET, PLAIN, LIVE, WAIT, FAULT = "ink_3", "ink_2", "signal", "amber", "fault"
@@ -49,6 +50,7 @@ REASONS = {
     "bind_failed": N_("the network port is taken"),
     "helper": N_("the audio helper stopped"),
     "conflict": N_("its output is muted there"),
+    "no_system_capture": N_("that machine cannot capture its sound"),
 }
 
 
@@ -82,6 +84,9 @@ class TileView:
     output_tone: str
     meter: Optional[str]            # the level key of the tile's thin bar
     description: str                # one sentence for screen readers
+    input_line: str = ""            # the machine's own default microphone, shown when it is not the active one
+    listen_line: str = ""           # "Hears This Mac": an app here records the shared mic from another machine
+    recording_line: str = ""        # while `recording`: one sentence saying so, for a badge's tooltip or a reader
 
 
 @dataclass(frozen=True)
@@ -178,18 +183,28 @@ def meter_reading(levels: Mapping, key: Optional[str]) -> Optional[tuple]:
 
 
 def layout_tiles(layout: Mapping) -> dict:
-    """settings["layout"] (tiles as {x, y, w, h, ...}) as page_model's `tiles`."""
+    """settings["layout"] (tiles as {x, y, w, h, ...}) as page_model's `tiles`; (x, y, w, h) tuples
+    pass through."""
     tiles = {}
     for machine, tile in (layout or {}).items():
         try:
-            tiles[machine] = (float(tile["x"]), float(tile["y"]), float(tile["w"]), float(tile["h"]))
+            values = (tile["x"], tile["y"], tile["w"], tile["h"]) if isinstance(tile, Mapping) else tuple(tile)[:4]
+            tiles[machine] = tuple(float(value) for value in values)
         except (KeyError, TypeError, ValueError):
             continue
+        if len(tiles[machine]) != 4:
+            del tiles[machine]
     return tiles
 
 
 def _choice_key(*parts) -> str:
     return "\t".join("" if part is None else str(part) for part in parts)
+
+
+def _title(machine: str, device: str) -> str:
+    """A choice on the closed selector, where no header says whose device it is."""
+    # Translators: a device chosen in a selector, after the machine it belongs to: "lebig · Wave:3".
+    return tr("{machine} · {device}").format(machine=machine, device=device)
 
 
 def _headset(form: Optional[str]) -> bool:
@@ -259,10 +274,10 @@ def _mic_choices(snap: AudioSnapshot, names: _Names, order):
         name = names(machine)
         group = [Choice(_choice_key("mic-head", machine), name, name, enabled=False, header=True, machine=machine)]
         default = model.device_by_key(inputs, held.default_input)
-        label = (tr("Default microphone ({name})").format(name=default.name) if default is not None
+        label = (tr("Default ({name})").format(name=default.name) if default is not None
                  else tr("Default microphone"))
         key = _choice_key("mic", machine, "")
-        group.append(Choice(key, label, tr("{device} on {machine}").format(device=label, machine=name),
+        group.append(Choice(key, label, _title(name, label),
                             enabled=usable, machine=machine, device=None))
         if mic.machine == machine and mic.device is None:
             selected = key
@@ -270,7 +285,7 @@ def _mic_choices(snap: AudioSnapshot, names: _Names, order):
         for device in inputs:
             key = _choice_key("mic", machine, device.key)
             ref = DeviceRef(device.key, device.name)
-            group.append(Choice(key, device.name, tr("{device} on {machine}").format(device=device.name, machine=name),
+            group.append(Choice(key, device.name, _title(name, device.name),
                                 enabled=usable, machine=machine, device=ref))
             if chosen is not None and chosen.key == device.key and mic.device is not None:
                 selected = key
@@ -278,7 +293,7 @@ def _mic_choices(snap: AudioSnapshot, names: _Names, order):
             # The chosen mic is unplugged: still the selection, so nothing has to be set again.
             key = _choice_key("mic", machine, mic.device.key)
             label = tr("{device} (not connected)").format(device=mic.device.name)
-            group.append(Choice(key, label, tr("{device} on {machine}").format(device=label, machine=name),
+            group.append(Choice(key, label, _title(name, label),
                                 enabled=False, machine=machine, device=mic.device))
             selected = key
         choices.extend(group)
@@ -288,17 +303,18 @@ def _mic_choices(snap: AudioSnapshot, names: _Names, order):
         key = _choice_key("mic", mic.machine, mic.device.key if mic.device else "")
         choices.append(Choice(_choice_key("mic-head", mic.machine), name, name, enabled=False, header=True,
                               machine=mic.machine))
-        choices.append(Choice(key, label, tr("{device} on {machine}").format(device=label, machine=name),
+        choices.append(Choice(key, label, _title(name, label),
                               enabled=False, machine=mic.machine, device=mic.device))
         selected = key
     return tuple(choices), selected
 
 
 def _mic_targets(snap: AudioSnapshot) -> list:
-    """The machines hearing the active mic: the status's `targets`, else the running mic streams,
+    """The machines hearing the active mic: the status's `to` (planner.py), else the running mic streams,
     and the mic's own machine while an app there records it (the local loop)."""
     source = snap.route.mic.machine
-    targets = _ids(snap.mic_status.params.get("targets"))
+    params = snap.mic_status.params
+    targets = _ids(params.get("to") or params.get("targets"))
     if not targets:
         targets = [stream.target for stream in snap.streams
                    if stream.kind == "mic" and stream.source == source and stream.state in ("running", "starting")]
@@ -312,7 +328,7 @@ def _mic_line(snap: AudioSnapshot, names: _Names) -> str:
     status = snap.mic_status
     source = snap.route.mic.machine
     if source is None or status.state == "off":
-        return tr("No microphone is shared. Apps that record Beamer Microphone or CABLE Output hear silence.")
+        return tr("No microphone is shared: apps that record it hear silence.")
     device, machine = _mic_device_name(snap), names(source)
     targets = joined(names(target) for target in _mic_targets(snap))
     state = status.state
@@ -428,8 +444,7 @@ def _output_choices(snap: AudioSnapshot, names: _Names, machine: str, order):
     name = names(machine)
     local = model.device_by_key(held.outputs, held.default_output) if held else None
     here = (tr("Here, on {device}").format(device=local.name) if local is not None else tr("Here"))
-    choices = [Choice(HERE, here, tr("{machine} itself").format(machine=name) if local is None else
-                      tr("{device} on {machine}").format(device=local.name, machine=name))]
+    choices = [Choice(HERE, here, name if local is None else _title(name, local.name))]
     selected = HERE
     can_send = held is not None and "system_capture" in held.features and machine in snap.online
     peers = _peers_of(snap, machine)
@@ -440,24 +455,24 @@ def _output_choices(snap: AudioSnapshot, names: _Names, machine: str, order):
         choices.append(Choice(_choice_key("out-head", target), target_name, target_name, enabled=False, header=True,
                               machine=target))
         default = model.device_by_key(other.outputs, other.default_output)
-        label = (tr("Default output ({name})").format(name=default.name) if default is not None
+        label = (tr("Default ({name})").format(name=default.name) if default is not None
                  else tr("Default output"))
         key = _choice_key("out", target, "")
-        choices.append(Choice(key, label, tr("{device} on {machine}").format(device=label, machine=target_name),
+        choices.append(Choice(key, label, _title(target_name, label),
                               enabled=usable, machine=target, device=None))
         if entry.to == target and entry.device is None:
             selected = key
         chosen = model.resolve(entry.device, other.outputs) if entry.to == target else None
         for device in other.outputs:
             key = _choice_key("out", target, device.key)
-            choices.append(Choice(key, device.name, tr("{device} on {machine}").format(device=device.name, machine=target_name),
+            choices.append(Choice(key, device.name, _title(target_name, device.name),
                                   enabled=usable, machine=target, device=DeviceRef(device.key, device.name)))
             if chosen is not None and chosen.key == device.key and entry.device is not None:
                 selected = key
         if entry.to == target and entry.device is not None and chosen is None:
             key = _choice_key("out", target, entry.device.key)
             label = tr("{device} (not connected)").format(device=entry.device.name)
-            choices.append(Choice(key, label, tr("{device} on {machine}").format(device=label, machine=target_name),
+            choices.append(Choice(key, label, _title(target_name, label),
                                   enabled=False, machine=target, device=entry.device))
             selected = key
     if entry.to is not None and selected == HERE:
@@ -467,7 +482,7 @@ def _output_choices(snap: AudioSnapshot, names: _Names, machine: str, order):
         key = _choice_key("out", entry.to, entry.device.key if entry.device else "")
         choices.append(Choice(_choice_key("out-head", entry.to), target_name, target_name, enabled=False, header=True,
                               machine=entry.to))
-        choices.append(Choice(key, label, tr("{device} on {machine}").format(device=label, machine=target_name),
+        choices.append(Choice(key, label, _title(target_name, label),
                               enabled=False, machine=entry.to, device=entry.device))
         selected = key
     return tuple(choices), selected, can_send
@@ -532,7 +547,8 @@ def _panel(snap: AudioSnapshot, names: _Names, machine: str, order) -> MachinePa
     return MachinePanel(
         machine=machine, heading=name,
         output_label=tr("Sound from {machine} plays on").format(machine=name),
-        output_choices=choices, output_selected=selected, output_enabled=can_send,
+        output_choices=choices, output_selected=selected,
+        output_enabled=selected != HERE or (can_send and any(choice.enabled and choice.key != HERE for choice in choices)),
         mute_note=(tr("Muted on {machine} while it plays elsewhere.").format(machine=name) if entry.to is not None else ""),
         output_line=line, output_tone=tone, inputs=inputs, outputs=outputs,
         inputs_empty=empty or (tr("No microphones.") if not inputs else ""),
@@ -597,6 +613,14 @@ def _tile(snap: AudioSnapshot, names: _Names, machine: str, frame, selected: str
         subtitle = tr("Audio unavailable")
     has_mic = snap.route.mic.machine == machine
     mic_line = _mic_device_name(snap) if has_mic else ""
+    default_input = model.device_by_key(_inputs(held), held.default_input) if held is not None else None
+    input_line = default_input.name if default_input is not None and not has_mic else ""
+    source = snap.route.mic.machine
+    listening = (not has_mic and source is not None and snap.mic_status.state == "streaming"
+                 and machine in _mic_targets(snap))
+    listen_line = tr("Hears {machine}").format(machine=names(source)) if listening else ""
+    recording = held is not None and held.virtual_mic.in_use
+    recording_line = tr("An app here is recording Beamer's microphone.") if recording else ""
     output_line, output_tone = _tile_output(snap, names, machine)
     if has_mic:
         meter = _mic_meter(snap)
@@ -604,16 +628,18 @@ def _tile(snap: AudioSnapshot, names: _Names, machine: str, frame, selected: str
         meter = meter_key(machine, "output", held.default_output)
     else:
         meter = None
-    recording = held is not None and held.virtual_mic.in_use
     name = names(machine)
     parts = [tr("{machine}, {state}.").format(machine=name, state=tr("online") if online else tr("offline"))]
     if has_mic:
         parts.append(tr("Its {device} is the shared microphone.").format(device=mic_line))
     parts.append(output_line + ".")
+    if recording_line:
+        parts.append(recording_line)
     return TileView(machine=machine, frame=frame, title=name, subtitle=subtitle, platform=platform, own=own,
                     online=online, selected=machine == selected, has_active_mic=has_mic, mic_line=mic_line,
                     recording=recording, output_line=output_line, output_tone=output_tone if online else QUIET,
-                    meter=meter, description=" ".join(parts))
+                    meter=meter, description=" ".join(parts), input_line=input_line,
+                    listen_line=listen_line, recording_line=recording_line)
 
 
 def _arrows(snap: AudioSnapshot, names: _Names, shown) -> tuple:
@@ -660,18 +686,34 @@ def _speaker_devices(snap: AudioSnapshot, machine: str) -> list:
     return [device for device in devices if device is not None and not _headset(device.form)]
 
 
-def _notices(snap: AudioSnapshot, names: _Names, platform: str, without_audio) -> tuple:
+def _notices(snap: AudioSnapshot, names: _Names, platform: str, without_audio, driver) -> tuple:
     notices = []
     own = snap.machines.get(snap.own)
     if snap.helper == "failed":
         notices.append(Notice("helper_failed", tr("Beamer's audio helper stopped and did not start again."), FAULT,
                               "retry_helper", tr("Retry")))
+    # The Mac driver: installing or updating it restarts coreaudiod, so it is offered only while no
+    # stream runs, and the notice says first that every app goes quiet for a moment.
+    busy = any(stream.state in STREAMS_RUNNING for stream in snap.streams)
+    restart = tr("Every app on this Mac goes quiet for about a second while it installs.")
+    later = tr("Beamer is sending or playing sound now; it can be installed once that stops.")
+    missing = (own is not None and not own.virtual_mic.present and driver not in ("current", "newer")) or driver == "missing"
+    if platform == "macos" and missing:
+        offered = driver != "no_bundle" and not busy
+        text = tr("Beamer Microphone is not installed, so apps on this Mac cannot hear another machine's microphone.")
+        if driver == "no_bundle":
+            text += " " + tr("This build of Beamer does not carry it.")
+        else:
+            text += " " + (later if busy else restart)
+        notices.append(Notice("driver_missing", text, WAIT, "install_driver" if offered else None,
+                              tr("Install Beamer Microphone") if offered else ""))
+    elif platform == "macos" and driver == "outdated":
+        offered = not busy
+        notices.append(Notice("driver_outdated", tr("This Beamer carries a newer Beamer Microphone.") + " "
+                              + (later if busy else restart), PLAIN, "install_driver" if offered else None,
+                              tr("Update Beamer Microphone") if offered else ""))
     if own is not None and not own.virtual_mic.present:
-        if platform == "macos":
-            notices.append(Notice("driver_missing", tr("Beamer Microphone is not installed, so apps on this Mac "
-                                                       "cannot hear another machine's microphone."), WAIT,
-                                  "install_driver", tr("Install Beamer Microphone")))
-        elif platform == "windows":
+        if platform == "windows":
             notices.append(Notice("vbcable_missing", tr("To use another machine's mic here, install VB-CABLE "
                                                         "(vb-audio.com), then choose 'CABLE Output' as the microphone "
                                                         "in your apps."), WAIT))
@@ -728,11 +770,13 @@ def _notices(snap: AudioSnapshot, names: _Names, platform: str, without_audio) -
 
 
 def page_model(snap: AudioSnapshot, tiles: Mapping, selected: Optional[str], own_label: str,
-               peers_without_audio=()) -> AudioPage:
+               peers_without_audio=(), driver: Optional[str] = None) -> AudioPage:
     """Everything the Audio page shows (§9.1). `tiles`: machine id -> (x, y, w, h), or the layout's
     {x, y, w, h} dicts; `selected`: the machine whose panel shows, else this one; `own_label`:
     "This Mac" / "This PC"; `peers_without_audio`: names of linked machines whose Beamer has no
-    audio (the snapshot lists audio machines only)."""
+    audio (the snapshot lists audio machines only); `driver`: the Mac's Beamer Microphone driver as
+    mac_app/audio_driver.py states it ("missing", "outdated", "current", "newer", "no_bundle"), None
+    when unknown (the snapshot's virtual mic then decides)."""
     names = _Names(snap, own_label)
     shown = [snap.own] + [machine for machine in snap.machines if machine != snap.own]
     frames = _frames(shown, tiles or {})
@@ -757,7 +801,7 @@ def page_model(snap: AudioSnapshot, tiles: Mapping, selected: Optional[str], own
         mic_meter=mic_meter,
         mic_hint=tr("Apps use 'Beamer Microphone' on a Mac and 'CABLE Output' on a PC."),
         tiles=tile_views, arrows=arrows, selected=selected, panel=panel,
-        notices=_notices(snap, names, platform, peers_without_audio),
+        notices=_notices(snap, names, platform, peers_without_audio, driver),
         map_description=" ".join([tile.description for tile in tile_views] + [arrow.description for arrow in arrows]),
         meters=frozenset(meters))
 
@@ -796,7 +840,8 @@ def apply_test(service, row: DeviceRow) -> None:
 
 def apply_notice(service, notice: Notice) -> bool:
     """Runs a notice's action through the service; False when the action is the app's own
-    ("install_driver", "open_mic_settings", "open_system_audio_settings") or there is none."""
+    ("install_driver", which installs or updates the Mac driver off the main thread,
+    "open_mic_settings", "open_system_audio_settings") or there is none."""
     if notice.action == "retry_helper":
         service.retry_helper()
         return True

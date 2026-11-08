@@ -45,6 +45,7 @@ setup(
         "notices",
         "notch_beam",
         "notch_island",
+        "audio_page",
         "pages",
         "pointer_hide",
         "previews",

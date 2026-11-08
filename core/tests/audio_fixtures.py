@@ -127,7 +127,7 @@ def mic_streaming() -> Fixture:
     route_mic = MicRoute(MAC, None, stamp(10))
     streams = (StreamView(2882400018, "mic", MAC, PC, "running", "udp", 23.0, 0.1, 5.2),)
     snap = snapshot([mac(links=(PC,)), pc(in_use=True)], direct=(PC,), mic=route_mic,
-                    mic_status=RouteStatus("streaming", None, {"targets": PC}),
+                    mic_status=RouteStatus("streaming", None, {"to": PC}),
                     output_status={MAC: RouteStatus("local"), PC: RouteStatus("local")}, streams=streams,
                     aec_active=True)
     levels = {f"{MAC}/in/{MAC_MIC.key}": (-22.0, -9.5), f"{MAC}/out/{MAC_SPEAKERS.key}": (-38.0, -27.0),
@@ -145,7 +145,7 @@ def sound_redirected() -> Fixture:
     snap = snapshot([mac(links=(PC,)), pc(in_use=True, outputs=(replace(REALTEK, default=True), replace(G733, default=False),
                                                                DUALSENSE))],
                     direct=(PC,), mic=route_mic, outputs=outputs,
-                    mic_status=RouteStatus("streaming", None, {"targets": PC}),
+                    mic_status=RouteStatus("streaming", None, {"to": PC}),
                     output_status={MAC: RouteStatus("local"), PC: RouteStatus("streaming")}, streams=streams,
                     aec_active=True)
     levels = {f"{MAC}/in/{MAC_MIC.key}": (-25.0, -11.0), f"{MAC}/out/{MAC_SPEAKERS.key}": (-18.0, -6.0),
@@ -171,7 +171,7 @@ def three_machines() -> Fixture:
     outputs = {MAC: OutputRoute(PC, DeviceRef("{gone}", "Headphones (Arctis 7)"), stamp(30))}
     streams = (StreamView(7, "mic", ROG, PC, "running", "udp", 20.0, 0.0, 3.0),)
     snap = snapshot([mac(links=(PC,)), pc(links=(MAC, ROG), in_use=True), rog()], direct=(PC,), mic=route_mic,
-                    outputs=outputs, mic_status=RouteStatus("streaming", None, {"targets": PC}),
+                    outputs=outputs, mic_status=RouteStatus("streaming", None, {"to": PC}),
                     output_status={MAC: RouteStatus("waiting_device"), PC: RouteStatus("local"),
                                    ROG: RouteStatus("local")},
                     streams=streams)
@@ -183,6 +183,49 @@ FIXTURES = {
     "mic_streaming": mic_streaming,
     "sound_redirected": sound_redirected,
     "driver_missing": driver_missing,
+}
+
+
+def seen_from(fixture: Fixture, machine: str, own_label: str = "This PC") -> Fixture:
+    """The same cluster from another machine's Beamer: its own id, its direct peers (the machines
+    whose lists name it), the same route and statuses. Streams and levels are the cluster's; each
+    page shows what concerns its machine."""
+    snap = fixture.snapshot
+    direct = frozenset(other for other, held in snap.machines.items() if other != machine and machine in held.links)
+    machines = dict(snap.machines)
+    if machine == MAC and MAC not in machines:
+        machines[MAC] = mac(links=direct)
+    seen = replace(snap, own=machine, direct=direct, machines=machines,
+                   online=model.online(machine, direct, machines))
+    selected = fixture.selected if fixture.selected != machine else None
+    return replace(fixture, name=f"{fixture.name}_from_{'pc' if machine == PC else machine[:6]}", snapshot=seen,
+                   selected=selected, own_label=own_label)
+
+
+def no_peers_pc() -> Fixture:
+    """lebig on its own."""
+    snap = snapshot([pc(links=())], own=PC)
+    return Fixture("no_peers_pc", snap, {PC: TILES[PC]}, None, {f"{PC}/out/{G733.key}": (-29.0, -18.0)}, "This PC")
+
+
+def vbcable_missing() -> Fixture:
+    """lebig without VB-CABLE, the Mac's microphone chosen: apps on lebig cannot hear it."""
+    route_mic = MicRoute(MAC, None, stamp(10))
+    no_cable = replace(pc(), virtual_mic=VirtualMic(None, False, False), features=PC_FEATURES - {"virtual_mic"})
+    snap = snapshot([mac(links=(PC,)), no_cable], own=PC, direct=(MAC,), mic=route_mic,
+                    mic_status=RouteStatus("ready"),
+                    output_status={MAC: RouteStatus("local"), PC: RouteStatus("local")})
+    return Fixture("vbcable_missing", snap, {MAC: TILES[MAC], PC: TILES[PC]}, None,
+                   {f"{MAC}/in/{MAC_MIC.key}": (-35.0, -24.0)}, "This PC")
+
+
+# The acceptance states as lebig's Beamer shows them (WP7), with the PC's own counterpart of the
+# Mac's driver notice.
+FIXTURES_PC = {
+    "no_peers": no_peers_pc,
+    "mic_streaming": lambda: seen_from(mic_streaming(), PC),
+    "sound_redirected": lambda: seen_from(sound_redirected(), PC),
+    "vbcable_missing": vbcable_missing,
 }
 
 
