@@ -109,10 +109,18 @@ class SpeexCanceller final : public EchoCanceller {
     if (window_count_ >= kConfirmFrames) hold_ = kHoldFrames;
     else if (harm_count_ >= kHarmFrames) hold_ = 0;  // the path has gone (speakers muted, moved away)
     else if (hold_ > 0) --hold_;
-    const double a = double(n_) / (kGainTauS * rate_);
-    r_dy_ += a * (rdy - r_dy_);
-    r_yy_ += a * (ryy - r_yy_);
-    if (r_yy_ > double(n_)) g_ = r_dy_ / r_yy_;  // y above 1 LSB rms: a meaningful estimate
+    // g follows only while the reference plays (or did within the filter's 100 ms): without it y is
+    // rounding noise, and its correlation with the mic says nothing (live: a near end talking alone
+    // closed the gate)
+    double rxx = 0;
+    for (int i = 0; i < n_; ++i) rxx += double(ref_[i]) * ref_[i];
+    ref_quiet_ = rxx > kMinMicEnergy * n_ ? 0 : ref_quiet_ + 1;
+    if (ref_quiet_ <= kTailFrames) {
+      const double a = double(n_) / (kGainTauS * rate_);
+      r_dy_ += a * (rdy - r_dy_);
+      r_yy_ += a * (ryy - r_yy_);
+      if (r_yy_ > double(n_)) g_ = r_dy_ / r_yy_;  // y above 1 LSB rms: a meaningful estimate
+    }
     const double target = hold_ > 0 ? std::clamp((g_ - kGainLo) / (kGainHi - kGainLo), 0.0, 1.0) : 0.0;
     // at most kMaxStep per frame (0 -> 1 in 100 ms), ramped across the frame
     const double w1 = std::clamp(target, w_ - kMaxStep, w_ + kMaxStep);
@@ -143,7 +151,7 @@ class SpeexCanceller final : public EchoCanceller {
     notch_[0] = notch_[1] = 0;
     r_dy_ = r_yy_ = g_ = w_ = 0;
     std::fill(std::begin(window_), std::end(window_), uint8_t(0));
-    window_count_ = harm_count_ = window_pos_ = hold_ = 0;
+    window_count_ = harm_count_ = window_pos_ = hold_ = ref_quiet_ = 0;
   }
 
   double echo_delay_ms() override {
@@ -174,7 +182,8 @@ class SpeexCanceller final : public EchoCanceller {
   static constexpr double kConfirmRatio = 6.3;           // the filter removed >= 8 dB of the frame
   static constexpr double kMinMicEnergy = 32.0 * 32.0;   // per sample, int16 units: -60 dBFS
   static constexpr double kGainTauS = 1.0, kGainLo = 0.3, kGainHi = 0.6, kMaxStep = 0.1;
-  static constexpr int kHarmFrames = 30;
+  static constexpr int kHarmFrames = 30, kTailFrames = 10;
+  int ref_quiet_ = 0;  // frames since the reference was above -60 dBFS
   uint8_t window_[kWindow] = {};  // bit 0 evidence, bit 1 harm
   int window_count_ = 0, harm_count_ = 0, window_pos_ = 0, hold_ = 0;
   double r_dy_ = 0, r_yy_ = 0, g_ = 0, w_ = 0;
