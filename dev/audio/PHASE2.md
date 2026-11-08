@@ -185,7 +185,8 @@ feed, "CABLE Output", "CABLE In 16 Ch"; "CABLE Input" is used only as the virtua
 
 - Command line: `beamer-audio --control --parent-pid <pid> --state-dir <dir> --exclude-pid <pid>
   [--dev] [--log-level debug|info|warn]`. Without `--control` it offers diagnostics only:
-  `beamer-audio list`, `beamer-audio restore`, `beamer-audio version`.
+  `beamer-audio list`, `beamer-audio restore`, `beamer-audio version`. `--backend null:<options>`
+  replaces the OS backend by the null backend (§11.3) in any helper (`beamer-audio-null` defaults to it).
 - `<dir>` = the folder of `settings.json` (Mac `~/Library/Application Support/Beamer`, Windows
   `%LOCALAPPDATA%\Beamer`). Windows journal: `<dir>/audio-mute-journal.json`.
 - `--exclude-pid` = Beamer's own Python process (`os.getpid()`): on Windows the process-loopback
@@ -201,16 +202,17 @@ feed, "CABLE Output", "CABLE In 16 Ch"; "CABLE Input" is used only as the virtua
   `unknown_cmd`; unknown fields are ignored. stdout is written by one writer under a mutex, flushed per line.
 - stderr: free text log lines, `level: message`. Beamer logs them under `beamer.audio.helper`, at most
   50 lines/s.
-- Threads: main (stdin reader + dispatcher), one network thread (`poll`/`WSAPoll`, 2 ms timeout, all flows),
-  one encoder thread per send stream, the backend's IO threads, one 50 ms timer thread (levels, stats, RR
-  scheduling hand-off). IO threads touch only SPSC rings and atomics.
+- Threads: main (dispatcher) + a stdin reader thread, one network thread (`poll`/`WSAPoll` on all flows,
+  sleeping until the earliest flow timer: <= 10 ms, 2 ms while a flow is in `link` state; it also sends
+  hello/ping/rr and batches `link_out`), one encoder thread per send stream, the backend's IO threads, one
+  50 ms timer thread (levels, stats, `in_use` off-delay). IO threads touch only SPSC rings and atomics.
 
 ### 3.2 Commands (Beamer -> helper)
 
 | cmd | fields | effect |
 |---|---|---|
 | `devices` | - | emit `devices` now |
-| `flow_open` | `flow` (str, 8 hex), `peer` (machine id), `role` `"offer"`/`"answer"`, `port` (int, 0 = any; answer side passes 24823 and the helper tries 24823..24830 then 0), `remote` `{"host","port"}` or null, `key` (b64, 32 B), `rr_ms` (10) | bind a UDP socket (IPv4, on the interface that routes to `remote.host` when known), emit `flow_bound`; when `remote` is known, `connect()` it and start probing (hello every 200 ms until a valid packet arrives, then every 1 s) |
+| `flow_open` | `flow` (str, 8 hex), `peer` (machine id), `role` `"offer"`/`"answer"`, `port` (int, 0 = any; answer side passes 24823 and the helper tries 24823..24830 then 0), `host` (the peer's IPv4 from the link, optional), `remote` `{"host","port"}` or null, `key` (b64, 32 B), `rr_ms` (10), `udp` (bool, default true) | open the UDP socket and emit `flow_bound` (its local port) and `flow_state probing`. With `port` 0 and `host` set (the side that must not listen: the Mac) the socket is **not bound**: it is `connect()`ed towards `host:24823` and gets an ephemeral port on the routing interface, as `proto/transport/peer.py` did (Phase 1 V3: no macOS firewall dialog); `flow_remote` re-connects it. With `port` > 0 it binds that port on the interface that routes to `host`/`remote.host`. With neither (`remote` null, no `host`) it binds `0.0.0.0:0`: tests on 127.0.0.1 only. When `remote` has a port, `connect()` and start probing (hello every 200 ms until a valid packet arrives, then every 1 s). `udp: false`: no socket, the flow is in `link` state at once (loopback / no host, §4.2) |
 | `flow_remote` | `flow`, `host`, `port` | set the remote (offer side, after the answer), `connect()`, start probing |
 | `flow_close` | `flow` | send `bye`, close; streams on it stop |
 | `link_in` | `flow`, `p` (list of b64 sealed packets) | packets that came over the TCP link (§4.5) |
@@ -220,8 +222,9 @@ feed, "CABLE Output", "CABLE In 16 Ch"; "CABLE Input" is used only as the virtua
 | `stop` | `stream` | stop that stream; restore any local mute it holds |
 | `meter` | `on` (bool), `period_ms` (50..500) | `levels` events on/off |
 | `test_input` | `device` (key), `seconds` (1..15) | open that input for metering only |
-| `ping` | `req` | `pong` with the same `req` |
+| `ping` | `req` | `pong` with the same `req` (no `ok`) |
 | `quit` | - | orderly exit |
+| `dev` | only with `--dev` (else `unknown_cmd`): `flow` (optional, default all flows), `drop_udp` (bool: drop all UDP in and out), `loss_pct` (0..100: drop media at send), `reset_stats` (restart the `run_*` statistics), `null` `{"vmic_in_use": bool, "remove": key, "add": key}` (null backend only) | test switches for E2E and acceptance runs |
 
 ### 3.3 Events (helper -> Beamer)
 
@@ -234,8 +237,8 @@ feed, "CABLE Output", "CABLE In 16 Ch"; "CABLE Input" is used only as the virtua
 | `link_out` | `flow`, `p` (list of b64 sealed packets, ≤ 4): only while the flow is in state `link` |
 | `stream_state` | `stream`, `state` `"starting"`/`"running"`/`"stopped"`/`"failed"`, `device` (key in use), `error` (code, on failed/stopped by error) |
 | `levels` | `t` (ms), `in` `{key:[rms_db,peak_db]}`, `out` `{key:[...]}`, `streams` `{id:[...]}`: dBFS, 0.1 dB, floor -100; only devices Beamer has open |
-| `stats` | every 1 s per stream: `{stream: {path, jb_ms, target_ms, late, expand, drop, loss_pct, fec, ppm, rtt_ms, kbps}}` |
-| `permission` | `mic` / `system_audio`: `granted`/`denied`/`undetermined`/`unknown`/`suspect` (`suspect` = a capture delivered digital zero for 5 s) |
+| `stats` | every 1 s while streams exist: `{"ev":"stats","t":ms,"cpu_pct":<helper process, % of a core>,"streams":{"<id>":{...}}}`; counters are **per interval** (since the previous `stats`). recv: `dir,kind,path` (`udp`/`link`, of the last packet), `jb_ms` (mean level), `jb_p99_ms`, `jb_max_ms`, `target_ms`, `late`, `expand`, `drop` (incl. flushed), `flushed`, `loss_pct`, `fec`, `plc`, `underrun`, `dec_err`, `ppm`, `ppm_i`, `rtt_ms`, `kbps`, `rx`, `rx_link`, `ring_full`, `playing`, `run_jb_p99_ms` / `run_target_ms` (level p99 and mean target since the stream started or `dev reset_stats`). send: `dir,kind,path`, `kbps`, `bitrate`, `jb_ms` (the receiver's level from its rr), `rtt_ms`, `frames`, `enc_us` (mean encode time), `overflow`, `dev_dropped`, `rr_rx`, `enc_err`. loop: `jb_ms`, `target_ms`, `ppm`, `underrun`, `flushed`, `overflow` |
+| `permission` | once after `ready`: `mic` and `system_audio`: `granted`/`denied`/`undetermined`/`unknown`; later `{"mic":"suspect"}` when a mic capture (send or loop) delivered only digital zero for 5 s. Never `suspect` for system sound: a silent machine's tap is digital zero too |
 | `ok`, `error`, `pong` | see §3.1. Error codes: `bad_args`, `no_device`, `blocked_device`, `no_virtual_mic`, `device_busy`, `permission`, `unsupported`, `bind_failed`, `unknown_flow`, `unknown_stream`, `internal` |
 
 ### 3.4 Example session (Mac sends its mic to the PC; abbreviated)
@@ -243,8 +246,9 @@ feed, "CABLE Output", "CABLE In 16 Ch"; "CABLE Input" is used only as the virtua
 ```
 <- {"ev":"ready","proto":1,"version":"0.1.0","platform":"macos","features":["system_capture","local_mute_tap","mic_demand","virtual_mic","aec"],"restored":0}
 <- {"ev":"devices","inputs":[{"key":"BuiltInMicrophoneDevice","name":"MacBook Air Microphone","transport":"builtin","channels":1,"form":"microphone"}],"outputs":[{"key":"BuiltInSpeakerDevice","name":"MacBook Air Speakers","transport":"builtin","channels":2,"form":"speakers"}],"default_input":"BuiltInMicrophoneDevice","default_output":"BuiltInSpeakerDevice","virtual_mic":{"kind":"beamer","present":true,"in_use":false}}
--> {"cmd":"flow_open","req":1,"flow":"9f2c01aa","peer":"q2Vx...==","role":"offer","port":0,"remote":null,"key":"3q2+7w...=","rr_ms":10}
+-> {"cmd":"flow_open","req":1,"flow":"9f2c01aa","peer":"q2Vx...==","role":"offer","port":0,"host":"192.168.1.134","remote":null,"key":"3q2+7w...=","rr_ms":10}
 <- {"ev":"flow_bound","flow":"9f2c01aa","port":52114}
+<- {"ev":"flow_state","flow":"9f2c01aa","state":"probing","rtt_ms":null}
 <- {"ev":"ok","req":1}
    (Beamer sends audio_flow offer {port:52114}; the PC answers {port:24823})
 -> {"cmd":"flow_remote","flow":"9f2c01aa","host":"192.168.1.134","port":24823}
@@ -286,7 +290,9 @@ feed, "CABLE Output", "CABLE In 16 Ch"; "CABLE Input" is used only as the virtua
 - `audio_hello.udp.listen` says whether a machine may receive unsolicited UDP: `false` on macOS (an
   unsigned listener there pops a firewall dialog), `true` on Windows/Linux.
 - **Offerer** = the side with `listen=false`; if both are equal, the smaller machine id (bytes). The offerer
-  draws the flow key, binds port 0 (or 24823 if it listens), sends `audio_flow {phase:"offer"}`. The
+  draws the flow key, opens its socket (`flow_open` with `host` = the answerer's IP and `port` 0: no bind,
+  connected towards `host:24823`, ephemeral port; or `port` 24823 if it listens), sends
+  `audio_flow {phase:"offer"}` with that port. The
   answerer binds 24823 (24824..24830, then 0), `connect()`s to `offerer_host:offer.port` and starts sending
   hello at once (its first datagram opens its own stateful firewall: the "punch"), then answers with its
   port. The offerer `connect()`s and probes. Both sockets are connected sockets that send first, which is
@@ -306,8 +312,13 @@ Per machine pair at most one `mic` stream and one `system` stream per direction 
 
 | kind | codec object |
 |---|---|
-| mic | `{"name":"opus","app":"voip","channels":1,"bitrate":32000,"frame_ms":10,"fec":true}` + encoder: `PACKET_LOSS_PERC 10`, DTX off, complexity 9 |
-| system | `{"name":"opus","app":"audio","channels":2,"bitrate":96000,"frame_ms":10,"fec":false}` |
+| mic | `{"name":"opus","app":"voip","channels":1,"bitrate":32000,"frame_ms":10,"fec":true}` + encoder: `PACKET_LOSS_PERC 10`, DTX off, complexity **5** |
+| system | `{"name":"opus","app":"audio","channels":2,"bitrate":96000,"frame_ms":10,"fec":false}`, complexity 9 |
+
+Optional `"complexity"` (0..10) overrides the encoder complexity; default 5 for `app` `voip`, 9 otherwise.
+The mic default was lowered from 9 (WP2, operator decision): the encoder CPU halves (in-helper encode
+118-160 us/frame at 5 on the M5), masked log-spectral distance on voiced speech 2.59 dB at 5 vs 2.35 dB
+at 9 (2.42 dB at 6).
 
 Jitter buffer (port `JitterBuffer` from `proto/transport/media.py`, current defaults): pull model from the
 render callback; target = render period + frame/2 + p97(transit, 10 s window, spikes > 150 ms excluded)
@@ -320,13 +331,26 @@ max(30 ms, frame); flush to target when above target + max(40 ms, target); dropp
 minus target -> 40 ppm/ms + integral 0.1 ppm/(ms.s) clamped ±200 ppm, total ±500 ppm; resampler =
 16-tap Kaiser-windowed sinc, 512 phases. The local loop (§3.2 `loop`) uses the same controller on its ring.
 
+Engine deviations from `media.py` (WP2; both off = the reference, verified identical by
+`native/audio/tests/jb_crosscheck.py`, 0.000 ms level/target difference over 225,001 pulls):
+- `merge_expand` (on): a frame concealed by expansion (nothing newer had arrived) that then proves lost
+  (a newer frame came, it never did) is not concealed a second time: the expansion was its concealment.
+  In `media.py` each such loss added a frame of latency that catch-up takes ~5 s to remove; with bursty
+  loss the buffer sat 10-20 ms above target (now within 5 ms). Late frames keep the reference behaviour.
+- `jitter_recalc_ms` 20: the p97 transit statistic is recomputed at most every 20 ms instead of after every
+  packet (it was most of the render thread's CPU).
+
 ### 4.5 TCP fallback
 
 A flow whose side has received no valid UDP packet for 2 s while the link is up goes to state `link`: the
 helper emits `link_out` (sealed packets, batched 2 per 20 ms, rr never) and Beamer posts them as
 `audio_frame`; incoming `audio_frame` -> `link_in`. Packets from both paths are accepted at any time (the
 replay window removes duplicates). In `link` state the sender caps Opus at 32 kb/s for mic and 48 kb/s for
-system sound, and keeps probing UDP every 1 s; after 1 s of received UDP the flow returns to `up`. Beamer
+system sound and queues its media for `link_out` **and also keeps sending them over UDP** (the receiver
+drops the duplicates), plus hello every 1 s and rr: UDP recovery is then seen at once and, after 1 s of
+received UDP, the flow returns to `up` (measured 1.0 s; fallback 2.0 s). A side that receives `link_in`
+packets (the peer cannot hear its UDP) also goes to `link` until 250 ms after the last one, so a one-way
+UDP blockage falls back in both directions. Beamer
 drops `link_out` packets (counted in the stream stats, heard as PLC) while the link's outbox holds > 64
 messages (`AudioHost.outbox_depth`), so audio can never starve input acks (`receiver.py:1003-1020`).
 
