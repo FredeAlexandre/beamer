@@ -71,8 +71,11 @@ Mac virtual mic validated live 2026-11-08.
 | WP7b Qt page follow-up | PC agent, `beamer-wp7b` / `pc/wp7b` | **done**, merged (`df0b8b0`): model tile lines, PC fixtures, notices under Microphone (Mac too, `d8d05d5`); 27 page tests, win_app suite = known failures; upper-case titles are the app's own style for every page but Crossing (no change). Operator wired `self.audio` + peers without audio (`a39e03a`) |
 | WP9 Echo cancellation | Mac `beamer-wp9` / `audio/wp9` (+ PC build) | running |
 | WP10 Two-machine E2E + soak, first live run with real helpers in Beamer | Mac `beamer-wp10` / `audio/wp10` (+ ssh) | **done**, merged (`4552504`). Real helpers in Beamer on both machines. p50 one way: PC mic -> Mac app 43 ms (0 glitch); PC sound -> Mac 81 ms (**+25 vs Phase 1**); Mac sound -> PC G733 80-88 ms; Mac test mic -> PC app via CABLE 152-156 ms (**+45**, shared render 3 periods), 2.2 glitches/min over a 31 min soak; both ways without loop. Recovery: UDP block -> link 2.0 s, helper kill -> unmute 0.06-0.3 s, device unplug/replug, app restart all pass; asusrog untouched. CPU helper 4.6 % Mac / 2.6 % PC; memory flat. Fixed live: helper froze on macOS permission prompts (3 commits). Open: drift integral at its +200 ppm limit for PC sound on the Mac; mic+output change opens the mic twice |
+| WP11 Mac side: PC sound -> Mac latency (+25 ms) and drift integral pinned at +200 ppm | Mac `beamer-wp11` / `audio/wp11` | running |
+| WP12 PC side: shared-mode render into CABLE Input (+45 ms) and capture periods | PC agent, `beamer-wp12` / `pc/wp12` | running |
+| WP13 Howl guard (Wave Link monitor loop) + mic stream opened twice on a combined route change | Mac `beamer-wp13` / `audio/wp13` | running |
 
-Coordination: deploys serialized with the lock dir `~/Developer/.beamer-deploy.lock`, live audio tests with `~/Developer/.beamer-audio-lab.lock`; each WP commits its
+Coordination: deploys serialized with the lock dir `~/Developer/.beamer-deploy.lock`, live audio tests with `~/Developer/.beamer-audio-lab.lock` (Mac) and `C:\Users\Alex\briefs\lab-lock.txt` (PC); each WP commits its
 report as `dev/audio/reports/<wp>.md`; the operator merges into `feat/audio`.
 
 ## Start checks (2026-11-07)
