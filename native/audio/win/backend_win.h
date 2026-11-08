@@ -137,11 +137,20 @@ struct EndpointLevel {  // what an endpoint mute changes and what is put back
     DWORD hw = 0;
 };
 bool read_level(IMMDevice* d, EndpointLevel* out);
-bool write_level(IMMDevice* d, const EndpointLevel& level);  // only the values that differ are written
+// Only the values that differ are written, tagged with `ctx` (IAudioEndpointVolume event context).
+bool write_level(IMMDevice* d, const EndpointLevel& level, const GUID* ctx = nullptr);
+// Event context of every endpoint volume/mute change this process makes (random per process): volume
+// notifications carrying it are ours, any other is the user's (WP17).
+const GUID& own_volume_context();
+
+class VolumeWatch;  // mute_journal_win.cpp: IAudioEndpointVolumeCallback of one held endpoint
 
 // Endpoint mutes taken by system-sound captures (refcounted per endpoint), journalled to
 // <state_dir>/audio-mute-journal.json before the mute so a crash can be undone: by the guard process
 // (helper killed) or by restore_journal() on the next start (helper and guard both killed).
+// The user's changes win (WP17): while an endpoint is held, its volume notifications not caused by this process
+// update what is restored (and the journal); a user unmute leaves the endpoint unmuted for the rest of the
+// redirect (no re-mute until every hold is released) and is reported through user_unmuted().
 class MuteManager {
  public:
     explicit MuteManager(std::wstring state_dir);
@@ -156,14 +165,32 @@ class MuteManager {
     static int restore_entries_of(const std::wstring& state_dir, DWORD owner_pid);
     std::wstring journal_path() const;
     int held_count();
+    // True when the user unmuted `device_id` while it was held (sound plays on this PC too).
+    bool user_unmuted(const std::string& device_id);
+    // What would be restored now for `device_id` (false when not held). Test hook.
+    bool restore_target(const std::string& device_id, EndpointLevel* out);
+    // Applies pending user changes now (the watcher thread does it within a few ms). Test hook.
+    void sync_user_changes();
  private:
-    struct Held { EndpointLevel saved; int refs = 0; };
+    struct Held {
+        EndpointLevel saved;  // the restore target: the state before the mute, then the user's latest choice
+        int refs = 0;
+        bool user_unmuted = false;
+        ComPtr<IAudioEndpointVolume> vol;
+        VolumeWatch* watch = nullptr;
+    };
     void write_journal_locked();
     void start_guard_locked();
+    void apply_user_changes_locked();
+    void unwatch(Held& h);
+    static DWORD WINAPI watch_thread(void* self);
     std::wstring dir_;
     std::mutex m_;
     std::vector<Held> held_;
+    std::vector<std::string> unmuted_ids_;  // user-unmuted endpoints of the current redirect (cleared when nothing is held)
     HANDLE guard_ = nullptr;
+    HANDLE changed_ = nullptr, watcher_ = nullptr;
+    std::atomic<bool> quit_{false};
 };
 
 // ------------------------------------------------------------------ demand (sessions_win.cpp)
@@ -196,6 +223,7 @@ struct Client {
     UINT32 buffer_frames = 0;
     int channels = 0;           // channels of the stream as initialized
     bool wasapi_convert = false;
+    bool up_mix = false;        // render: the engine's mono is copied into every channel of the mix here (WP17)
     bool exclusive = false;     // exclusive-mode render: fill the whole buffer on every event
     bool low_latency = false;   // shared stream below the engine's default period (IAudioClient3)
     UINT32 period_frames = 0;   // frames per period event
@@ -207,7 +235,9 @@ struct Client {
     ~Client();
 };
 // Shared-mode, event-driven, 48 kHz float32. Capture/EndpointLoopback stream the mix's channels (fold-down is ours);
-// Render uses `channels` (WASAPI converts when the mix differs: unity gain, unlike direct writes into an 8-ch mix).
+// Render uses `channels` (WASAPI converts when the mix differs: unity gain, unlike direct writes into an 8-ch mix),
+// except mono with a smaller period possible (CABLE Input): opened at the mix (`channels` = the mix's), `up_mix` set,
+// because IAudioClient3 refuses AUTOCONVERTPCM; the caller copies mono into every channel.
 // period_frames > 0: ask for that shared engine period (rounded to what the driver allows, never below its minimum)
 // through IAudioClient3; devices without a period range, and endpoint loopback, keep the default. 0 = the default
 // period, as an ordinary app opens a device.
@@ -239,6 +269,11 @@ DWORD windows_build();
 void inject_invalidation(StreamHandle* stream);
 // How many endpoint mutes the backend holds right now.
 int held_mutes(Backend* backend);
+// The backend's mute manager (backend_check: user-change tests).
+MuteManager* mute_manager(Backend* backend);
+// System stream (mute_local): true when the user unmuted its endpoint during the redirect, i.e. the sound also
+// plays on this PC. For the engine's stream stats (WP17; field described in dev/audio/reports/wp17.md).
+bool local_unmuted(StreamHandle* stream);
 // Capture-side counters of a capture stream (WP14): packets, flags, device-position gaps, wake timing.
 struct CaptureStats {
     uint64_t wakes = 0, empty_wakes = 0, packets = 0, frames = 0, silent = 0, discontinuity = 0, ts_error = 0;

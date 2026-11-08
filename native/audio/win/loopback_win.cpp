@@ -94,6 +94,14 @@ static HRESULT init_low_latency(IAudioClient* ac, DWORD flags, const WAVEFORMATE
     return S_OK;
 }
 
+// True when the device reports a shared engine period range below its default for `mix` (IAudioClient3).
+static bool has_period_range(IAudioClient* ac, const WAVEFORMATEX* mix) {
+    ComPtr<IAudioClient3> ac3;
+    if (FAILED(ac->QueryInterface(IID_PPV_ARGS(&ac3)))) return false;
+    UINT32 def = 0, fund = 0, mn = 0, mx = 0;
+    return SUCCEEDED(ac3->GetSharedModeEnginePeriod(mix, &def, &fund, &mn, &mx)) && fund && mn < def;
+}
+
 HRESULT open_endpoint_client(IMMDevice* d, ClientKind kind, int channels, Client* c, UINT32 period_frames) {
     HRESULT hr;
     ComPtr<IAudioClient> ac;
@@ -109,7 +117,12 @@ HRESULT open_endpoint_client(IMMDevice* d, ClientKind kind, int channels, Client
     const WAVEFORMATEX* fmt = mix;
     int stream_ch = mix_ch;
     if (kind == ClientKind::Render) {
-        if (!(mix_ok && mix_ch == channels)) {
+        if (mix_ok && channels == 1 && mix_ch > 1 && period_frames && has_period_range(ac.Get(), mix)) {
+            // Mono into a device that allows a smaller period (CABLE Input, stereo mix): AUTOCONVERTPCM would make
+            // IAudioClient3::InitializeSharedAudioStream refuse the stream (AUDCLNT_E_INVALID_STREAM_FLAG, WP16 miss 1),
+            // so open at the mix and copy mono into every channel ourselves (unity gain, as WASAPI's mono up-mix).
+            c->up_mix = true;
+        } else if (!(mix_ok && mix_ch == channels)) {
             want = float_format(channels, 0);
             fmt = &want.Format;
             stream_ch = channels;
@@ -140,7 +153,7 @@ HRESULT open_endpoint_client(IMMDevice* d, ClientKind kind, int channels, Client
     c->client = ac;
     c->channels = stream_ch;
     c->path = std::string(kind == ClientKind::Render ? "render" : kind == ClientKind::Capture ? "capture" : "endpoint-loopback") +
-              (c->wasapi_convert ? "+autoconvert" : "");
+              (c->wasapi_convert ? "+autoconvert" : c->up_mix ? "+upmix" : "");
     hr = finish(c, kind);
     char p[64];
     snprintf(p, sizeof p, "(%s period %u)", c->low_latency ? "low-latency" : "default", c->period_frames);

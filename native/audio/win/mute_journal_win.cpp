@@ -9,6 +9,13 @@
 // - helper and guard both killed: the next helper start restores every entry whose owner is gone (restore_journal,
 //   before `ready`), and so does `beamer-audio restore`.
 // Entries carry the owner's pid and process creation time, so a live helper's mute is never undone by another.
+//
+// The user's changes win (WP17): every volume/mute write of this process carries own_volume_context(); a held
+// endpoint's IAudioEndpointVolume notification with any other context is the user's (volume flyout, keys, the
+// headset's wheel, another app). A user volume becomes the restore target; a user unmute leaves the endpoint
+// unmuted for the rest of the redirect and its mute state becomes the user's too. The journal is rewritten with the
+// new target at once, so a crash also restores the user's latest choice. Notifications are only copied in the
+// callback (it must not block); a watcher thread applies them under the manager's lock.
 #include "backend_win.h"
 
 #include <algorithm>
@@ -247,11 +254,53 @@ bool restore_entry(IMMDeviceEnumerator* e, const Entry& x) {
         BLOG_D("mute journal: endpoint %s (%s) not present, entry kept", x.level.device.c_str(), x.level.name.c_str());
         return false;
     }
-    if (!write_level(d.Get(), x.level)) return false;
+    if (!write_level(d.Get(), x.level, &own_volume_context())) return false;
     BLOG_I("restored endpoint %s (%s): mute=%d master=%.3f", x.level.name.c_str(), x.level.device.c_str(), x.level.mute ? 1 : 0, x.level.master);
     return true;
 }
+bool same_level(const EndpointLevel& a, const EndpointLevel& b) {
+    if (a.mute != b.mute || std::fabs(a.master - b.master) > 1e-6f || a.channels.size() != b.channels.size()) return false;
+    for (size_t i = 0; i < a.channels.size(); i++)
+        if (std::fabs(a.channels[i] - b.channels[i]) > 1e-6f) return false;
+    return true;
+}
 }  // namespace
+
+const GUID& own_volume_context() {
+    static GUID g = [] { GUID x{}; if (FAILED(CoCreateGuid(&x))) x.Data1 = GetCurrentProcessId() ^ 0xBEA3E700u; return x; }();
+    return g;
+}
+
+// ------------------------------------------------------------------ volume notifications
+
+class VolumeWatch : public IAudioEndpointVolumeCallback {
+    std::atomic<ULONG> ref_{1};
+    HANDLE signal_;
+ public:
+    explicit VolumeWatch(HANDLE signal) : signal_(signal) {}
+    std::mutex m;               // held only to copy (never across a call)
+    bool pending = false;
+    EndpointLevel last;         // the latest user change (mute, master, channels)
+    STDMETHODIMP QueryInterface(REFIID r, void** p) override {
+        if (r == __uuidof(IUnknown) || r == __uuidof(IAudioEndpointVolumeCallback)) { *p = this; AddRef(); return S_OK; }
+        *p = nullptr;
+        return E_NOINTERFACE;
+    }
+    STDMETHODIMP_(ULONG) AddRef() override { return ++ref_; }
+    STDMETHODIMP_(ULONG) Release() override { ULONG n = --ref_; if (!n) delete this; return n; }
+    STDMETHODIMP OnNotify(PAUDIO_VOLUME_NOTIFICATION_DATA d) override {
+        if (!d || IsEqualGUID(d->guidEventContext, own_volume_context())) return S_OK;  // our own write
+        {
+            std::lock_guard<std::mutex> g(m);
+            pending = true;
+            last.mute = d->bMuted != FALSE;
+            last.master = d->fMasterVolume;
+            last.channels.assign(d->afChannelVolumes, d->afChannelVolumes + d->nChannels);
+        }
+        SetEvent(signal_);
+        return S_OK;
+    }
+};
 
 // ------------------------------------------------------------------ levels
 
@@ -270,31 +319,105 @@ bool read_level(IMMDevice* d, EndpointLevel* out) {
     return true;
 }
 
-bool write_level(IMMDevice* d, const EndpointLevel& want) {
+bool write_level(IMMDevice* d, const EndpointLevel& want, const GUID* ctx) {
     auto v = endpoint_volume(d);
     EndpointLevel cur;
     if (!v || !read_level(d, &cur)) return false;
     bool ok = true;
     auto differs = [](float a, float b) { return std::fabs(a - b) > 1e-6f; };
-    if (differs(cur.master, want.master)) ok &= SUCCEEDED(v->SetMasterVolumeLevelScalar(want.master, nullptr));
+    if (differs(cur.master, want.master)) ok &= SUCCEEDED(v->SetMasterVolumeLevelScalar(want.master, ctx));
     if (want.channels.size() == cur.channels.size()) {
         for (UINT i = 0; i < (UINT)want.channels.size(); i++) {
             float now = 0;
             if (SUCCEEDED(v->GetChannelVolumeLevelScalar(i, &now)) && differs(now, want.channels[i]))
-                ok &= SUCCEEDED(v->SetChannelVolumeLevelScalar(i, want.channels[i], nullptr));
+                ok &= SUCCEEDED(v->SetChannelVolumeLevelScalar(i, want.channels[i], ctx));
         }
     }
-    if (cur.mute != want.mute) ok &= SUCCEEDED(v->SetMute(want.mute ? TRUE : FALSE, nullptr));
+    if (cur.mute != want.mute) ok &= SUCCEEDED(v->SetMute(want.mute ? TRUE : FALSE, ctx));
     return ok;
 }
 
 // ------------------------------------------------------------------ MuteManager
 
-MuteManager::MuteManager(std::wstring state_dir) : dir_(std::move(state_dir)) {}
+MuteManager::MuteManager(std::wstring state_dir) : dir_(std::move(state_dir)) {
+    changed_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+}
 
 MuteManager::~MuteManager() {
     release_all();
+    quit_ = true;
+    if (watcher_) { SetEvent(changed_); WaitForSingleObject(watcher_, INFINITE); CloseHandle(watcher_); }
+    if (changed_) CloseHandle(changed_);
     if (guard_) CloseHandle(guard_);  // the guard sees this process exit and finds nothing left to restore
+}
+
+DWORD WINAPI MuteManager::watch_thread(void* p) {
+    auto* self = static_cast<MuteManager*>(p);
+    ComScope com;
+    while (!self->quit_) {
+        WaitForSingleObject(self->changed_, INFINITE);
+        if (self->quit_) break;
+        std::lock_guard<std::mutex> g(self->m_);
+        self->apply_user_changes_locked();
+    }
+    return 0;
+}
+
+void MuteManager::sync_user_changes() {
+    std::lock_guard<std::mutex> g(m_);
+    apply_user_changes_locked();
+}
+
+// User changes seen by the held endpoints' callbacks become their restore targets (then the journal is rewritten).
+void MuteManager::apply_user_changes_locked() {
+    bool changed = false;
+    for (auto& h : held_) {
+        if (!h.watch) continue;
+        EndpointLevel user;
+        {
+            std::lock_guard<std::mutex> g(h.watch->m);
+            if (!h.watch->pending) continue;
+            h.watch->pending = false;
+            user = h.watch->last;
+        }
+        EndpointLevel t = h.saved;
+        t.master = user.master;
+        if (user.channels.size() == t.channels.size()) t.channels = user.channels;
+        if (!h.user_unmuted && !user.mute) {
+            // The endpoint is held muted and now plays: the user wants local sound. Never re-muted in this redirect.
+            h.user_unmuted = true;
+            if (std::find(unmuted_ids_.begin(), unmuted_ids_.end(), h.saved.device) == unmuted_ids_.end()) unmuted_ids_.push_back(h.saved.device);
+            BLOG_W("endpoint %s unmuted by the user during the redirect: sound also plays on this PC; not muted again until the redirect ends",
+                   h.saved.name.c_str());
+        }
+        if (h.user_unmuted) t.mute = user.mute;  // from now on the mute state is the user's too
+        if (same_level(t, h.saved)) continue;
+        BLOG_I("endpoint %s changed by the user during the redirect: restore target now mute=%d master=%.3f (was mute=%d master=%.3f)",
+               h.saved.name.c_str(), t.mute ? 1 : 0, t.master, h.saved.mute ? 1 : 0, h.saved.master);
+        h.saved = t;
+        changed = true;
+    }
+    if (changed) write_journal_locked();
+}
+
+void MuteManager::unwatch(Held& h) {
+    if (h.vol && h.watch) h.vol->UnregisterControlChangeNotify(h.watch);
+}
+
+bool MuteManager::user_unmuted(const std::string& id) {
+    std::lock_guard<std::mutex> g(m_);
+    apply_user_changes_locked();
+    for (auto& h : held_)
+        if (h.saved.device == id) return h.user_unmuted && !h.saved.mute;
+    return false;
+}
+
+bool MuteManager::restore_target(const std::string& id, EndpointLevel* out) {
+    std::lock_guard<std::mutex> g(m_);
+    apply_user_changes_locked();
+    for (auto& h : held_)
+        if (h.saved.device == id) { *out = h.saved; return true; }
+    return false;
 }
 
 std::wstring MuteManager::journal_path() const { return journal_file(dir_); }
@@ -350,6 +473,8 @@ bool MuteManager::acquire(IMMDevice* device, const std::string& name, std::strin
     if (!read_level(device, &h.saved)) { if (err) *err = "internal: cannot read the endpoint volume"; return false; }
     h.saved.name = name;
     h.refs = 1;
+    // Unmuted by the user earlier in this redirect (the stream left this endpoint and came back): leave it playing.
+    h.user_unmuted = std::find(unmuted_ids_.begin(), unmuted_ids_.end(), id) != unmuted_ids_.end();
     held_.push_back(h);
     write_journal_locked();
     // The journal must be on disk before the mute: without it a crash would leave the machine muted.
@@ -365,7 +490,20 @@ bool MuteManager::acquire(IMMDevice* device, const std::string& name, std::strin
     }
     start_guard_locked();
     auto v = endpoint_volume(device);
-    if (!v || FAILED(v->SetMute(TRUE, nullptr))) {
+    // Watch the user's changes from before our mute on (ours carry own_volume_context() and are ignored).
+    if (v) {
+        if (!watcher_) watcher_ = CreateThread(nullptr, 0, &MuteManager::watch_thread, this, 0, nullptr);
+        auto* w = new VolumeWatch(changed_);
+        if (SUCCEEDED(v->RegisterControlChangeNotify(w))) { held_.back().vol = v; held_.back().watch = w; }
+        else { w->Release(); BLOG_W("endpoint %s: no volume notifications, user changes during the redirect are not kept", name.c_str()); }
+    }
+    if (held_.back().user_unmuted) {
+        BLOG_I("endpoint %s left unmuted: the user unmuted it earlier in this redirect", name.c_str());
+        return true;
+    }
+    if (!v || FAILED(v->SetMute(TRUE, &own_volume_context()))) {
+        unwatch(held_.back());
+        if (held_.back().watch) held_.back().watch->Release();
         held_.pop_back();
         write_journal_locked();
         if (err) *err = "internal: SetMute failed";
@@ -382,9 +520,14 @@ void MuteManager::release(const std::string& id) {
     for (size_t i = 0; i < held_.size(); i++) {
         if (held_[i].saved.device != id) continue;
         if (--held_[i].refs > 0) return;
+        // No more notifications for it; the last user change still pending becomes the target first.
+        unwatch(held_[i]);
+        apply_user_changes_locked();
+        if (held_[i].watch) { held_[i].watch->Release(); held_[i].watch = nullptr; }
+        held_[i].vol.Reset();
         auto e = make_enumerator();
         ComPtr<IMMDevice> d;
-        bool ok = e && SUCCEEDED(e->GetDevice(wide(id).c_str(), &d)) && write_level(d.Get(), held_[i].saved);
+        bool ok = e && SUCCEEDED(e->GetDevice(wide(id).c_str(), &d)) && write_level(d.Get(), held_[i].saved, &own_volume_context());
         if (!ok) {
             // Device gone (unplugged while muted): keep the entry so the next start, or replug + restore, puts it back.
             BLOG_W("endpoint %s not restored now (gone?); left in the journal", held_[i].saved.name.c_str());
@@ -397,9 +540,10 @@ void MuteManager::release(const std::string& id) {
                 write_entries(path, all);
             }
         } else {
-            BLOG_I("restored endpoint %s", held_[i].saved.name.c_str());
+            BLOG_I("restored endpoint %s: mute=%d master=%.3f", held_[i].saved.name.c_str(), held_[i].saved.mute ? 1 : 0, held_[i].saved.master);
         }
         held_.erase(held_.begin() + i);
+        if (held_.empty()) unmuted_ids_.clear();  // the redirect is over
         if (ok) write_journal_locked();
         return;
     }

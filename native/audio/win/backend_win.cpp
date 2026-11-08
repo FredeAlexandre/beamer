@@ -42,6 +42,7 @@ class WinStream : public StreamHandle {
     }
     bool start(std::string* err);
     void inject_invalidation() { inject_ = true; SetEvent(wake_); }
+    bool local_unmuted();
     void wake() { SetEvent(wake_); }
     CaptureStats stats() const {
         std::lock_guard<std::mutex> g(m_);
@@ -562,7 +563,17 @@ WinStream::End WinStream::pump_render() {
     BYTE* p;
     HRESULT hr;
     // The engine always fills float32; integer buffers (exclusive mode) go through scratch_ and are converted here.
+    // Up-mix (WP17): the engine fills mono into scratch_, copied here into every channel of the mix.
     auto fill = [&](BYTE* dst, UINT32 n, uint64_t t) {
+        if (c.up_mix) {
+            for (UINT32 done = 0; done < n;) {
+                const UINT32 k = (UINT32)std::min<size_t>(n - done, scratch_.size() / c.channels);
+                source->on_render(scratch_.data(), (int)k, channels, t + (uint64_t)done * 1000000000ull / kRate);
+                convert_channels(scratch_.data(), channels, reinterpret_cast<float*>(dst) + (size_t)done * c.channels, c.channels, k);
+                done += k;
+            }
+            return;
+        }
         if (c.sample_kind == 0) { source->on_render(reinterpret_cast<float*>(dst), (int)n, c.channels, t); return; }
         n = (UINT32)std::min<size_t>(n, scratch_.size() / c.channels);
         source->on_render(scratch_.data(), (int)n, c.channels, t);
@@ -720,6 +731,19 @@ std::string capture_stats_text(const CaptureStats& s) {
 int held_mutes(Backend* backend) {
     auto* b = dynamic_cast<WinBackend*>(backend);
     return b ? b->mutes().held_count() : -1;
+}
+MuteManager* mute_manager(Backend* backend) {
+    auto* b = dynamic_cast<WinBackend*>(backend);
+    return b ? &b->mutes() : nullptr;
+}
+bool WinStream::local_unmuted() {
+    if (kind_ != StreamKind::System || !mute_local) return false;
+    std::string id = device_in_use();
+    return !id.empty() && b_->mutes().user_unmuted(id);
+}
+bool local_unmuted(StreamHandle* stream) {
+    auto* s = dynamic_cast<WinStream*>(stream);
+    return s && s->local_unmuted();
 }
 
 // UTF-8 argv from the wide command line (main's char** argv is in the ANSI code page on Windows).

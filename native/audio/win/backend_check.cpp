@@ -9,17 +9,20 @@
 //   backend_check vmic-test                     render into CABLE Input, record CABLE Output, demand latency
 //   backend_check render-test                   render to the default output (muted) checked on its loopback
 //   backend_check journal-test                  kill a muting helper (and its guard): state restored exactly
-//   backend_check invalidate-test               injected AUDCLNT_E_DEVICE_INVALIDATED: streams recover
+//   backend_check invalidate-test [--device K]  injected AUDCLNT_E_DEVICE_INVALIDATED: streams recover (mic: not Elgato)
 //   backend_check exclusive-test                exclusive open of CABLE Input by another process vs our shared stream
 //   backend_check vmic-latency [--vmic-exclusive] click latency CABLE Input -> an app's capture of CABLE Output
 //   backend_check render-latency [--device K]  the same for a render to a (muted) endpoint, via process loopback
 //   backend_check periods                       shared-mode engine periods each endpoint allows (IAudioClient3)
-//   (latency tests take --vmic-period N --vmic-queue Q --render-period N --render-queue Q --seconds S --tone A)
+//   (latency tests take --vmic-period N --vmic-queue Q --render-period N --render-queue Q --seconds S --tone A
+//    --channels C: channels the engine renders, 1 = the mic stream as Beamer opens it; vmic-test takes it too)
+//   backend_check user-change-test              the user's volume/unmute during a redirect wins (WP17): kept as the
+//                                               restore target, journalled (guard restores it), no re-mute
 //   backend_check restore                       restore_journal() (as `beamer-audio restore`)
 //   backend_check loss-test [--seconds S] [--load N] [--no-mute] [--dump K]
 //                                               sample-exact ramp rendered to the (muted) default output, captured by
 //                                               process loopback: samples lost between the mix and the sink (WP14)
-// Child modes (spawned by the tests): record, sleeper, hold-mute, exclusive, busy.
+// Child modes (spawned by the tests): record, sleeper, hold-mute, exclusive, busy, set-level.
 // Every command takes --state-dir D (default: %TEMP%\beamer-wp4-check) so the real Beamer journal is never touched.
 #include "backend_win.h"
 
@@ -401,6 +404,24 @@ static int child_hold_mute(const Args& a) {
     return 0;
 }
 
+// Another process changing an endpoint as the user would (event context GUID_NULL): --master V, --mute 0|1.
+static int child_set_level(const Args& a) {
+    ComScope com;
+    auto e = make_enumerator();
+    auto d = device_by_id(e.Get(), a.get("device"));
+    EndpointLevel l;
+    if (!d || !read_level(d.Get(), &l)) { out("error no device"); return 2; }
+    if (a.has("master")) l.master = (float)a.num("master", l.master);
+    if (a.has("mute")) l.mute = a.num("mute", 0) != 0;
+    ComPtr<IAudioEndpointVolume> v;
+    d->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_ALL, nullptr, &v);
+    HRESULT hr = S_OK;
+    if (a.has("master")) hr = v->SetMasterVolumeLevelScalar(l.master, nullptr);
+    if (SUCCEEDED(hr) && a.has("mute")) hr = v->SetMute(l.mute, nullptr);
+    out("set %s", hr_text(hr).c_str());
+    return SUCCEEDED(hr) ? 0 : 1;
+}
+
 static int child_exclusive(const Args& a) {
     ComScope com;
     auto e = make_enumerator();
@@ -638,7 +659,7 @@ static int cmd_vmic_test(const Args& a) {
 
     Tone tone;
     tone.amp = a.num("amp", 0.1);
-    RenderSpec ps{"", true, 2};
+    RenderSpec ps{"", true, (int)a.num("channels", 2)};
     std::string err;
     auto p = b->open_render(ps, &tone, &err);
     check((bool)p, "render into the virtual mic (CABLE Input) opens", p ? p->device_in_use() : err);
@@ -766,7 +787,13 @@ static int cmd_invalidate_test(const Args&) {
     Meter mic, sys;
     Tone tone;
     tone.amp = 0.0;  // silence: the render stream is checked by its pull rate only
-    auto m = b->open_capture(CaptureSpec{CaptureKind::Mic, "", 1, false, {}}, &mic, &err);
+    // Never the Elgato Wave:3 (rule since WP12): the first other mic, unless --device names one.
+    std::string mic_id = g_args->get("device");
+    if (mic_id.empty())
+        for (auto& d : b->snapshot().devices)
+            if (d.input && d.role == Role::Normal && lower(d.name + d.manufacturer).find("elgato") == std::string::npos) { mic_id = d.key; break; }
+    if (mic_id.empty()) { check(false, "a non-Elgato mic exists"); return 1; }
+    auto m = b->open_capture(CaptureSpec{CaptureKind::Mic, mic_id, 1, false, {}}, &mic, &err);
     auto s = b->open_capture(CaptureSpec{CaptureKind::System, "", 2, true, {}}, &sys, &err);
     auto r = b->open_render(RenderSpec{"", true, 2}, &tone, &err);
     if (!m || !s || !r) { check(false, "streams open", err); return 1; }
@@ -853,7 +880,8 @@ static int cmd_vmic_latency(const Args& a, bool endpoint) {
     if (endpoint && !holder) { check(false, "mute holder opens", err); return 1; }
     ToneClicks clk;
     clk.amp = a.num("tone", 0.05);
-    auto r = b->open_render(endpoint ? RenderSpec{dev, false, 2} : RenderSpec{"", true, 2}, &clk, &err);
+    const int ch = (int)a.num("channels", 2);
+    auto r = b->open_render(endpoint ? RenderSpec{dev, false, ch} : RenderSpec{"", true, ch}, &clk, &err);
     if (!r) { check(false, "render opens", err); return 1; }
     double sec = a.num("seconds", 10);
     Child rec;
@@ -883,8 +911,8 @@ static int cmd_vmic_latency(const Args& a, bool endpoint) {
     auto h = result.find("holes=");
     long holes = h == std::string::npos ? -1 : atol(result.c_str() + h + 6);
     double med = lat[lat.size() / 2], p95 = lat[std::min(lat.size() - 1, lat.size() * 95 / 100)];
-    out("%s latency (%s): %u clicks, min %.1f ms, median %.1f ms, p95 %.1f ms, max %.1f ms, holes %ld in %d s", endpoint ? "render" : "vmic",
-        g_vmic_exclusive && !endpoint ? "exclusive" : "shared", (unsigned)lat.size(), lat.front(), med, p95, lat.back(), holes, (int)sec);
+    out("%s latency (%s, %d ch): %u clicks, min %.1f ms, median %.1f ms, p95 %.1f ms, max %.1f ms, holes %ld in %d s", endpoint ? "render" : "vmic",
+        g_vmic_exclusive && !endpoint ? "exclusive" : "shared", ch, (unsigned)lat.size(), lat.front(), med, p95, lat.back(), holes, (int)sec);
     return holes == 0 ? 0 : 3;
 }
 
@@ -1061,6 +1089,144 @@ static int cmd_loss_test(const Args& a) {
     return g_fail ? 1 : 0;
 }
 
+// ------------------------------------------------------------------ user-change-test (WP17)
+
+static std::string read_text(const std::wstring& path) {
+    std::ifstream f(path, std::ios::binary);
+    std::stringstream s;
+    s << f.rdbuf();
+    return s.str();
+}
+static bool close_to(float a, float b) { return std::fabs(a - b) < 1e-4f; }
+
+// While a system capture holds the default output muted (as a redirect does), the user changes its volume and unmutes
+// it: from another process (context GUID_NULL) and in this process with a foreign context GUID. Our own writes
+// (own_volume_context) must be ignored. The restore target, the journal and a crash restore follow the user.
+static int cmd_user_change_test(const Args&) {
+    ComScope com;
+    auto before = read_all_levels();
+    std::string out_id;
+    {
+        auto b = make_win_backend(options());
+        out_id = b->snapshot().default_output;
+        b->restore_journal();
+    }
+    if (out_id.empty() || !before.count(out_id)) { check(false, "a default output exists"); return 1; }
+    const EndpointLevel orig = before[out_id];
+    out("endpoint %s: [%s]", orig.name.c_str(), level_text(orig).c_str());
+    if (orig.mute) { check(false, "the default output is unmuted before the test (needed to see a user unmute)"); return 1; }
+    // Two user volumes near the current one (never louder than +0.06).
+    const float v1 = orig.master > 0.5f ? orig.master - 0.06f : orig.master + 0.06f;
+    const float v2 = orig.master > 0.5f ? orig.master - 0.03f : orig.master + 0.03f;
+    char vb[32];
+    auto set_level = [&](const std::string& args) {
+        Child c;
+        c.start("set-level --device " + out_id + " " + args);
+        std::string l = c.wait_for("set ", 10);
+        c.wait(5000);
+        return l;
+    };
+    auto read_now = [&](EndpointLevel* l) { auto e = make_enumerator(); auto d = device_by_id(e.Get(), out_id); return d && read_level(d.Get(), l); };
+    std::wstring journal;
+    {
+        auto b = make_win_backend(options());
+        MuteManager* mm = mute_manager(b.get());
+        journal = mm->journal_path();
+        Meter sink;
+        std::string err;
+        auto s = b->open_capture(CaptureSpec{CaptureKind::System, "", 2, true, {}}, &sink, &err);
+        if (!s) { check(false, "system capture with mute opens", err); return 1; }
+        check(is_muted(out_id), "default output muted by the redirect");
+        // A. Our own write (own context): ignored.
+        {
+            auto e = make_enumerator();
+            auto d = device_by_id(e.Get(), out_id);
+            EndpointLevel l;
+            read_level(d.Get(), &l);
+            l.master = v2;
+            write_level(d.Get(), l, &own_volume_context());
+            Sleep(300);
+            EndpointLevel t;
+            mm->restore_target(out_id, &t);
+            check(close_to(t.master, orig.master), "a change with our own event context is not taken as the user's", "target " + std::to_string(t.master));
+        }
+        // B. The user changes the volume from another process while muted: new restore target, journalled, still muted.
+        snprintf(vb, sizeof vb, "%.4f", v1);
+        std::string r = set_level(std::string("--master ") + vb);
+        Sleep(300);
+        EndpointLevel t;
+        mm->restore_target(out_id, &t);
+        check(close_to(t.master, v1) && !t.mute, "user volume change (other process) becomes the restore target", r + ", target [" + level_text(t) + "]");
+        check(is_muted(out_id) && !local_unmuted(s.get()), "still muted after a volume-only change");
+        std::string j = read_text(journal);
+        snprintf(vb, sizeof vb, "\"master\":%.9g", t.master);
+        check(j.find(vb) != std::string::npos, "journal holds the user's volume", vb);
+        // C. The user unmutes (this process, foreign context GUID): not re-muted, reported.
+        GUID other{};
+        CoCreateGuid(&other);
+        {
+            auto e = make_enumerator();
+            auto d = device_by_id(e.Get(), out_id);
+            ComPtr<IAudioEndpointVolume> v;
+            d->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_ALL, nullptr, &v);
+            v->SetMute(FALSE, &other);
+        }
+        double t0 = secs();
+        while (secs() - t0 < 2 && !local_unmuted(s.get())) Sleep(10);
+        check(local_unmuted(s.get()), "user unmute reported (local_unmuted)", std::to_string((int)((secs() - t0) * 1000)) + " ms");
+        // A second capture on the same endpoint in the same redirect does not mute it again.
+        Meter sink2;
+        auto s2 = b->open_capture(CaptureSpec{CaptureKind::System, "", 2, true, {}}, &sink2, &err);
+        Sleep(1000);
+        check(s2 && !is_muted(out_id), "not muted again for the rest of the redirect (second capture opened too)");
+        s2.reset();
+        // D. A later volume change after the unmute is the target too.
+        snprintf(vb, sizeof vb, "%.4f", v2);
+        set_level(std::string("--master ") + vb);
+        Sleep(300);
+        mm->restore_target(out_id, &t);
+        check(close_to(t.master, v2) && !t.mute, "later user volume is the target", "[" + level_text(t) + "]");
+        s.reset();
+        EndpointLevel now;
+        read_now(&now);
+        check(close_to(now.master, v2) && !now.mute, "at the end of the redirect the user's choice stays (not the state before)", "[" + level_text(now) + "]");
+        check(held_mutes(b.get()) == 0, "no mute held after the redirect");
+        // E. Next redirect: muted again (the user's unmute only lasted for that redirect).
+        auto s3 = b->open_capture(CaptureSpec{CaptureKind::System, "", 2, true, {}}, &sink, &err);
+        check(s3 && is_muted(out_id) && !local_unmuted(s3.get()), "a new redirect mutes again");
+        s3.reset();
+    }
+    // F. Crash: a child helper holds the mute, the user changes the volume, the helper is killed: its guard restores
+    //    the user's volume (from the journal), not the one before the mute.
+    {
+        Child h;
+        h.start("hold-mute --seconds 60");
+        std::string l = h.wait_for("muted ", 10);
+        check(!l.empty() && is_muted(out_id), "child helper muted the default output", l);
+        snprintf(vb, sizeof vb, "%.4f", v1);
+        set_level(std::string("--master ") + vb);
+        Sleep(500);
+        h.kill();
+        h.wait();
+        double t0 = secs();
+        while (secs() - t0 < 3 && is_muted(out_id)) Sleep(20);
+        EndpointLevel now;
+        read_now(&now);
+        check(!now.mute && close_to(now.master, v1), "after a kill the guard restores the user's latest volume (journal)", "[" + level_text(now) + "]");
+        auto b = make_win_backend(options());
+        check(b->restore_journal() == 0, "journal empty afterwards");
+    }
+    // Put the endpoint back exactly as it was, and compare every active endpoint.
+    {
+        auto e = make_enumerator();
+        auto d = device_by_id(e.Get(), out_id);
+        if (d) write_level(d.Get(), orig);
+    }
+    Sleep(200);
+    check(compare_levels(before, "after user-change-test") == 0, "all active endpoints back to their state before the test", std::to_string(before.size()) + " endpoints");
+    return g_fail ? 1 : 0;
+}
+
 static int cmd_restore(const Args&) {
     auto b = make_win_backend(options());
     out("restored %d", b->restore_journal());
@@ -1097,6 +1263,8 @@ int main(int argc, char** argv) {
     if (cmd == "vmic-latency") return cmd_vmic_latency(a, false);
     if (cmd == "render-latency") return cmd_vmic_latency(a, true);
     if (cmd == "restore") return cmd_restore(a);
+    if (cmd == "user-change-test") return cmd_user_change_test(a);
+    if (cmd == "set-level") return child_set_level(a);
     if (cmd == "loss-test") return cmd_loss_test(a);
     if (cmd == "busy") return child_busy(a);
     if (cmd == "periods") return cmd_periods(a);
