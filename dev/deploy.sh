@@ -33,6 +33,21 @@ COMMIT="$(git rev-parse --short HEAD)"
 echo "Deploying $BRANCH @ $COMMIT to: $TARGET"
 
 deploy_mac() {
+    # mise.local.toml (git-excluded) holds the python.org Python and the "Beamer Dev" identity. A
+    # worktree has none: copy the main clone's, and refuse to build ad-hoc, because an ad-hoc
+    # signature makes macOS drop Beamer's privacy grants (Accessibility, Microphone, ...). Both
+    # checks run before Beamer is quit.
+    local main identity
+    main="$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
+    if [ ! -f "$ROOT/mise.local.toml" ] && [ -f "$main/mise.local.toml" ]; then
+        cp "$main/mise.local.toml" "$ROOT/mise.local.toml"
+        echo "mac: copied mise.local.toml from $main"
+    fi
+    identity="$(cd mac_app && mise exec -- printenv BEAMER_SIGN_IDENTITY 2>/dev/null || true)"
+    if [ -z "$identity" ] || ! security find-identity -v -p codesigning | grep -qF "\"$identity\""; then
+        echo "mac: no signing identity (BEAMER_SIGN_IDENTITY='$identity'); not deploying an ad-hoc build" >&2
+        return 1
+    fi
     osascript -e 'quit app "Beamer"' 2>/dev/null || true
     (cd mac_app && mise exec -- ./Install-Beamer-Mac.command </dev/null) > "$LOG_DIR/mac.log" 2>&1
     open -a /Applications/Beamer.app
