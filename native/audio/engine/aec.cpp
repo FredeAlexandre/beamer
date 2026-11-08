@@ -30,8 +30,12 @@ inline int16_t to_i16(float v) {
 class SpeexCanceller final : public EchoCanceller {
  public:
   explicit SpeexCanceller(const EchoConfig& c)
-      : n_(c.frame), rate_(c.rate), mic_(c.frame), ref_(c.frame), out_(c.frame) {
+      : n_(c.frame), rate_(c.rate), mic_(c.frame), ref_(c.frame), out_(c.frame), lin_(c.frame), dn_(c.frame), y_(c.frame) {
     st_ = speex_echo_state_init(c.frame, c.tail);
+    // mdf.c's DC notch on the mic (float build), replicated to get its echo estimate
+    notch_r_ = c.rate < 12000 ? 0.9f : c.rate < 24000 ? 0.982f : 0.992f;
+    notch_den2_ = notch_r_ * notch_r_ + 0.7f * (1 - notch_r_) * (1 - notch_r_);
+
     int rate = c.rate;
     speex_echo_ctl(st_, SPEEX_ECHO_SET_SAMPLING_RATE, &rate);
     int ir = 0;
@@ -50,7 +54,7 @@ class SpeexCanceller final : public EchoCanceller {
       speex_preprocess_ctl(pp_, SPEEX_PREPROCESS_SET_DEREVERB, &off);
       speex_preprocess_ctl(pp_, SPEEX_PREPROCESS_SET_ECHO_SUPPRESS, &sup);
       speex_preprocess_ctl(pp_, SPEEX_PREPROCESS_SET_ECHO_SUPPRESS_ACTIVE, &act);
-      speex_preprocess_ctl(pp_, SPEEX_PREPROCESS_SET_ECHO_STATE, st_);
+      res_on_ = false;  // turned on once an echo path shows (process())
     }
   }
   ~SpeexCanceller() override {
@@ -64,12 +68,83 @@ class SpeexCanceller final : public EchoCanceller {
       ref_[i] = to_i16(ref[i]);
     }
     speex_echo_cancellation(st_, mic_.data(), ref_.data(), out_.data());
-    if (pp_) speex_preprocess_run(pp_, out_.data());
+    // Is there an echo path at all? MDF cannot tell: without one (speakers muted or not heard), its
+    // leak estimate stays under its "adapted" threshold, so it keeps its fast initial adaptation
+    // forever, with no double-talk protection; the filter wanders with the near end, and its echo
+    // estimate y (filtered reference the mic does not contain) is subtracted: the reference ends up in
+    // the forwarded mic, and the residual echo suppressor (fed the raw reference until MDF has adapted)
+    // ducks the mic (WP16 miss 4). So the output is notch(mic) - w * y, with w > 0 only while
+    //  - an echo path has shown: >= 12 of the last 100 frames had the linear filter remove >= 8 dB of
+    //    the mic (an echo heard while the near end is quiet does that within ~2 s; a filter wandering
+    //    on an uncorrelated mic did not once in 40 simulated minutes: engine test aec_no_echo_path),
+    //    held 15 s after the last such second, and
+    //  - y is really in the mic: g = <mic, y> / <y, y> over ~1 s is ~1 for a real echo, double talk
+    //    included (the near end does not correlate with y), and ~0 for a filter left over from a path
+    //    that has gone (speakers muted mid-stream).
+    // y = notch(mic) - e: MDF high-passes the mic with its DC notch first (replicated here); with
+    // w = 0 the output is the notched mic, MDF's output with w = 1.
+    double rdy = 0, ryy = 0, rdd = 0, ree = 0;
+    for (int i = 0; i < n_; ++i) {
+      const float vin = float(mic_[i]);
+      const float vout = notch_[0] + vin;
+      notch_[0] = notch_[1] + 2 * (-vin + notch_r_ * vout);
+      notch_[1] = vin - notch_den2_ * vout;
+      const float dn = notch_r_ * vout, y = dn - float(out_[i]);
+      dn_[i] = dn;
+      y_[i] = y;
+      rdy += double(dn) * y;
+      ryy += double(y) * y;
+      rdd += double(dn) * dn;
+      ree += double(out_[i]) * out_[i];
+    }
+    const bool audible = rdd > kMinMicEnergy * n_;
+    const bool evidence = audible && rdd >= kConfirmRatio * ree;
+    // harm: an audible estimate, >= -6 dB re the mic, yet subtracting it made the frame >= 1 dB louder
+    const bool harm = ryy > kMinMicEnergy * n_ && ryy >= 0.25 * rdd && ree > 1.26 * rdd;
+    const uint8_t f = uint8_t(evidence) | uint8_t(harm) << 1, old = window_[window_pos_];
+    window_count_ += int(evidence) - int(old & 1);
+    harm_count_ += int(harm) - int(old >> 1);
+    window_[window_pos_] = f;
+    window_pos_ = (window_pos_ + 1) % kWindow;
+    if (window_count_ >= kConfirmFrames) hold_ = kHoldFrames;
+    else if (harm_count_ >= kHarmFrames) hold_ = 0;  // the path has gone (speakers muted, moved away)
+    else if (hold_ > 0) --hold_;
+    const double a = double(n_) / (kGainTauS * rate_);
+    r_dy_ += a * (rdy - r_dy_);
+    r_yy_ += a * (ryy - r_yy_);
+    if (r_yy_ > double(n_)) g_ = r_dy_ / r_yy_;  // y above 1 LSB rms: a meaningful estimate
+    const double target = hold_ > 0 ? std::clamp((g_ - kGainLo) / (kGainHi - kGainLo), 0.0, 1.0) : 0.0;
+    // at most kMaxStep per frame (0 -> 1 in 100 ms), ramped across the frame
+    const double w1 = std::clamp(target, w_ - kMaxStep, w_ + kMaxStep);
+    const double dw = (w1 - w_) / n_;
+    for (int i = 0; i < n_; ++i) {
+      const double v = double(dn_[i]) - (w_ + dw * (i + 1)) * y_[i];
+      lin_[i] = spx_int16_t(std::lrint(std::clamp(v, -32768.0, 32767.0)));
+    }
+    w_ = w1;
+    if (pp_) {
+      // residual echo suppression only where there is an echo to suppress: its estimate is MDF's
+      // (before MDF has adapted, the raw reference), which would duck the mic for nothing
+      const bool on = res_on_ ? w_ > 0.25 : w_ > 0.5;
+      if (on != res_on_) {
+        res_on_ = on;
+        speex_preprocess_ctl(pp_, SPEEX_PREPROCESS_SET_ECHO_STATE, on ? st_ : nullptr);
+      }
+      speex_preprocess_run(pp_, lin_.data());
+    }
     constexpr float k = 1.0f / 32768.0f;
-    for (int i = 0; i < n_; ++i) out[i] = out_[i] * k;
+    for (int i = 0; i < n_; ++i) out[i] = lin_[i] * k;
   }
 
-  void reset() override { speex_echo_state_reset(st_); }  // the preprocessor re-adapts by itself
+  double echo_weight() const override { return w_; }
+
+  void reset() override {  // the preprocessor re-adapts by itself
+    speex_echo_state_reset(st_);
+    notch_[0] = notch_[1] = 0;
+    r_dy_ = r_yy_ = g_ = w_ = 0;
+    std::fill(std::begin(window_), std::end(window_), uint8_t(0));
+    window_count_ = harm_count_ = window_pos_ = hold_ = 0;
+  }
 
   double echo_delay_ms() override {
     if (ir_.empty()) return -1;
@@ -90,8 +165,20 @@ class SpeexCanceller final : public EchoCanceller {
   int n_, rate_;
   SpeexEchoState* st_ = nullptr;
   SpeexPreprocessState* pp_ = nullptr;
-  std::vector<spx_int16_t> mic_, ref_, out_;
+  std::vector<spx_int16_t> mic_, ref_, out_, lin_;
+  std::vector<float> dn_, y_;
   std::vector<spx_int32_t> ir_;
+  float notch_r_ = 0.992f, notch_den2_ = 0, notch_[2] = {0, 0};
+  // echo path gate (process())
+  static constexpr int kWindow = 100, kConfirmFrames = 12, kHoldFrames = 1500;  // 1 s, 12 %, 15 s
+  static constexpr double kConfirmRatio = 6.3;           // the filter removed >= 8 dB of the frame
+  static constexpr double kMinMicEnergy = 32.0 * 32.0;   // per sample, int16 units: -60 dBFS
+  static constexpr double kGainTauS = 1.0, kGainLo = 0.3, kGainHi = 0.6, kMaxStep = 0.1;
+  static constexpr int kHarmFrames = 30;
+  uint8_t window_[kWindow] = {};  // bit 0 evidence, bit 1 harm
+  int window_count_ = 0, harm_count_ = 0, window_pos_ = 0, hold_ = 0;
+  double r_dy_ = 0, r_yy_ = 0, g_ = 0, w_ = 0;
+  bool res_on_ = false;
 };
 
 }  // namespace
@@ -284,6 +371,7 @@ void AecPath::process(const float* mic, uint64_t m, float* out) {
   }
   e_ref_.store(e_ref_.load(std::memory_order_relaxed) + eref, std::memory_order_relaxed);
   ec_->process(mic, ref, out);
+  weight_.store(ec_->echo_weight(), std::memory_order_relaxed);
   double eout = 0;
   for (int i = 0; i < kAecFrame; ++i) eout += double(out[i]) * out[i];
   e_in_.store(e_in_.load(std::memory_order_relaxed) + ein, std::memory_order_relaxed);
@@ -311,6 +399,8 @@ Json AecPath::stats(double dt_s) {
   j["mic_db"] = nfr > 0 && din > 0 ? std::round(10.0 * std::log10(din / nfr) * 10) / 10 : -100.0;
   j["ref_db"] = nfr > 0 && dref > 0 ? std::round(10.0 * std::log10(dref / nfr) * 10) / 10 : -100.0;
   j["echo_ms"] = std::round(delay_ms_.load() * 10) / 10;
+  // 0..1: how much of the echo estimate is removed (0 = no echo path found: the mic passes as is)
+  j["path"] = std::round(weight_.load() * 100) / 100;
   j["err_ms"] = std::round(err_ms_.load() * 100) / 100;
   j["ppm"] = std::round(ppm_.load() * 10) / 10;
   j["resync"] = resyncs_.load();

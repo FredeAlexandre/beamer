@@ -7,10 +7,10 @@
 // process out of the capture (Windows excludes one process tree only: Beamer's own), so the guard
 // watches what is about to be sent and ducks it when feedback builds up.
 //
-// What feedback looks like, and what music does not: one narrow spectral line (most of the band's
-// energy within +-2 bins of a 1024-point FFT, no partials at f/2, 2f or 3f, no other line within
-// 15 dB) whose level keeps rising over a few hundred ms to a few seconds at a stable frequency. A
-// held note at a constant level, a chord, a sweep or an attack (a step, then flat) are not. On
+// What feedback looks like, and what music or a voice does not: one narrow spectral line from 800 Hz
+// up (most of the band's energy within +-2 bins of a 1024-point FFT, no partials at f/2, 2f or 3f, no
+// other line within 15 dB) whose level keeps rising over a few hundred ms to a few seconds at a
+// stable frequency. A held note at a constant level, a chord, a sweep or an attack (a step, then flat) are not. On
 // detection the stream is ducked by 20 dB (a loop gain above 20 dB is not plausible between two
 // machines), held for 2 s (doubled for each repeat within a minute, up to 30 s), then released over
 // 1 s once the tone has decayed. A tone that does not decay at all while ducked is the source's own

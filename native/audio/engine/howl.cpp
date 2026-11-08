@@ -12,9 +12,12 @@ constexpr double kRateHz = 48000.0;
 constexpr double kBinHz = kRateHz / HowlGuard::kFft;
 constexpr int kMinBin = 3;    // 140 Hz
 constexpr int kMaxBin = 341;  // 16 kHz
-// Tones are looked for from 330 Hz: below, 47 Hz bins cannot tell a chord or a voice from one line,
-// and small speakers hardly feed back there.
-constexpr int kMinPeakBin = 7;
+// Tones are looked for from 800 Hz. Below, a voice's first formant lifts one harmonic far above the
+// rest, and a syllable that swells looks like feedback building up: WP16 saw 23 false ducks at
+// 307-523 Hz on room speech (Wave Link's monitor in the PC's sound). Laptop and desk speakers hardly
+// feed back down there (the one live howl was at 7.1 kHz), and 47 Hz bins cannot tell a chord from
+// one line either.
+constexpr int kMinPeakBin = 17;  // 797 Hz
 constexpr int kHist = 216;    // frames of 10.7 ms: 2.3 s
 constexpr int kWindows[] = {24, 72, 216};  // 0.26 s, 0.77 s, 2.3 s
 constexpr int kMaxMisses = 4;
