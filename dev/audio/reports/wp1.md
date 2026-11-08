@@ -28,3 +28,11 @@ The service covers flows (§4.2: offerer/answerer, want, close), streams (open/o
 **Commits:** 4e8efa2 model (milestone 1) · 5ccd888 wire/planner/store/helper/service/fake helper/harness + tests · b958178 helper tests · e8770c5 exports · b5a82ac stream-consistency check · (this report).
 
 **Follow-up (§4.2 risk accepted):** the offering side's `flow_open` now carries `host` = `AudioHost.peer_host(peer)` (the peer's link IPv4, already in the protocol; null when that is None/loopback), so the helper binds towards the peer instead of `INADDR_ANY`. No AudioHost change. Fake helper and tests updated; all `test_audio_*` green.
+
+**Follow-up 2 (after merging feat/audio 5b9a540):**
+- `core/audio/helper.py` no longer reads `__file__`. The repository fallback comes from `__spec__.origin` and is used only when not frozen. A frozen app looks next to `sys.executable` (`Beamer.app/Contents/MacOS/`, or next to `Beamer.exe`).
+- WP5's py2app excludes are removed from `mac_app/setup.py`. A standalone `setup.py py2app` build took about 15 s and gave a 74 MB app: no `core/tests`, `mac_app`, `win_app` or `tools` inside, and all `core.audio` modules present.
+- The helper's environment drops `PYTHONHOME` and `PYTHONPATH`.
+- `test_audio_helper` runs the fake helper by path with `-I`, so it works from any working directory.
+- All `test_audio_*`: 132 OK, 2 skipped, on the Mac and the PC, from the repo root and from `win_app/`.
+- `test_audio_helper_native` against WP2's `build/tests/beamer-audio-null` with `BEAMER_AUDIO_NULL`: 2/2 PASS on the Mac. That covers ready/devices/error codes and two helpers streaming mic over loopback with `stats path=udp`.

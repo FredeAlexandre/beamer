@@ -13,10 +13,13 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from core.audio import fake_helper
 from core.audio import helper as helper_module
 from core.audio.helper import HelperProcess
 
-FAKE = [sys.executable, "-m", "core.audio.fake_helper"]
+# The fake helper needs only the standard library: run by path, isolated (-I), it works from any
+# working directory and without PYTHONPATH, which the helper's environment drops.
+FAKE = [sys.executable, "-I", fake_helper.__spec__.origin]
 
 
 class Events:
@@ -154,6 +157,34 @@ class LocateTests(unittest.TestCase):
                 self.assertTrue(helper_module.available())
             with mock.patch.object(helper_module.feature_flags, "AUDIO", False, create=True):
                 self.assertFalse(helper_module.available())
+
+    def test_python_variables_do_not_reach_the_helper(self):
+        seen = {}
+
+        def popen(cmd, **kwargs):
+            seen.update(kwargs["env"])
+            raise OSError("not really")
+        with mock.patch.dict(os.environ, {"PYTHONHOME": "/app/Resources", "PYTHONPATH": "/app/lib", "KEEP": "1"}):
+            process = HelperProcess(["beamer-audio"], lambda event: None, popen=popen, fail_limit=1)
+            with self.assertLogs("beamer.audio", "WARNING"):
+                process.start()
+                deadline = time.monotonic() + 5
+                while process.state != "failed" and time.monotonic() < deadline:
+                    time.sleep(0.01)
+            process.stop()
+        self.assertEqual(seen.get("KEEP"), "1")
+        self.assertNotIn("PYTHONHOME", seen)
+        self.assertNotIn("PYTHONPATH", seen)
+
+    def test_frozen_app_finds_the_helper_next_to_its_executable(self):
+        app = Path(self.folder, "Beamer.app", "Contents", "MacOS")
+        app.mkdir(parents=True)
+        Path(app, helper_module.binary_name()).write_text("")
+        environment = {key: value for key, value in os.environ.items() if key != helper_module.ENV_HELPER}
+        with mock.patch.dict(os.environ, environment, clear=True), \
+                mock.patch.object(sys, "frozen", "macosx_app", create=True), \
+                mock.patch.object(sys, "executable", str(app / "python")):
+            self.assertEqual(helper_module.locate(self.folder), [str(app / helper_module.binary_name())])
 
     def test_command_line(self):
         argv = helper_module.command_line(["beamer-audio"], "/state", dev=True)

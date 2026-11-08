@@ -29,7 +29,20 @@ CREATE_NO_WINDOW = 0x08000000
 MAX_LINE = 64 * 1024
 DEV_ENABLED = "audio-dev.enabled"
 ENV_HELPER = "BEAMER_AUDIO_HELPER"
-REPO = Path(__file__).resolve().parents[2]
+HELPER_ENV_DROP = ("PYTHONHOME", "PYTHONPATH")
+
+
+def _repo_root():
+    """The source checkout this module runs from, for its `native/audio/build` output; None when frozen.
+    Found through the module spec, not `__file__`: py2app takes any package whose code reads
+    `__file__` whole, `core.tests` included."""
+    if getattr(sys, "frozen", False):
+        return None
+    origin = getattr(__spec__, "origin", None)
+    return Path(origin).resolve().parents[2] if origin else None
+
+
+REPO = _repo_root()
 
 
 def binary_name(platform=None):
@@ -56,7 +69,8 @@ def dev_config(state_dir):
 
 def locate(state_dir=None):
     """The helper's argv before `--control`: the dev switch's `helper`, else $BEAMER_AUDIO_HELPER, else
-    next to the frozen app, else the repository's build output. None when no file exists."""
+    next to the frozen app's executable (Mac `Beamer.app/Contents/MacOS/beamer-audio`, Windows next to
+    `Beamer.exe`), else, run from source, the repository's build output. None when no file exists."""
     dev = dev_config(state_dir) if state_dir is not None else None
     helper = (dev or {}).get("helper")
     if isinstance(helper, list) and helper and all(isinstance(part, str) for part in helper):
@@ -68,8 +82,9 @@ def locate(state_dir=None):
         candidates.append(Path(os.environ[ENV_HELPER]))
     if getattr(sys, "frozen", False):
         candidates.append(Path(sys.executable).parent / binary_name())
-    system = "win" if sys.platform.startswith("win") else "mac"
-    candidates.append(REPO / "native" / "audio" / "build" / system / binary_name())
+    elif REPO is not None:
+        system = "win" if sys.platform.startswith("win") else "mac"
+        candidates.append(REPO / "native" / "audio" / "build" / system / binary_name())
     for candidate in candidates:
         if candidate.is_file():
             return [str(candidate)]
@@ -79,6 +94,15 @@ def locate(state_dir=None):
 def available(state_dir=None):
     """Whether this machine can advertise `audio`: the feature flag is on and a helper exists."""
     return bool(getattr(feature_flags, "AUDIO", False)) and locate(state_dir) is not None
+
+
+def helper_environment(base=None):
+    """The helper's environment: Beamer's own, without the Python variables the app sets for itself
+    (a frozen app's PYTHONHOME/PYTHONPATH would leak into any Python the helper or its tests start)."""
+    environment = dict(os.environ if base is None else base)
+    for name in HELPER_ENV_DROP:
+        environment.pop(name, None)
+    return environment
 
 
 def command_line(base, state_dir, *, parent_pid=None, exclude_pid=None, dev=False, log_level="info"):
@@ -177,7 +201,8 @@ class HelperProcess:
     def _spawn(self):
         self._generation += 1
         generation = self._generation
-        kwargs = dict(stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
+        kwargs = dict(stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0,
+                      env=helper_environment())
         if sys.platform.startswith("win"):
             kwargs["creationflags"] = CREATE_NO_WINDOW
         try:

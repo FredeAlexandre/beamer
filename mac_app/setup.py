@@ -89,10 +89,6 @@ setup(
                 "core.audio", "core.audio.helper", "core.audio.model", "core.audio.planner", "core.audio.service",
                 "core.audio.store", "core.audio.wire",
             ],
-            # core/audio/helper.py reads __file__, so py2app's detect_dunder_file recipe takes all of
-            # `core` as a package; its tests would then pull in the repository's mac_app, win_app and
-            # tools folders whole (mac_app holds the build itself: an endless copy).
-            "excludes": ["core.tests", "mac_app", "win_app", "tools"],
             "iconfile": "../Beamer.icns",
             "plist": {
                 "CFBundleDisplayName": "Beamer",
