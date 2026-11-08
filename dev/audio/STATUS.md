@@ -58,10 +58,10 @@ Mac virtual mic validated live 2026-11-08.
 | WP5 Link integration | Mac `beamer-wp5` / `audio/wp5` | **done**, merged (`5b9a540`): `audio` cap (Mac 14 caps), 11 `audio_*` types gated, service wired in both apps; 23 gating tests incl. a real loopback link with a 1.5.x-style peer receiving nothing; deployed both: `audio_hello`/`audio_devices` exchanged Mac<->PC, asusrog gets no audio message and logs no warning. Both machines currently run WP1's scripted fake helper via `audio-dev.enabled` |
 | WP6 Page model + Mac Audio page | Mac `beamer-wp6` / `audio/wp6` | running; milestone 1 (`view.py`) committed `8102be9` |
 | WP7 Qt Audio page | PC agent, `beamer-wp7` / `pc/wp7` | **done**, merged (`58f1ff7`): page after Crossing (Ctrl+3), map in the Crossing tile style with sound/mic arrows and meters, device rows with Test / Headset, notices; 19 tests, win_app suite = known failures only; renders `reports/wp7-shots/` reviewed by operator (consistent; nit: title renders upper-case in the offscreen shot, check in the live app) |
-| WP9 Echo cancellation | Mac + PC | waits for WP2, WP3, WP4 |
-| WP10 Two-machine E2E + soak | Mac + ssh | waits for WP1-5, WP8 (WP9) |
+| WP9 Echo cancellation | Mac `beamer-wp9` / `audio/wp9` (+ PC build) | running |
+| WP10 Two-machine E2E + soak, first live run with real helpers in Beamer | Mac `beamer-wp10` / `audio/wp10` (+ ssh) | running |
 
-Coordination: deploys serialized with the lock dir `~/Developer/.beamer-deploy.lock`; each WP commits its
+Coordination: deploys serialized with the lock dir `~/Developer/.beamer-deploy.lock`, live audio tests with `~/Developer/.beamer-audio-lab.lock`; each WP commits its
 report as `dev/audio/reports/<wp>.md`; the operator merges into `feat/audio`.
 
 ## Start checks (2026-11-07)
