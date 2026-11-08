@@ -119,6 +119,21 @@ def _key():
     return base64.b64encode(secrets.token_bytes(wire.KEY_SIZE)).decode("ascii")
 
 
+def _test_signal_ok(signal):
+    """Dev test source: "A" or "B", optionally with a pilot amplitude ("A:0.2", 0..0.5)."""
+    if not isinstance(signal, str):
+        return False
+    name, _, amp = signal.partition(":")
+    if name not in ("A", "B"):
+        return False
+    if not amp:
+        return True
+    try:
+        return 0.0 <= float(amp) <= 0.5
+    except ValueError:
+        return False
+
+
 def _usable_host(host):
     return isinstance(host, str) and host and not host.startswith("127.") and host != "localhost"
 
@@ -1116,7 +1131,7 @@ class AudioService:
             if "test_source" in item:
                 value = item["test_source"]
                 signal = value.get("signal") if isinstance(value, dict) else None
-                self._test_source = signal if signal in ("A", "B") else None
+                self._test_source = signal if _test_signal_ok(signal) else None
             if item.get("retry_helper"):
                 self._retry_helper()
             if "helper_dev" in item and isinstance(item["helper_dev"], dict):

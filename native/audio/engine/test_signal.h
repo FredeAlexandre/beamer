@@ -11,7 +11,7 @@ namespace beamer::audio {
 
 class TestSignal {
  public:
-  // spec: "A" | "B" (signatures), "sine:<hz>[:<amp>]", "silence", "noise[:<amp>]"
+  // spec: "A[:<pilot amp>]" | "B[:<pilot amp>]" (signatures), "sine:<hz>[:<amp>]", "silence", "noise[:<amp>]"
   static bool parse(const std::string& spec, TestSignal* out);
   // Mono samples for absolute indices [s0, s0 + n).
   void render(int64_t s0, int n, float* out);

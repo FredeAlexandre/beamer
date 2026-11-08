@@ -37,6 +37,14 @@ bool TestSignal::parse(const std::string& spec, TestSignal* out) {
       double hann = 0.5 - 0.5 * std::cos(2 * kPi * i / (n - 1));  // np.hanning
       t.tpl_[i] = static_cast<float>(marker_amp * hann * std::sin(2 * kPi * (f0 * tt + 0.5 * k * tt * tt)));
     }
+    // "A:<pilot amplitude>": Phase 1 mixed mic signatures with a 0.2 pilot under 0.1 chirps (chirps
+    // louder than the pilot make an Opus VOIP decoder that once concealed a frame dip the pilot after
+    // each chirp: false glitches, dev/audio/proto/scenarios/README.md)
+    std::string pa = parts(1);
+    if (!pa.empty()) {
+      t.pilot_amp_ = std::atof(pa.c_str());
+      if (!(t.pilot_amp_ >= 0 && t.pilot_amp_ <= 0.5)) return false;
+    }
   } else if (kind == "sine") {
     t.kind_ = Kind::Sine;
     std::string f = parts(1), a = parts(2);

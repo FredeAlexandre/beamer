@@ -350,6 +350,22 @@ static void test_resampler_snr() {
   }
 }
 
+static void test_signal_pilot_level() {
+  TestSignal a, a2;
+  CHECK(TestSignal::parse("A", &a) && TestSignal::parse("A:0.2", &a2));
+  TestSignal bad;
+  CHECK(!TestSignal::parse("A:0.9", &bad));
+  std::vector<float> x(480), y(480);  // 10 ms before the first marker (2 s): pilot only
+  a.render(0, 480, x.data());
+  a2.render(0, 480, y.data());
+  float px = 0, py = 0;
+  for (int i = 0; i < 480; ++i) {
+    px = std::max(px, std::fabs(x[i]));
+    py = std::max(py, std::fabs(y[i]));
+  }
+  CHECK(std::fabs(px - 0.02f) < 1e-3f && std::fabs(py - 0.2f) < 1e-3f);
+}
+
 static void test_map_channels() {
   float st[6] = {1, 3, 2, 4, -1, 1}, mono[3], back[6], eight[24];
   map_channels(st, 2, mono, 1, 3);
@@ -1039,6 +1055,7 @@ int main(int argc, char** argv) {
       {"opus_roundtrip", test_opus_roundtrip},
       {"resampler_snr", test_resampler_snr},
       {"map_channels", test_map_channels},
+      {"signal_pilot_level", test_signal_pilot_level},
       {"jb_quiet", test_jb_quiet_and_fixed},
       {"jb_loss_jitter_drift_10min", test_jb_loss_jitter_drift_10min},
       {"jb_gilbert_negative_drift", test_jb_gilbert_negative_drift},
