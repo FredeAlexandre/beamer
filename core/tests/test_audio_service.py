@@ -368,6 +368,17 @@ class DevCommandTests(unittest.TestCase):
         status = json.loads(Path(a.state_dir, service_module.DEV_STATUS).read_text())
         self.assertEqual(status["snapshot"]["output_status"][a.id]["state"], "streaming")
         self.assertEqual({s["kind"] for s in status["snapshot"]["streams"]}, {"mic", "system"})
+        command.write_text(json.dumps({"helper_dev": {"drop_udp": True}}))
+        self.net.clock.advance(1.1)
+        self.net.settle()
+        self.assertEqual(a.helper.commands("dev")[-1], {"cmd": "dev", "drop_udp": True})
+        events = [json.loads(line) for line in
+                  Path(a.state_dir, service_module.DEV_EVENTS).read_text().splitlines()]
+        names = {event["ev"] for event in events}
+        self.assertIn("ready", names)
+        self.assertIn("_link_up", names)
+        self.assertNotIn("levels", names)
+        self.assertTrue(all("mono" in event and "wall" in event for event in events))
 
     def test_without_the_switch_nothing_is_read(self):
         a = self.net.add(1, "mac", "macos")

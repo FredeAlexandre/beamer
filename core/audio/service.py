@@ -42,6 +42,8 @@ STATS_PERIOD = 0.25        # 4 Hz audio_stats to watching peers
 METER_PERIOD_MS = 50
 DEV_CMD = "audio-dev-cmd.json"
 DEV_STATUS = "audio-dev-status.json"
+DEV_EVENTS = "audio-dev-events.jsonl"   # dev only: helper events (no levels) and link changes, for the E2E harness
+DEV_EVENTS_MAX = 20_000_000              # bytes; the file is then moved to `.1` and started again
 
 
 class AudioHost(Protocol):
@@ -184,6 +186,7 @@ class AudioService:
         self._dev = None
         self._dev_at = 0.0
         self._test_source = None
+        self._dev_events = None
         self._wake_at = None
         self._dirty = True
         self.link_out_dropped = 0
@@ -324,6 +327,8 @@ class AudioService:
         self._queue.put(("helper", event))
 
     def _handle(self, item):
+        if self._dev is not None:
+            self._dev_event(item)
         try:
             kind = item[0]
             if kind == "link_up":
@@ -400,6 +405,9 @@ class AudioService:
         if self._helper is not None:
             self._helper.stop()
         self._save_now()
+        if self._dev_events is not None:
+            self._dev_events.close()
+            self._dev_events = None
         self._stopped = True
 
     # Helpers on the worker ----------------------------------------------------------------------
@@ -1050,6 +1058,33 @@ class AudioService:
         except OSError as error:
             self._log.debug("audio: dev status not written: %s", error)
 
+    def _dev_event(self, item):
+        """Dev mode: append helper events (not levels) and link changes to DEV_EVENTS, stamped with
+        this service's clock (the E2E harness puts them on the same timeline as its recordings)."""
+        kind = item[0] if isinstance(item, tuple) else None
+        if kind == "helper":
+            if not isinstance(item[1], dict) or item[1].get("ev") == "levels":
+                return
+            record = dict(item[1])
+        elif kind in ("link_up", "link_down"):
+            record = {"ev": "_" + kind, "peer": item[1]}
+        else:
+            return
+        record["mono"] = round(self._clock(), 6)
+        record["wall"] = round(self._wall(), 3)
+        path = self._state_dir / DEV_EVENTS
+        try:
+            if self._dev_events is None:
+                self._dev_events = open(path, "a", encoding="utf-8")
+            self._dev_events.write(json.dumps(record, separators=(",", ":")) + "\n")
+            self._dev_events.flush()
+            if self._dev_events.tell() > DEV_EVENTS_MAX:
+                self._dev_events.close()
+                self._dev_events = None
+                os.replace(path, path.with_name(DEV_EVENTS + ".1"))
+        except (OSError, TypeError, ValueError) as error:
+            self._log.debug("audio: dev event not written: %s", error)
+
     def _dev_command(self, command):
         commands = command if isinstance(command, list) else [command]
         for item in commands:
@@ -1068,6 +1103,9 @@ class AudioService:
                 value = item["test_source"]
                 signal = value.get("signal") if isinstance(value, dict) else None
                 self._test_source = signal if signal in ("A", "B") else None
+            if "helper_dev" in item and isinstance(item["helper_dev"], dict):
+                # the helper's own dev switches (drop_udp, loss_pct, reset_stats); needs `--dev`
+                self._helper_send(dict(item["helper_dev"], cmd="dev"))
 
     # Settling: own list, plan, snapshot ---------------------------------------------------------
 
