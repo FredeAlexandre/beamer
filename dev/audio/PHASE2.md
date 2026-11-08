@@ -216,7 +216,7 @@ feed, "CABLE Output", "CABLE In 16 Ch"; "CABLE Input" is used only as the virtua
 | `flow_remote` | `flow`, `host`, `port` | set the remote (offer side, after the answer), `connect()`, start probing |
 | `flow_close` | `flow` | send `bye`, close; streams on it stop |
 | `link_in` | `flow`, `p` (list of b64 sealed packets) | packets that came over the TCP link (§4.5) |
-| `send` | `stream` (u32), `flow`, `kind` `"mic"`/`"system"`, `source` (`{"device": key|null}` for mic, `{"system": true}`; with `--dev` also `{"test": "A"|"B"}`), `codec` (§4.4), `key` (b64), `mute_local` (bool, system only), `aec` (`{"reference": key|null}` or null) | capture -> encode -> seal -> flow |
+| `send` | `stream` (u32), `flow`, `kind` `"mic"`/`"system"`, `source` (`{"device": key|null}` for mic, `{"system": true}`; with `--dev` also `{"test": spec}`, spec as `TestSignal`: `"A"`/`"B"[:<pilot amp>]`, `"sine:<hz>[:<amp>]"`, `"noise[:<amp>]"`, `"silence"`, `"rise:<hz>[:<dB/s>]"`), `codec` (§4.4), `key` (b64), `mute_local` (bool, system only), `aec` (`{"reference": key|null}` or null; mic only, a system stream ignores it; with `--dev` the object may also carry `lead_ms` (-40..80: the reference sample fed with mic sample t is the one captured at t + lead_ms, default -1), `max_wait_ms` (0..200, default 30: how long a mic frame waits for its reference) and `exclude_pids` (list of ints: processes left out of the reference capture, for live tests)) | capture -> [echo canceller] -> [howl guard, system only] -> encode -> seal -> flow |
 | `recv` | `stream`, `flow`, `kind`, `codec`, `key`, `sink` (`{"device": key|null}` or `{"virtual_mic": true}`) | flow -> open -> JB -> decode -> resample -> render |
 | `loop` | `stream`, `source` `{"device": key|null}`, `sink` `{"virtual_mic": true}` | local mic -> virtual mic, through the drift controller, no codec, no AEC |
 | `stop` | `stream` | stop that stream; restore any local mute it holds |
@@ -237,9 +237,10 @@ feed, "CABLE Output", "CABLE In 16 Ch"; "CABLE Input" is used only as the virtua
 | `link_out` | `flow`, `p` (list of b64 sealed packets, ≤ 4): only while the flow is in state `link` |
 | `stream_state` | `stream`, `state` `"starting"`/`"running"`/`"stopped"`/`"failed"`, `device` (key in use), `error` (code, on failed/stopped by error) |
 | `levels` | `t` (ms), `in` `{key:[rms_db,peak_db]}`, `out` `{key:[...]}`, `streams` `{id:[...]}`: dBFS, 0.1 dB, floor -100; only devices Beamer has open |
-| `stats` | every 1 s while streams exist: `{"ev":"stats","t":ms,"cpu_pct":<helper process, % of a core>,"streams":{"<id>":{...}}}`; counters are **per interval** (since the previous `stats`). recv: `dir,kind,path` (`udp`/`link`, of the last packet), `jb_ms` (mean level), `jb_p99_ms`, `jb_max_ms`, `target_ms`, `late`, `expand`, `drop` (incl. flushed), `flushed`, `loss_pct`, `fec`, `plc`, `underrun`, `dec_err`, `ppm`, `ppm_i`, `rtt_ms`, `kbps`, `rx`, `rx_link`, `ring_full`, `playing`, `run_jb_p99_ms` / `run_target_ms` (level p99 and mean target since the stream started or `dev reset_stats`). send: `dir,kind,path`, `kbps`, `bitrate`, `jb_ms` (the receiver's level from its rr), `rtt_ms`, `frames`, `enc_us` (mean encode time), `overflow`, `dev_dropped`, `rr_rx`, `enc_err`. loop: `jb_ms`, `target_ms`, `ppm`, `underrun`, `flushed`, `overflow` |
+| `stats` | every 1 s while streams exist: `{"ev":"stats","t":ms,"cpu_pct":<helper process, % of a core>,"streams":{"<id>":{...}}}`; counters are **per interval** (since the previous `stats`). recv: `dir,kind,path` (`udp`/`link`, of the last packet), `jb_ms` (mean level), `jb_p99_ms`, `jb_max_ms`, `target_ms`, `late`, `expand`, `drop` (incl. flushed), `flushed`, `loss_pct`, `fec`, `plc`, `underrun`, `dec_err`, `ppm`, `ppm_i`, `rtt_ms`, `kbps`, `rx`, `rx_link`, `ring_full`, `playing`, `run_jb_p99_ms` / `run_target_ms` (level p99 and mean target since the stream started or `dev reset_stats`). send: `dir,kind,path`, `kbps`, `bitrate`, `jb_ms` (the receiver's level from its rr), `rtt_ms`, `frames`, `enc_us` (mean encode time), `overflow`, `dev_dropped`, `rr_rx`, `enc_err`. loop: `jb_ms`, `target_ms`, `ppm`, `underrun`, `flushed`, `overflow` Send streams with `aec` also carry an `aec` object: `{"on":false,"error":code}` when the reference did not open (the mic runs without echo cancellation), else `on` true, `ref` (reference device in use), `atten_db` (how much the canceller lowered the mic over the interval: echo and whatever else it removed), `mic_db` and `ref_db` (mean levels it got from the mic and the reference, dBFS), `echo_ms` (the echo delay the filter found, from host timestamps, minus `lead_ms`; -1 unknown), `err_ms` and `ppm` (the reference/mic drift loop: position error and applied correction), `resync` (re-alignments after a gap), `ref_short`, `no_ref` (frames with a short or no reference), `waits` (mic frames that waited for their reference), `us` (mean processing time per 10 ms frame) and `cpu_pct` (canceller CPU, % of a core); `resync`, `ref_short`, `no_ref`, `waits` are cumulative since the stream started |
 | `permission` | once after `ready`: `mic` and `system_audio`: `granted`/`denied`/`undetermined`/`unknown`; later `{"mic":"suspect"}` when a mic capture (send or loop) delivered only digital zero for 5 s. Never `suspect` for system sound: a silent machine's tap is digital zero too |
 | `ok`, `error`, `pong` | see §3.1. Error codes: `bad_args`, `no_device`, `blocked_device`, `no_virtual_mic`, `device_busy`, `permission`, `unsupported`, `bind_failed`, `unknown_flow`, `unknown_stream`, `internal` |
+| `howl` | `stream` (a `system` send), `active` (bool), `freq_hz` (the tone, Hz), `duck_db` (-20 while active, else 0). The howl guard (`native/audio/engine/howl.{h,cpp}`) of every system send stream emits it on each change. Acoustic feedback through two machines: M's sound plays on T's speakers, a microphone on M hears them and something on M (Elgato Wave Link's monitor, Windows "Listen to this device") plays it into M's own sound, which the capture sends again; Windows excludes one process tree only, so the loop cannot be cut at capture. Detection, on the mono mix just before the encoder: 1024-point Hann FFT every 512 samples; a tone (peak +-2 bins, from 330 Hz to 16 kHz) that holds >= 40 % of the 140 Hz-16 kHz band, has no partial at f/2, 2f or 3f and no other spectral line within 15 dB, and whose level rises at a stable frequency (+-1 bin) by >= 6 dB over 0.26, 0.77 or 2.3 s with all four quarter means non-decreasing and both halves carrying >= 35 % of the rise (so an attack, a step then flat, never counts), ending >= -45 dBFS. Then the stream is ducked by 20 dB (20 ms ramp), held 2 s (doubled per repeat within a minute, at most 30 s) and released over 1 s once the tone has decayed by 12 dB (or gone) for 0.3 s; a tone that never decays under the duck is the source's own sound: released after 4 s, its frequency ignored for 30 s. Samples pass bit for bit while no duck is in force. Engine tests: a loop simulation (gain 1.06-4 at 1.2 or 7.1 kHz, 100-180 ms, with and without a music bed) and music that must pass untouched (chords, a chord swell, sine sweeps, held and swelling flute-like notes, a switched-on tone, a voice-like signal). Known limit: a pure tone fading in slowly looks like feedback and gets the 4 s duck once. |
 
 ### 3.4 Example session (Mac sends its mic to the PC; abbreviated)
 
@@ -387,7 +388,7 @@ messages (`AudioHost.outbox_depth`), so audio can never starve input acks (`rece
 | `audio_close` | `{"stream":u32,"reason":"route"|"demand"|"device_gone"|"helper"|"shutdown"|"error"}` | direct, either side |
 | `audio_frame` | `{"flow":str,"p":[b64,...]}` (≤ 4) | direct, fallback only |
 | `audio_watch` | `{"on":bool}` | direct; the sender's Audio page is visible |
-| `audio_stats` | `{"t":ms,"levels":{"in:<key>":[rms,peak],"out:<key>":[...]},"streams":{"<id>":{"path":"udp","jb_ms":23.0,"loss_pct":0.1,"rtt_ms":5.1}}}` | direct, 4 Hz, only to peers watching |
+| `audio_stats` | `{"t":ms,"levels":{"in:<key>":[rms,peak],"out:<key>":[...]},"streams":{"<id>":{"path":"udp","jb_ms":23.0,"loss_pct":0.1,"rtt_ms":5.1}},"howls":[{"to":id,"freq_hz":7100.0,"active":true}]}`; `howls` (≤ 8, left out when empty): the sender's system sound to `to` was ducked by its howl guard (§3.3 `howl`), `active` false during the notice hold (120 s) after the release | direct, 4 Hz, only to peers watching |
 | `audio_test` | `{"device":key,"seconds":10}` | direct; meter one idle input of the receiver (its stats carry the level) |
 
 ### 5.3 Cluster propagation (reuses the `layout` flood rule of `settings_sync`)
@@ -486,7 +487,7 @@ Rules, evaluated identically on every machine (each acts only on `sends`/`loop` 
    missing -> `waiting_device`). For each online T ≠ S with demand (or hold): if T ∈ S's direct peers and T's
    `virtual_mic.present` -> send `("mic", T)` from S with `sink {"virtual_mic":true}`; else status lists T as
    `unreachable` / `no_virtual_mic`. S with its own demand -> `loop`. Each mic `SendSpec` gets `aec=True` and
-   `aec_reference` = S's default output key when `aec_mode == "auto"` and S's output form (override first) is
+   `aec_reference` = S's default output key when `aec_mode == "auto"`, S's helper lists `aec` in its `features` and S's output form (override first) is
    not `headphones`/`headset` (helper `aec {"reference": key|null}`, else `aec: null`). Never on the loop: apps
    on S cancel their own playback.
 2. **Output of M** (`route.outputs[M]`, `to` = T): requires M and T online and direct peers, M has
@@ -584,7 +585,9 @@ class AudioService:
   may hold `{"helper": [argv...]}` to run another helper, e.g. `beamer-audio-null`, without env vars):
   every 1 s read and delete `<state_dir>/audio-dev-cmd.json` (`{"set_mic":...}`, `{"set_output":...}`,
   `{"test_source":{"kind":"mic","signal":"A"}}`) and write `<state_dir>/audio-dev-status.json` (snapshot +
-  last `stats`). Used by the E2E harness (§11.4); no socket, no listener.
+  last `stats` + `test_source`, the dev source in force: a harness that sets it on one machine waits for it
+  there before setting a route that opens the stream, else the stream opens on the real device and opens
+  again on the test source). Used by the E2E harness (§11.4); no socket, no listener.
 
 ### 8.2 HelperProcess (`core/audio/helper.py`)
 
@@ -622,6 +625,7 @@ class AudioService:
     own: str; machines: Mapping[str, MachineAudio]; online: frozenset[str]; direct: frozenset[str]
     route: Route; mic_status: RouteStatus; output_status: Mapping[str, RouteStatus]
     streams: tuple[StreamView, ...]; helper: str; permission: Mapping[str, str]; aec_mode: str; aec_active: bool
+    howls: tuple[HowlView, ...] = ()   # HowlView: source: str; target: str; freq_hz: float; active: bool
 ```
 
 Pure functions in `model.py`: `merge_route(held, incoming) -> (merged, changed, answer)`,
@@ -654,7 +658,13 @@ default mark, form, meter key, test enabled), `notices` (code, sentence, action)
 Notices: `driver_missing` (Mac, action "Install Beamer Microphone"), `vbcable_missing` (PC: "To use another
 machine's mic here, install VB-CABLE (vb-audio.com), then choose 'CABLE Output' as the microphone in your
 apps."), `pick_virtual_mic` (how apps pick it, per platform), `permission_mic`/`permission_system`
-(action opens System Settings), `helper_failed` (action Retry), `echo_aec`, `echo_cross`, `conflict`,
+(action opens System Settings), `helper_failed` (action Retry), `echo_aec` (only where S's helper has `aec`
+and, for this machine, `aec_mode` is `auto`; else `echo_no_aec`: "<S>'s microphone can hear its speakers, and Beamer
+does not cancel that echo there. Use a headset on <S>.", and `echo_cross` drops its "send the sound to S" advice),
+`howl` (one per sound stream in `snapshot.howls`, ours or a watched peer's: "Beamer heard feedback between <T>'s
+speakers and a microphone on <M>, and turned down <M>'s sound on <T>. Use headphones on <T>, or stop <M> from playing
+that microphone through its own sound."; when M lists an Elgato/Wave Link device the advice is "or turn off Wave
+Link's monitor to the system output on <M>"), `echo_cross`, `conflict`,
 `peer_no_audio` (a linked machine runs a Beamer without audio).
 
 ### 9.2 Layout (both apps, same order and words)
