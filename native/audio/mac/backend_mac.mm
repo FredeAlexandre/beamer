@@ -84,6 +84,56 @@ void disable_scope(AudioObjectID dev, AudioDeviceIOProcID proc, bool input_scope
 }
 
 // ---------------------------------------------------------------------------------------------
+// IO buffer size. kAudioDevicePropertyBufferFrameSize is per process: it sets the IO cycle of this
+// helper's IOProcs on the device, other apps keep theirs (the HAL runs each client at its own size;
+// checked live, WP11). The helper asks for a small one (latency: our render is one IO buffer ahead
+// of the device, and the jitter buffer target includes one buffer), and puts the value it found back
+// when its last Port on that device closes.
+
+class BufferSizes {
+ public:
+  static void acquire(AudioObjectID dev, UInt32 frames) {
+    std::lock_guard<std::mutex> lock(mu());
+    auto& m = held();
+    auto it = m.find(dev);
+    if (it == m.end()) {
+      UInt32 orig = 0, size = sizeof(orig);
+      auto a = addr(kAudioDevicePropertyBufferFrameSize);
+      if (AudioObjectGetPropertyData(dev, &a, 0, nullptr, &size, &orig) != noErr) orig = 0;
+      it = m.emplace(dev, Held{0, orig}).first;
+    }
+    it->second.refs++;
+    auto a = addr(kAudioDevicePropertyBufferFrameSize);
+    AudioObjectSetPropertyData(dev, &a, 0, nullptr, sizeof(frames), &frames);
+  }
+  static void release(AudioObjectID dev) {
+    std::lock_guard<std::mutex> lock(mu());
+    auto& m = held();
+    auto it = m.find(dev);
+    if (it == m.end() || --it->second.refs > 0) return;
+    if (it->second.orig) {
+      auto a = addr(kAudioDevicePropertyBufferFrameSize);
+      AudioObjectSetPropertyData(dev, &a, 0, nullptr, sizeof(it->second.orig), &it->second.orig);
+    }
+    m.erase(it);
+  }
+
+ private:
+  struct Held {
+    int refs;
+    UInt32 orig;
+  };
+  static std::mutex& mu() {
+    static std::mutex m;
+    return m;
+  }
+  static std::map<AudioObjectID, Held>& held() {
+    static std::map<AudioObjectID, Held> m;
+    return m;
+  }
+};
+
+// ---------------------------------------------------------------------------------------------
 // Port: one IOProc on one device, one direction, converting to/from 48 kHz float32 interleaved.
 
 class Port {
@@ -107,9 +157,8 @@ class Port {
       return nullptr;
     }
     if (buffer_frames > 0) {
-      UInt32 n = UInt32(buffer_frames);
-      auto a = addr(kAudioDevicePropertyBufferFrameSize);
-      AudioObjectSetPropertyData(dev, &a, 0, nullptr, sizeof(n), &n);
+      BufferSizes::acquire(dev, UInt32(buffer_frames));
+      p->buffer_held_ = true;
     }
     AudioValueRange range{0, 4096};
     {
@@ -164,6 +213,7 @@ class Port {
       if (running_) AudioDeviceStop(dev_, proc_);  // synchronous: the IOProc is not called afterwards
       AudioDeviceDestroyIOProcID(dev_, proc_);
     }
+    if (buffer_held_) BufferSizes::release(dev_);
     if (conv_) AudioConverterDispose(conv_);
   }
 
@@ -172,6 +222,8 @@ class Port {
   int device_channels() const { return dev_ch_; }
   int granted_frames() const { return granted_frames_; }
   uint64_t callbacks() const { return callbacks_.load(std::memory_order_relaxed); }
+  uint64_t gaps() const { return gaps_.load(std::memory_order_relaxed); }
+  uint64_t gap_frames() const { return gap_frames_.load(std::memory_order_relaxed); }
 
  private:
   Port() = default;
@@ -180,6 +232,17 @@ class Port {
                           AudioBufferList* out, const AudioTimeStamp* out_time, void* ctx) {
     auto* p = static_cast<Port*>(ctx);
     p->callbacks_.fetch_add(1, std::memory_order_relaxed);
+    // IO cycles the HAL skipped (this IOProc overran, or the device stalled): the sample time jumps
+    if (const AudioTimeStamp* ts = p->input_ ? in_time : out_time; ts && (ts->mFlags & kAudioTimeStampSampleTimeValid)) {
+      if (p->next_sample_ >= 0 && ts->mSampleTime > p->next_sample_ + 0.5) {
+        p->gaps_.fetch_add(1, std::memory_order_relaxed);
+        p->gap_frames_.fetch_add(uint64_t(ts->mSampleTime - p->next_sample_), std::memory_order_relaxed);
+      }
+      const AudioBufferList* bl = p->input_ ? in : out;
+      const AudioBuffer* b0 = bl && bl->mNumberBuffers ? &bl->mBuffers[0] : nullptr;
+      const double n = b0 && b0->mNumberChannels ? double(b0->mDataByteSize / (4 * b0->mNumberChannels)) : 0.0;
+      p->next_sample_ = ts->mSampleTime + n;
+    }
     if (p->input_) {
       if (in && in->mNumberBuffers) p->capture(in, in_time);
     } else if (out && out->mNumberBuffers) {
@@ -317,13 +380,14 @@ class Port {
   CaptureSink* sink_ = nullptr;
   RenderSource* source_ = nullptr;
   AudioDeviceIOProcID proc_ = nullptr;
-  bool running_ = false;
+  bool running_ = false, buffer_held_ = false;
   AudioConverterRef conv_ = nullptr;
   std::vector<float> dev_buf_, client_buf_, conv_buf_;
   const float* push_ptr_ = nullptr;
   UInt32 push_frames_ = 0;
   uint64_t pull_ns_ = 0;
-  std::atomic<uint64_t> callbacks_{0};
+  std::atomic<uint64_t> callbacks_{0}, gaps_{0}, gap_frames_{0};
+  double next_sample_ = -1;  // IO thread only
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -372,7 +436,8 @@ class MacStream final : public StreamHandle {
   bool lost = false;
   double down_since = 0;     // > 0 while the stream has no running port
   double started_at = 0, last_progress = 0;
-  uint64_t last_callbacks = 0;
+  uint64_t last_callbacks = 0, logged_gaps = 0;
+  double gaps_logged_at = 0;
   std::string last_error;
 
  private:
@@ -682,6 +747,7 @@ class MacBackend final : public Backend {
     s->down_since = 0;
     s->started_at = s->last_progress = seconds();
     s->last_callbacks = 0;
+    s->logged_gaps = 0;
     s->last_error.clear();
     return true;
   }
@@ -742,6 +808,13 @@ class MacBackend final : public Backend {
           restart(s, "no IO for 1.5 s");
         }
         if (s->kind == SKind::System && !s->tap.pending.empty()) late_exclusions(s);
+        // skipped IO cycles, logged at most every 10 s (WP11: is a 128-frame buffer too tight?)
+        if (const uint64_t g = s->port->gaps(); g != s->logged_gaps && now - s->gaps_logged_at >= 10.0) {
+          log_line("warn", "%s stream: %llu skipped IO cycles (%llu frames) since it started", kind_name(s->kind),
+                   (unsigned long long)g, (unsigned long long)s->port->gap_frames());
+          s->logged_gaps = g;
+          s->gaps_logged_at = now;
+        }
         continue;
       }
       restart(s, "retry");
@@ -918,7 +991,9 @@ class MacBackend final : public Backend {
   std::map<AudioObjectID, AudioObjectPropertyListenerBlock> dev_blocks_;
   std::string signature_;
   uint64_t debounce_gen_ = 0, tick_count_ = 0;
-  int buffer_frames_ = 480;
+  // Phase 1's size (W2/W3: tap delivery 8 ms at 128 vs 21 ms at 480; the WP10 PC sound -> Mac run
+  // at 480 was 25 ms slower than Phase 1). BEAMER_AUDIO_MAC_BUFFER_FRAMES overrides, 0 = leave it.
+  int buffer_frames_ = 128;
   bool alive_ = true;
   std::mutex live_mu_;
   std::set<MacStream*> live_;

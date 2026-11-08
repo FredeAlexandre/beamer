@@ -57,6 +57,16 @@ struct JbConfig {
   // Recompute the p97 transit statistic at most this often (0 = every pull with new packets,
   // as media.py). It moves by one sample in ~1000 per packet; 20 ms saves most of the IO-thread CPU.
   double jitter_recalc_ms = 20.0;
+  // Engine addition (WP11): once the clock ratio has been measured from the timestamps
+  // (drift_est_ppm, valid after 60 s), it is the drift integral instead of the integrated level error.
+  // The level also rises by a frame at each expansion whose late frame then plays; integrating that
+  // pinned the integral at +200 ppm live (WP10 soak) for clocks ~20 ppm apart. false = media.py.
+  bool drift_est = true;
+  // Engine addition (WP11): the render-period term of the target is at least this. With the Mac's
+  // 128-frame IO buffers (2.7 ms) the target fell by 7 ms and underruns/glitches on PC sound rose
+  // from ~2.7 to ~3.7/min live (WP11 b runs); 10 ms keeps WP10's target, and the shorter IO buffer
+  // still shortens the render path. 0 = media.py.
+  double period_floor_ms = 10.0;
 };
 
 struct JbCounters {
@@ -85,6 +95,12 @@ class JitterBuffer {
   double ppm() const { return drift_.ppm; }
   double integ_ppm() const { return drift_.integ; }
   double last_level_ms() const { return last_level_; }  // level measured before the last pull
+  // Clock ratio measured from timestamps alone (sender ts vs arrival, frames pulled vs pull time):
+  // the long-run resampling ppm the drift control has to apply. Valid (and then followed by the drift
+  // integral) once it spans 60 s with a standard error <= 5 ppm.
+  double drift_est_ppm() const { return est_ppm_; }
+  bool drift_est_valid() const { return est_valid_; }
+  double drift_est_se_ppm() const { return est_se_ppm_; }
   bool playing() const { return playing_; }
   int channels() const { return cfg_.channels; }
   int frame() const { return frame_; }
@@ -115,6 +131,8 @@ class JitterBuffer {
   void flush_to_target();
   void control(double now, double block_s);
   double pull_jitter_ms() const;
+  void est_pull(double now, int n);
+  void est_fit();
 
   JbConfig cfg_;
   OpusDec dec_;
@@ -160,6 +178,27 @@ class JitterBuffer {
   static constexpr int kPeakCap = 64;
   double pk_t_[kPeakCap], pk_ex_[kPeakCap];
   int pk_head_ = 0, pk_n_ = 0;
+  // clock-ratio estimate: per 1 s of pull time, the lowest transit (arrival - ts/48k) and the lowest
+  // pull lag (now - pulled/48k); the slope of (lag - transit) is the ratio of the two clocks.
+  static constexpr int kEstCap = 600;  // 10 min of 1 s points
+  int64_t est_bucket_ = 0;
+  bool est_has_bucket_ = false, est_has_tr_ = false, est_has_pl_ = false, est_valid_ = false;
+  double est_tr_min_ = 0, est_pl_min_ = 0, est_ppm_ = 0;
+  double est_t_[kEstCap], est_d_[kEstCap];
+  int est_seg_[kEstCap];
+  int est_head_ = 0, est_n_ = 0, est_cur_seg_ = 0;
+  // est_fit scratch, per segment in ring order: kept points, their sums of t and d, the offset
+  double est_sn_[kEstCap], est_st_[kEstCap], est_sd_[kEstCap], est_icpts_[kEstCap] = {};
+  // last fit's slope for the step check, and how many points in a row missed it by more than kEstStep
+  static constexpr double kEstStep = 0.015;
+  static constexpr int kEstStepPoints = 20;
+  static constexpr double kEstMinSpanS = 60.0, kEstMaxSePpm = 5.0;
+  double est_se_ppm_ = 1e9;
+  bool est_ever_ = false;  // a valid estimate was seen: the integral is held from then on
+  bool est_has_fit_ = false;
+  double est_slope_ = 0;
+  int est_miss_ = 0;
+  void est_add(double t, double d);
   // pull-clock deviations (time, deviation s), ring
   std::unique_ptr<double[]> pl_t_, pl_d_;
   int pl_head_ = 0, pl_n_ = 0;

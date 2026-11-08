@@ -171,7 +171,8 @@ class RecvStream : public StreamBase, public RenderSource {
   std::atomic<uint64_t> rx_pkts_{0}, rx_bytes_{0}, rx_link_{0}, ring_full_{0}, seq_hi_{0};
   std::atomic<bool> last_via_link_{false};
   // IO thread -> control thread
-  std::atomic<double> level_ms_{0}, target_ms_{0}, ppm_{0}, integ_{0};
+  std::atomic<double> level_ms_{0}, target_ms_{0}, ppm_{0}, integ_{0}, est_{0}, est_se_{0};
+  std::atomic<bool> est_valid_{false};
   std::atomic<uint64_t> c_late_{0}, c_expand_{0}, c_drop_{0}, c_flushed_{0}, c_fec_{0}, c_plc_{0},
       c_dec_err_{0}, c_underrun_{0}, c_ok_{0}, c_dup_{0};
   std::atomic<bool> playing_{false};

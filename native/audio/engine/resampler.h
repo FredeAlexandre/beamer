@@ -47,9 +47,11 @@ class Resampler {
 // PI drift controller on (level - target), from JitterBuffer._control: P 40 ppm/ms, integral
 // 0.1 ppm/(ms.s) clamped to +-200 ppm, total +-max_ppm; catch-up (speed-up only) up to
 // catchup_ppm when more than 4 ms above target.
+// hold_integ: the integral is set from outside (a measured clock ratio) and not integrated.
 struct DriftController {
   double max_ppm = 500, catchup_ppm = 2000;
   double integ = 0, ppm = 0;
+  bool hold_integ = false;
   double update(double err_ms, double block_s);
   void reset() { integ = ppm = 0; }
 };

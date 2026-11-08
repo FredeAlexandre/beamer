@@ -380,13 +380,22 @@ int cmd_play(Backend& b, const Args& a) {
     last_ns = &tone->last_ns;
   }
   std::string err;
+  // this process's IO buffer size on the default output, before, while and after the stream (WP11)
+  auto buffer_frames = [] {
+    UInt32 v = 0, size = sizeof(v);
+    auto ad = mac::addr(kAudioDevicePropertyBufferFrameSize);
+    AudioObjectGetPropertyData(mac::default_device(false), &ad, 0, nullptr, &size, &v);
+    return int(v);
+  };
+  const int buf_before = buffer_frames();
   const double c0 = cpu_seconds(), w0 = now_s();
   auto h = b.open_render(spec, src, &err);
   if (!h) {
     emit("{\"ev\":\"error\",\"msg\":" + jstr(err) + "}");
     return 1;
   }
-  emit("{\"ev\":\"playing\",\"device\":" + jstr(h->device_in_use()) + ",\"pid\":" + std::to_string(getpid()) + "}");
+  emit("{\"ev\":\"playing\",\"device\":" + jstr(h->device_in_use()) + ",\"pid\":" + std::to_string(getpid()) +
+       ",\"default_out_buffer\":" + std::to_string(buffer_frames()) + "}");
   std::thread reader;
   if (in) reader = std::thread([&] { in->reader(); });
   const bool report = a.has("report-io");
@@ -408,11 +417,15 @@ int cmd_play(Backend& b, const Args& a) {
     }
   }
   const double cpu = cpu_seconds() - c0, wall = now_s() - w0;
+  const uint64_t calls = tone ? tone->calls.load() : 0;
   h.reset();
   if (reader.joinable()) reader.detach();
-  char b2[160];
-  snprintf(b2, sizeof b2, "{\"ev\":\"played\",\"seconds\":%.2f,\"cpu_pct\":%.2f,\"underruns\":%llu}", wall,
-           100 * cpu / wall, (unsigned long long)(in ? in->underruns.load() : 0));
+  char b2[256];
+  snprintf(b2, sizeof b2,
+           "{\"ev\":\"played\",\"seconds\":%.2f,\"cpu_pct\":%.2f,\"underruns\":%llu,\"callbacks_per_s\":%.1f,"
+           "\"default_out_buffer_before\":%d,\"default_out_buffer_after\":%d}",
+           wall, 100 * cpu / wall, (unsigned long long)(in ? in->underruns.load() : 0), calls / wall, buf_before,
+           buffer_frames());
   emit(b2);
   return 0;
 }
