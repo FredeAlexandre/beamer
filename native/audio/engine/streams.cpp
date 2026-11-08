@@ -294,17 +294,13 @@ Json SendStream::stats(double dt) {
   j["dev_dropped"] = dev_dropped_.load();
   j["rr_rx"] = rr_rx_.load();
   j["enc_err"] = enc_err_.load();
-<<<<<<< HEAD
   if (const int64_t t0 = test_t0_ns_.load()) j["test_t0_ns"] = t0;  // sample k is due at t0 + k/48 kHz
-||||||| 6ed9c5b
-=======
   if (aec_) {
     j["aec"] = aec_->stats(dt);
     j["aec"]["on"] = true;
   } else if (cfg_.aec) {
     j["aec"] = Json{{"on", false}, {"error", aec_error_}};
   }
->>>>>>> audio/wp9
   return j;
 }
 
