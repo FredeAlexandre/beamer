@@ -426,6 +426,7 @@ static SimOut simulate(const SimSpec& sp) {
     cfg.merge_expand = false;
     cfg.jitter_recalc_ms = 0;
     cfg.drift_est = false;
+    cfg.period_floor_ms = 0;
   }
   if (std::getenv("BA_SIM_NO_DRIFT_EST")) cfg.drift_est = false;
   JitterBuffer jb(cfg);

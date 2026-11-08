@@ -383,7 +383,7 @@ void JitterBuffer::control(double now, double block_s) {
         for (int k = 0; k < pk_n_; ++k) jit = std::max(jit, pk_ex_[(pk_head_ + k) % kPeakCap]);
       }
     }
-    double t = block_ * kMsPerSample + frame_ * 500.0 / kRate + jit +
+    double t = std::max(block_ * kMsPerSample, cfg_.period_floor_ms) + frame_ * 500.0 / kRate + jit +
                (cfg_.pull_jitter ? pull_jitter_ms() : 0.0) + cfg_.margin_ms;
     t = std::min(cfg_.max_ms, std::max(cfg_.min_ms, t));
     // rise fast, decay slowly

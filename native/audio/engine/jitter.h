@@ -62,6 +62,11 @@ struct JbConfig {
   // The level also rises by a frame at each expansion whose late frame then plays; integrating that
   // pinned the integral at +200 ppm live (WP10 soak) for clocks ~20 ppm apart. false = media.py.
   bool drift_est = true;
+  // Engine addition (WP11): the render-period term of the target is at least this. With the Mac's
+  // 128-frame IO buffers (2.7 ms) the target fell by 7 ms and underruns/glitches on PC sound rose
+  // from ~2.7 to ~3.7/min live (WP11 b runs); 10 ms keeps WP10's target, and the shorter IO buffer
+  // still shortens the render path. 0 = media.py.
+  double period_floor_ms = 10.0;
 };
 
 struct JbCounters {
