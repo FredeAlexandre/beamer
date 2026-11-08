@@ -423,10 +423,76 @@ class MacBackend final : public Backend {
       alive_ = false;
     });
     listener_.store(nullptr);
+    probe_->listener.store(nullptr);
+    sys_probe_->listener.store(nullptr);
     dispatch_sync(notify_q_, ^{});
   }
 
-  void set_listener(BackendListener* l) override { listener_.store(l); }
+  void set_listener(BackendListener* l) override {
+    listener_.store(l);
+    probe_->listener.store(l);
+    sys_probe_->listener.store(l);
+  }
+
+  // The first tap blocks like the mic while macOS asks for "System Audio Recording" (WP10: the helper
+  // stopped answering pings and the watchdog gave up after 5 kills). There is no API to read that
+  // permission, so the first system/reference capture runs a throwaway tap on a background queue: if
+  // it finishes within 1.5 s (granted or denied, answered before) streams open as usual; otherwise
+  // this stream fails with "permission" and permission("system_audio") says "undetermined" until the
+  // probe returns, which notifies the engine (a `permission` event; Beamer opens the stream again).
+  bool system_audio_answered() {
+    auto probe = sys_probe_;
+    int state = 0;
+    if (probe->state.compare_exchange_strong(state, 1)) {
+      dispatch_queue_t nq = notify_q_;
+      dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        TapSpec ts;
+        Tap t;
+        std::string e;
+        if (create_tap(ts, &t, &e)) {
+          AudioDeviceIOProcID proc = nullptr;
+          if (AudioDeviceCreateIOProcIDWithBlock(&proc, t.aggregate, nullptr,
+                                                 ^(const AudioTimeStamp*, const AudioBufferList*, const AudioTimeStamp*,
+                                                   AudioBufferList*, const AudioTimeStamp*) {}) == noErr) {
+            AudioDeviceStart(t.aggregate, proc);
+            AudioDeviceStop(t.aggregate, proc);
+            AudioDeviceDestroyIOProcID(t.aggregate, proc);
+          }
+          destroy_tap(&t);
+        }
+        probe->state.store(2);
+        dispatch_async(nq, ^{
+          if (BackendListener* l = probe->listener.load()) l->devices_changed();
+        });
+      });
+    }
+    for (int i = 0; i < 30 && probe->state.load() != 2; ++i) usleep(50000);
+    return probe->state.load() == 2;
+  }
+
+  // Shows the microphone prompt (once) without blocking the caller: a throwaway input IOProc is started
+  // on a background queue, where the HAL waits for the answer. Outlives the backend safely (own state).
+  void probe_mic_permission() {
+    if (probe_->running.exchange(true)) return;
+    auto probe = probe_;
+    dispatch_queue_t nq = notify_q_;
+    log_line("info", "microphone permission not determined yet: asking macOS");
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+      AudioObjectID dev = default_device(true);
+      AudioDeviceIOProcID proc = nullptr;
+      if (dev && AudioDeviceCreateIOProcIDWithBlock(&proc, dev, nullptr,
+                                                    ^(const AudioTimeStamp*, const AudioBufferList*, const AudioTimeStamp*,
+                                                      AudioBufferList*, const AudioTimeStamp*) {}) == noErr) {
+        AudioDeviceStart(dev, proc);
+        AudioDeviceStop(dev, proc);
+        AudioDeviceDestroyIOProcID(dev, proc);
+      }
+      dispatch_async(nq, ^{
+        probe->running.store(false);
+        if (BackendListener* l = probe->listener.load()) l->devices_changed();
+      });
+    });
+  }
 
   DeviceSnapshot snapshot() override {
     DeviceSnapshot snap;
@@ -441,7 +507,20 @@ class MacBackend final : public Backend {
     if (!sink) return fail(err, "bad_args: no sink");
     SKind kind = spec.kind == CaptureKind::Mic ? SKind::Mic : spec.kind == CaptureKind::System ? SKind::System : SKind::Reference;
     if (kind != SKind::Mic && !taps_supported()) return fail(err, "unsupported: process taps need macOS 14.2");
-    if (kind == SKind::Mic && mic_permission() == "denied") return fail(err, "permission: microphone access denied");
+    if (kind != SKind::Mic && !system_audio_answered())
+      return fail(err, "permission: waiting for the macOS System Audio Recording permission");
+    if (kind == SKind::Mic) {
+      const std::string perm = mic_permission();
+      if (perm == "denied") return fail(err, "permission: microphone access denied");
+      if (perm == "undetermined") {
+        // Starting an input IOProc while macOS has not asked yet blocks that thread until Alex answers
+        // the prompt (seen in WP10: the helper stopped answering pings, the watchdog killed it every
+        // 10 s). Ask from a background thread instead and fail this stream; tick() notices the answer,
+        // the engine reports it as a `permission` event and Beamer opens the stream again.
+        probe_mic_permission();
+        return fail(err, "permission: waiting for the macOS microphone permission");
+      }
+    }
     auto s = std::make_unique<MacStream>(this, kind);
     s->want = spec.device;
     s->channels = std::clamp(spec.channels, 1, 8);
@@ -476,7 +555,9 @@ class MacBackend final : public Backend {
 
   std::string permission(const std::string& what) override {
     if (what == "mic") return mic_permission();
-    return "unknown";  // system audio: a denied tap delivers silence; the engine reports "suspect"
+    // system audio: no API; "undetermined" while the first tap waits for the prompt, else unknown (a
+    // denied tap delivers silence)
+    return sys_probe_->state.load() == 1 ? "undetermined" : "unknown";
   }
 
   // Called by ~MacStream (any thread but the queues).
@@ -641,6 +722,13 @@ class MacBackend final : public Backend {
   void tick() {
     if (!alive_) return;
     const double now = seconds();
+    // Only while the answer is pending: each read is a synchronous XPC round trip to tccd.
+    if (last_mic_perm_ == "undetermined") {
+      if (const std::string perm = mic_permission(); perm != last_mic_perm_) {
+        last_mic_perm_ = perm;  // answered: the engine re-reads permission()
+        notify_devices_changed();
+      }
+    }
     for (MacStream* s : streams_) {
       if (s->lost) continue;
       if (s->port) {
@@ -808,6 +896,17 @@ class MacBackend final : public Backend {
     for (auto a : device_addresses()) AudioObjectRemovePropertyListenerBlock(d, &a, q_, bl);
   }
 
+  struct MicProbe {
+    std::atomic<bool> running{false};
+    std::atomic<BackendListener*> listener{nullptr};
+  };
+  std::shared_ptr<MicProbe> probe_ = std::make_shared<MicProbe>();
+  struct SysProbe {
+    std::atomic<int> state{0};  // 0 never probed, 1 probing (prompt pending), 2 answered
+    std::atomic<BackendListener*> listener{nullptr};
+  };
+  std::shared_ptr<SysProbe> sys_probe_ = std::make_shared<SysProbe>();
+  std::string last_mic_perm_ = mic_permission();
   dispatch_queue_t q_ = nil, notify_q_ = nil;
   dispatch_source_t timer_ = nil;
   std::atomic<BackendListener*> listener_{nullptr};

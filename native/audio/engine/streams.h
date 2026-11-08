@@ -106,6 +106,7 @@ class SendStream : public StreamBase, public CaptureSink {
       enc_err_{0}, enc_ns_{0};
   uint64_t last_frames_ = 0, last_enc_ns_ = 0;
   std::atomic<int> peer_level_01ms_{-1};
+  std::atomic<int64_t> test_t0_ns_{0};  // dev test source: now_ns() of its sample 0 (E2E timeline)
   uint64_t last_tx_ = 0, last_tx_bytes_ = 0;
 };
 

@@ -136,6 +136,41 @@ class PairTests(unittest.TestCase):
         self.assertEqual(len(types(self.mac.host.posted, wire.OPEN)), opens + 1)
         self.assertEqual(self.mac.snapshot().mic_status.state, "streaming")
 
+    def test_mic_waiting_for_permission_opens_once_granted(self):
+        self.link()
+        self.mac.helper.engine.mic_error = "permission"
+        self.mac.service.set_mic(self.mac.id, None)
+        self.pc.helper.set_in_use(True)
+        self.net.settle()
+        snap = self.mac.snapshot()
+        self.assertEqual((snap.mic_status.state, snap.mic_status.reason), ("error", "permission"))
+        sends = len(self.mac.helper.commands("send"))
+        self.net.round()
+        self.net.settle()
+        self.assertEqual(len(self.mac.helper.commands("send")), sends)  # no retry loop while waiting
+        self.mac.helper.engine.mic_error = None
+        self.mac.helper.emit({"ev": "permission", "mic": "undetermined", "system_audio": "unknown"})
+        self.net.settle()
+        self.assertEqual(len(self.mac.helper.commands("send")), sends)  # nothing answered yet
+        self.mac.helper.emit({"ev": "permission", "mic": "granted", "system_audio": "unknown"})
+        self.net.settle()
+        self.assertEqual(len(self.mac.helper.commands("send")), sends + 1)
+        self.assertEqual(self.mac.snapshot().mic_status.state, "streaming")
+
+    def test_system_sound_waiting_for_its_prompt_opens_once_answered(self):
+        self.link()
+        self.mac.helper.engine.system_error = "permission"
+        self.mac.helper.emit({"ev": "permission", "mic": "granted", "system_audio": "undetermined"})
+        self.mac.service.set_output(self.mac.id, self.pc.id, None)
+        self.net.settle()
+        self.assertEqual(self.mac.snapshot().output_status[self.mac.id].reason, "permission")
+        sends = len(self.mac.helper.commands("send"))
+        self.mac.helper.engine.system_error = None
+        self.mac.helper.emit({"ev": "permission", "mic": "granted", "system_audio": "unknown"})
+        self.net.settle()
+        self.assertEqual(len(self.mac.helper.commands("send")), sends + 1)
+        self.assertEqual(self.mac.snapshot().output_status[self.mac.id].state, "streaming")
+
     def test_receiver_refuses_its_muted_endpoint(self):
         self.link()
         self.pc.service.set_output(self.pc.id, self.mac.id, None)
@@ -358,6 +393,9 @@ class DevCommandTests(unittest.TestCase):
         self.assertFalse(command.exists())
         self.assertEqual(a.snapshot().route.mic.machine, a.id)
         self.assertEqual(a.helper.commands("send")[-1]["source"], {"test": "A"})
+        self.assertTrue(service_module._test_signal_ok("B:0.2"))
+        self.assertFalse(service_module._test_signal_ok("B:2"))
+        self.assertFalse(service_module._test_signal_ok("C"))
         status = json.loads(Path(a.state_dir, service_module.DEV_STATUS).read_text())
         self.assertEqual(status["snapshot"]["own"], a.id)
         command.write_text(json.dumps({"set_output": {"machine": a.id, "to": b.id, "device": None}}))
@@ -368,6 +406,17 @@ class DevCommandTests(unittest.TestCase):
         status = json.loads(Path(a.state_dir, service_module.DEV_STATUS).read_text())
         self.assertEqual(status["snapshot"]["output_status"][a.id]["state"], "streaming")
         self.assertEqual({s["kind"] for s in status["snapshot"]["streams"]}, {"mic", "system"})
+        command.write_text(json.dumps({"helper_dev": {"drop_udp": True}}))
+        self.net.clock.advance(1.1)
+        self.net.settle()
+        self.assertEqual(a.helper.commands("dev")[-1], {"cmd": "dev", "drop_udp": True})
+        events = [json.loads(line) for line in
+                  Path(a.state_dir, service_module.DEV_EVENTS).read_text().splitlines()]
+        names = {event["ev"] for event in events}
+        self.assertIn("ready", names)
+        self.assertIn("_link_up", names)
+        self.assertNotIn("levels", names)
+        self.assertTrue(all("mono" in event and "wall" in event for event in events))
 
     def test_without_the_switch_nothing_is_read(self):
         a = self.net.add(1, "mac", "macos")
