@@ -50,7 +50,8 @@ OPUS_SRCS="$( (cd "$OPUS" && mkvar celt_sources.mk CELT_SOURCES; mkvar silk_sour
   mkvar silk_sources.mk SILK_SOURCES_FLOAT; mkvar opus_sources.mk OPUS_SOURCES; mkvar opus_sources.mk OPUS_SOURCES_FLOAT) )"
 OPUS_FLAGS="$COMMON $OPT $SAN -w -DPACKAGE_VERSION=\"1.6.1\" -DOPUS_BUILD -DUSE_ALLOCA -DHAVE_LRINTF -I$OPUS/include -I$OPUS/celt -I$OPUS/silk -I$OPUS/silk/float -I$OPUS/src"
 
-INC="-I$HERE -I$OPUS/include -I$ROOT/third_party/monocypher-4.0.2/src -I$ROOT/third_party/nlohmann-json-3.11.3/single_include"
+SPEEX="$ROOT/third_party/speexdsp-1.2.1"
+INC="-I$HERE -I$OPUS/include -I$ROOT/third_party/monocypher-4.0.2/src -I$ROOT/third_party/nlohmann-json-3.11.3/single_include -I$SPEEX/include"
 CXX_FLAGS="$COMMON $OPT $SAN -std=c++17 -Wall -Wextra -Wno-unused-parameter $INC"
 
 NEWEST_HDR="$(ls -t "$HERE"/*.h | head -1)"
@@ -70,7 +71,7 @@ for s in $(grep -v '^\s*#' "$HERE/sources.txt" | grep -v '^\s*$'); do
   o="$OBJ/engine/${b%.*}.o"
   ENGINE_OBJS+=("$o")
   kind=X
-  case "$s" in *.c) kind=E ;; esac
+  case "$s" in *speexdsp-*.c) kind=S ;; *.c) kind=E ;; esac
   if [ ! -f "$o" ] || [ "$HERE/$s" -nt "$o" ] || [ "$NEWEST_HDR" -nt "$o" ]; then echo "$kind|$HERE/$s|$o" >> "$JOBLIST"; fi
 done
 for s in engine_tests.cpp null_main.cpp; do
@@ -81,7 +82,9 @@ done
 N=$(wc -l < "$JOBLIST" | tr -d ' ')
 echo "build-tests ($VARIANT): $N to compile, $JOBS jobs"
 C_FLAGS="$COMMON $OPT $SAN -std=c99 -Wall -Wextra $INC"
-export CC CXX OPUS_FLAGS CXX_FLAGS C_FLAGS
+# vendored speexdsp (echo canceller): float build, kiss FFT, no config.h, its own warnings off
+SPEEX_FLAGS="$COMMON $OPT $SAN -std=c99 -w -DFLOATING_POINT -DUSE_KISS_FFT -DEXPORT= $INC"
+export CC CXX OPUS_FLAGS CXX_FLAGS C_FLAGS SPEEX_FLAGS
 if [ "$N" -gt 0 ]; then
   # shellcheck disable=SC2016
   tr '\n' '\0' < "$JOBLIST" | xargs -0 -P "$JOBS" -n 1 sh -c '
@@ -91,6 +94,7 @@ EOF
     case "$kind" in
       C) $CC $OPUS_FLAGS -c "$src" -o "$obj" || exit 255 ;;
       E) $CC $C_FLAGS -c "$src" -o "$obj" || exit 255 ;;
+      S) $CC $SPEEX_FLAGS -c "$src" -o "$obj" || exit 255 ;;
       *) $CXX $CXX_FLAGS -c "$src" -o "$obj" || exit 255 ;;
     esac' sh
 fi

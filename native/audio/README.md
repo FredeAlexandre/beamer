@@ -22,10 +22,11 @@ build scripts have their own notes.
 | `engine/net.*`, `flow.*` | UDP sockets; `Flow` (probe, ping, RR, replay, link mode) and the network thread |
 | `engine/streams.*` | `SendStream`, `RecvStream`, `LoopStream`, `TestInput` |
 | `engine/helper.*` | `run_helper` (command line) and `run_control` (the §3 control loop) |
+| `engine/aec.*` | echo cancellation (§7): `EchoCanceller` (speexdsp MDF + residual echo suppression), `HostClock`, `AecPath` (reference capture, alignment, drift), `engine_features()` |
 | `engine/null_backend.*` | `make_null_backend` (§11.3) |
 | `engine/test_signal.*` | signatures A/B of `proto/scenarios/sig.py`, sine, noise (null devices, dev `test` source) |
 | `tests/` | `engine_tests.cpp`, `golden_control.txt`, `vectors/` (+ `gen_vectors.py`), `null_main.cpp`, `two_helpers.py`, `jb_crosscheck.py` |
-| `third_party/` | Opus 1.6.1, Monocypher 4.0.2, nlohmann/json 3.11.3 (see its README) |
+| `third_party/` | Opus 1.6.1, Monocypher 4.0.2, nlohmann/json 3.11.3, speexdsp 1.2.1 (see its README) |
 
 ## Build and test
 
@@ -76,8 +77,11 @@ the render callback drains before each pull.
   anything else is reported as `internal`.
 - `vmic_in_use`: report the raw state and call `devices_changed()` promptly when it flips (no
   300 ms debounce needed for that). The engine applies the §3.3 "off after 3 s" delay itself.
-- `host_ns` is not used by the engine yet (WP9's AEC alignment will); the jitter buffer times pulls
-  with the engine's own steady clock.
+- `host_ns` must be the host time of the block's first sample, in one time base for every capture
+  of the backend (Mac: `mach_absolute_time` in ns, Windows: QPC in ns): the AEC aligns the reference
+  to the mic with it. The jitter buffer times pulls with the engine's own steady clock.
+- Feature `aec` from a backend means "can capture a `CaptureKind::Reference`"; the engine keeps it
+  only when the canceller is compiled in (`engine_features()`).
 - `channels` in the callbacks may be anything; the engine maps (mono = average, stereo into the
   first two channels). Render callbacks of any size are fine (pulled in chunks of up to 2048).
 - `stream_lost` may be called from any thread; the stream is then reported `failed` (`no_device`).
@@ -120,7 +124,7 @@ identical counters. Defaults add two things:
   last two over the stream's life or since dev `reset_stats`); send: `path kbps bitrate jb_ms` (the
   receiver's level from its RR) `rtt_ms frames overflow dev_dropped rr_rx enc_err`.
 - `levels` keys are device keys (`device_in_use()`), streams by id.
-- `send.aec` is accepted and ignored until WP9.
+- `send.aec` (`{"reference": key|null}`, mic only): see "Echo cancellation" below. `loop` ignores `aec`.
 - `permission` is emitted once after `ready` (`mic`, `system_audio`), and `{"mic":"suspect"}` when a
   mic capture delivered only digital zeros for 5 s (never for system sound: a silent tap is zero too).
 - `codec.complexity` (0..10, optional): default 5 for `voip` (the mic), 9 otherwise.
@@ -128,3 +132,31 @@ identical counters. Defaults add two things:
   "reset_stats":true,"null":{"vmic_in_use":bool,"remove":key,"add":key}}`: block UDP, drop media at
   send, restart the run statistics, drive the null backend.
 - Errors without a `req` are still emitted (without `req`); `ping` is answered by `pong` only.
+
+## Echo cancellation (§7, `engine/aec.*`)
+
+A mic `send` with `aec` opens a second capture, `CaptureKind::Reference` of the output device
+(`reference` key, null = the default output, followed by the backend), into an `AecPath`: the
+reference IO thread writes mono samples into an SPSC ring plus one `(index, host_ns)` mark per
+callback; the mic IO thread adds the same marks for the send stream's ring. The encoder thread then
+runs 10 ms mono frames through the canceller before Opus:
+
+- `HostClock` per stream: sample index -> host time (offset smoothed over ~0.5 s; a jump > 20 ms
+  restarts it). The reference sample fed with mic sample `m` is the one captured at host time
+  `t_mic(m) + lead_ms` (default -1 ms), so the filter sees the echo at the acoustic delay by
+  timestamps (MacBook Air: ~44-60 ms) inside its 100 ms.
+- Drift: the reference is read through the engine's `Resampler`; a PI loop (wn 0.2 rad/s) on the
+  position error steers its step, so devices on different clocks stay aligned (tested at +-100 ppm
+  with 0.5 ms timestamp jitter). An error > 20 ms (restart, lost blocks) re-aligns at once.
+- A mic frame waits for its reference at most `max_wait_ms` (30) of mic backlog; missing samples are
+  zeros. No reference callback for 100 ms of mic time = no reference (the mic runs through the
+  canceller with silence, no wait). A reference that cannot be opened leaves the mic without AEC.
+- `EchoCanceller`: speexdsp 1.2.1 `speex_echo_cancellation` (frame 480, filter 4800, 48 kHz, int16
+  at the API) + `speex_preprocess_run` with only residual echo suppression (denoise stage on with a
+  0 dB noise floor, -40 dB echo / -15 dB during double talk; AGC, VAD, dereverb off).
+- `stats` of the send stream: `aec {on, ref, error?, atten_db, mic_db, ref_db, echo_ms, err_ms, ppm, resync,
+  ref_short, no_ref, waits, us, cpu_pct}`: `atten_db` = mic energy in / out over the interval, `mic_db`/`ref_db` = their levels (dBFS),
+  `echo_ms` = position of the strongest filter tap minus the lead (the acoustic delay by
+  timestamps), `us`/`cpu_pct` = canceller time per frame / share of a core.
+- `--dev` only: `aec.lead_ms`, `aec.max_wait_ms`, `aec.exclude_pids` (processes left out of the
+  reference, for the live test's "near-end talker" played through the same speakers).

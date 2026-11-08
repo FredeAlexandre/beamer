@@ -2,7 +2,8 @@
 // Null device backend (§11.3): virtual devices on threads with a given clock error. Options:
 //   "<group>=<signal|record:path|null>[,ppm=<+-ppm>][,period=<frames>][,in_use=0|1][,kind=..];..."
 // groups: mic (input "null-mic"), system (system-sound capture), out (output "null-out"),
-// vmic (virtual mic sink "null-vmic"); a bare "ppm=<v>" or "period=<n>" applies to every group.
+// vmic (virtual mic sink "null-vmic"), ref (the AEC reference capture of null-out: what it "plays",
+// default silence); a bare "ppm=<v>" or "period=<n>" applies to every group.
 // Signals: sine:<hz>[:<amp>], A, B (E2E signatures), noise[:amp], silence.
 // Example: "mic=sine:440,ppm=+80;out=record:/tmp/out.wav".
 #pragma once

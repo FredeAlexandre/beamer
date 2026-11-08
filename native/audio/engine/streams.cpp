@@ -79,6 +79,23 @@ bool SendStream::start(Backend& backend, const std::vector<int64_t>& exclude_pid
     *msg = e;
     return false;
   }
+  if (cfg_.aec && cfg_.kind == "mic") {
+    // The reference opens first, so that it already flows when the first mic block arrives. A
+    // reference that cannot be opened leaves the mic running without echo cancellation.
+    const int C = cfg_.codec.channels;
+    aec_ = std::make_unique<AecPath>(cfg_.aec_opt);
+    aec_->set_wake(&wake_);
+    aec_in_.assign(size_t(kAecFrame) * C, 0.0f);
+    aec_out_.assign(size_t(kAecFrame) * 2, 0.0f);
+    aec_pend_.assign(size_t(frame_ + kAecFrame) * C, 0.0f);
+    std::string re;
+    if (!aec_->open_reference(backend, &re)) {
+      aec_error_ = error_code_of(re);
+      BA_WARN("stream %u: no echo cancellation, the reference '%s' did not open: %s", cfg_.id,
+              cfg_.aec_opt.reference.c_str(), re.c_str());
+      aec_.reset();
+    }
+  }
   enc_thread_ = std::thread([this] { encoder_loop(); });
   if (!cfg_.test_signal.empty()) {
     TestSignal probe;
@@ -106,28 +123,31 @@ void SendStream::stop() {
   if (stopped_) return;
   stopped_ = true;
   handle_.reset();  // the backend stops calling on_capture before this returns
+  if (aec_) aec_->close_reference();
   stop_.store(true);
   wake_.signal();
   if (test_thread_.joinable()) test_thread_.join();
   if (enc_thread_.joinable()) enc_thread_.join();
 }
 
-void SendStream::push_samples(const float* x, int frames) {
+void SendStream::push_samples(const float* x, int frames, uint64_t host_ns) {
   const int C = cfg_.codec.channels;
   meter.post(x, frames, C);
+  if (aec_) aec_->mic_mark(mic_written_, host_ns);
   size_t w = ring_.write(x, static_cast<size_t>(frames));
+  mic_written_ += w;
   if (w < static_cast<size_t>(frames)) overflow_.fetch_add(frames - w, std::memory_order_relaxed);
-  if (ring_.available() >= static_cast<size_t>(frame_)) wake_.signal();
+  if (ring_.available() >= static_cast<size_t>(aec_ ? kAecFrame : frame_)) wake_.signal();
 }
 
-void SendStream::on_capture(const float* x, int frames, int channels, uint64_t) {
+void SendStream::on_capture(const float* x, int frames, int channels, uint64_t host_ns) {
   if (channels <= 0 || frames <= 0) return;
   device_meter.post(x, frames, channels);
   const int C = cfg_.codec.channels;
   for (int off = 0; off < frames;) {
     int k = std::min(kConvFrames, frames - off);
     map_channels(x + size_t(off) * channels, channels, conv_.get(), C, k);
-    push_samples(conv_.get(), k);
+    push_samples(conv_.get(), k, host_ns ? host_ns + uint64_t(off) * 1'000'000'000ull / kRate : 0);
     off += k;
   }
 }
@@ -148,7 +168,7 @@ void SendStream::test_source_loop() {
     sig.render(s, block, mono.data());
     map_channels(mono.data(), 1, buf.data(), C, block);
     device_meter.post(buf.data(), block, C);
-    push_samples(buf.data(), block);
+    push_samples(buf.data(), block, static_cast<uint64_t>(now_ns()));
     s += block;
   }
 }
@@ -158,51 +178,88 @@ void SendStream::encoder_loop() {
   set_thread_interactive();
   const int C = cfg_.codec.channels;
   std::vector<float> pcm(size_t(frame_) * C);
-  uint8_t payload[kMaxPayload];
-  uint8_t pkt[kMaxPacket];
   std::uniform_real_distribution<double> uni(0.0, 1.0);
   const int link_cap = cfg_.kind == "mic" ? 32000 : 48000;  // §4.5
   while (!stop_.load()) {
     wake_.wait_ms(20);
+    if (aec_) {
+      aec_drain(pcm, uni, link_cap);
+      continue;
+    }
     while (!stop_.load() && ring_.available() >= static_cast<size_t>(frame_)) {
       ring_.read(pcm.data(), static_cast<size_t>(frame_));
-      const uint32_t ts = ts_;
-      ts_ += static_cast<uint32_t>(frame_);
-      enc_.set_bitrate(flow_->link_mode() ? std::min(cfg_.codec.bitrate, link_cap) : cfg_.codec.bitrate);
-      const int64_t t0 = now_ns();
-      int n = enc_.encode(pcm.data(), payload, static_cast<int>(sizeof payload));
-      enc_ns_.fetch_add(static_cast<uint64_t>(now_ns() - t0), std::memory_order_relaxed);
-      if (n < 0) {
-        enc_err_.fetch_add(1, std::memory_order_relaxed);
-        continue;
-      }
-      double ss = 0;
-      for (float v : pcm) ss += double(v) * v;
-      Header h;
-      h.ptype = kMedia;
-      h.codec = kCodecOpus;
-      h.flags = cfg_.codec.fec ? kFlagFec : 0;
-      if (first_) {
-        h.flags |= kFlagMarker;
-        first_ = false;
-      }
-      if (std::sqrt(ss / pcm.size()) < 0.003) h.flags |= kFlagSilence;  // < -50 dBFS
-      h.stream = cfg_.id;
-      h.ts = ts;
-      h.nsamp = static_cast<uint16_t>(frame_);
-      h.channels = static_cast<uint8_t>(C);
-      size_t len = sealer_.seal(h, payload, static_cast<size_t>(n), pkt);
-      frames_.fetch_add(1, std::memory_order_relaxed);
-      double loss = flow_->dev_loss.load(std::memory_order_relaxed);
-      if (loss > 0 && uni(rng_) < loss) {
-        dev_dropped_.fetch_add(1, std::memory_order_relaxed);
-        continue;
-      }
-      flow_->send_media(pkt, len);
-      tx_.fetch_add(1, std::memory_order_relaxed);
-      tx_bytes_.fetch_add(len + 28, std::memory_order_relaxed);
+      encode_frame(pcm.data(), uni, link_cap);
     }
   }
+}
+
+// Echo cancellation in 10 ms mono frames between the ring and the encoder. A frame waits (up to
+// AecOptions::max_wait_ms of mic backlog) until its reference has been captured.
+void SendStream::aec_drain(std::vector<float>& pcm, std::uniform_real_distribution<double>& uni, int link_cap) {
+  const int C = cfg_.codec.channels;
+  float* mono = aec_out_.data();
+  float* clean = aec_out_.data() + kAecFrame;
+  while (!stop_.load() && ring_.available() >= size_t(kAecFrame)) {
+    if (!aec_->ready(mic_read_, ring_.available() - size_t(kAecFrame))) break;
+    ring_.read(aec_in_.data(), size_t(kAecFrame));
+    map_channels(aec_in_.data(), C, mono, 1, kAecFrame);
+    aec_->process(mono, mic_read_, clean);
+    mic_read_ += kAecFrame;
+    map_channels(clean, 1, aec_pend_.data() + aec_pend_n_ * C, C, kAecFrame);
+    aec_pend_n_ += kAecFrame;
+    size_t done = 0;
+    while (aec_pend_n_ - done >= size_t(frame_)) {
+      std::memcpy(pcm.data(), aec_pend_.data() + done * C, sizeof(float) * size_t(frame_) * C);
+      encode_frame(pcm.data(), uni, link_cap);
+      done += size_t(frame_);
+    }
+    if (done) {
+      std::memmove(aec_pend_.data(), aec_pend_.data() + done * C, sizeof(float) * (aec_pend_n_ - done) * C);
+      aec_pend_n_ -= done;
+    }
+  }
+}
+
+void SendStream::encode_frame(const float* pcm_in, std::uniform_real_distribution<double>& uni, int link_cap) {
+  const int C = cfg_.codec.channels;
+  uint8_t payload[kMaxPayload];
+  uint8_t pkt[kMaxPacket];
+  const uint32_t ts = ts_;
+  ts_ += static_cast<uint32_t>(frame_);
+  enc_.set_bitrate(flow_->link_mode() ? std::min(cfg_.codec.bitrate, link_cap) : cfg_.codec.bitrate);
+  const int64_t t0 = now_ns();
+  int n = enc_.encode(pcm_in, payload, static_cast<int>(sizeof payload));
+  enc_ns_.fetch_add(static_cast<uint64_t>(now_ns() - t0), std::memory_order_relaxed);
+  if (n < 0) {
+    enc_err_.fetch_add(1, std::memory_order_relaxed);
+    return;
+  }
+  double ss = 0;
+  const size_t total = size_t(frame_) * C;
+  for (size_t i = 0; i < total; ++i) ss += double(pcm_in[i]) * pcm_in[i];
+  Header h;
+  h.ptype = kMedia;
+  h.codec = kCodecOpus;
+  h.flags = cfg_.codec.fec ? kFlagFec : 0;
+  if (first_) {
+    h.flags |= kFlagMarker;
+    first_ = false;
+  }
+  if (std::sqrt(ss / double(total)) < 0.003) h.flags |= kFlagSilence;  // < -50 dBFS
+  h.stream = cfg_.id;
+  h.ts = ts;
+  h.nsamp = static_cast<uint16_t>(frame_);
+  h.channels = static_cast<uint8_t>(C);
+  size_t len = sealer_.seal(h, payload, static_cast<size_t>(n), pkt);
+  frames_.fetch_add(1, std::memory_order_relaxed);
+  double loss = flow_->dev_loss.load(std::memory_order_relaxed);
+  if (loss > 0 && uni(rng_) < loss) {
+    dev_dropped_.fetch_add(1, std::memory_order_relaxed);
+    return;
+  }
+  flow_->send_media(pkt, len);
+  tx_.fetch_add(1, std::memory_order_relaxed);
+  tx_bytes_.fetch_add(len + 28, std::memory_order_relaxed);
 }
 
 OpenResult SendStream::ingest_rr(const uint8_t* data, size_t len, int64_t) {
@@ -237,7 +294,17 @@ Json SendStream::stats(double dt) {
   j["dev_dropped"] = dev_dropped_.load();
   j["rr_rx"] = rr_rx_.load();
   j["enc_err"] = enc_err_.load();
+<<<<<<< HEAD
   if (const int64_t t0 = test_t0_ns_.load()) j["test_t0_ns"] = t0;  // sample k is due at t0 + k/48 kHz
+||||||| 6ed9c5b
+=======
+  if (aec_) {
+    j["aec"] = aec_->stats(dt);
+    j["aec"]["on"] = true;
+  } else if (cfg_.aec) {
+    j["aec"] = Json{{"on", false}, {"error", aec_error_}};
+  }
+>>>>>>> audio/wp9
   return j;
 }
 

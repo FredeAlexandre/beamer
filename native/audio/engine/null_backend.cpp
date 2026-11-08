@@ -129,6 +129,7 @@ class NullBackend : public Backend {
     groups_["system"].signal = "sine:1000:0.25";
     groups_["out"].signal = "";
     groups_["vmic"].signal = "";
+    groups_["ref"].signal = "silence";  // what null-out "plays" (AEC reference capture)
     double gppm = 0;
     int gperiod = 0;
     bool has_gppm = false;
@@ -239,8 +240,12 @@ class NullBackend : public Backend {
       key = "null-system";
       group = "system";
     } else if (spec.kind == CaptureKind::Reference) {
-      *err = "unsupported: no reference capture in the null backend";
-      return nullptr;
+      key = spec.device.empty() ? "null-out" : spec.device;
+      group = "ref";
+      if (key != "null-out" || !present_["null-out"]) {
+        *err = "no_device: " + key;
+        return nullptr;
+      }
     } else {
       key = spec.device.empty() ? "null-mic" : spec.device;
       group = "mic";
@@ -281,7 +286,7 @@ class NullBackend : public Backend {
   }
 
   int restore_journal() override { return 0; }
-  std::vector<std::string> features() override { return {"system_capture", "mic_demand", "virtual_mic"}; }
+  std::vector<std::string> features() override { return {"system_capture", "mic_demand", "virtual_mic", "aec"}; }
   std::string permission(const std::string&) override { return "granted"; }
 
   void set_vmic_in_use(bool v) {

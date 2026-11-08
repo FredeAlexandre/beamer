@@ -550,6 +550,7 @@ class MacBackend final : public Backend {
     }
     f.push_back("mic_demand");
     f.push_back("virtual_mic");
+    if (taps_supported()) f.push_back("aec");  // = CaptureKind::Reference (a tap); engine_features() decides
     return f;
   }
 
@@ -656,6 +657,7 @@ class MacBackend final : public Backend {
       } else {
         ts.device_uid = device_uid(target);
         ts.exclude_self = false;  // the AEC reference includes Beamer's own playback
+        ts.exclude = s->exclude;  // empty except in tests (engine `aec.exclude_pids`, --dev)
         key = ts.device_uid;
       }
       if (!create_tap(ts, &s->tap, err)) return false;
