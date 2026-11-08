@@ -126,7 +126,10 @@ identical counters. Defaults add two things:
 - `levels` keys are device keys (`device_in_use()`), streams by id.
 - `send.aec` (`{"reference": key|null}`, mic only): see "Echo cancellation" below. `loop` ignores `aec`.
 - `permission` is emitted once after `ready` (`mic`, `system_audio`), and `{"mic":"suspect"}` when a
-  mic capture delivered only digital zeros for 5 s (never for system sound: a silent tap is zero too).
+  mic capture delivered only digital zeros for 5 s (never for system sound: a silent tap is zero too),
+  and again on each change. Mac `system_audio`: `granted` once a tap has called back (silence
+  included), `undetermined` while its prompt is pending, else `unknown`, never `denied` (no API, no
+  definite error); an `undetermined` mic permission is re-read every 2 s (tccd XPC), not every tick.
 - `codec.complexity` (0..10, optional): default 5 for `voip` (the mic), 9 otherwise.
 - `dev` (only with `--dev`): `{"cmd":"dev","flow"?:id,"drop_udp":bool,"loss_pct":0..100,
   "reset_stats":true,"null":{"vmic_in_use":bool,"remove":key,"add":key}}`: block UDP, drop media at
