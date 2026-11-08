@@ -407,6 +407,7 @@ struct SimSpec {
   double stall_at = -1, stall_s = 0;
   double spike_every_s = 0, spike_ms = 0;  // periodic transit spikes: held, then a burst
   double step_at = -1, step_ms = 0;        // the path gets slower for good
+  double episode_at = -1, episode_ms = 0, episode_s = 0;  // slower at once, then back over episode_s
   int block = 128;         // render period (samples)
   uint64_t seed = 1;
 };
@@ -455,6 +456,8 @@ static SimOut simulate(const SimSpec& sp) {
     if (sp.stall_at >= 0 && ts >= sp.stall_at && ts < sp.stall_at + sp.stall_s)
       a = std::max(a, sp.stall_at + sp.stall_s + 0.001 * uni(rng));  // held, then a burst
     if (sp.step_at >= 0 && ts >= sp.step_at) a += sp.step_ms * 1e-3;
+    if (sp.episode_at >= 0 && ts >= sp.episode_at && ts < sp.episode_at + sp.episode_s)
+      a += sp.episode_ms * 1e-3 * (1.0 - (ts - sp.episode_at) / sp.episode_s);
     if (sp.spike_every_s > 0) {
       double k0 = std::floor(ts / sp.spike_every_s) * sp.spike_every_s + sp.spike_every_s / 2;
       if (ts >= k0 && ts < k0 + sp.spike_ms * 1e-3) a = std::max(a, k0 + sp.spike_ms * 1e-3 + 0.001 * uni(rng));
@@ -649,6 +652,30 @@ static void test_jb_drift_estimate_step() {
   std::printf("    estimate after the step: worst |est-drift| %.1f, |integ-drift| %.1f ppm (est at 99 s %.1f)\n", worst_e,
               worst_i, o.sec_est[99]);
   CHECKF(worst_e < 10 && worst_i < 30, "after a transit step: estimate off by %.1f, integral by %.1f ppm", worst_e, worst_i);
+
+  // a Wi-Fi episode: 40 ms slower at once, back over 40 s (WP11 live: a window restarted inside one
+  // read -177 ppm). Twice, the second inside the 10 min window of the first.
+  SimSpec ep;
+  ep.seconds = 600;
+  ep.ppm = 16;
+  ep.jitter_ms = 5;
+  ep.episode_at = 200;
+  ep.episode_ms = 40;
+  ep.episode_s = 40;
+  SimOut e1 = simulate(ep);
+  ep.episode_at = 290;
+  ep.step_at = 400;
+  ep.step_ms = -25;  // and a path that gets faster
+  SimOut e2 = simulate(ep);
+  for (const SimOut* o : {&e1, &e2}) {
+    double we = 0, wi = 0;
+    for (size_t s = 90; s < o->sec_est.size(); ++s) {
+      we = std::max(we, std::fabs(o->sec_est[s] - 16));
+      wi = std::max(wi, std::fabs(o->sec_integ[s] - 16));
+    }
+    std::printf("    episode: worst |est-drift| %.1f, |integ-drift| %.1f ppm after 90 s\n", we, wi);
+    CHECKF(we < 10 && wi < 30, "Wi-Fi episode: estimate off by %.1f, integral by %.1f ppm", we, wi);
+  }
 }
 
 static void test_jb_quiet_and_fixed() {

@@ -126,7 +126,6 @@ class JitterBuffer {
   void flush_to_target();
   void control(double now, double block_s);
   double pull_jitter_ms() const;
-  void est_reset();
   void est_pull(double now, int n);
   void est_fit();
 
@@ -181,15 +180,18 @@ class JitterBuffer {
   bool est_has_bucket_ = false, est_has_tr_ = false, est_has_pl_ = false, est_valid_ = false;
   double est_tr_min_ = 0, est_pl_min_ = 0, est_ppm_ = 0;
   double est_t_[kEstCap], est_d_[kEstCap];
-  int est_head_ = 0, est_n_ = 0;
-  // last fit (relative to the first point) for the step check, and how many points in a row
-  // missed it by more than kEstStep
+  int est_seg_[kEstCap];
+  int est_head_ = 0, est_n_ = 0, est_cur_seg_ = 0;
+  // est_fit scratch, per segment in ring order: kept points, their sums of t and d, the offset
+  double est_sn_[kEstCap], est_st_[kEstCap], est_sd_[kEstCap], est_icpts_[kEstCap] = {};
+  // last fit's slope for the step check, and how many points in a row missed it by more than kEstStep
   static constexpr double kEstStep = 0.015;
+  static constexpr int kEstStepPoints = 20;
   static constexpr double kEstMinSpanS = 60.0, kEstMaxSePpm = 5.0;
   double est_se_ppm_ = 1e9;
   bool est_ever_ = false;  // a valid estimate was seen: the integral is held from then on
   bool est_has_fit_ = false;
-  double est_t0_ = 0, est_d0_ = 0, est_slope_ = 0, est_icpt_ = 0;
+  double est_slope_ = 0;
   int est_miss_ = 0;
   void est_add(double t, double d);
   // pull-clock deviations (time, deviation s), ring

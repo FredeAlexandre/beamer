@@ -103,7 +103,8 @@ int JitterBuffer::clear_slots() {
 }
 
 void JitterBuffer::reset_timeline() {
-  est_reset();  // a timestamp jump would read as a clock step
+  est_cur_seg_++;  // a timestamp jump is a step for the clock estimate: a new segment
+  est_miss_ = 0;
   c_.skipped += clear_slots();
   has_base_ = false;
   has_next_ = false;
@@ -435,21 +436,18 @@ void JitterBuffer::control(double now, double block_s) {
   }
 }
 
-void JitterBuffer::est_reset() {
-  est_has_bucket_ = est_has_tr_ = est_has_pl_ = est_valid_ = est_has_fit_ = false;  // est_ppm_ stays (stats)
-  est_head_ = est_n_ = est_miss_ = 0;
-}
-
 // A step in (lag - transit) is not a clock ratio: the sender's capture or our render restarted, the
-// path changed, the flow fell back to the link. One second off the line is left out; three in a row
-// start the estimate over from there (the drift integral meanwhile integrates again).
+// path changed, the flow fell back to the link. A second off the line by more than kEstStep is left
+// out (a Wi-Fi episode that holds packets for a while leaves no trace); kEstStepPoints of them in a
+// row start a new segment. Segments share the slope and each has its own
+// offset (est_fit), so a step neither bends the line nor throws away the history.
 void JitterBuffer::est_add(double t, double d) {
   if (est_n_ > 0) {
     const int last = (est_head_ + est_n_ - 1) % kEstCap;
-    const double pred = est_has_fit_ ? est_d0_ + est_icpt_ + est_slope_ * (t - est_t0_) : est_d_[last];
+    const double pred = est_d_[last] + (est_has_fit_ ? est_slope_ : 0.0) * (t - est_t_[last]);
     if (std::fabs(d - pred) > kEstStep) {
-      if (++est_miss_ < 3) return;
-      est_reset();  // (est_pull sets the bucket again right after)
+      if (++est_miss_ < kEstStepPoints) return;
+      est_cur_seg_++;
     }
   }
   est_miss_ = 0;
@@ -460,6 +458,7 @@ void JitterBuffer::est_add(double t, double d) {
   const int w = (est_head_ + est_n_) % kEstCap;
   est_t_[w] = t;
   est_d_[w] = d;
+  est_seg_[w] = est_cur_seg_;
   est_n_++;
   est_fit();
 }
@@ -479,51 +478,82 @@ void JitterBuffer::est_pull(double now, int n) {
   }
 }
 
-// Least squares of (lag - transit) over time, twice: the second pass leaves out the seconds whose
-// minimum was itself late (a whole second inside a Wi-Fi episode). The estimate counts only once it
-// spans 60 s and its slope is known to +-kEstMaxSePpm (standard error): a sender that stalls or a
-// path that keeps getting slower for a while is no clock, and must not steer the integral (seen live
-// in WP11's first run: -977 ppm after 20 s that included a 30 ms excursion).
+static inline bool est_keep(double r, double lo, double hi) { return r >= -lo && r <= hi; }
+
+// Least squares of (lag - transit) over time with one offset per segment (pooled within-segment
+// slope), three passes: the later ones leave out the seconds whose minimum was itself late (inside a
+// Wi-Fi episode). Segments of fewer than 5 points carry no weight. The estimate counts once
+// the points span 60 s and the slope is known to +-kEstMaxSePpm (standard error): a sender that
+// stalls or a path that keeps getting slower for a while is no clock and must not steer the integral
+// (WP11 live: -977 ppm from 20 s that included a 30 ms excursion; -177 ppm from a window restarted
+// inside a Wi-Fi episode).
 void JitterBuffer::est_fit() {
   if (est_n_ < 20) return;
   const double t0 = est_t_[est_head_], d0 = est_d_[est_head_];
-  double slope = 0, icpt = 0, clip = 1e9, rms = 0, stt_c = 0;
-  for (int pass = 0; pass < 2; ++pass) {
-    double st = 0, sd = 0, stt = 0, std_ = 0, m = 0;
-    for (int k = 0; k < est_n_; ++k) {
-      const int i = (est_head_ + k) % kEstCap;
-      const double t = est_t_[i] - t0, d = est_d_[i] - d0;
-      if (pass && std::fabs(d - (icpt + slope * t)) > clip) continue;
-      st += t;
-      sd += d;
-      stt += t * t;
-      std_ += t * d;
-      m += 1;
+  double slope = 0, lo = 1e9, hi = 1e9, rms = 0, sxx = 0;
+  for (int pass = 0; pass < 3; ++pass) {
+    const double ps = slope;  // the previous pass's line decides which points are kept
+    // per segment sums over the kept points; segments are contiguous in ring order
+    double sxy = 0, m = 0;
+    sxx = 0;
+    int nseg = 0;
+    for (int k = 0; k < est_n_;) {
+      const int seg = est_seg_[(est_head_ + k) % kEstCap];
+      const int prev_idx = nseg;
+      double n = 0, st = 0, sd = 0, stt = 0, std_ = 0;
+      int e = k;
+      for (; e < est_n_ && est_seg_[(est_head_ + e) % kEstCap] == seg; ++e) {
+        const int i = (est_head_ + e) % kEstCap;
+        const double t = est_t_[i] - t0, d = est_d_[i] - d0;
+        if (pass && !est_keep(d - (est_icpts_[prev_idx] + ps * t), lo, hi)) continue;
+        n += 1;
+        st += t;
+        sd += d;
+        stt += t * t;
+        std_ += t * d;
+      }
+      est_sn_[nseg] = n;
+      est_st_[nseg] = st;
+      est_sd_[nseg] = sd;
+      if (n >= 5) {
+        sxx += stt - st * st / n;
+        sxy += std_ - st * sd / n;
+        m += n;
+      }
+      nseg++;
+      k = e;
     }
-    const double den = m * stt - st * st;
-    if (m < 20 || den <= 0) return;
-    const double prev_slope = slope, prev_icpt = icpt;
-    slope = (m * std_ - st * sd) / den;
-    icpt = (sd - slope * st) / m;
-    stt_c = den / m;  // sum of (t - mean t)^2
+    if (m < 20 || sxx <= 0) return;
+    slope = sxy / sxx;
     double ss = 0, used = 0;
-    for (int k = 0; k < est_n_; ++k) {
-      const int i = (est_head_ + k) % kEstCap;
-      const double t = est_t_[i] - t0, d = est_d_[i] - d0;
-      if (pass && std::fabs(d - (prev_icpt + prev_slope * t)) > clip) continue;
-      const double r = d - (icpt + slope * t);
-      ss += r * r;
-      used += 1;
+    int si = 0;
+    for (int k = 0; k < est_n_;) {
+      const int seg = est_seg_[(est_head_ + k) % kEstCap];
+      const double old_icpt = est_icpts_[si];
+      const double icpt = est_sn_[si] > 0 ? (est_sd_[si] - slope * est_st_[si]) / est_sn_[si] : 0.0;
+      int e = k;
+      for (; e < est_n_ && est_seg_[(est_head_ + e) % kEstCap] == seg; ++e) {
+        if (est_sn_[si] < 5) continue;
+        const int i = (est_head_ + e) % kEstCap;
+        const double t = est_t_[i] - t0, d = est_d_[i] - d0;
+        if (pass && !est_keep(d - (old_icpt + ps * t), lo, hi)) continue;
+        const double r = d - (icpt + slope * t);
+        ss += r * r;
+        used += 1;
+      }
+      est_icpts_[si] = icpt;
+      si++;
+      k = e;
     }
-    rms = std::sqrt(ss / std::max(1.0, used - 2));
-    clip = std::max(0.001, 3.0 * rms);
+    rms = std::sqrt(ss / std::max(1.0, used - si - 1));
+    // Lower envelope: extra delay only ever pushes a point below the line (transit up), so the
+    // low side is cut harder; a path that recovers slowly from an episode then does not tilt it.
+    lo = std::max(0.001, 2.0 * rms);
+    hi = std::max(0.003, 4.0 * rms);
   }
   est_has_fit_ = true;
-  est_t0_ = t0;
-  est_d0_ = d0;
   est_slope_ = slope;
-  est_icpt_ = icpt;
-  est_se_ppm_ = stt_c > 0 ? rms / std::sqrt(stt_c) * 1e6 : 1e9;
+  est_se_ppm_ = sxx > 0 ? rms / std::sqrt(sxx) * 1e6 : 1e9;
   est_ppm_ = slope * 1e6;
   est_valid_ = est_t_[(est_head_ + est_n_ - 1) % kEstCap] - t0 >= kEstMinSpanS - 0.5 && est_se_ppm_ <= kEstMaxSePpm;
 }
