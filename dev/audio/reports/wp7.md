@@ -19,8 +19,7 @@
 - Selector changes call the setters (FakeService): set_mic, set_output (selected machine), set_form,
   test_input, retry_helper; headers and disabled choices never call. PASS.
 - `win_app` suite: before 2 failures + 6 errors, after 1 failure + 6 errors = the 7 known environmental
-  ones. 3969 tests ran (+19). The baseline's extra failure was the i18n catalogue, stale only because my new file existed
-  during that run. PASS.
+  ones; 3969 tests (+19). The baseline's extra failure (i18n catalogue) came from my new file. PASS.
 - Ctrl+<n>: the window's Ctrl+3 shortcut opens the page (the test fires the QShortcut; an offscreen
   window is never active, so a real key press could not be tested). Keyboard: Tab reaches the mic selector,
   map, output selector, every Test/Headset control and notice actions; arrows/Home/End move between
@@ -45,11 +44,7 @@
 - WP5: set `self.audio_service` on `WindowsApplication` (the page looks it up every 1 s while visible and
   no service is set), or call `self.audio_page.set_service(service)`. `peers_without_audio` is not wired yet
   (needs the linked peers' caps); pass it to `AudioPageWidget` when WP5 lands.
-- Fixtures are all Mac-own; a PC-own fixture set in `audio_fixtures.py` would let both apps render the
-  PC's view without the local `as_pc()` transform in my test.
+- Fixtures are all Mac-own; PC-own ones in `audio_fixtures.py` would replace my test's local `as_pc()`.
 
 ## Commits
-- 00d1826 Add the Qt Audio page (PHASE2 §9.2, WP7)
-- 04bdc11 Regenerate the catalogue for the Audio page strings
-- 98186e3 Add the WP7 Audio page renders
-- (this report)
+00d1826 Qt Audio page · 04bdc11 catalogue · 98186e3 renders · 46b375c + next: this report
