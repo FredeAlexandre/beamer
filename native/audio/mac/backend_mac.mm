@@ -24,6 +24,7 @@ namespace mac {
 namespace {
 
 constexpr int kTickMs = 250;                // watchdog period
+constexpr int kMicPermTicks = 8;            // undetermined microphone permission: read every 2 s
 constexpr double kStallS = 1.5;             // no IO callback for this long -> restart the stream
 constexpr double kGraceS = 3.0;             // a device missing this long -> stream_lost
 constexpr double kFeedGraceS = 6.0;         // the virtual mic feed (driver reinstall restarts coreaudiod)
@@ -516,12 +517,18 @@ class MacBackend final : public Backend {
         std::string e;
         if (create_tap(ts, &t, &e)) {
           AudioDeviceIOProcID proc = nullptr;
+          auto calls = std::make_shared<std::atomic<int>>(0);
           if (AudioDeviceCreateIOProcIDWithBlock(&proc, t.aggregate, nullptr,
                                                  ^(const AudioTimeStamp*, const AudioBufferList*, const AudioTimeStamp*,
-                                                   AudioBufferList*, const AudioTimeStamp*) {}) == noErr) {
-            AudioDeviceStart(t.aggregate, proc);
+                                                   AudioBufferList*, const AudioTimeStamp*) {
+                                                   calls->fetch_add(1, std::memory_order_relaxed);
+                                                 }) == noErr) {
+            const OSStatus st = AudioDeviceStart(t.aggregate, proc);  // blocks while macOS asks
+            // a running tap calls back within a few IO cycles (with digital silence when nothing plays)
+            for (int i = 0; st == noErr && i < 50 && calls->load() == 0; ++i) usleep(10000);
             AudioDeviceStop(t.aggregate, proc);
             AudioDeviceDestroyIOProcID(t.aggregate, proc);
+            if (calls->load() > 0) probe->verdict.store(1);
           }
           destroy_tap(&t);
         }
@@ -621,9 +628,13 @@ class MacBackend final : public Backend {
 
   std::string permission(const std::string& what) override {
     if (what == "mic") return mic_permission();
-    // system audio: no API; "undetermined" while the first tap waits for the prompt, else unknown (a
-    // denied tap delivers silence)
-    return sys_probe_->state.load() == 1 ? "undetermined" : "unknown";
+    // System Audio Recording has no API to read. "undetermined" while the first tap waits for the
+    // prompt; "granted" once a tap (the probe's or a stream's) has run and called back, digital
+    // silence included (silence is normal: nothing may be playing); else "unknown". Never "denied":
+    // macOS gives no definite error for it (a tap that may not record still runs and delivers
+    // silence, WP3), so "granted" means "taps run here", not proof that sound comes through.
+    if (sys_probe_->state.load() == 1) return "undetermined";
+    return sys_probe_->verdict.load() == 1 ? "granted" : "unknown";
   }
 
   // Called by ~MacStream (any thread but the queues).
@@ -790,8 +801,11 @@ class MacBackend final : public Backend {
   void tick() {
     if (!alive_) return;
     const double now = seconds();
-    // Only while the answer is pending: each read is a synchronous XPC round trip to tccd.
-    if (last_mic_perm_ == "undetermined") {
+    // Only while the answer is pending, and every 2 s: each read is several synchronous XPC round
+    // trips to tccd (WP16: polled every tick, tccd took 3.6 % CPU, 1.16 M messages). macOS has no
+    // notification for it; the probe's own IOProc returns when the prompt is answered and notifies the
+    // engine at once, so this poll only catches an answer given elsewhere (System Settings).
+    if (last_mic_perm_ == "undetermined" && tick_count_ % kMicPermTicks == 0) {
       if (const std::string perm = mic_permission(); perm != last_mic_perm_) {
         last_mic_perm_ = perm;  // answered: the engine re-reads permission()
         notify_devices_changed();
@@ -804,6 +818,10 @@ class MacBackend final : public Backend {
         if (cb != s->last_callbacks) {
           s->last_callbacks = cb;
           s->last_progress = now;
+          if ((s->kind == SKind::System || s->kind == SKind::Reference) && sys_probe_->verdict.load() != 1) {
+            sys_probe_->verdict.store(1);  // a tap runs: System Audio Recording works (see permission())
+            notify_devices_changed();
+          }
         } else if (now - s->last_progress > kStallS) {
           restart(s, "no IO for 1.5 s");
         }
@@ -978,6 +996,7 @@ class MacBackend final : public Backend {
   std::shared_ptr<MicProbe> probe_ = std::make_shared<MicProbe>();
   struct SysProbe {
     std::atomic<int> state{0};  // 0 never probed, 1 probing (prompt pending), 2 answered
+    std::atomic<int> verdict{0};  // 1 once a tap has called back (permission() says "granted")
     std::atomic<BackendListener*> listener{nullptr};
   };
   std::shared_ptr<SysProbe> sys_probe_ = std::make_shared<SysProbe>();

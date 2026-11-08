@@ -307,6 +307,19 @@ class States(unittest.TestCase):
         snap = replace(base.snapshot, machines={**base.snapshot.machines, fx.MAC: headset_mac})
         self.assertNotIn("echo_aec", codes(build(base, snapshot=snap)))
 
+    def test_no_echo_notice_while_the_mic_machine_plays_nothing(self):
+        # WP18: the Mac's own sound plays on lebig (muted on the Mac) and nothing plays on its
+        # speakers: no echo to cancel or warn about (the planner turns the canceller off too).
+        base = fx.mic_streaming()
+        route = replace(base.snapshot.route, outputs={fx.MAC: OutputRoute(fx.PC, None, fx.stamp(20))})
+        snap = replace(base.snapshot, route=route,
+                       output_status={fx.MAC: RouteStatus("streaming"), fx.PC: RouteStatus("local")})
+        self.assertFalse([c for c in codes(build(base, snapshot=snap)) if c.startswith("echo")])
+        # lebig's sound comes to the Mac's speakers as well: the echo is back, and cancelled.
+        route = replace(route, outputs={**route.outputs, fx.PC: OutputRoute(fx.MAC, None, fx.stamp(21))})
+        snap = replace(snap, route=route, output_status={fx.MAC: RouteStatus("streaming"), fx.PC: RouteStatus("streaming")})
+        self.assertIn("echo_aec", codes(build(base, snapshot=snap)))
+
     def test_echo_notices_follow_the_aec_rule(self):
         base = fx.sound_redirected()
         without = replace(fx.mac(links=(fx.PC,)), features=fx.MAC_FEATURES - {"aec"})
@@ -333,9 +346,12 @@ class States(unittest.TestCase):
         base = fx.sound_redirected()
         snap = replace(base.snapshot, howls=(model.HowlView(fx.PC, fx.MAC, 7100.0, True),))
         notice = next(n for n in build(base, snapshot=snap).notices if n.code == "howl")
-        self.assertEqual(notice.text, "Beamer heard feedback between This Mac's speakers and a microphone on lebig, and "
-                                      "turned down lebig's sound on This Mac. Use headphones on This Mac, or stop lebig "
-                                      "from playing that microphone through its own sound.")
+        # Beamer cannot see whether This Mac's speakers are muted, and the guard can be wrong: the cause
+        # is a condition, not a fact (WP16: the notice blamed muted speakers).
+        self.assertEqual(notice.text, "Beamer heard what sounds like feedback in lebig's sound playing on This Mac, and "
+                                      "turned it down. If a microphone on lebig can hear This Mac's speakers, use "
+                                      "headphones on This Mac, or stop lebig from playing that microphone through its "
+                                      "own sound.")
         self.assertEqual((notice.tone, notice.machine, notice.target, notice.action), (view.WAIT, fx.PC, fx.MAC, None))
         # lebig lists an Elgato device: the notice names Wave Link's monitor. Seen from lebig.
         elgato = replace(fx.WAVE, name="Mic In (2- Elgato Wave:3)")
@@ -345,10 +361,19 @@ class States(unittest.TestCase):
         page = build(fx.seen_from(replace(base, snapshot=snap), fx.PC))
         notices = [n for n in page.notices if n.code == "howl"]
         self.assertEqual(len(notices), 1)  # one per sound stream
-        self.assertEqual(notices[0].text, "Beamer heard feedback between MacBook Air's speakers and a microphone on "
-                                          "This PC, and turned down This PC's sound on MacBook Air. Use headphones on "
-                                          "MacBook Air, or turn off Wave Link's monitor to the system output on This PC.")
+        self.assertEqual(notices[0].text, "Beamer heard what sounds like feedback in This PC's sound playing on MacBook "
+                                          "Air, and turned it down. If a microphone on This PC can hear MacBook Air's "
+                                          "speakers, use headphones on MacBook Air, or turn off Wave Link's monitor to "
+                                          "the system output on This PC.")
         self.assertFalse(view.apply_notice(fx.FakeService(snap), notices[0]))
+        # lebig's sound plays on the Mac's AirPods: no speakers to blame at all.
+        route = replace(snap.route, outputs={fx.PC: OutputRoute(fx.MAC, DeviceRef(fx.AIRPODS.key, fx.AIRPODS.name),
+                                                                fx.stamp(22))})
+        notice = next(n for n in build(replace(base, snapshot=replace(snap, route=route))).notices if n.code == "howl")
+        self.assertEqual(notice.text, "Beamer heard what sounds like feedback in lebig's sound playing on This Mac, and "
+                                      "turned it down. If Wave Link's monitor plays a microphone into the system output "
+                                      "on lebig, turn it off.")
+        self.assertNotIn("speakers", notice.text)
 
     def test_conflict(self):
         base = fx.sound_redirected()

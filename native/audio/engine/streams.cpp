@@ -81,7 +81,11 @@ bool SendStream::start(Backend& backend, const std::vector<int64_t>& exclude_pid
     *msg = e;
     return false;
   }
-  if (cfg_.aec && cfg_.kind == "mic") {
+  if (cfg_.aec && cfg_.kind == "mic" && !cfg_.test_signal.empty()) {
+    // a dev test source is no microphone: nothing in the room reaches it, so there is no echo to
+    // cancel, and a canceller would only alter the signal under test (WP16 miss 4)
+    aec_error_ = "test_source";
+  } else if (cfg_.aec && cfg_.kind == "mic") {
     // The reference opens first, so that it already flows when the first mic block arrives. A
     // reference that cannot be opened leaves the mic running without echo cancellation.
     const int C = cfg_.codec.channels;

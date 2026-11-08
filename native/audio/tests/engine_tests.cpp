@@ -1307,6 +1307,115 @@ static void test_aec_double_talk() {
   CHECKF(echo_red > 10.0, "echo reduction during double talk %.1f dB", echo_red);
 }
 
+// WP16 miss 4: with NO echo path (the speakers are muted, the reference plays only digitally) the
+// forwarded mic must come out as it went in, and must never carry the reference. Mic = the dev test
+// signature A:0.2 (a steady 1025 Hz pilot + 2->5 kHz chirps); reference = PC sound: signature B
+// (625 Hz pilot, 5->2 kHz chirps) plus loud room speech, as in the soak. Also with a speech near end.
+// "What the reference did" = the output minus the output of the same canceller fed a silent
+// reference (that one is the canceller's own transparent path: one frame of latency, the DC notch).
+static std::vector<float> run_path_aligned(const std::vector<float>& mic, const std::vector<float>& ref) {
+  AecOptions opt;
+  AecPath path(opt);
+  std::vector<float> out(mic.size(), 0.0f);
+  const double t0 = 5e9;
+  for (size_t i = 0; i + kAecFrame <= mic.size(); i += kAecFrame) {
+    path.on_capture(&ref[i], kAecFrame, 1, uint64_t(t0 + double(i) / kRate * 1e9));
+    path.mic_mark(i, uint64_t(t0 + double(i) / kRate * 1e9));
+    path.ready(i, 0);
+    path.process(&mic[i], i, &out[i]);
+  }
+  return out;
+}
+
+static void test_aec_no_echo_path() {
+  const double secs = std::getenv("BA_AEC_SECS") ? std::atof(std::getenv("BA_AEC_SECS")) : 60;
+  const size_t n = size_t(secs * kRate);
+  std::vector<float> sig_a(n), ref(n), bsig(n), silent(n, 0.0f);
+  TestSignal a, b;
+  CHECK(TestSignal::parse("A:0.2", &a));
+  CHECK(TestSignal::parse("B", &b));
+  a.render(0, int(n), sig_a.data());
+  b.render(0, int(n), bsig.data());
+  auto talk = speechlike(n, 51);
+  for (size_t i = 0; i < n; ++i) ref[i] = bsig[i] + 2.0f * talk[i];  // room speech at about -14 dBFS
+  auto near_talk = speechlike(n, 52);
+  for (int variant = 0; variant < 4; ++variant) {
+    const bool path = variant & 1;
+    const std::vector<float>& mic = variant < 2 ? sig_a : near_talk;
+    auto out = path ? run_path_aligned(mic, ref) : run_canceller(mic, ref);
+    auto base = path ? run_path_aligned(mic, silent) : run_canceller(mic, silent);
+    // per second after the first one: level change (output vs the transparent path) and what the
+    // reference added, relative to the mic
+    double worst_db = 0, worst_add = -200, e_in = 0, e_add = 0;
+    const size_t m_end = n - n % kAecFrame, S = size_t(kRate);
+    for (size_t s0 = S; s0 + S <= m_end; s0 += S) {
+      double ei = 0, eb = 0, eo = 0, ed = 0;
+      for (size_t i = s0; i < s0 + S; ++i) {
+        ei += double(mic[i]) * mic[i];
+        eb += double(base[i]) * base[i];
+        eo += double(out[i]) * out[i];
+        const double d = double(out[i]) - base[i];
+        ed += d * d;
+      }
+      e_in += ei;
+      e_add += ed;
+      if (ei < 1e-3 * S) continue;  // near end quieter than -30 dBFS this second
+      worst_db = std::max(worst_db, std::fabs(10 * std::log10(eo / eb)));
+      worst_add = std::max(worst_add, 10 * std::log10(std::max(ed, 1e-20) / ei));
+      if (std::getenv("BA_AEC_TRACE"))
+        std::printf("      %3zu s: out/in %+.2f dB, reference added %.1f dB\n", s0 / S, 10 * std::log10(eo / eb),
+                    10 * std::log10(std::max(ed, 1e-20) / ei));
+    }
+    // B markers in the output: matched filter on the B-only signal (dB re the B markers themselves)
+    double xb = 0, eb2 = 0;
+    for (size_t i = S; i < m_end; ++i) {
+      xb += (double(out[i]) - base[i]) * bsig[i];
+      eb2 += double(bsig[i]) * bsig[i];
+    }
+    const double b_gain = 20 * std::log10(std::max(std::fabs(xb) / eb2, 1e-10));
+    std::printf("    %s, near end %s: worst 1 s level change %.2f dB, reference added worst %.1f dB / overall %.1f dB re mic, "
+                "B gain %.1f dB\n",
+                path ? "AecPath  " : "canceller", variant < 2 ? "A:0.2 " : "speech", worst_db, worst_add,
+                10 * std::log10(std::max(e_add, 1e-20) / e_in), b_gain);
+    CHECKF(worst_db < 0.5, "near end changed by %.2f dB with no echo path", worst_db);
+    CHECKF(worst_add < -40, "the reference changed the mic by %.1f dB re mic with no echo path", worst_add);
+    CHECKF(b_gain < -50, "reference signature in the output at %.1f dB", b_gain);
+  }
+}
+
+// The echo path goes away mid-stream (speakers muted): 8 s of echo with the near end silent, then the
+// echo stops, the reference keeps playing and the near end talks. Within 2 s the output must stop
+// carrying the (now absent) echo estimate; before, the echo must have been cancelled.
+static void test_aec_echo_path_goes() {
+  const size_t n = size_t(24 * kRate), cut = size_t(8 * kRate);
+  auto far = speechlike(n, 61);
+  auto echo = convolve(far, room_ir(44, -11, 14));
+  auto noise = white(n, -65, 15);
+  auto near = speechlike(n, 62);
+  std::vector<float> mic(n), mic_after(n);
+  for (size_t i = 0; i < n; ++i) {
+    mic[i] = (i < cut ? echo[i] : near[i]) + noise[i];
+    mic_after[i] = (i < cut ? 0.0f : near[i]) + noise[i];
+  }
+  auto out = run_canceller(mic, far);
+  auto base = run_canceller(mic_after, std::vector<float>(n, 0.0f));  // the transparent path
+  const double erle = erle_db(mic, out, echo, size_t(4 * kRate), cut);
+  double worst_add = -200;
+  for (size_t s0 = cut + size_t(2 * kRate); s0 + size_t(kRate) <= n; s0 += size_t(kRate / 2)) {
+    double ei = 0, ed = 0;
+    for (size_t i = s0; i < s0 + size_t(kRate / 2); ++i) {
+      ei += double(mic[i]) * mic[i];
+      const double d = double(out[i]) - base[i];
+      ed += d * d;
+    }
+    worst_add = std::max(worst_add, 10 * std::log10(std::max(ed, 1e-20) / ei));
+  }
+  std::printf("    echo removed %.1f dB while heard; after it went (from +2 s) the output differs from the "
+              "transparent path by %.1f dB re mic at worst\n", erle, worst_add);
+  CHECKF(erle >= 12.0, "echo reduction %.1f dB", erle);  // 13.3 dB before WP18 too (this room, 4-8 s)
+  CHECKF(worst_add < -30, "after the echo path went the output differs by %.1f dB re mic", worst_add);
+}
+
 // AecPath end to end without threads: mic and reference capture blocks with their own clocks and
 // host timestamps (+-jitter), the reference device running `ppm` fast, the echo `acoustic_ms` after
 // the reference's timestamp; the stream is processed like SendStream's encoder does.
@@ -1430,13 +1539,15 @@ static void test_aec_wiring() {
   CHECK(std::find(f.begin(), f.end(), "aec") != f.end());
   // send with aec through the control loop: the reference opens on null-out, frames flow through
   // the canceller; without null-out the mic still runs, without echo cancellation.
-  for (int variant = 0; variant < 2; ++variant) {
-    InProc a(variant == 0 ? "mic=sine:440:0.2;ref=sine:1000:0.2" : "out=absent");
+  // A dev test source never gets a canceller (WP18): nothing in the room reaches it.
+  for (int variant = 0; variant < 3; ++variant) {
+    InProc a(variant != 1 ? "mic=sine:440:0.2;ref=sine:1000:0.2" : "out=absent");
     size_t c = 0;
     a.send(R"({"cmd":"flow_open","req":1,"flow":"0000aec0","peer":"p","role":"offer","port":0,"remote":null,"key":")" +
            b64key(3) + R"(","udp":false})");
     CHECK(a.wait(&c, [](const Json& e) { return e.value("ev", "") == "ok" && e.value("req", 0) == 1; }, 3000));
-    a.send(R"({"cmd":"send","req":2,"stream":77,"flow":"0000aec0","kind":"mic","source":{"device":null},"key":")" +
+    const std::string source = variant == 2 ? R"({"test":"A:0.2"})" : R"({"device":null})";
+    a.send(R"({"cmd":"send","req":2,"stream":77,"flow":"0000aec0","kind":"mic","source":)" + source + R"(,"key":")" +
            b64key(4) + R"(","aec":{"reference":null,"lead_ms":5}})");
     CHECK(a.wait(&c, [](const Json& e) { return e.value("ev", "") == "ok" && e.value("req", 0) == 2; }, 3000));
     Json st;
@@ -1448,10 +1559,13 @@ static void test_aec_wiring() {
     CHECK(got);
     if (!got) continue;
     const Json& s = st["streams"]["77"]["aec"];
-    std::printf("    %s: %s\n", variant == 0 ? "reference" : "no null-out", s.dump().c_str());
+    std::printf("    %s: %s\n", variant == 0 ? "reference" : variant == 1 ? "no null-out" : "test source", s.dump().c_str());
     if (variant == 0) {
       CHECK(s.value("on", false));
       CHECK(s.value("ref", std::string()) == "null-out");
+    } else if (variant == 2) {
+      CHECK(!s.value("on", true));
+      CHECK(s.value("error", std::string()) == "test_source");
     } else {
       CHECK(!s.value("on", true));
       CHECK(s.value("error", std::string()) == "no_device");
@@ -1645,6 +1759,120 @@ static void test_howl_music_untouched() {
   }
 }
 
+// WP16 miss 5: voice in the system sound (Wave Link's monitor of a room mic) made the guard duck PC
+// sound 23 times at 307-523 Hz. Voices: pitch that drifts and wobbles (vibrato), harmonics shaped by
+// formants, syllables that swell. None may trigger, and the samples pass bit for bit. With
+// BA_HOWL_CLIPS=<dir> the test also runs every *.f32 there (48 kHz mono float: WP16's PC sound before
+// each false trigger, not in the repository) and counts the episodes.
+static void test_howl_voice_untouched() {
+  std::mt19937 rng(11);
+  std::uniform_real_distribution<double> u(0.0, 1.0);
+  // A voice: f0(t) and a formant envelope, syllables with an onset swell (attack 60-250 ms).
+  struct Voice {
+    double f0_lo, f0_hi, vib_hz, vib_depth, level;
+    std::vector<std::pair<double, double>> formants;  // (Hz, boost dB), 150 Hz wide
+    bool sung;                                        // one long swelling note instead of syllables
+  };
+  auto render = [&](const Voice& v, double secs, uint32_t seed) {
+    std::mt19937 r(seed);
+    std::uniform_real_distribution<double> ur(0.0, 1.0);
+    const size_t n = size_t(secs * kRate);
+    std::vector<float> x(n, 0.0f);
+    size_t i = size_t(0.1 * kRate);
+    while (i < n) {
+      const double len_s = v.sung ? secs - 0.2 : 0.15 + 0.45 * ur(r), att = v.sung ? 2.0 : 0.06 + 0.19 * ur(r);
+      const size_t len = size_t(len_s * kRate);
+      const double base = v.f0_lo + (v.f0_hi - v.f0_lo) * ur(r), glide = (ur(r) - 0.5) * 0.3;
+      double ph = 0;
+      for (size_t k = 0; k < len && i + k < n; ++k) {
+        const double t = double(k) / kRate;
+        const double f0 = base * (1 + glide * t / len_s) * (1 + v.vib_depth * std::sin(2 * M_PI_ * v.vib_hz * t));
+        ph += 2 * M_PI_ * f0 / kRate;
+        double s = 0;
+        for (int h = 1; h * f0 < 8000; ++h) {
+          double a = 1.0 / h;
+          for (auto& fm : v.formants) a *= std::pow(10.0, fm.second / 20.0 * std::exp(-std::pow((h * f0 - fm.first) / 150, 2)));
+          s += a * std::sin(h * ph);
+        }
+        // swell over the attack (from -30 dB), then hold, 40 ms release
+        const double env = std::pow(10.0, -1.5 * std::max(0.0, 1 - t / att)) * std::min(1.0, (len_s - t) / 0.04);
+        x[i + k] = float(v.level * env * s);
+      }
+      i += len + size_t((0.05 + 0.3 * ur(r)) * kRate);
+    }
+    return x;
+  };
+  struct Case {
+    const char* name;
+    std::vector<float> x;
+  };
+  std::vector<Case> cases;
+  {
+    auto sp = speechlike(size_t(30 * kRate), 71);
+    for (float& s : sp) s *= 3.0f;  // about -10 dBFS while talking
+    cases.push_back({"speech, drifting 90-220 Hz, two formants, -10 dBFS", sp});
+  }
+  cases.push_back({"male voice 95-160 Hz, vibrato 5 Hz 2 %, F1 500 F2 1500 +15 dB",
+                   render({95, 160, 5, 0.02, 0.05, {{500, 15}, {1500, 15}}, false}, 30, 72)});
+  cases.push_back({"female voice 180-320 Hz, vibrato 5.5 Hz 2 %, F1 800 F2 2200 +18 dB",
+                   render({180, 320, 5.5, 0.02, 0.05, {{800, 18}, {2200, 18}}, false}, 30, 73)});
+  cases.push_back({"high voice 260-400 Hz, little vibrato, F2 1300 +24 dB",
+                   render({260, 400, 4, 0.005, 0.05, {{1300, 24}}, false}, 30, 74)});
+  cases.push_back({"sung note 330 Hz swelling 2 s, vibrato 5.5 Hz 1.5 %, F2 1320 +18 dB",
+                   render({330, 330, 5.5, 0.015, 0.05, {{700, 10}, {1320, 18}}, true}, 6, 75)});
+  // first formants at 330-600 Hz +20..24 dB: like the live false triggers (the old guard ducked each)
+  cases.push_back({"male voice 100-180 Hz, F1 450 +20 dB, F2 1500 +12 dB",
+                   render({100, 180, 5, 0.02, 0.05, {{450, 20}, {1500, 12}}, false}, 30, 91)});
+  cases.push_back({"female voice 180-300 Hz, F1 600 +20 dB, F2 2000 +12 dB",
+                   render({180, 300, 5.5, 0.02, 0.05, {{600, 20}, {2000, 12}}, false}, 30, 92)});
+  cases.push_back({"male voice 110-170 Hz, F1 380 +24 dB", render({110, 170, 5, 0.02, 0.05, {{380, 24}}, false}, 30, 94)});
+  cases.push_back({"female voice 200-260 Hz, no vibrato, F1 480 +24 dB",
+                   render({200, 260, 5, 0.004, 0.05, {{480, 24}}, false}, 30, 95)});
+  // second formants above 800 Hz
+  cases.push_back({"male voice 100-150 Hz, F1 500 +10 dB, F2 1100 +20 dB",
+                   render({100, 150, 5, 0.01, 0.05, {{500, 10}, {1100, 20}}, false}, 30, 96)});
+  cases.push_back({"female voice 190-260 Hz, F1 750 +10 dB, F2 1700 +20 dB",
+                   render({190, 260, 5, 0.01, 0.05, {{750, 10}, {1700, 20}}, false}, 30, 97)});
+  cases.push_back({"sung note 330 Hz swelling 2 s, F1 660 +18 dB", render({330, 330, 5.5, 0.015, 0.05, {{660, 18}}, true}, 6, 93)});
+  {
+    // the soak's PC sound: test signature B (625 Hz pilot, chirps) under room speech
+    TestSignal b;
+    TestSignal::parse("B", &b);
+    auto sp = speechlike(size_t(30 * kRate), 76);
+    std::vector<float> x(sp.size());
+    b.render(0, int(x.size()), x.data());
+    for (size_t k = 0; k < x.size(); ++k) x[k] += 2.0f * sp[k];
+    cases.push_back({"signature B under room speech", x});
+  }
+  if (const char* dir = std::getenv("BA_HOWL_CLIPS")) {
+    std::string cmd = std::string("ls ") + dir + "/*.f32 2>/dev/null";
+    if (FILE* ls = popen(cmd.c_str(), "r")) {
+      char line[1024];
+      while (std::fgets(line, sizeof line, ls)) {
+        std::string path(line);
+        while (!path.empty() && (path.back() == '\n' || path.back() == '\r')) path.pop_back();
+        std::ifstream f(path, std::ios::binary);
+        std::vector<float> x;
+        float v;
+        while (f.read(reinterpret_cast<char*>(&v), sizeof v)) x.push_back(v);
+        if (x.size() > size_t(12 * kRate)) x.resize(size_t(12 * kRate));  // up to the live trigger
+        cases.push_back({nullptr, x});
+        cases.back().name = strdup(path.substr(path.rfind('/') + 1).c_str());
+      }
+      pclose(ls);
+    }
+  }
+  for (const Case& c : cases) {
+    HowlGuard g(1);
+    std::vector<float> y = c.x;
+    for (size_t o = 0; o + 480 <= y.size(); o += 480) g.process(&y[o], 480);
+    const bool same = y == c.x;
+    std::printf("    %-66s %u episodes%s\n", c.name, g.episodes(), g.episodes() ? (" at " + std::to_string(int(g.freq_hz())) + " Hz").c_str() : "");
+    CHECKF(g.episodes() == 0, "%s: %u episodes", c.name, g.episodes());
+    CHECKF(same, "%s: samples changed", c.name);
+  }
+}
+
 // A pure tone that fades in looks like feedback: the guard ducks it, sees it does not decay under the
 // duck (no loop), releases within ~5 s and ignores that frequency; poll() reports both changes.
 static void test_howl_false_alarm_release() {
@@ -1744,10 +1972,13 @@ int main(int argc, char** argv) {
       {"aec_synthetic_echo", test_aec_synthetic_echo},
       {"aec_near_end_only", test_aec_near_end_only},
       {"aec_double_talk", test_aec_double_talk},
+      {"aec_no_echo_path", test_aec_no_echo_path},
+      {"aec_echo_path_goes", test_aec_echo_path_goes},
       {"aec_path_alignment", test_aec_path_alignment},
       {"aec_wiring", test_aec_wiring},
       {"howl_feedback_loop", test_howl_feedback_loop},
       {"howl_music_untouched", test_howl_music_untouched},
+      {"howl_voice_untouched", test_howl_voice_untouched},
       {"howl_false_alarm_release", test_howl_false_alarm_release},
       {"howl_event", test_howl_event},
   };

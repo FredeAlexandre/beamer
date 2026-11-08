@@ -126,7 +126,10 @@ identical counters. Defaults add two things:
 - `levels` keys are device keys (`device_in_use()`), streams by id.
 - `send.aec` (`{"reference": key|null}`, mic only): see "Echo cancellation" below. `loop` ignores `aec`.
 - `permission` is emitted once after `ready` (`mic`, `system_audio`), and `{"mic":"suspect"}` when a
-  mic capture delivered only digital zeros for 5 s (never for system sound: a silent tap is zero too).
+  mic capture delivered only digital zeros for 5 s (never for system sound: a silent tap is zero too),
+  and again on each change. Mac `system_audio`: `granted` once a tap has called back (silence
+  included), `undetermined` while its prompt is pending, else `unknown`, never `denied` (no API, no
+  definite error); an `undetermined` mic permission is re-read every 2 s (tccd XPC), not every tick.
 - `codec.complexity` (0..10, optional): default 5 for `voip` (the mic), 9 otherwise.
 - `dev` (only with `--dev`): `{"cmd":"dev","flow"?:id,"drop_udp":bool,"loss_pct":0..100,
   "reset_stats":true,"null":{"vmic_in_use":bool,"remove":key,"add":key}}`: block UDP, drop media at
@@ -154,8 +157,14 @@ runs 10 ms mono frames through the canceller before Opus:
 - `EchoCanceller`: speexdsp 1.2.1 `speex_echo_cancellation` (frame 480, filter 4800, 48 kHz, int16
   at the API) + `speex_preprocess_run` with only residual echo suppression (denoise stage on with a
   0 dB noise floor, -40 dB echo / -15 dB during double talk; AGC, VAD, dereverb off).
-- `stats` of the send stream: `aec {on, ref, error?, atten_db, mic_db, ref_db, echo_ms, err_ms, ppm, resync,
-  ref_short, no_ref, waits, us, cpu_pct}`: `atten_db` = mic energy in / out over the interval, `mic_db`/`ref_db` = their levels (dBFS),
+- Echo path gate (WP18): the output is `notch(mic) - w * y` (y = MDF's echo estimate, the notch
+  replicated from mdf.c) and the residual echo suppression runs only while `w` > 0.5. `w` = 0 until
+  an echo path has shown (>= 12 of the last 100 frames with MDF removing >= 8 dB of the mic, held
+  15 s), then a ramp of `<mic,y>/<y,y>` over ~1 s; it drops to 0 when the estimate keeps making the
+  mic louder (the path went). Without the gate a mic that hears no speakers got the reference mixed
+  in and was ducked by the suppressor (WP16). A dev test source never gets a canceller.
+- `stats` of the send stream: `aec {on, ref, error?, path, atten_db, mic_db, ref_db, echo_ms, err_ms, ppm, resync,
+  ref_short, no_ref, waits, us, cpu_pct}`: `path` = the gate's `w`, `atten_db` = mic energy in / out over the interval, `mic_db`/`ref_db` = their levels (dBFS),
   `echo_ms` = position of the strongest filter tap minus the lead (the acoustic delay by
   timestamps), `us`/`cpu_pct` = canceller time per frame / share of a core.
 - `--dev` only: `aec.lead_ms`, `aec.max_wait_ms`, `aec.exclude_pids` (processes left out of the

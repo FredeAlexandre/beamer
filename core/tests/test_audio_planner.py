@@ -133,6 +133,22 @@ class MicTests(unittest.TestCase):
         result = run(MAC, [mac(), pc(in_use=True, features=PC_FEATURES - {"aec"})], route(MAC, None))
         self.assertTrue(result.sends[("mic", PC)].aec)  # the receiver's features do not matter
 
+    def test_no_aec_while_the_speakers_play_nothing(self):
+        # WP18: the Mac's own sound goes to the PC (muted here) and nothing else plays on its default
+        # output: its mic hears no speakers, so no canceller. PC sound to the Mac's speakers brings it back.
+        mac_to_pc = {MAC: (PC, DeviceRef("hdmi", "LG HDR 4K"))}
+        cases = [("own sound away", mac_to_pc, False),
+                 ("own sound away, PC sound here", dict(mac_to_pc, **{PC: (MAC, None)}), True),
+                 ("own sound away, PC sound to the speakers by name", dict(mac_to_pc, **{PC: (MAC, DeviceRef("spk", "x"))}), True),
+                 ("own sound here, PC sound here", {PC: (MAC, None)}, True),
+                 ("own sound to an offline machine: plays here", {MAC: (ROG, None)}, True)]
+        for name, outputs, aec in cases:
+            with self.subTest(name):
+                result = run(MAC, [mac(), pc(in_use=True)], route(MAC, None, outputs=outputs))
+                self.assertEqual(result.sends[("mic", PC)].aec, aec)
+                if name == "own sound away":
+                    self.assertIn(("system", PC), result.sends)  # the redirect itself still runs
+
     def test_no_aec_on_the_loop(self):
         result = run(MAC, [mac(in_use=True), pc()], route(MAC, None))
         self.assertEqual(result.loop, planner.LoopSpec(None))
