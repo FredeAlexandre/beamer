@@ -120,6 +120,7 @@ class HelperProcess:
         self._stopping = False
         self._thread = None
         self._ping_req = 1 << 30
+        self._readers = []
 
     @property
     def state(self):
@@ -186,10 +187,24 @@ class HelperProcess:
             return False
         self._proc = proc
         self._log.info("audio: helper started, pid %s", proc.pid)
-        threading.Thread(target=self._read_stdout, args=(proc, generation), name="Beamer-audio-out",
-                         daemon=True).start()
-        threading.Thread(target=self._read_stderr, args=(proc,), name="Beamer-audio-err", daemon=True).start()
+        self._readers = [
+            threading.Thread(target=self._read_stdout, args=(proc, generation), name="Beamer-audio-out", daemon=True),
+            threading.Thread(target=self._read_stderr, args=(proc,), name="Beamer-audio-err", daemon=True)]
+        for reader in self._readers:
+            reader.start()
         return True
+
+    def _reap(self, proc):
+        """After the child exited: let its readers reach EOF, then close the pipes."""
+        for reader in self._readers:
+            if reader is not threading.current_thread():
+                reader.join(1.0)
+        for pipe in (proc.stdin, proc.stdout, proc.stderr):
+            try:
+                if pipe is not None:
+                    pipe.close()
+            except OSError:
+                pass
 
     def _end(self, timeout=1.0):
         proc, self._proc = self._proc, None
@@ -211,6 +226,7 @@ class HelperProcess:
                 proc.wait(1.0)
             except subprocess.TimeoutExpired:
                 pass
+        self._reap(proc)
 
     def _kill(self):
         proc, self._proc = self._proc, None
@@ -221,12 +237,7 @@ class HelperProcess:
             proc.wait(2.0)
         except (OSError, subprocess.TimeoutExpired):
             pass
-        for pipe in (proc.stdin, proc.stdout, proc.stderr):
-            try:
-                if pipe is not None:
-                    pipe.close()
-            except OSError:
-                pass
+        self._reap(proc)
 
     def _failed_lately(self, now):
         self._failures = [moment for moment in self._failures if now - moment < self._fail_window]
