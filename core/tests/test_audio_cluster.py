@@ -103,7 +103,16 @@ class ConvergenceTests(unittest.TestCase):
                 self.assertEqual(final[key], entry, f"seed {seed}: {key} lost its newest edit")
             self.assertEqual(net.violations, [], f"seed {seed}: audio_* sent to a peer without the cap")
             for node in audio:
-                self.assertEqual(set(node.snapshot().machines), {n.id for n in audio})
+                snap = node.snapshot()
+                self.assertEqual(set(snap.machines), {n.id for n in audio})
+                # What the service shows running is exactly what its helper runs, and a redirected
+                # output that says "streaming" has its stream.
+                running = {s.stream for s in snap.streams if s.state == "running"}
+                self.assertEqual(set(node.helper.engine.streams), running, f"seed {seed}")
+                status = snap.output_status.get(node.id)
+                if status is not None and status.state == "streaming":
+                    self.assertIn(("system", status.params["to"]),
+                                  {(s.kind, s.target) for s in snap.streams if s.source == node.id}, f"seed {seed}")
             return rounds
         finally:
             net.close()
