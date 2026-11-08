@@ -18,7 +18,8 @@ Sinks are recorded by the Phase 1 tools as an app would use them: Mac "Beamer Mi
 joined by clock.py (ssh), analysis by results.py (reusing proto/scenarios/analyze.py).
 
 Cases: mic_pc_mac mic_pc_mac_real sound_pc_mac sound_mac_pc mic_mac_pc mic_mac_pc_real both both_mic
-fallback helperkill_pc helperkill_mac unplug_mac linkloss soak. Output: runs/<name>/result.json.
+fallback helperkill_pc helperkill_mac unplug_mac linkloss (= persist) oldpeer soak.
+Output: runs/<name>/result.json.
 """
 from __future__ import annotations
 
@@ -427,6 +428,33 @@ def _redeploy(run_dir, notes):
         DEPLOY_LOCK.rmdir()
 
 
+def oldpeer(run_dir):
+    """§11.4 oldpeer: tools/older_peer_check.py against Beamer 1.4.3's source (git tag v1.4.3), and the
+    PC log since its last start: the PC<->asusrog link (a 1.5.x peer without `audio`) came up with no
+    audio cap and nothing audio_* went to it."""
+    src = run_dir / "beamer-1.4.3"
+    src.mkdir(parents=True, exist_ok=True)
+    subprocess.run(f"git -C {shlex.quote(str(REPO))} archive v1.4.3 | tar -x -C {shlex.quote(str(src))}", shell=True, check=True)
+    # this tree's core needs PyNaCl, 1.4.3's needs cryptography
+    check = subprocess.run(["uv", "run", "-q", "--python", "3.13", "--with", "pynacl", "--with", "cryptography",
+                            "--with", "pyobjc-core", "--with", "pyobjc-framework-Cocoa", "--with", "pyobjc-framework-Quartz", "python",
+                            str(REPO / "tools" / "older_peer_check.py"), str(src)], cwd=REPO, capture_output=True,
+                           text=True, timeout=600)
+    log = beamer.ssh(f"Select-String -Path {beamer.PC_DIR}\\Beamer.log -Pattern 'asusrog' | ForEach-Object {{ $_.Line }}",
+                     check=False)
+    lines = [ln for ln in log.splitlines() if ln.strip()]
+    bad = [ln for ln in lines if "audio_" in ln or "WARNING" in ln or "ERROR" in ln]
+    up = [ln for ln in lines if "out link with asusrog up" in ln]
+    result = {"case": "oldpeer", "older_peer_check_rc": check.returncode, "older_peer_check_tail": check.stdout[-1500:],
+              "asusrog_link_up_lines": up[-10:], "asusrog_audio_or_warnings": bad[-10:],
+              # The tool's own verdict also wants acead88's texts (not in this repo); the audio criterion is
+              # that nothing connects across versions and the 1.5.x peer link stays audio-free.
+              "refused_both_ways": "[CONNECTED]" not in check.stdout and "v6" in check.stdout,
+              "pass": "[CONNECTED]" not in check.stdout and bool(up) and not bad and all("no audio" in ln for ln in up)}
+    (run_dir / "result.json").write_text(json.dumps(result, indent=1))
+    print(json.dumps(result, indent=1))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("case")
@@ -436,6 +464,11 @@ def main():
     a = ap.parse_args()
     if a.case == "setup":
         return setup()
+    if a.case == "oldpeer":
+        run_dir = RUNS / (a.name or f"oldpeer_{time.strftime('%m%d_%H%M%S')}")
+        return oldpeer(run_dir)
+    if a.case == "persist":
+        a.case = "linkloss"  # §11.4 persist: the same run (route re-applied after both apps' restart)
     if a.case == "idle":
         for m in (mac, pc):
             m.command(beamer.idle_commands(m.status()))
