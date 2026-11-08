@@ -154,8 +154,8 @@ runs 10 ms mono frames through the canceller before Opus:
 - `EchoCanceller`: speexdsp 1.2.1 `speex_echo_cancellation` (frame 480, filter 4800, 48 kHz, int16
   at the API) + `speex_preprocess_run` with only residual echo suppression (denoise stage on with a
   0 dB noise floor, -40 dB echo / -15 dB during double talk; AGC, VAD, dereverb off).
-- `stats` of the send stream: `aec {on, ref, error?, atten_db, echo_ms, err_ms, ppm, resync,
-  ref_short, no_ref, waits, us, cpu_pct}`: `atten_db` = mic energy in / out over the interval,
+- `stats` of the send stream: `aec {on, ref, error?, atten_db, mic_db, ref_db, echo_ms, err_ms, ppm, resync,
+  ref_short, no_ref, waits, us, cpu_pct}`: `atten_db` = mic energy in / out over the interval, `mic_db`/`ref_db` = their levels (dBFS),
   `echo_ms` = position of the strongest filter tap minus the lead (the acoustic delay by
   timestamps), `us`/`cpu_pct` = canceller time per frame / share of a core.
 - `--dev` only: `aec.lead_ms`, `aec.max_wait_ms`, `aec.exclude_pids` (processes left out of the

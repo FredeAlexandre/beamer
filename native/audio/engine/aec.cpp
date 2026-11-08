@@ -277,8 +277,12 @@ void AecPath::process(const float* mic, uint64_t m, float* out) {
     }
     fill_reference(ref, kAecFrame);
   }
-  double ein = 0;
-  for (int i = 0; i < kAecFrame; ++i) ein += double(mic[i]) * mic[i];
+  double ein = 0, eref = 0;
+  for (int i = 0; i < kAecFrame; ++i) {
+    ein += double(mic[i]) * mic[i];
+    eref += double(ref[i]) * ref[i];
+  }
+  e_ref_.store(e_ref_.load(std::memory_order_relaxed) + eref, std::memory_order_relaxed);
   ec_->process(mic, ref, out);
   double eout = 0;
   for (int i = 0; i < kAecFrame; ++i) eout += double(out[i]) * out[i];
@@ -296,11 +300,16 @@ void AecPath::process(const float* mic, uint64_t m, float* out) {
 Json AecPath::stats(double dt_s) {
   const uint64_t fr = frames_.load(), pn = proc_ns_.load();
   const double ein = e_in_.load(), eout = e_out_.load();
-  const double din = ein - p_e_in_, dout = eout - p_e_out_;
+  const double eref = e_ref_.load();
+  const double din = ein - p_e_in_, dout = eout - p_e_out_, dref = eref - p_e_ref_;
   Json j{{"ref", ref_handle_ ? Json(ref_handle_->device_in_use()) : Json(nullptr)}};
   if (!ref_error_.empty()) j["error"] = error_code_of(ref_error_);
   // attenuation of the mic by the canceller over the interval (echo + whatever else it removed)
   j["atten_db"] = din > 0 && dout > 0 ? std::round(10.0 * std::log10(din / dout) * 10) / 10 : 0.0;
+  // levels over the interval, dBFS: what the canceller got from the mic and from the reference
+  const double nfr = double(fr - p_frames_) * kAecFrame;
+  j["mic_db"] = nfr > 0 && din > 0 ? std::round(10.0 * std::log10(din / nfr) * 10) / 10 : -100.0;
+  j["ref_db"] = nfr > 0 && dref > 0 ? std::round(10.0 * std::log10(dref / nfr) * 10) / 10 : -100.0;
   j["echo_ms"] = std::round(delay_ms_.load() * 10) / 10;
   j["err_ms"] = std::round(err_ms_.load() * 100) / 100;
   j["ppm"] = std::round(ppm_.load() * 10) / 10;
@@ -314,6 +323,7 @@ Json AecPath::stats(double dt_s) {
   p_proc_ns_ = pn;
   p_e_in_ = ein;
   p_e_out_ = eout;
+  p_e_ref_ = eref;
   return j;
 }
 

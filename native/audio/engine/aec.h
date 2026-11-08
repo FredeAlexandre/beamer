@@ -171,9 +171,9 @@ class AecPath : public CaptureSink {
 
   // consumer -> control thread
   std::atomic<uint64_t> frames_{0}, resyncs_{0}, ref_short_{0}, waits_{0}, no_ref_{0}, proc_ns_{0};
-  std::atomic<double> e_in_{0}, e_out_{0}, err_ms_{0}, ppm_{0}, delay_ms_{-1};
+  std::atomic<double> e_in_{0}, e_out_{0}, e_ref_{0}, err_ms_{0}, ppm_{0}, delay_ms_{-1};
   uint64_t p_frames_ = 0, p_proc_ns_ = 0;
-  double p_e_in_ = 0, p_e_out_ = 0;
+  double p_e_in_ = 0, p_e_out_ = 0, p_e_ref_ = 0;
 };
 
 }  // namespace beamer::audio
