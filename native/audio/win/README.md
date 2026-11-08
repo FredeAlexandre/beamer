@@ -26,11 +26,18 @@ Behaviour worth knowing:
 - **Mute**: journal on disk before `SetMute`; mute, master and per-channel volumes are put back exactly at stop,
   by the guard within ~30 ms of a kill, by `restore_journal()` at the next start (entries of dead owners only),
   and after a device change when an endpoint unplugged while muted comes back.
+  **The user's change wins** (WP17): our writes carry a per-process event context GUID; any other
+  `IAudioEndpointVolume` notification on a held endpoint is the user's. A volume change becomes the value restored
+  (journal rewritten at once, so the guard and the next start restore it too); an unmute leaves the endpoint playing
+  for the rest of the redirect (no re-mute until every hold is released), its mute state is then the user's, and
+  `win::local_unmuted(stream)` reports it (logged as a warning).
 - **Virtual mic**: render into "CABLE Input", shared, at a 128-frame engine period (IAudioClient3; VB-CABLE allows
   128..480) with 3 periods (8 ms) queued: 59-72 ms click latency to an app's capture of CABLE Output, 0 holes in
   4x60 s + 300 s (WP12; the old 480 x 3 measured 102-117 ms, 128 x 2 gave holes). When another stream already runs
   CABLE Input's engine at another period, the open falls back to the default period (logged). After a preemption
   (another app's exclusive open) the stream waits 250 ms before reopening, so that app's format retries succeed.
+  The engine's mono mic stream is opened at CABLE Input's mix (stereo) and copied into every channel here
+  (`render+upmix`): AUTOCONVERTPCM makes `InitializeSharedAudioStream` refuse the 128-frame period (WP16/WP17).
   `--vmic-exclusive` (helper command line; reported as feature `vmic_exclusive`) renders exclusively, 16-bit, 2 ms
   period: 36-45 ms, but takes CABLE Input away from other apps, so it is opt-in per machine.
 - **Endpoint render** keeps 1.5 periods (15 ms) queued (WP12: 0 holes on the G733 in 4x60 s + 300 s). USB
