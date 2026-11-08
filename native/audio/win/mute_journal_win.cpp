@@ -244,7 +244,7 @@ ComPtr<IAudioEndpointVolume> endpoint_volume(IMMDevice* d) {
 bool restore_entry(IMMDeviceEnumerator* e, const Entry& x) {
     ComPtr<IMMDevice> d;
     if (!e || FAILED(e->GetDevice(wide(x.level.device).c_str(), &d))) {
-        BLOG_W("mute journal: endpoint %s (%s) not present, entry kept", x.level.device.c_str(), x.level.name.c_str());
+        BLOG_D("mute journal: endpoint %s (%s) not present, entry kept", x.level.device.c_str(), x.level.name.c_str());
         return false;
     }
     if (!write_level(d.Get(), x.level)) return false;

@@ -69,7 +69,7 @@ struct Session : public IAudioSessionEvents {
 };
 }  // namespace
 
-// Holds a strong ref on the impl only while a callback is being processed.
+// Lets the session callbacks (anonymous namespace) reach the impl's private recompute().
 struct SessionWatcherAccess {
     static void changed(SessionWatcher::Impl* impl) { impl->recompute(); }
 };

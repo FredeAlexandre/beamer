@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <deque>
 
@@ -73,6 +74,7 @@ class WinStream : public StreamHandle {
     std::unique_ptr<KeepAlive> keepalive_;
     std::vector<float> scratch_;
     uint64_t gen_seen_ = 0;
+    uint64_t starved_ = 0;         // render wakes that found the device buffer empty
     HANDLE thread_ = nullptr, wake_ = nullptr, opened_ = nullptr;
     std::atomic<bool> stop_{false}, inject_{false};
     std::string open_err_;
@@ -243,7 +245,7 @@ class WinBackend : public Backend {
     }
 
     // Re-reads defaults, bumps the generation of a flow whose default moved, re-attaches the demand watcher.
-    void refresh(IMMDeviceEnumerator* e) {
+    void refresh(IMMDeviceEnumerator* e, bool device_change) {
         for (EDataFlow f : {eRender, eCapture}) {
             std::string id = default_endpoint_id(e, f);
             int i = f == eRender ? 0 : 1;
@@ -255,6 +257,11 @@ class WinBackend : public Backend {
                 for (auto* s : streams_) s->wake();
             }
         }
+        // An endpoint unplugged while muted left an orphan journal entry (no owner); put it back when it returns,
+        // without waiting for the next helper start.
+        // (Not on the first refresh: the startup replay is the engine's restore_journal() call, whose count goes in `ready`.)
+        if (device_change)
+            if (int n = mutes_.restore_journal()) BLOG_I("restored %d endpoint(s) from the journal after a device change", n);
         std::vector<Endpoint> all = enumerate_endpoints(e, DEVICE_STATE_ACTIVE, false);
         std::string cable;
         for (auto& ep : all)
@@ -279,7 +286,7 @@ class WinBackend : public Backend {
             HRESULT hr = e->RegisterEndpointNotificationCallback(nc);
             if (FAILED(hr)) BLOG_E("RegisterEndpointNotificationCallback: %s", hr_text(hr).c_str());
         }
-        refresh(e.Get());
+        refresh(e.Get(), false);
         std::string last = fingerprint(build_snapshot(e.Get(), vmic_.in_use()));
         SetEvent(ready_);
         std::unique_lock<std::mutex> lk(qm_);
@@ -305,7 +312,7 @@ class WinBackend : public Backend {
                 std::lock_guard<std::mutex> g(sm_);
                 lost_in_flight_ = nullptr;
             }
-            if (due) refresh(e.Get());
+            if (due) refresh(e.Get(), true);
             if (due || vmic) {
                 // Device changes are debounced; the virtual mic's in_use is reported at once (demand latency).
                 std::string fp = fingerprint(build_snapshot(e.Get(), vmic_.in_use()));
@@ -427,7 +434,15 @@ bool WinStream::open(IMMDeviceEnumerator* e, const std::string& id, std::string*
     } else {
         if (!d) { *err = "no_device: " + id + " is not present"; return false; }
         ClientKind ck = kind_ == StreamKind::Mic ? ClientKind::Capture : kind_ == StreamKind::Reference ? ClientKind::EndpointLoopback : ClientKind::Render;
-        hr = open_endpoint_client(d.Get(), ck, channels, c.get());
+        hr = E_FAIL;
+        if (virtual_mic && b_->opt_.vmic_exclusive) {
+            hr = open_exclusive_render(d.Get(), channels, c.get());
+            if (FAILED(hr)) {
+                BLOG_W("exclusive render into CABLE Input refused (%s), using shared mode", hr_text(hr).c_str());
+                c = std::make_unique<Client>();
+            }
+        }
+        if (FAILED(hr)) hr = open_endpoint_client(d.Get(), ck, channels, c.get());
     }
     if (FAILED(hr)) {
         *err = (hr == E_ACCESSDENIED ? "permission: " : hr == AUDCLNT_E_DEVICE_IN_USE ? "device_busy: " : hr == AUDCLNT_E_DEVICE_INVALIDATED ? "no_device: " : "internal: ") +
@@ -485,11 +500,27 @@ WinStream::End WinStream::pump_render() {
     REFERENCE_TIME period = 0;
     c.client->GetDevicePeriod(&period, nullptr);
     UINT32 period_frames = period ? (UINT32)(period * kRate / 10000000) : kRate / 100;
-    const UINT32 target = std::min(c.buffer_frames, period_frames * 2);  // 2 periods: Phase 1's glitch-free default
+    // Shared: keep 2 periods queued (Phase 1's glitch-free default). Exclusive: the buffer is one period and each event
+    // asks for all of it.
+    const UINT32 target = c.exclusive ? c.buffer_frames : std::min(c.buffer_frames, period_frames * (virtual_mic ? 3 : 2));
     BYTE* p;
     HRESULT hr;
+    // The engine always fills float32; integer buffers (exclusive mode) go through scratch_ and are converted here.
+    auto fill = [&](BYTE* dst, UINT32 n, uint64_t t) {
+        if (c.sample_kind == 0) { source->on_render(reinterpret_cast<float*>(dst), (int)n, c.channels, t); return; }
+        n = (UINT32)std::min<size_t>(n, scratch_.size() / c.channels);
+        source->on_render(scratch_.data(), (int)n, c.channels, t);
+        const size_t count = (size_t)n * c.channels;
+        if (c.sample_kind == 1) {
+            auto* o = reinterpret_cast<int16_t*>(dst);
+            for (size_t i = 0; i < count; i++) o[i] = (int16_t)std::lrint(std::clamp(scratch_[i], -1.f, 1.f) * 32767.f);
+        } else {
+            auto* o = reinterpret_cast<int32_t*>(dst);
+            for (size_t i = 0; i < count; i++) o[i] = (int32_t)std::llrint(std::clamp((double)scratch_[i], -1.0, 1.0) * 2147483647.0);
+        }
+    };
     if (SUCCEEDED(c.render->GetBuffer(target, &p))) {
-        source->on_render(reinterpret_cast<float*>(p), (int)target, c.channels, now_ns());
+        fill(p, target, now_ns());
         c.render->ReleaseBuffer(target, 0);
     }
     hr = c.client->Start();
@@ -501,12 +532,13 @@ WinStream::End WinStream::pump_render() {
         if (inject_.exchange(false)) return End::Invalidated;
         if (follows_default() && b_->default_gen(flow()) != gen_seen_) return End::DefaultChanged;
         UINT32 pad = 0;
-        hr = c.client->GetCurrentPadding(&pad);
+        hr = c.exclusive ? S_OK : c.client->GetCurrentPadding(&pad);
+        if (SUCCEEDED(hr) && !c.exclusive && pad == 0) starved_++;  // the device drained everything: a hole, unless at start
         if (SUCCEEDED(hr) && pad < target) {
             UINT32 n = target - pad;
             hr = c.render->GetBuffer(n, &p);
             if (SUCCEEDED(hr)) {
-                source->on_render(reinterpret_cast<float*>(p), (int)n, c.channels, now_ns() + (uint64_t)pad * 1000000000ull / kRate);
+                fill(p, n, now_ns() + (uint64_t)pad * 1000000000ull / kRate);
                 hr = c.render->ReleaseBuffer(n, 0);
             }
         }
@@ -599,6 +631,7 @@ void WinStream::run() {
         if (!back) { lost_why = end == End::Invalidated ? "device_invalidated" : "device_failed"; if (!err.empty()) lost_why += " (" + err + ")"; break; }
     }
     close_device();
+    if (starved_) BLOG_I("%s stream: %llu render wake(s) found the device buffer empty", kind_name(kind_), (unsigned long long)starved_);
     // The capture is over: give the sound back to the speakers before anything else.
     if (!muted_.empty()) { b_->mutes().release(muted_); muted_.clear(); }
     if (!lost_why.empty() && !stop_) b_->post_lost(this, lost_why);
@@ -634,6 +667,7 @@ WinOptions win_options_from_args(int, char**) {
         if (a[i] == "--state-dir" && i + 1 < a.size()) o.state_dir = win::wide(a[++i]);
         else if (a[i] == "--log-level" && i + 1 < a.size()) o.log_level = a[++i];
         else if (a[i] == "--dev") o.dev = true;
+        else if (a[i] == "--vmic-exclusive") o.vmic_exclusive = true;
     }
     return o;
 }

@@ -10,6 +10,7 @@
 #include <mmreg.h>
 
 #include <algorithm>
+#include <cstdio>
 
 #pragma comment(lib, "mmdevapi.lib")
 
@@ -99,6 +100,50 @@ HRESULT open_endpoint_client(IMMDevice* d, ClientKind kind, int channels, Client
     c->path = std::string(kind == ClientKind::Render ? "render" : kind == ClientKind::Capture ? "capture" : "endpoint-loopback") +
               (c->wasapi_convert ? "+autoconvert" : "");
     return finish(c, kind);
+}
+
+HRESULT open_exclusive_render(IMMDevice* d, int channels, Client* c) {
+    HRESULT hr;
+    ComPtr<IAudioClient> ac;
+    if (FAILED(hr = d->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, &ac))) return hr;
+    // Exclusive mode takes the device's own sample format: float32, else 32-bit, 24-in-32 or 16-bit integer PCM
+    // (the render loop converts from the engine's float).
+    struct Cand { int bits, valid; bool flt; int kind; };
+    const Cand cands[] = {{32, 32, true, 0}, {32, 32, false, 2}, {32, 24, false, 2}, {16, 16, false, 1}};
+    WAVEFORMATEXTENSIBLE want{};
+    int kind = -1;
+    for (const auto& k : cands) {
+        want = float_format(channels, 0);
+        want.Format.wBitsPerSample = (WORD)k.bits;
+        want.Format.nBlockAlign = (WORD)(channels * k.bits / 8);
+        want.Format.nAvgBytesPerSec = kRate * want.Format.nBlockAlign;
+        want.Samples.wValidBitsPerSample = (WORD)k.valid;
+        want.SubFormat = k.flt ? KSDATAFORMAT_SUBTYPE_IEEE_FLOAT : KSDATAFORMAT_SUBTYPE_PCM;
+        if (ac->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE, &want.Format, nullptr) == S_OK) { kind = k.kind; break; }
+    }
+    if (kind < 0) return AUDCLNT_E_UNSUPPORTED_FORMAT;
+    c->sample_kind = kind;
+    REFERENCE_TIME def = 0, mn = 0;
+    ac->GetDevicePeriod(&def, &mn);
+    REFERENCE_TIME period = mn ? mn : def;
+    hr = ac->Initialize(AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, period, period, &want.Format, nullptr);
+    if (hr == AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED) {
+        // Documented dance: take the aligned buffer size, re-activate, initialize with that period.
+        UINT32 frames = 0;
+        ac->GetBufferSize(&frames);
+        period = (REFERENCE_TIME)(10000000.0 * frames / kRate + 0.5);
+        ac.Reset();
+        if (FAILED(hr = d->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, &ac))) return hr;
+        hr = ac->Initialize(AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, period, period, &want.Format, nullptr);
+    }
+    if (FAILED(hr)) return hr;
+    c->client = ac;
+    c->channels = channels;
+    c->exclusive = true;
+    char p[48];
+    snprintf(p, sizeof p, "render-exclusive(%.2f ms, %s)", period / 10000.0, kind == 0 ? "f32" : kind == 1 ? "s16" : "s32");
+    c->path = p;
+    return finish(c, ClientKind::Render);
 }
 
 // ------------------------------------------------------------------ process loopback

@@ -34,6 +34,9 @@ struct WinOptions {
     std::wstring state_dir;       // folder of settings.json; the mute journal lives there
     std::string log_level = "info";
     bool dev = false;
+    // Render into CABLE Input in exclusive mode (PHASE2 risk 6: shorter VB-CABLE path). Off by default: it takes
+    // CABLE Input away from any other app using it. `--vmic-exclusive` on the helper's command line.
+    bool vmic_exclusive = false;
 };
 // Parses --state-dir, --log-level and --dev out of the helper's argv (other arguments are ignored).
 WinOptions win_options_from_args(int argc, char** argv);
@@ -182,6 +185,8 @@ struct Client {
     UINT32 buffer_frames = 0;
     int channels = 0;           // channels of the stream as initialized
     bool wasapi_convert = false;
+    bool exclusive = false;     // exclusive-mode render: fill the whole buffer on every event
+    int sample_kind = 0;        // buffer samples: 0 float32, 1 int16, 2 int32 (exclusive mode only uses 1 and 2)
     std::string path;           // diagnostics
     Client() = default;
     Client(const Client&) = delete;
@@ -191,6 +196,8 @@ struct Client {
 // Shared-mode, event-driven, 48 kHz float32. Capture/EndpointLoopback stream the mix's channels (fold-down is ours);
 // Render uses `channels` (WASAPI converts when the mix differs: unity gain, unlike direct writes into an 8-ch mix).
 HRESULT open_endpoint_client(IMMDevice* d, ClientKind kind, int channels, Client* c);
+// Exclusive-mode, event-driven render at the device's minimum period, 48 kHz float32 with `channels`.
+HRESULT open_exclusive_render(IMMDevice* d, int channels, Client* c);
 // Process loopback excluding (or including) the tree of `pid`; `channels` as requested.
 HRESULT open_process_loopback(DWORD pid, bool include_tree, int channels, Client* c);
 // Fold-down / mix-down / up-mix interleaved float frames (LFE dropped above stereo).

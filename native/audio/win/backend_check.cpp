@@ -11,6 +11,7 @@
 //   backend_check journal-test                  kill a muting helper (and its guard): state restored exactly
 //   backend_check invalidate-test               injected AUDCLNT_E_DEVICE_INVALIDATED: streams recover
 //   backend_check exclusive-test                exclusive open of CABLE Input by another process vs our shared stream
+//   backend_check vmic-latency [--vmic-exclusive] click latency CABLE Input -> an app's capture of CABLE Output
 //   backend_check restore                       restore_journal() (as `beamer-audio restore`)
 // Child modes (spawned by the tests): record, sleeper, hold-mute, exclusive.
 // Every command takes --state-dir D (default: %TEMP%\beamer-wp4-check) so the real Beamer journal is never touched.
@@ -80,10 +81,12 @@ static double dbfs(double x) { return x > 1e-10 ? 20 * std::log10(x) : -200.0; }
 static double secs() { return now_ns() / 1e9; }
 
 static std::wstring g_state_dir;
+static bool g_vmic_exclusive = false;
 static WinOptions options() {
     WinOptions o;
     o.state_dir = g_state_dir;
     o.log_level = "info";
+    o.vmic_exclusive = g_vmic_exclusive;
     return o;
 }
 
@@ -132,6 +135,25 @@ struct Tone : RenderSource {
             for (int c = 0; c < ch; c++) x[(size_t)i * ch + c] = v;
         }
         frames += n;
+    }
+};
+
+// Clicks every 0.5 s (96-sample Hann-windowed 2 kHz burst, as proto/transport/devloop.py); records when the
+// callback that wrote each click's centre ran (QPC ns, shared by every process on the machine).
+struct Clicks : RenderSource {
+    uint64_t pos = 0;
+    std::mutex m;
+    std::vector<uint64_t> written;
+    void on_render(float* x, int n, int ch, uint64_t) override {
+        uint64_t now = now_ns();
+        for (int i = 0; i < n; i++) {
+            uint64_t ph = (pos + i) % 24000;
+            float v = 0;
+            if (ph < 96) v = (float)(0.5 * 0.5 * (1 - std::cos(2 * kPi * ph / 95)) * std::sin(2 * kPi * 2000 * ((double)ph - 48) / kRate + kPi / 2));
+            if (ph == 48) { std::lock_guard<std::mutex> g(m); written.push_back(now + (uint64_t)i * 1000000000ull / kRate); }
+            for (int c = 0; c < ch; c++) x[(size_t)i * ch + c] = v;
+        }
+        pos += n;
     }
 };
 
@@ -297,6 +319,9 @@ static int child_record(const Args& a) {
     Meter m;
     m.freq = a.num("freq", 997);
     double end = secs() + a.num("seconds", 3);
+    const bool clicks = a.has("clicks");
+    uint64_t cool = 0, seen = 0, run = 0, holes = 0;
+    const double hole_amp = a.num("hole-amp", 0);
     std::vector<float> conv(48000 * 2);
     while (secs() < end) {
         WaitForSingleObject(c.event, 100);
@@ -307,13 +332,23 @@ static int child_record(const Args& a) {
             n = std::min<UINT32>(n, 48000);
             if (fl & AUDCLNT_BUFFERFLAGS_SILENT) std::fill(conv.begin(), conv.begin() + n, 0.f);
             else convert_channels(reinterpret_cast<float*>(p), c.channels, conv.data(), 1, n);
-            m.on_capture(conv.data(), (int)n, 1, now_ns());
+            uint64_t delivered = now_ns();
+            if (clicks && delivered > cool)
+                for (UINT32 i = 0; i < n; i++)
+                    if (std::abs(conv[i]) > 0.1f) { out("click %llu", (unsigned long long)delivered); cool = delivered + 200000000ull; break; }
+            m.on_capture(conv.data(), (int)n, 1, delivered);
+            // Holes: >= 8 consecutive near-zero samples inside a continuous tone (after 0.5 s), as Phase 1's glitch check.
+            for (UINT32 i = 0; i < n && hole_amp > 0; i++, seen++) {
+                if (seen < 24000) continue;
+                if (std::abs(conv[i]) < hole_amp * 1e-3) { if (++run == 8) holes++; }
+                else run = 0;
+            }
             c.capture->ReleaseBuffer(n);
         }
     }
     c.client->Stop();
     out("stopped %llu", (unsigned long long)now_ns());
-    out("result frames=%llu tone_dbfs=%.2f rms_dbfs=%.2f", (unsigned long long)m.frames.load(), m.tone_db(), m.rms_db());
+    out("result frames=%llu tone_dbfs=%.2f rms_dbfs=%.2f holes=%llu", (unsigned long long)m.frames.load(), m.tone_db(), m.rms_db(), (unsigned long long)holes);
     return 0;
 }
 
@@ -574,9 +609,10 @@ static int cmd_vmic_test(const Args& a) {
     check((bool)p, "render into the virtual mic (CABLE Input) opens", p ? p->device_in_use() : err);
     if (!p) return 1;
     Child rec;
-    rec.start("record --device " + cable_out + " --seconds 3 --delay 0.5");
+    const double rec_s = a.num("seconds", 3);
+    rec.start("record --device " + cable_out + " --seconds " + std::to_string(rec_s) + " --delay 0.5 --hole-amp " + std::to_string(tone.amp));
     std::string started = rec.wait_for("started ", 10);
-    std::string stopped = rec.wait_for("stopped ", 10);
+    std::string stopped = rec.wait_for("stopped ", rec_s + 10);
     std::string result = rec.wait_for("result ", 5);
     rec.wait(5000);
     uint64_t t_start = started.empty() ? 0 : _strtoui64(started.c_str() + 8, nullptr, 10);
@@ -590,7 +626,10 @@ static int cmd_vmic_test(const Args& a) {
     auto k = result.find("tone_dbfs=");
     if (k != std::string::npos) tone_db = atof(result.c_str() + k + 10);
     check(std::fabs(tone_db - dbfs(tone.amp)) < 0.5, "the recorder hears the helper's tone on CABLE Output",
-          std::to_string(tone_db) + " dBFS, rendered " + std::to_string(dbfs(tone.amp)));
+          std::to_string(tone_db) + " dBFS, rendered " + std::to_string(dbfs(tone.amp)) + (g_vmic_exclusive ? " (exclusive)" : " (shared)"));
+    auto h = result.find("holes=");
+    long holes = h == std::string::npos ? -1 : atol(result.c_str() + h + 6);
+    check(holes == 0, "no holes in the tone on CABLE Output", std::to_string(holes) + " in " + std::to_string((int)rec_s) + " s");
     p.reset();
     b->set_listener(nullptr);
     return g_fail ? 1 : 0;
@@ -760,6 +799,43 @@ static int cmd_exclusive_test(const Args&) {
     return g_fail ? 1 : 0;
 }
 
+// Latency of the virtual-mic path as an app sees it: our render callback writes a click into CABLE Input -> an app's
+// shared-mode capture of CABLE Output delivers it (the metric of devloop.py, "as the transport sees it").
+static int cmd_vmic_latency(const Args& a) {
+    ComScope com;
+    auto b = make_win_backend(options());
+    auto s = b->snapshot();
+    std::string cable_out;
+    for (auto& d : s.devices) if (d.role == Role::VirtualMic) cable_out = d.key;
+    Clicks clk;
+    std::string err;
+    auto r = b->open_render(RenderSpec{"", true, 2}, &clk, &err);
+    if (!r) { check(false, "virtual-mic render opens", err); return 1; }
+    double sec = a.num("seconds", 10);
+    Child rec;
+    rec.start("record --clicks --device " + cable_out + " --seconds " + std::to_string((int)sec));
+    std::vector<double> lat;
+    double end = secs() + sec + 5;
+    while (secs() < end) {
+        std::string l = rec.line(end - secs());
+        if (l.rfind("click ", 0) == 0) {
+            uint64_t t = _strtoui64(l.c_str() + 6, nullptr, 10);
+            std::lock_guard<std::mutex> g(clk.m);
+            uint64_t best = 0;
+            for (uint64_t w : clk.written) if (w <= t) best = w;
+            if (best) lat.push_back((t - best) / 1e6);
+        }
+        if (l.rfind("result", 0) == 0) break;
+    }
+    r.reset();
+    std::sort(lat.begin(), lat.end());
+    if (lat.size() < 3) { check(false, "clicks detected", std::to_string(lat.size())); return 1; }
+    double med = lat[lat.size() / 2], p95 = lat[std::min(lat.size() - 1, lat.size() * 95 / 100)];
+    out("vmic latency (%s): %u clicks, min %.1f ms, median %.1f ms, p95 %.1f ms, max %.1f ms", g_vmic_exclusive ? "exclusive" : "shared",
+        (unsigned)lat.size(), lat.front(), med, p95, lat.back());
+    return 0;
+}
+
 static int cmd_restore(const Args&) {
     auto b = make_win_backend(options());
     out("restored %d", b->restore_journal());
@@ -771,6 +847,7 @@ int main(int argc, char** argv) {
     if (run_guard_if_requested(argc, argv, &rc)) return rc;
     auto argv8 = wargs();
     Args a = parse(argv8);
+    g_vmic_exclusive = a.has("vmic-exclusive");
     if (a.has("state-dir")) g_state_dir = wide(a.get("state-dir"));
     else {
         wchar_t t[MAX_PATH];
@@ -791,6 +868,7 @@ int main(int argc, char** argv) {
     if (cmd == "journal-test") return cmd_journal_test(a);
     if (cmd == "invalidate-test") return cmd_invalidate_test(a);
     if (cmd == "exclusive-test") return cmd_exclusive_test(a);
+    if (cmd == "vmic-latency") return cmd_vmic_latency(a);
     if (cmd == "restore") return cmd_restore(a);
     if (cmd == "record") return child_record(a);
     if (cmd == "sleeper") return child_sleeper(a);
