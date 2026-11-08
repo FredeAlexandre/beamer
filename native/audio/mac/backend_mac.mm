@@ -222,6 +222,8 @@ class Port {
   int device_channels() const { return dev_ch_; }
   int granted_frames() const { return granted_frames_; }
   uint64_t callbacks() const { return callbacks_.load(std::memory_order_relaxed); }
+  uint64_t gaps() const { return gaps_.load(std::memory_order_relaxed); }
+  uint64_t gap_frames() const { return gap_frames_.load(std::memory_order_relaxed); }
 
  private:
   Port() = default;
@@ -230,6 +232,17 @@ class Port {
                           AudioBufferList* out, const AudioTimeStamp* out_time, void* ctx) {
     auto* p = static_cast<Port*>(ctx);
     p->callbacks_.fetch_add(1, std::memory_order_relaxed);
+    // IO cycles the HAL skipped (this IOProc overran, or the device stalled): the sample time jumps
+    if (const AudioTimeStamp* ts = p->input_ ? in_time : out_time; ts && (ts->mFlags & kAudioTimeStampSampleTimeValid)) {
+      if (p->next_sample_ >= 0 && ts->mSampleTime > p->next_sample_ + 0.5) {
+        p->gaps_.fetch_add(1, std::memory_order_relaxed);
+        p->gap_frames_.fetch_add(uint64_t(ts->mSampleTime - p->next_sample_), std::memory_order_relaxed);
+      }
+      const AudioBufferList* bl = p->input_ ? in : out;
+      const AudioBuffer* b0 = bl && bl->mNumberBuffers ? &bl->mBuffers[0] : nullptr;
+      const double n = b0 && b0->mNumberChannels ? double(b0->mDataByteSize / (4 * b0->mNumberChannels)) : 0.0;
+      p->next_sample_ = ts->mSampleTime + n;
+    }
     if (p->input_) {
       if (in && in->mNumberBuffers) p->capture(in, in_time);
     } else if (out && out->mNumberBuffers) {
@@ -373,7 +386,8 @@ class Port {
   const float* push_ptr_ = nullptr;
   UInt32 push_frames_ = 0;
   uint64_t pull_ns_ = 0;
-  std::atomic<uint64_t> callbacks_{0};
+  std::atomic<uint64_t> callbacks_{0}, gaps_{0}, gap_frames_{0};
+  double next_sample_ = -1;  // IO thread only
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -422,7 +436,8 @@ class MacStream final : public StreamHandle {
   bool lost = false;
   double down_since = 0;     // > 0 while the stream has no running port
   double started_at = 0, last_progress = 0;
-  uint64_t last_callbacks = 0;
+  uint64_t last_callbacks = 0, logged_gaps = 0;
+  double gaps_logged_at = 0;
   std::string last_error;
 
  private:
@@ -730,6 +745,7 @@ class MacBackend final : public Backend {
     s->down_since = 0;
     s->started_at = s->last_progress = seconds();
     s->last_callbacks = 0;
+    s->logged_gaps = 0;
     s->last_error.clear();
     return true;
   }
@@ -790,6 +806,13 @@ class MacBackend final : public Backend {
           restart(s, "no IO for 1.5 s");
         }
         if (s->kind == SKind::System && !s->tap.pending.empty()) late_exclusions(s);
+        // skipped IO cycles, logged at most every 10 s (WP11: is a 128-frame buffer too tight?)
+        if (const uint64_t g = s->port->gaps(); g != s->logged_gaps && now - s->gaps_logged_at >= 10.0) {
+          log_line("warn", "%s stream: %llu skipped IO cycles (%llu frames) since it started", kind_name(s->kind),
+                   (unsigned long long)g, (unsigned long long)s->port->gap_frames());
+          s->logged_gaps = g;
+          s->gaps_logged_at = now;
+        }
         continue;
       }
       restart(s, "retry");
