@@ -686,6 +686,34 @@ def _speaker_devices(snap: AudioSnapshot, machine: str) -> list:
     return [device for device in devices if device is not None and not _headset(device.form)]
 
 
+def _wave_link(machine: Optional[MachineAudio]) -> bool:
+    """Whether `machine` lists an Elgato or Wave Link device: Wave Link's monitor mix may then play a
+    microphone into its sound."""
+    devices = (machine.inputs + machine.outputs) if machine is not None else ()
+    return any("elgato" in device.name.lower() or "wave link" in device.name.lower() for device in devices)
+
+
+def _howl_notices(snap: AudioSnapshot, names: _Names) -> list:
+    """Feedback the howl guard caught (§3.3 `howl`): one notice per sound stream, while ducked and
+    for a while after."""
+    notices, seen = [], set()
+    for howl in snap.howls:
+        if (howl.source, howl.target) in seen:
+            continue
+        seen.add((howl.source, howl.target))
+        if _wave_link(snap.machines.get(howl.source)):
+            text = tr("Beamer heard feedback between {target}'s speakers and a microphone on {source}, and turned "
+                      "down {source}'s sound on {target}. Use headphones on {target}, or turn off Wave Link's "
+                      "monitor to the system output on {source}.")
+        else:
+            text = tr("Beamer heard feedback between {target}'s speakers and a microphone on {source}, and turned "
+                      "down {source}'s sound on {target}. Use headphones on {target}, or stop {source} from playing "
+                      "that microphone through its own sound.")
+        notices.append(Notice("howl", text.format(source=names(howl.source), target=names(howl.target)), WAIT,
+                              machine=howl.source, target=howl.target))
+    return notices
+
+
 def _notices(snap: AudioSnapshot, names: _Names, platform: str, without_audio, driver) -> tuple:
     notices = []
     own = snap.machines.get(snap.own)
@@ -737,16 +765,34 @@ def _notices(snap: AudioSnapshot, names: _Names, platform: str, without_audio, d
                                                  "its own sound elsewhere, which mutes that output.").format(
                 machine=names(machine), device=_sink_name(snap, entry), target=names(entry.to)), FAULT,
                 machine=machine, target=entry.to))
+    notices += _howl_notices(snap, names)
     source = snap.route.mic.machine
     targets = [target for target in _mic_targets(snap) if target != source] if snap.mic_status.state == "streaming" else []
+    # Beamer cancels echo only where the helper can (`aec` in its features) and it is not turned off
+    # (this machine's own setting; another machine's is not known here): the planner's rule (§6.4).
+    held_source = snap.machines.get(source) if source is not None else None
+    cancels = (held_source is not None and "aec" in held_source.features
+               and (source != snap.own or snap.aec_mode == "auto"))
     if source is not None and targets and _speaker_devices(snap, source):
-        notices.append(Notice("echo_aec", tr("Beamer cancels the echo of {machine}'s speakers. A headset on {machine} "
-                                             "sounds better.").format(machine=names(source)), PLAIN, machine=source))
+        if cancels:
+            notices.append(Notice("echo_aec", tr("Beamer cancels the echo of {machine}'s speakers. A headset on "
+                                                 "{machine} sounds better.").format(machine=names(source)), PLAIN,
+                                  machine=source))
+        else:
+            notices.append(Notice("echo_no_aec", tr("{machine}'s microphone can hear its speakers, and Beamer does not "
+                                                    "cancel that echo there. Use a headset on {machine}.").format(
+                machine=names(source)), WAIT, machine=source))
     mic_name = _mic_device_name(snap) if source is not None else ""
     for target in targets:
         if (model.output_of(snap.route, target).to is None and not _headset(_output_form(snap, target))
                 and _output_form(snap, target) is not None):
             can_send = "system_capture" in snap.machines[target].features if target in snap.machines else False
+            if not cancels:
+                notices.append(Notice(
+                    "echo_cross", tr("If {target}'s speakers can be heard by {mic}, people in a call on {target} hear "
+                                     "themselves. Use a headset on {target}.").format(target=names(target), mic=mic_name),
+                    WAIT, machine=target, target=source))
+                continue
             notices.append(Notice(
                 "echo_cross", tr("If {target}'s speakers can be heard by {mic}, people in a call on {target} hear "
                                  "themselves. Use a headset, or send {target}'s sound to {source}, where Beamer "

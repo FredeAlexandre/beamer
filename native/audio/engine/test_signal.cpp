@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "test_signal.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 
@@ -51,6 +52,13 @@ bool TestSignal::parse(const std::string& spec, TestSignal* out) {
     if (!f.empty()) t.freq_ = std::atof(f.c_str());
     if (!a.empty()) t.amp_ = std::atof(a.c_str());
     if (!(t.freq_ > 0 && t.freq_ < 24000)) return false;
+  } else if (kind == "rise") {
+    t.kind_ = Kind::Rise;
+    std::string f = parts(1), r = parts(2);
+    t.freq_ = f.empty() ? 1000.0 : std::atof(f.c_str());
+    if (!r.empty()) t.rise_db_s_ = std::atof(r.c_str());
+    t.amp_ = 0.3;
+    if (!(t.freq_ > 0 && t.freq_ < 24000) || !(t.rise_db_s_ > 0 && t.rise_db_s_ <= 200)) return false;
   } else if (kind == "noise") {
     t.kind_ = Kind::Noise;
     std::string a = parts(1);
@@ -81,6 +89,14 @@ void TestSignal::render(int64_t s0, int n, float* out) {
         out[i] = static_cast<float>(amp_ * ((rng_ >> 11) * (2.0 / 9007199254740992.0) - 1.0));
       }
       return;
+    case Kind::Rise: {
+      const double base = std::fmod(freq_ * double(s0), kR), w = 2 * kPi / kR;
+      for (int i = 0; i < n; ++i) {
+        const double a = std::min(amp_, std::pow(10.0, (-70.0 + rise_db_s_ * double(s0 + i) / kR) / 20.0));
+        out[i] = static_cast<float>(a * std::sin(w * (base + freq_ * i)));
+      }
+      return;
+    }
     case Kind::Sine:
     case Kind::Signature: {
       // phase reduced once per block (exact for the absolute index), then advanced per sample

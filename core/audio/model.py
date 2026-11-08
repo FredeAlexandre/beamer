@@ -121,6 +121,16 @@ class StreamView:
     rtt_ms: Optional[float]
 
 
+@dataclass(frozen=True)
+class HowlView:
+    """Feedback the howl guard of `source`'s sound stream to `target` heard (PHASE2 §3.3 `howl`):
+    `target`'s speakers reach a microphone whose sound `source` plays into its own output."""
+    source: str              # machine id: whose sound was turned down
+    target: str              # machine id: whose speakers play it
+    freq_hz: float
+    active: bool             # still ducked; False: ended within the notice hold
+
+
 @dataclass(frozen=True, kw_only=True)
 class AudioSnapshot:
     own: str
@@ -135,6 +145,7 @@ class AudioSnapshot:
     permission: Mapping[str, str] = field(default_factory=dict)
     aec_mode: str
     aec_active: bool
+    howls: tuple[HowlView, ...] = ()
 
 
 ZERO = Stamp(0, "")

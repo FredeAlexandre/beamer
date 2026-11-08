@@ -11,14 +11,15 @@ namespace beamer::audio {
 
 class TestSignal {
  public:
-  // spec: "A[:<pilot amp>]" | "B[:<pilot amp>]" (signatures), "sine:<hz>[:<amp>]", "silence", "noise[:<amp>]"
+  // spec: "A[:<pilot amp>]" | "B[:<pilot amp>]" (signatures), "sine:<hz>[:<amp>]", "silence", "noise[:<amp>]",
+  // "rise:<hz>[:<dB/s>]" (a sine rising from -70 dBFS at 20 dB/s up to 0.3: feedback building up, howl.h)
   static bool parse(const std::string& spec, TestSignal* out);
   // Mono samples for absolute indices [s0, s0 + n).
   void render(int64_t s0, int n, float* out);
 
  private:
-  enum class Kind { Silence, Sine, Signature, Noise } kind_ = Kind::Silence;
-  double freq_ = 440, amp_ = 0.25;
+  enum class Kind { Silence, Sine, Signature, Noise, Rise } kind_ = Kind::Silence;
+  double freq_ = 440, amp_ = 0.25, rise_db_s_ = 20;
   // signature
   double pilot_amp_ = 0.02, period_s_ = 1.0, start_s_ = 2.0;
   std::vector<float> tpl_;

@@ -44,6 +44,7 @@ DEV_CMD = "audio-dev-cmd.json"
 DEV_STATUS = "audio-dev-status.json"
 DEV_EVENTS = "audio-dev-events.jsonl"   # dev only: helper events (no levels) and link changes, for the E2E harness
 DEV_EVENTS_MAX = 20_000_000              # bytes; the file is then moved to `.1` and started again
+HOWL_NOTICE_HOLD = 120.0   # s: the howl notice stays this long after the guard released its duck
 
 
 class AudioHost(Protocol):
@@ -147,7 +148,8 @@ def snapshot_data(snap: AudioSnapshot) -> dict:
             "mic_status": status(snap.mic_status),
             "output_status": {ident: status(value) for ident, value in snap.output_status.items()},
             "streams": [dataclasses.asdict(stream) for stream in snap.streams], "helper": snap.helper,
-            "permission": dict(snap.permission), "aec_mode": snap.aec_mode, "aec_active": snap.aec_active}
+            "permission": dict(snap.permission), "aec_mode": snap.aec_mode, "aec_active": snap.aec_active,
+            "howls": [dataclasses.asdict(howl) for howl in snap.howls]}
 
 
 class AudioService:
@@ -192,6 +194,8 @@ class AudioService:
         self._req = 0
         self._stats = {}
         self._remote_streams = {}
+        self._howls = {}            # target -> {"freq_hz", "active", "until"}: our system sound's howl guard
+        self._remote_howls = {}     # peer -> [{"to", "freq_hz", "active"}] from its audio_stats
         self._levels = {}
         self._levels_dirty = False
         self._levels_at = 0.0
@@ -524,6 +528,7 @@ class AudioService:
         if state.flow is not None:
             self._helper_send({"cmd": "flow_close", "flow": state.flow.id})
         self._remote_streams.pop(peer, None)
+        self._remote_howls.pop(peer, None)
         self._levels = {key: value for key, value in self._levels.items() if not key.startswith(peer + "/")}
 
     def _on_link_message(self, peer, message):
@@ -765,6 +770,7 @@ class AudioService:
         for (side, key), level in data["levels"].items():
             self._levels[f"{peer}/{side}/{key}"] = level
         self._remote_streams[peer] = data["streams"]
+        self._remote_howls[peer] = data.get("howls", [])
         self._levels_dirty = True
 
     def _on_audio_test(self, peer, state, data):
@@ -780,7 +786,9 @@ class AudioService:
         streams = {str(stream): {"path": values.get("path", ""), "jb_ms": values.get("jb_ms"),
                                  "loss_pct": values.get("loss_pct"), "rtt_ms": values.get("rtt_ms")}
                    for stream, values in self._stats.items()}
-        msg = wire.stats(self._clock() * 1000, levels, streams)
+        howls = [{"to": target, "freq_hz": round(float(howl["freq_hz"]), 1), "active": howl["active"]}
+                 for target, howl in sorted(self._howls.items())]
+        msg = wire.stats(self._clock() * 1000, levels, streams, howls)
         for ident, peer in self._peers.items():
             if peer.watching:
                 self._post(ident, msg)
@@ -911,6 +919,8 @@ class AudioService:
             if isinstance(streams, dict):
                 self._stats = {int(key): value for key, value in streams.items()
                                if str(key).isdigit() and isinstance(value, dict)}
+        elif name == "howl":
+            self._on_howl(event)
         elif name == "permission":
             before = dict(self._permission)
             for what in ("mic", "system_audio"):
@@ -929,6 +939,37 @@ class AudioService:
                 if self._loop is not None and self._loop.state == "failed":
                     self._helper_send({"cmd": "stop", "stream": self._loop.stream})
                     self._loop = None
+
+    def _on_howl(self, event):
+        """The howl guard of a system sound stream ducked it, or let go (§3.3 `howl`)."""
+        key, send = self._send_for_stream(event.get("stream"))
+        if send is None or key[0] != "system" or not isinstance(event.get("active"), bool):
+            return
+        freq = event.get("freq_hz") if isinstance(event.get("freq_hz"), (int, float)) else 0.0
+        target = key[1]
+        if event["active"]:
+            self._log.warning("audio: feedback at %.0f Hz between %s's speakers and a microphone here; "
+                              "this machine's sound to it is turned down", freq, self._host.peer_name(target) or target)
+            self._howls[target] = {"freq_hz": float(freq), "active": True, "until": None}
+        elif target in self._howls:
+            self._howls[target] = dict(self._howls[target], active=False,
+                                       until=self._clock() + HOWL_NOTICE_HOLD)
+
+    def _howl_views(self):
+        """The howls to show, ours and those watched peers report; ends ours whose stream is gone and
+        drops those past their hold. Returns (views, earliest expiry or None)."""
+        now = self._clock()
+        for target, howl in list(self._howls.items()):
+            if howl["active"] and ("system", target) not in self._sends:
+                howl.update(active=False, until=now + HOWL_NOTICE_HOLD)
+            if not howl["active"] and howl["until"] <= now:
+                del self._howls[target]
+        views = [model.HowlView(self._own, target, howl["freq_hz"], howl["active"])
+                 for target, howl in sorted(self._howls.items())]
+        for peer, howls in sorted(self._remote_howls.items()):
+            views += [model.HowlView(peer, howl["to"], howl["freq_hz"], howl["active"]) for howl in howls]
+        expiry = [howl["until"] for howl in self._howls.values() if howl["until"] is not None]
+        return tuple(views), (min(expiry) if expiry else None)
 
     def _helper_gone(self, state):
         """The helper process is (re)starting or failed: its flows and streams are gone (§5.4)."""
@@ -1049,6 +1090,7 @@ class AudioService:
             self._post(peer, wire.watch(on))
         if not on:
             self._levels = {key: value for key, value in self._levels.items() if key.startswith(self._own + "/")}
+            self._remote_howls.clear()
 
     def _test_input(self, machine, device_key):
         if machine == self._own:
@@ -1079,7 +1121,7 @@ class AudioService:
                 self._log.warning("audio: dev command ignored: %s", error)
             self._settle()
         status = {"snapshot": snapshot_data(self._snapshot), "stats": {str(key): value for key, value in self._stats.items()},
-                  "link_out_dropped": self.link_out_dropped, "wall": self._wall()}
+                  "link_out_dropped": self.link_out_dropped, "wall": self._wall(), "test_source": self._test_source}
         temporary = self._state_dir / f".{DEV_STATUS}.tmp"
         try:
             temporary.write_text(json.dumps(status, indent=1, sort_keys=True), encoding="utf-8")
@@ -1204,8 +1246,10 @@ class AudioService:
         plan = planner.plan(self._own, self._machines, self._route, direct, online, self._aec, self._clock(),
                             self._demand_hold)
         self._apply(plan)
-        self._wake_at = plan.wake_at
-        snap = self._compose_snapshot(plan, direct, online)
+        howls, howl_expiry = self._howl_views()
+        wakes = [moment for moment in (plan.wake_at, howl_expiry) if moment is not None]
+        self._wake_at = min(wakes) if wakes else None
+        snap = self._compose_snapshot(plan, direct, online, howls)
         if snap != self._snapshot:
             self._snapshot = snap
             for fn in self._listeners(self._subscribers):
@@ -1221,7 +1265,7 @@ class AudioService:
         state = self._peers.get(peer)
         return state.flow.rtt_ms if state is not None and state.flow is not None else None
 
-    def _compose_snapshot(self, plan, direct, online):
+    def _compose_snapshot(self, plan, direct, online, howls=()):
         views = []
         for (kind, peer), send in sorted(self._sends.items()):
             stats = self._stats.get(send.stream, {})
@@ -1249,4 +1293,4 @@ class AudioService:
         return AudioSnapshot(own=self._own, machines=dict(self._machines), online=online, direct=direct,
                              route=self._route, mic_status=mic_status, output_status=output_status,
                              streams=tuple(views), helper=self._helper_state, permission=dict(self._permission),
-                             aec_mode=self._aec, aec_active=aec_active)
+                             aec_mode=self._aec, aec_active=aec_active, howls=howls)

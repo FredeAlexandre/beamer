@@ -307,6 +307,49 @@ class States(unittest.TestCase):
         snap = replace(base.snapshot, machines={**base.snapshot.machines, fx.MAC: headset_mac})
         self.assertNotIn("echo_aec", codes(build(base, snapshot=snap)))
 
+    def test_echo_notices_follow_the_aec_rule(self):
+        base = fx.sound_redirected()
+        without = replace(fx.mac(links=(fx.PC,)), features=fx.MAC_FEATURES - {"aec"})
+        snap = replace(base.snapshot, machines={**base.snapshot.machines, fx.MAC: without})
+        page = build(base, snapshot=snap)
+        self.assertNotIn("echo_aec", codes(page))
+        notice = next(n for n in page.notices if n.code == "echo_no_aec")
+        self.assertEqual(notice.text, "This Mac's microphone can hear its speakers, and Beamer does not cancel that echo "
+                                      "there. Use a headset on This Mac.")
+        self.assertFalse(any("cancels" in n.text for n in page.notices))
+        # This machine's own AEC switched off: the same.
+        page = build(base, snapshot=replace(base.snapshot, aec_mode="off"))
+        self.assertEqual([c for c in codes(page) if c.startswith("echo")], ["echo_no_aec"])
+        # echo_cross without AEC at the mic's machine: no "send it there" advice.
+        mic_base = fx.mic_streaming()
+        speakers_pc = fx.pc(in_use=True, outputs=(replace(fx.REALTEK, default=True), replace(fx.G733, default=False)))
+        snap = replace(mic_base.snapshot, machines={**mic_base.snapshot.machines, fx.PC: speakers_pc, fx.MAC: without})
+        notice = next(n for n in build(mic_base, snapshot=snap).notices if n.code == "echo_cross")
+        self.assertEqual(notice.text, "If lebig's speakers can be heard by MacBook Air Microphone, people in a call on "
+                                      "lebig hear themselves. Use a headset on lebig.")
+        self.assertIsNone(notice.action)
+
+    def test_howl_notice(self):
+        base = fx.sound_redirected()
+        snap = replace(base.snapshot, howls=(model.HowlView(fx.PC, fx.MAC, 7100.0, True),))
+        notice = next(n for n in build(base, snapshot=snap).notices if n.code == "howl")
+        self.assertEqual(notice.text, "Beamer heard feedback between This Mac's speakers and a microphone on lebig, and "
+                                      "turned down lebig's sound on This Mac. Use headphones on This Mac, or stop lebig "
+                                      "from playing that microphone through its own sound.")
+        self.assertEqual((notice.tone, notice.machine, notice.target, notice.action), (view.WAIT, fx.PC, fx.MAC, None))
+        # lebig lists an Elgato device: the notice names Wave Link's monitor. Seen from lebig.
+        elgato = replace(fx.WAVE, name="Mic In (2- Elgato Wave:3)")
+        pc = replace(snap.machines[fx.PC], inputs=(elgato, fx.G733_MIC))
+        snap = replace(snap, machines={**snap.machines, fx.PC: pc},
+                       howls=snap.howls + (model.HowlView(fx.PC, fx.MAC, 7100.0, False),))
+        page = build(fx.seen_from(replace(base, snapshot=snap), fx.PC))
+        notices = [n for n in page.notices if n.code == "howl"]
+        self.assertEqual(len(notices), 1)  # one per sound stream
+        self.assertEqual(notices[0].text, "Beamer heard feedback between MacBook Air's speakers and a microphone on "
+                                          "This PC, and turned down This PC's sound on MacBook Air. Use headphones on "
+                                          "MacBook Air, or turn off Wave Link's monitor to the system output on This PC.")
+        self.assertFalse(view.apply_notice(fx.FakeService(snap), notices[0]))
+
     def test_conflict(self):
         base = fx.sound_redirected()
         outputs = {fx.PC: OutputRoute(fx.MAC, None, fx.stamp(20)), fx.MAC: OutputRoute(fx.PC, None, fx.stamp(21))}

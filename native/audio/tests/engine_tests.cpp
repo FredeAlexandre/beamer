@@ -27,6 +27,7 @@
 #include "engine.h"
 #include "flow.h"
 #include "helper.h"
+#include "howl.h"
 #include "jitter.h"
 #include "json.h"
 #include "packet.h"
@@ -1363,6 +1364,248 @@ static void test_aec_wiring() {
   }
 }
 
+// ===================================================================== howl guard (WP13)
+
+namespace howl_sim {
+struct Biquad {
+  double b0, b1, b2, a1, a2, z1 = 0, z2 = 0;
+  double run(double x) {
+    double y = b0 * x + z1;
+    z1 = b1 * x - a1 * y + z2;
+    z2 = b2 * x - a2 * y;
+    return y;
+  }
+};
+static Biquad bandpass(double f, double q) {  // RBJ, 0 dB at f
+  const double w = 2 * M_PI_ * f / 48000, al = std::sin(w) / (2 * q), a0 = 1 + al;
+  return Biquad{al / a0, 0, -al / a0, -2 * std::cos(w) / a0, (1 - al) / a0};
+}
+struct LoopResult {
+  uint32_t episodes = 0, false_alarms = 0;
+  double first_s = -1, freq_hz = 0;
+  double loud_after = 0;  // share of 100 ms output blocks above -20 dBFS from detection + 0.5 s on
+  double max_db = -200;   // loudest 100 ms block over the run
+};
+// Feedback through two machines: what the guard sends plays on speakers that a microphone hears
+// after `delay_ms` (network, buffers, air), with gain `G` at f0 (a resonance of quality q) and 0.3
+// elsewhere, back into the captured sound, plus a -65 dBFS noise floor and an optional music bed.
+// The speaker path saturates (tanh) near -10 dBFS RMS, as the live howl did.
+static LoopResult loop(double G, double f0, double q, double delay_ms, double secs, bool guard,
+                       const std::function<double(int64_t)>& bed) {
+  HowlGuard g(2);
+  const int D = int(delay_ms * 48);
+  std::vector<double> line(size_t(D), 0.0);
+  int lp = 0;
+  Biquad bp = bandpass(f0, q);
+  std::mt19937 rng(1);
+  std::normal_distribution<double> nd(0, 1);
+  std::vector<float> blk(960);
+  const int64_t N = int64_t(secs * 48000);
+  LoopResult r;
+  double acc = 0;
+  int accn = 0, after = 0, loud = 0;
+  for (int64_t n = 0; n < N; n += 480) {
+    for (int i = 0; i < 480; ++i) {
+      const double y = line[size_t((lp + i) % D)];
+      const double v = 0.3 * y + (G - 0.3) * bp.run(y) + 0.0006 * nd(rng) + (bed ? bed(n + i) : 0.0);
+      blk[2 * i] = blk[2 * i + 1] = float(v);
+    }
+    if (guard) g.process(blk.data(), 480);
+    for (int i = 0; i < 480; ++i) {
+      const double o = std::tanh(blk[2 * i] * 2.0) / 2.0;
+      line[size_t((lp + i) % D)] = o;
+      acc += o * o;
+      ++accn;
+    }
+    lp = (lp + 480) % D;
+    if (r.first_s < 0 && g.episodes()) {
+      r.first_s = n / 48000.0;
+      r.freq_hz = g.freq_hz();
+    }
+    if (accn >= 4800) {
+      const double db = 10 * std::log10(acc / accn + 1e-20);
+      r.max_db = std::max(r.max_db, db);
+      if (r.first_s >= 0 && n / 48000.0 > r.first_s + 0.5) {
+        ++after;
+        loud += db > -20 ? 1 : 0;
+      }
+      acc = 0;
+      accn = 0;
+    }
+  }
+  r.episodes = g.episodes();
+  r.false_alarms = g.false_alarms();
+  r.loud_after = after ? double(loud) / after : 1.0;
+  return r;
+}
+static double chord_bed(int64_t n) {  // a C major chord with partials, slowly swelling and fading
+  const double t = n / 48000.0, fs[] = {261.6, 329.6, 392.0};
+  double s = 0;
+  for (double f : fs)
+    for (int h = 1; h <= 5; ++h) s += 0.02 / h * std::sin(2 * M_PI_ * f * h * t);
+  return s * (0.6 + 0.4 * std::sin(2 * M_PI_ * 0.5 * t));
+}
+}  // namespace howl_sim
+
+static void test_howl_feedback_loop() {
+  using namespace howl_sim;
+  // Without the guard the loop howls at the speakers' limit.
+  LoopResult free_run = loop(1.25, 7100, 6, 100, 10, false, nullptr);
+  CHECKF(free_run.max_db > -15, "%.1f", free_run.max_db);
+  struct Case {
+    const char* name;
+    double G, f0, q, delay_ms;
+    bool bed;
+    double max_first_s, max_loud;
+  };
+  const Case cases[] = {
+      {"7.1 kHz, loop gain 1.25 (+19 dB/s)", 1.25, 7100, 6, 100, false, 4, 0.0},
+      {"7.1 kHz, loop gain 1.06 (+5 dB/s)", 1.06, 7100, 6, 100, false, 9, 0.0},
+      {"7.1 kHz, narrow resonance, gain 2", 2.0, 7100, 20, 100, false, 2, 0.0},
+      {"7.1 kHz, narrow resonance, gain 4", 4.0, 7100, 20, 100, false, 1, 0.0},
+      {"1.2 kHz, 180 ms loop, gain 1.15", 1.15, 1200, 6, 180, false, 8, 0.0},
+      {"7.1 kHz under music, gain 1.25", 1.25, 7100, 6, 100, true, 5, 0.1},
+  };
+  for (const Case& c : cases) {
+    LoopResult r = loop(c.G, c.f0, c.q, c.delay_ms, 20, true, c.bed ? chord_bed : nullptr);
+    std::printf("    %-36s first %.2f s at %.0f Hz, %u episodes, loud after %.0f %%, false %u\n", c.name, r.first_s,
+                r.freq_hz, r.episodes, 100 * r.loud_after, r.false_alarms);
+    CHECKF(r.first_s >= 0 && r.first_s <= c.max_first_s, "%s: first %.2f", c.name, r.first_s);
+    CHECKF(std::fabs(r.freq_hz - c.f0) < 200, "%s: %.0f Hz", c.name, r.freq_hz);
+    CHECKF(r.loud_after <= c.max_loud, "%s: %.2f", c.name, r.loud_after);
+    CHECKF(r.false_alarms == 0, "%s", c.name);
+  }
+}
+
+// Music with sustained tones never triggers the guard, and passes bit for bit.
+static void test_howl_music_untouched() {
+  struct Sig {
+    const char* name;
+    double secs;
+    std::function<double(int64_t)> f;
+  };
+  std::mt19937 rng(7);
+  std::normal_distribution<double> nd(0, 1);
+  auto flute = [&](double f0, std::function<double(double)> amp) {
+    return [=, &nd, &rng](int64_t n) {  // partials at -12/-20 dB, 5 Hz vibrato of 0.5 %, breath
+      const double t = n / 48000.0, ph = 2 * M_PI_ * f0 * t + 0.005 * f0 / 5.0 * std::sin(2 * M_PI_ * 5 * t);
+      return amp(t) * (std::sin(ph) + 0.25 * std::sin(2 * ph) + 0.1 * std::sin(3 * ph) + 0.003 * nd(rng));
+    };
+  };
+  double voice_ph = 0;
+  const Sig sigs[] = {
+      {"chord (C major, 4 notes, 6 partials)", 10,
+       [](int64_t n) {
+         const double t = n / 48000.0, fs[] = {261.6, 329.6, 392.0, 523.3};
+         double s = 0;
+         for (double f : fs)
+           for (int h = 1; h <= 6; ++h) s += 0.05 / h * std::sin(2 * M_PI_ * f * h * t);
+         return s;
+       }},
+      {"chord swell, -40 to -10 dB over 4 s", 8,
+       [](int64_t n) {
+         const double t = n / 48000.0, fs[] = {220, 277.2, 329.6};
+         double s = 0;
+         for (double f : fs)
+           for (int h = 1; h <= 4; ++h) s += 0.08 / h * std::sin(2 * M_PI_ * f * h * t);
+         return s * std::pow(10, (-40 + 30 * std::min(t / 4, 1.0)) / 20);
+       }},
+      {"log sine sweep 100 Hz-12 kHz", 8,
+       [](int64_t n) {
+         const double t = n / 48000.0, T = 8, f1 = 100, k = std::log(12000 / f1);
+         return 0.25 * std::sin(2 * M_PI_ * f1 * T / k * (std::exp(t / T * k) - 1));
+       }},
+      {"linear sine sweep 200 Hz-10 kHz", 10,
+       [](int64_t n) {
+         const double t = n / 48000.0;
+         return 0.25 * std::sin(2 * M_PI_ * (200 * t + 0.5 * 1000 * t * t));
+       }},
+      {"held flute-like A5, constant level", 10, flute(880, [](double t) { return 0.2 * std::min(t / 0.08, 1.0); })},
+      {"held flute-like E7, constant level", 10, flute(2637, [](double t) { return 0.2 * std::min(t / 0.08, 1.0); })},
+      {"flute-like crescendo, -40 to -10 dB in 3 s", 6,
+       flute(880, [](double t) { return std::pow(10, (-40 + 30 * std::min(t / 3, 1.0)) / 20); })},
+      {"pure 1 kHz tone switched on", 10, [](int64_t n) { return 0.25 * std::sin(2 * M_PI_ * 1000 * n / 48000.0); }},
+      {"voice-like (120-170 Hz, syllables)", 10,
+       [&](int64_t n) {
+         const double t = n / 48000.0, f = 120 + 50 * std::sin(2 * M_PI_ * 0.7 * t);
+         voice_ph += 2 * M_PI_ * f / 48000;
+         double s = 0;
+         for (int h = 1; h <= 20; ++h) s += std::sin(h * voice_ph) / h;
+         return 0.1 * std::max(0.0, std::sin(2 * M_PI_ * 2 * t)) * s;
+       }},
+  };
+  for (const Sig& s : sigs) {
+    HowlGuard g(2);
+    std::vector<float> blk(960), orig(960);
+    bool same = true;
+    const int64_t N = int64_t(s.secs * 48000);
+    for (int64_t n = 0; n < N; n += 480) {
+      for (int i = 0; i < 480; ++i) blk[2 * i] = blk[2 * i + 1] = float(s.f(n + i));
+      orig = blk;
+      g.process(blk.data(), 480);
+      same = same && blk == orig;
+    }
+    CHECKF(g.episodes() == 0, "%s: %u episodes", s.name, g.episodes());
+    CHECKF(same, "%s: samples changed", s.name);
+  }
+}
+
+// A pure tone that fades in looks like feedback: the guard ducks it, sees it does not decay under the
+// duck (no loop), releases within ~5 s and ignores that frequency; poll() reports both changes.
+static void test_howl_false_alarm_release() {
+  HowlGuard g(1);
+  std::vector<float> blk(480);
+  HowlReport r;
+  CHECK(!g.poll(&r) && !r.active);
+  int on = 0, off = 0;
+  double on_at = -1, off_at = -1;
+  for (int64_t n = 0; n < 12 * 48000; n += 480) {
+    for (int i = 0; i < 480; ++i) {
+      const double t = (n + i) / 48000.0;
+      blk[size_t(i)] = float(0.25 * std::min(t, 1.0) * std::sin(2 * M_PI_ * 1000 * t));
+    }
+    g.process(blk.data(), 480);
+    if (g.poll(&r)) {
+      if (r.active) {
+        ++on;
+        on_at = n / 48000.0;
+        CHECKF(std::fabs(r.freq_hz - 1000) < 30 && r.duck_db == -20, "%.0f Hz %.0f dB", r.freq_hz, r.duck_db);
+      } else {
+        ++off;
+        off_at = n / 48000.0;
+      }
+    }
+  }
+  std::printf("    ducked at %.2f s, released at %.2f s\n", on_at, off_at);
+  CHECK(on == 1 && off == 1);
+  CHECK(g.false_alarms() == 1);
+  CHECK(off_at > on_at + 4 && off_at < on_at + 6.5);
+  CHECK(g.gain_db() == 0);
+}
+
+// Through the helper: a system send stream whose sound rises like feedback (dev test source
+// "rise:7100") emits `howl` active, then (no loop: the tone stays) inactive after the false-alarm
+// release.
+static void test_howl_event() {
+  InProc a("");
+  size_t c = 0;
+  a.send(R"({"cmd":"flow_open","req":1,"flow":"0000b0b0","peer":"p","role":"offer","port":0,"remote":null,"key":")" +
+         b64key(5) + R"(","udp":false})");
+  CHECK(a.wait(&c, [](const Json& e) { return e.value("ev", "") == "ok" && e.value("req", 0) == 1; }, 3000));
+  a.send(R"({"cmd":"send","req":2,"stream":88,"flow":"0000b0b0","kind":"system","source":{"test":"rise:7100:30"},"key":")" +
+         b64key(6) + R"(","mute_local":false})");
+  CHECK(a.wait(&c, [](const Json& e) { return e.value("ev", "") == "ok" && e.value("req", 0) == 2; }, 3000));
+  Json ev;
+  bool got = a.wait(&c, [](const Json& e) { return e.value("ev", "") == "howl"; }, 8000, &ev);
+  CHECK(got);
+  if (!got) return;
+  std::printf("    %s\n", ev.dump().c_str());
+  CHECK(ev.value("stream", 0) == 88 && ev.value("active", false) && ev.value("duck_db", 0.0) == -20.0);
+  CHECKF(std::fabs(ev.value("freq_hz", 0.0) - 7100) < 50, "%s", ev.dump().c_str());
+  got = a.wait(&c, [](const Json& e) { return e.value("ev", "") == "howl"; }, 8000, &ev);
+  CHECK(got && !ev.value("active", true));
+}
+
 // ===================================================================== main
 
 struct Case {
@@ -1406,6 +1649,10 @@ int main(int argc, char** argv) {
       {"aec_double_talk", test_aec_double_talk},
       {"aec_path_alignment", test_aec_path_alignment},
       {"aec_wiring", test_aec_wiring},
+      {"howl_feedback_loop", test_howl_feedback_loop},
+      {"howl_music_untouched", test_howl_music_untouched},
+      {"howl_false_alarm_release", test_howl_false_alarm_release},
+      {"howl_event", test_howl_event},
   };
   int run = 0;
   for (const Case& c : cases) {

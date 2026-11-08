@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "flow.h"
+#include "howl.h"
 
 namespace beamer::audio {
 
@@ -64,6 +65,7 @@ SendStream::SendStream(const Config& cfg, std::shared_ptr<Flow> flow)
       ts_(random_u32()),
       rng_(random_u32()) {
   sealer_.init(cfg_.key, cfg_.id & ~kDirBit);
+  if (cfg_.kind == "system") howl_ = std::make_unique<HowlGuard>(cfg_.codec.channels);
 }
 
 SendStream::~SendStream() {
@@ -188,6 +190,7 @@ void SendStream::encoder_loop() {
     }
     while (!stop_.load() && ring_.available() >= static_cast<size_t>(frame_)) {
       ring_.read(pcm.data(), static_cast<size_t>(frame_));
+      if (howl_) howl_->process(pcm.data(), frame_);
       encode_frame(pcm.data(), uni, link_cap);
     }
   }
