@@ -44,7 +44,7 @@ class PagesWinTest(unittest.TestCase):
 
     def test_the_sidebar_runs_in_setup_order(self):
         self.assertEqual(pages_win.KEYS,
-                         ("overview", "crossing", "keyboard", "design", "connection"))
+                         ("overview", "crossing", "audio", "keyboard", "design", "connection"))
 
     def test_the_footer_drops_apply_as_you_go_on_connection(self):
         self.assertEqual(pages_win.footer("design"),
