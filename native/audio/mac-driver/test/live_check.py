@@ -4,7 +4,7 @@
 Drives the real devices through the prototype tool `beamer-audio`: a feeder plays a 1025 Hz pilot
 with chirp markers into the hidden "Beamer Mic Feed", a recorder captures "Beamer Microphone".
 
-    uv run --python 3.13 --with numpy test/live_check.py [--skip-restart] [--json out.json]
+    uv run --python 3.13 --with numpy test/live_check.py [--skip-restart] [--feeder proto|native] [--json out.json]
 
 Needs the driver installed (sudo -n /usr/local/libexec/beamer-hal install) and, for the coreaudiod
 restart step, the beamer-hal sudo rule. Writes nothing outside build/.
@@ -24,11 +24,14 @@ from pathlib import Path
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
-DRIVER = HERE.parent
-sys.path.insert(0, str(DRIVER.parent / "scenarios"))
+DRIVER = HERE.parent                      # native/audio/mac-driver
+PROTO = DRIVER.parents[2] / "dev" / "audio" / "proto"
+sys.path.insert(0, str(PROTO / "scenarios"))
 import sig  # noqa: E402  (shared test signals: pilot + chirp markers, lock-in glitch detector)
 
-TOOL = DRIVER.parent / "mac" / ".build" / "beamer-audio"
+TOOL = PROTO / "mac" / ".build" / "beamer-audio"
+NATIVE = DRIVER.parent / "build" / "mac" / "backend_check"   # the helper's Mac backend (build-mac.sh)
+FEEDER = "proto"   # --feeder: who plays into the feed; the recorder is always the prototype tool (an app)
 CA_UTIL = DRIVER / "build" / "ca_util"
 HELPER = "/usr/local/libexec/beamer-hal"
 MIC, FEED = "com.beamer.audio.mic", "com.beamer.audio.micfeed"
@@ -61,9 +64,14 @@ class Feeder:
     def __init__(self, buffer_frames=512, rate=RATE):
         self.rate = rate
         self.inj = sig.Injector("A", pilot_amp=0.1, marker_amp=0.3, period=1.0, start=0.5)
-        self.p = subprocess.Popen([str(TOOL), "play", "--device", FEED, "--channels", "1", "--rate", str(rate),
-                                   "--stats", "0", "--buffer-frames", str(buffer_frames), "--prefill-ms", "10"],
-                                  stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        if FEEDER == "native":  # 48 kHz mono through the Mac backend (it converts to the device rate)
+            cmd = [str(NATIVE), "play", "--vmic", "--stdin", "--channels", "1"]
+            env = {**os.environ, "BEAMER_AUDIO_MAC_BUFFER_FRAMES": str(buffer_frames)}
+        else:
+            cmd = [str(TOOL), "play", "--device", FEED, "--channels", "1", "--rate", str(rate),
+                   "--stats", "0", "--buffer-frames", str(buffer_frames), "--prefill-ms", "10"]
+            env = None
+        self.p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=env)
         self.markers: list[int] = []
         self.stop_ev = threading.Event()
         self.t = threading.Thread(target=self._run, daemon=True)
@@ -214,9 +222,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--skip-restart", action="store_true", help="do not restart coreaudiod")
     ap.add_argument("--json", help="write results here")
+    ap.add_argument("--feeder", choices=("proto", "native"), default="proto",
+                    help="native: feed through native/audio/build/mac/backend_check (the helper's Mac backend)")
     args = ap.parse_args()
+    global FEEDER
+    FEEDER = args.feeder
 
-    for p in (TOOL, CA_UTIL):
+    for p in (TOOL, CA_UTIL) + ((NATIVE,) if FEEDER == "native" else ()):
         if not p.exists():
             sys.exit(f"missing {p} (build it first)")
 
