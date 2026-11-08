@@ -7,21 +7,20 @@ significant step. Branch: `feat/audio` (from `dev/local-build`).
 
 Grouped; nothing else is blocked. Ordered by what it unblocks.
 
-1. **Mac: the `beamer-hal` root helper is missing** (start check 1 failed, 2026-11-07 14:51).
-   `/usr/local/libexec/beamer-hal` does not exist and `sudo -n -l /usr/local/libexec/beamer-hal install`
-   asks for a password, so there is no sudoers rule either. Needed: the helper (install/uninstall/restart
-   of `~/Developer/beamer-hal-staging/BeamerAudio.driver` into /Library/Audio/Plug-Ins/HAL + coreaudiod
-   reload) and a NOPASSWD rule for `beamer-hal install|uninstall|restart`. Unblocks: the PC microphone
-   appearing on the Mac as "Beamer Microphone" (driver is built, signed Beamer Dev, tested out of process).
-2. **Decision: echo between machines on one desk.** The PC's Wave:3 hears the MacBook speakers at about
-   -11 dB; forwarding a mic to a machine that plays on speakers howls. Options: (a) acoustic echo
-   cancellation in Beamer when a forwarded mic and local speakers are both active (more work, some latency),
-   (b) rule "forward the mic only when the listening side uses a headset", (c) both. My default if you
-   don't answer: (c), AEC on, with a warning in the UI.
-3. **Decision: how the PC's "active mic" reaches apps.** The PC's communications default is the DualSense
-   (input and output). Either Beamer switches the default (console + communications) recording device to
-   CABLE Output while a remote mic is active (undocumented Windows API, restores on stop), or you pick
-   "CABLE Output" once in Zoom/Discord. My default: pick it once in the apps (documented, no surprise).
+1. **Mac virtual mic: done (2026-11-08)**, nothing waiting for Alex. `beamer-hal` installed
+   (`/usr/local/libexec/beamer-hal` + `/etc/sudoers.d/beamer-hal`, NOPASSWD `install|uninstall|restart`;
+   source in `proto/mac-driver/helper/`). The driver blocker (coreaudiod asks safety offset in both
+   directions, unknown answer -> device dropped) is fixed; "Beamer Microphone" appears, the hidden feed
+   loops to it bit-exact (17.5 ms at 512 frames, 4.2 ms at 128), input volume + mute added. README checks
+   1-9 pass (`proto/mac-driver/README.md`, "Live test results"), except sleep/wake (not tested) and
+   Zoom/Discord pickers by hand (not installed). **Note for Alex:** on this Mac coreaudiod, Brave, Hex,
+   universalaccessd and ControlCenter regularly sit at 50-100 % CPU together, about a minute after
+   coreaudiod starts, with or without the Beamer driver (measured 3 min each way). Not Beamer; quitting
+   Brave/Hex one at a time would show which one triggers it.
+2. ~~Decision: echo between machines~~ **decided by Alex 2026-11-08: (c)**, echo cancellation in Beamer
+   when a forwarded mic and local speakers are both active, plus a headset warning in the UI.
+3. ~~Decision: how the PC's active mic reaches apps~~ **decided by Alex 2026-11-08**: pick "CABLE Output"
+   once in the apps; Beamer does not switch Windows default devices.
 4. **Optional: PC Wi-Fi adapter power saving.** The MediaTek RZ616's "Power Saving" is Auto; it is the root cause of the Mac->PC jitter (W3, V3). Beamer works around it, but setting it to Off (Device Manager > adapter > Advanced) would remove most of the remaining spikes. A system setting, so yours to decide; also on DFS channel 52 at 160 MHz (radar events can stall the channel).
 5. **Ear checks, 2 minutes, whenever you are at the machines** (not blocking): (a) PC: during a
    `--mute-local` run the G733 is really silent (the API says muted, no microphone can hear the headset);
@@ -30,7 +29,11 @@ Grouped; nothing else is blocked. Ordered by what it unblocks.
 
 ## Phase
 
-**Phase 1: prototyping and technical proof — conclusions written in `dev/audio/PHASE1.md`** (2026-11-07 22:20). All mission questions answered with measurements; the only Phase 1 item not proven on real hardware is the Mac virtual mic install (blocked on `beamer-hal`). Next: Phase 2 integration into Beamer, per the architecture in PHASE1.md.
+**Phase 2: integration into Beamer — started 2026-11-08.** Alex confirmed the driver and the defaults
+(echo: AEC + headset warning; PC: apps pick CABLE Output). Design and work packages: `dev/audio/PHASE2.md`.
+
+Phase 1 (prototyping and technical proof) closed 2026-11-07 22:20, conclusions in `dev/audio/PHASE1.md`;
+Mac virtual mic validated live 2026-11-08.
 
 ## Start checks (2026-11-07)
 

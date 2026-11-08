@@ -1,0 +1,81 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-only
+# beamer-hal: root helper that installs BeamerAudio.driver into Core Audio.
+# Installed as /usr/local/libexec/beamer-hal (root:wheel 755); run via the NOPASSWD rule in
+# /etc/sudoers.d/beamer-hal:  sudo /usr/local/libexec/beamer-hal install|uninstall|restart
+# `status` needs no root. Takes no other arguments and ignores the environment on purpose.
+set -euo pipefail
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+umask 022
+
+STAGED="__STAGED__"   # set when the helper is installed
+DEST_DIR=/Library/Audio/Plug-Ins/HAL
+DEST="$DEST_DIR/BeamerAudio.driver"
+BUNDLE_ID=com.beamer.audio.driver
+
+die() { echo "beamer-hal: $*" >&2; exit 1; }
+need_root() { [ "$(id -u)" -eq 0 ] || die "$1 needs root: sudo $0 $1"; }
+
+restart_coreaudiod() {
+    # launchd relaunches coreaudiod on demand; launchctl kickstart is refused under SIP.
+    killall coreaudiod 2>/dev/null || true
+    for _ in $(seq 1 50); do
+        pgrep -x coreaudiod >/dev/null && { echo "coreaudiod restarted"; return 0; }
+        sleep 0.1
+    done
+    # Nudge launchd: any Core Audio client brings it back.
+    system_profiler SPAudioDataType >/dev/null 2>&1 || true
+    pgrep -x coreaudiod >/dev/null && echo "coreaudiod restarted" || echo "beamer-hal: coreaudiod not running yet (launchd starts it on demand)" >&2
+}
+
+do_install() {
+    need_root install
+    [ -d "$STAGED" ] && [ ! -L "$STAGED" ] || die "no staged bundle at $STAGED (run build.sh)"
+
+    # Copy into a root-only temp dir first, then check what we copied (not the user-writable source).
+    tmp="$(mktemp -d /private/var/tmp/beamer-hal.XXXXXX)"
+    trap 'rm -rf "$tmp"' EXIT
+    ditto --norsrc "$STAGED" "$tmp/BeamerAudio.driver"
+    new="$tmp/BeamerAudio.driver"
+
+    [ -z "$(find "$new" -type l -print -quit)" ] || die "staged bundle contains symlinks; refused"
+    [ -f "$new/Contents/Info.plist" ] && [ -f "$new/Contents/MacOS/BeamerAudio" ] || die "staged bundle is incomplete"
+    id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$new/Contents/Info.plist" 2>/dev/null || true)"
+    [ "$id" = "$BUNDLE_ID" ] || die "unexpected bundle identifier '$id'"
+    codesign --verify --strict -R="identifier \"$BUNDLE_ID\"" "$new" || die "signature check failed"
+
+    chown -R root:wheel "$new"
+    chmod -R u+rwX,go+rX,go-w "$new"
+    xattr -cr "$new" 2>/dev/null || true
+
+    rm -rf "$DEST"
+    mv "$new" "$DEST"
+    echo "installed $DEST ($(codesign -dvv "$DEST" 2>&1 | sed -n 's/^Authority=//p' | head -1))"
+    restart_coreaudiod
+}
+
+do_uninstall() {
+    need_root uninstall
+    if [ -e "$DEST" ]; then rm -rf "$DEST"; echo "removed $DEST"; else echo "not installed"; fi
+    restart_coreaudiod
+}
+
+do_status() {
+    echo "staged:    $STAGED $( [ -d "$STAGED" ] && echo present || echo MISSING )"
+    if [ -d "$DEST" ]; then
+        echo "installed: $DEST"
+        if [ -d "$STAGED" ] && diff -rq "$STAGED" "$DEST" >/dev/null 2>&1; then echo "           identical to staged"; else echo "           differs from staged"; fi
+    else
+        echo "installed: no"
+    fi
+    pgrep -x coreaudiod >/dev/null && echo "coreaudiod: running" || echo "coreaudiod: not running"
+}
+
+[ $# -eq 1 ] || die "usage: beamer-hal install|uninstall|restart|status"
+case "$1" in
+    install)   do_install ;;
+    uninstall) do_uninstall ;;
+    restart)   need_root restart; restart_coreaudiod ;;
+    status)    do_status ;;
+    *)         die "usage: beamer-hal install|uninstall|restart|status" ;;
+esac

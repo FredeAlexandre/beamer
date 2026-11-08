@@ -181,6 +181,18 @@ func defaultsInfo() -> [String: Any] {
     ]
 }
 
+/// kAudioHardwarePropertyTranslateUIDToDevice: works for hidden devices too. 0 if unknown.
+func translateUIDToDevice(_ uid: String) -> AudioObjectID {
+    var address = paddr(kAudioHardwarePropertyTranslateUIDToDevice)
+    var cfUID = uid as CFString
+    var device = AudioObjectID(0)
+    var size = UInt32(MemoryLayout<AudioObjectID>.size)
+    let status = withUnsafeMutablePointer(to: &cfUID) { q in
+        AudioObjectGetPropertyData(systemObject, &address, UInt32(MemoryLayout<CFString>.size), q, &size, &device)
+    }
+    return status == noErr ? device : 0
+}
+
 enum DeviceSelectError: Error, CustomStringConvertible {
     case notFound(String), ambiguous(String, [String])
     var description: String {
@@ -202,6 +214,9 @@ func selectDevice(_ query: String?, scope: AudioObjectPropertyScope, defaultSel:
     }
     let candidates = allDevices().filter { channelCount($0, scope) > 0 }
     if let d = candidates.first(where: { deviceUID($0) == q }) { return d }
+    // Hidden devices (e.g. "Beamer Mic Feed") are not in the device list but translate by UID.
+    let hidden = translateUIDToDevice(q)
+    if hidden != 0 && channelCount(hidden, scope) > 0 { return hidden }
     if allowName {
         let m = candidates.filter { deviceName($0).localizedCaseInsensitiveContains(q) }
         if m.count == 1 { return m[0] }

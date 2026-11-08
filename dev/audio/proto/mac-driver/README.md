@@ -5,12 +5,15 @@ A Core Audio AudioServerPlugIn (HAL plug-in, runs inside coreaudiod) that makes 
 received from another machine show up on the Mac as a real input device that Zoom, Discord,
 FaceTime... can pick.
 
-Status: built, signed, staged and tested **out of process only**. Not installed yet (it needs
-the `beamer-hal` root helper, which does not exist yet).
+Status (2026-11-08): **installed and validated on the Mac** through the `beamer-hal` root helper
+(see "Installing"). "Beamer Microphone" shows up in macOS, the hidden feed loops back to it
+bit-exact, and the mic has an input volume and mute. Live results: "Live test results" below.
 
 ```
 ./build.sh   # universal bundle -> build/BeamerAudio.driver, copied to ~/Developer/beamer-hal-staging/
 ./test.sh    # build.sh + drives the bundle with test/test_host (plus ASan/UBSan and TSan builds)
+sudo -n /usr/local/libexec/beamer-hal install   # copy the staged bundle into the HAL + restart coreaudiod
+swiftc -O test/ca_util.swift -o build/ca_util && (cd test && uv run --python 3.13 --with numpy live_check.py)
 ```
 
 Command Line Tools only (clang, lipo, codesign); no Xcode project.
@@ -30,8 +33,20 @@ One plug-in, two devices, one shared ring buffer (the classic loopback "virtual 
 | Used by | apps that record | Beamer, which plays the received mic into it |
 
 Common: manufacturer `Beamer`, model UID `com.beamer.audio.model`, transport type `virt`,
-Float32 mono packed, 48 kHz (default) or 44.1 kHz, clock domain `'BEMR'` on both, no controls
-(no volume/mute), latency 0, safety offset 0, zero-timestamp period 16384 frames.
+Float32 mono packed, 48 kHz (default) or 44.1 kHz, clock domain `'BEMR'` on both, latency 0,
+safety offset 0 (answered in **both** directions, see below), zero-timestamp period 16384 frames.
+
+**Microphone controls** (input scope, owned by "Beamer Microphone"; the feed has none):
+volume control object 6 (scalar 0..1, linear in dB over -64..0 dB, scalar 0 = silence) and mute
+control object 7. Apps and System Settings see them as the device's input volume/mute
+(`kAudioDevicePropertyVolumeScalar` / `kAudioDevicePropertyMute`, settable). The gain is applied
+in the mic's ReadInput only, read lock-free; at full volume nothing is multiplied, so the loopback
+stays bit-exact. Values are not persisted by the driver (start at 1.0 / unmuted after each
+coreaudiod start); Beamer sets them if it needs to.
+
+**Unknown properties are logged** (`os_log`, subsystem `com.beamer.audio.driver`, category
+`property`) for GetPropertyData/DataSize, never on the IO path. That is how the install blocker was
+found: coreaudiod's own log redacts the selector.
 Bundle: `CFBundleIdentifier com.beamer.audio.driver`, factory UUID
 `D590F59B-06C8-4FA2-B549-9F9A6F1756BD` -> `BeamerAudio_Create` (the only exported symbol),
 registered for `kAudioServerPlugInTypeUUID`.
@@ -129,32 +144,57 @@ Mutation check (done once by hand, not part of `test.sh`): removing gap zeroing,
 Not covered: the x86_64 slice is built and its exports checked, but not executed (Rosetta is not
 installed on this Mac).
 
-## What remains to verify once installed
+## Installing (beamer-hal)
 
-Install = copy `~/Developer/beamer-hal-staging/BeamerAudio.driver` to
-`/Library/Audio/Plug-Ins/HAL/` and restart coreaudiod (`beamer-hal install`).
+`/usr/local/libexec/beamer-hal` (root:wheel 755) with a NOPASSWD sudoers rule
+(`/etc/sudoers.d/beamer-hal`, only `install`, `uninstall`, `restart`). Source and one-time setup in
+`helper/` (`sudo helper/setup-beamer-hal.sh <user> <staged bundle path>`; installed 2026-11-08).
 
-1. coreaudiod loads it: `system_profiler SPAudioDataType` / Audio MIDI Setup shows
-   "Beamer Microphone"; `log stream --predicate 'process == "coreaudiod"'` free of plug-in errors.
-   Check that the self-signed "Beamer Dev" signature is accepted by the Core Audio driver service
-   (ad-hoc signing is the fallback).
-2. "Beamer Mic Feed" is hidden: absent from Sound settings output list and app pickers (Zoom,
-   Discord, Chrome). Some apps enumerate all devices without honouring `IsHidden`; record which.
-3. `TranslateUIDToDevice("com.beamer.audio.micfeed")` from a user process returns the hidden
-   device, and Beamer can start IO on it.
-4. End-to-end: Beamer plays a tone into the feed, an app records from the mic; measure latency
-   (expect about 2 HAL buffers plus any safety offset). Tune `kAudioDevicePropertyLatency` /
-   `SafetyOffset` (currently 0, as NullAudio) if apps report glitches or bad A/V sync, and check
-   behaviour with large buffers (the ring tolerates feed lead + mic lag up to 12288 frames).
-5. Feed and mic started/stopped in every order, apps joining mid-stream, Beamer quitting while
-   Zoom records (expect silence, no loop of old audio), sleep/wake.
-6. coreaudiod restart (`killall coreaudiod` via the helper) while Beamer feeds and an app records:
-   both must reconnect; Beamer must re-translate the UID (object IDs can change) and restart its
-   IO proc on `kAudioHardwarePropertyDevices` / `kAudioDevicePropertyDeviceIsAlive` changes.
-7. Sample-rate change from Audio MIDI Setup on the mic while running: both devices follow.
-8. Apps that want an input volume control (Zoom "automatically adjust microphone volume", the
-   Sound settings input slider) see none; decide whether to add a volume/mute control.
-9. CPU use of coreaudiod with the plug-in idle and running (should be negligible).
+* `install`: copies the staged bundle into a root-only temp dir, refuses symlinks, checks the
+  bundle id and `codesign --verify --strict`, chowns root:wheel, moves it to
+  `/Library/Audio/Plug-Ins/HAL/BeamerAudio.driver`, restarts coreaudiod (`killall`; launchd
+  relaunches it, `launchctl kickstart` is refused under SIP).
+* `uninstall`, `restart`; `status` (no root) compares the staged and installed bundles.
+* The staged path is fixed at setup time; the helper takes no other argument and ignores the
+  environment.
+
+Signature: amfid logs "adhoc signed or signed by an unknown certificate chain" for the self-signed
+"Beamer Dev" signature, but the Core Audio driver service loads the plug-in anyway (same with
+ad-hoc). A shipped build should still be Developer ID signed and notarized.
+
+**Restarting coreaudiod is disruptive**: every app's audio drops, and on this Mac (macOS 27.0)
+coreaudiod sometimes stays at ~100 % CPU after a restart done while apps play or record (same with
+the built-in devices only, so not the driver). A second restart with nothing playing clears it.
+Beamer should install/update the driver when no audio is running, or tell the user.
+
+## Live test results (2026-11-08, macOS 27.0 26A428, MacBook Air, installed driver)
+
+The install blocker: coreaudiod asks every device for `kAudioDevicePropertySafetyOffset` (and
+latency) in **both** directions while adding it, even the direction without a stream; the driver
+answered only its own direction, the HAL got `'who?'` and dropped both devices ("Caught exception
+trying to add device"). Fixed by answering 0 in input and output scopes; `test_host` now checks it.
+
+`test/live_check.py` drives the real devices with the prototype tool `beamer-audio` (`../mac`): a
+feeder plays a 1025 Hz pilot (-20 dBFS) with chirp markers into the hidden feed, a recorder
+captures "Beamer Microphone" (both 48 kHz mono, 512-frame buffers). Results (all PASS):
+
+| README check | result |
+|---|---|
+| 1 loads | "Beamer Microphone" in `system_profiler` / device list, virtual, 48 kHz; no unknown-property request from coreaudiod after the fix |
+| 2 feed hidden | not in `kAudioHardwarePropertyDevices` (what Sound settings and app pickers enumerate); not checked by hand in Zoom/Discord (not installed here) |
+| 3 UID lookup | `TranslateUIDToDevice("com.beamer.audio.micfeed")` from a user process returns it; IO starts (`beamer-audio` now falls back to it for hidden devices) |
+| 4 end-to-end | 12/12 clicks: render -> mic delivery **17.5 ms at 512 frames, 4.2 ms at 128**; HAL timestamps identical (0 ms). 10.6 s of pilot: 0 glitches, 0 lost/repeated samples (constant marker offset), **bit-exact** (432000 frames, max error 0.0) |
+| 5 start/stop orders | mic alone: digital silence; feed SIGKILLed while recording: audio stops 22-25 ms later, then 3 s of exact silence (no replay); feed restarted: clean; recorder stopped and a new one joins mid-stream: clean. Sleep/wake **not tested** |
+| 6 coreaudiod restart | devices come back under the same UIDs (new object IDs), a fresh feed/recorder pair is clean. Clients that were running keep their process but get no more audio: Beamer must re-translate the UID and restart its IO proc. See the CPU caveat above |
+| 7 rate change | 44.1 kHz set on the mic while both run -> both devices 44.1 kHz; 48 kHz clients through the HAL's converter: 0 glitches; back to 48 kHz |
+| 8 volume/mute | added (see Design). Input volume and mute visible and settable from apps; volume 0.5 -> pilot -52 dBFS (-32 dB as designed), mute -> exact silence, unmute keeps the volume, 1.0 -> -20 dBFS again |
+| 9 CPU | driver service process 0.0-0.2 %; coreaudiod 2-3 % while streaming. Idle coreaudiod numbers on this Mac are dominated by the unrelated spikes above |
+
+Out-of-process suite (`./test.sh`) after the changes: **2205 checks, 0 failures** (signed bundle,
+ASan+UBSan, TSan), including the controls and the both-scopes latency/safety offset answers.
+
+Still open: sleep/wake; a look at Zoom/Discord/Chrome pickers by hand; latency/safety offset stay
+0 (no app complained in these tests; revisit if an app reports A/V sync issues).
 
 ## Files
 
@@ -164,3 +204,5 @@ Install = copy `~/Developer/beamer-hal-staging/BeamerAudio.driver` to
 * `build.sh`: universal build, export check, signing ("Beamer Dev" if present, else ad-hoc),
   staging copy.
 * `test/test_host.c`, `test.sh`: the out-of-process test host.
+* `test/live_check.py`, `test/ca_util.swift`: live checks against the installed driver.
+* `helper/beamer-hal`, `helper/setup-beamer-hal.sh`: the root install helper and its one-time setup.

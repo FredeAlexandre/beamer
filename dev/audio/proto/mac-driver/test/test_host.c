@@ -23,7 +23,7 @@
 #include <unistd.h>
 
 // Mirrors of driver constants (asserted against what the driver reports where it reports them).
-enum { kObjPlugIn = 1, kObjMic = 2, kObjMicStream = 3, kObjFeed = 4, kObjFeedStream = 5 };
+enum { kObjPlugIn = 1, kObjMic = 2, kObjMicStream = 3, kObjFeed = 4, kObjFeedStream = 5, kObjMicVolume = 6, kObjMicMute = 7 };
 #define kPeriod        16384u      // kAudioDevicePropertyZeroTimeStampPeriod
 #define kRingFrames    16384
 #define kRingValid     (16384 - 4096)
@@ -265,7 +265,25 @@ static void TestDevice(AudioObjectID dev, AudioObjectID stream, int isInput)
     CHECK(GetProp(dev, kAudioDevicePropertyStreams, mine, sizeof(streams), streams, &sz) == 0 && sz == sizeof(AudioObjectID) && streams[0] == stream,
           "streams in own scope");
     CHECK(GetProp(dev, kAudioDevicePropertyStreams, other, sizeof(streams), streams, &sz) == 0 && sz == 0, "no streams in other scope");
-    CHECK(GetProp(dev, kAudioObjectPropertyControlList, kAudioObjectPropertyScopeGlobal, sizeof(streams), streams, &sz) == 0 && sz == 0, "no controls");
+    AudioObjectID ctl[4] = {0};
+    CHECK(GetProp(dev, kAudioObjectPropertyControlList, kAudioObjectPropertyScopeGlobal, sizeof(ctl), ctl, &sz) == 0, "control list");
+    if (isInput) CHECK(sz == 2 * sizeof(AudioObjectID) && ctl[0] == kObjMicVolume && ctl[1] == kObjMicMute, "mic controls = [volume, mute]");
+    else         CHECK(sz == 0, "feed has no controls");
+    AudioObjectID owned[8] = {0};
+    CHECK(GetProp(dev, kAudioObjectPropertyOwnedObjects, kAudioObjectPropertyScopeGlobal, sizeof(owned), owned, &sz) == 0, "owned objects");
+    if (isInput) CHECK(sz == 3 * sizeof(AudioObjectID) && owned[0] == stream && owned[1] == kObjMicVolume && owned[2] == kObjMicMute, "mic owns stream + 2 controls");
+    else         CHECK(sz == sizeof(AudioObjectID) && owned[0] == stream, "feed owns its stream");
+    CHECK(GetProp(dev, kAudioObjectPropertyOwnedObjects, other, sizeof(owned), owned, &sz) == 0 && sz == 0, "owns nothing in the other scope");
+
+    // What coreaudiod asks while adding a device, in BOTH directions even without a stream there:
+    // an unknown-property answer makes it drop the device ("Caught exception trying to add device").
+    for (int sc = 0; sc < 2; sc++) {
+        AudioObjectPropertyScope scope = sc ? kAudioObjectPropertyScopeOutput : kAudioObjectPropertyScopeInput;
+        UInt32 v = 99;
+        CHECK(GetProp(dev, kAudioDevicePropertyLatency, scope, sizeof(v), &v, &sz) == 0 && v == 0, "latency answered in scope %d", sc);
+        v = 99;
+        CHECK(GetProp(dev, kAudioDevicePropertySafetyOffset, scope, sizeof(v), &v, &sz) == 0 && v == 0, "safety offset answered in scope %d", sc);
+    }
 
     UInt32 stereo[2] = {0, 0};
     CHECK(GetProp(dev, kAudioDevicePropertyPreferredChannelsForStereo, mine, sizeof(stereo), stereo, &sz) == 0 && stereo[0] == 1 && stereo[1] == 1, "stereo pair = 1,1");
@@ -328,6 +346,10 @@ static void TestPropertySweep(void)
         kAudioStreamPropertyIsActive, kAudioStreamPropertyDirection, kAudioStreamPropertyTerminalType,
         kAudioStreamPropertyStartingChannel, kAudioStreamPropertyLatency, kAudioStreamPropertyVirtualFormat,
         kAudioStreamPropertyAvailableVirtualFormats, kAudioStreamPropertyPhysicalFormat, kAudioStreamPropertyAvailablePhysicalFormats,
+        kAudioControlPropertyScope, kAudioControlPropertyElement, kAudioLevelControlPropertyScalarValue,
+        kAudioLevelControlPropertyDecibelValue, kAudioLevelControlPropertyDecibelRange,
+        kAudioLevelControlPropertyConvertScalarToDecibels, kAudioLevelControlPropertyConvertDecibelsToScalar,
+        kAudioBooleanControlPropertyValue,
         'zzzz',
     };
     static const AudioObjectPropertyScope scopes[] = { kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyScopeInput, kAudioObjectPropertyScopeOutput };
@@ -337,7 +359,7 @@ static void TestPropertySweep(void)
         kAudioDevicePropertyModelUID, kAudioPlugInPropertyResourceBundle,
     };
     int supported = 0;
-    for (AudioObjectID obj = kObjPlugIn; obj <= kObjFeedStream; obj++) {
+    for (AudioObjectID obj = kObjPlugIn; obj <= kObjMicMute; obj++) {
         for (size_t si = 0; si < sizeof(scopes) / sizeof(scopes[0]); si++) {
             for (size_t i = 0; i < sizeof(sels) / sizeof(sels[0]); i++) {
                 AudioObjectPropertyAddress a = Addr(sels[i], scopes[si]);
@@ -747,6 +769,129 @@ static void TestSampleRateChange(Float64 to)
     printf("  both devices now %.0f Hz (2 config-change requests, applied via Perform)\n", to);
 }
 
+
+// ---------------------------------------------------------------------------------------------
+// Microphone controls (volume, mute)
+// ---------------------------------------------------------------------------------------------
+
+static Float32 GetF32(AudioObjectID obj, AudioObjectPropertySelector sel)
+{
+    Float32 v = -999.0f;
+    OSStatus err = GetProp(obj, sel, kAudioObjectPropertyScopeGlobal, sizeof(v), &v, NULL);
+    CHECK(err == 0, "GetF32 obj %u sel '%.4s' err %d", obj, (char*)&(UInt32){CFSwapInt32HostToBig(sel)}, (int)err);
+    return v;
+}
+
+static OSStatus SetF32(AudioObjectID obj, AudioObjectPropertySelector sel, Float32 v)
+{
+    AudioObjectPropertyAddress a = Addr(sel, kAudioObjectPropertyScopeGlobal);
+    return DRV->SetPropertyData(D, obj, getpid(), &a, 0, NULL, sizeof(v), &v);
+}
+
+static OSStatus SetMute(UInt32 on)
+{
+    AudioObjectPropertyAddress a = Addr(kAudioBooleanControlPropertyValue, kAudioObjectPropertyScopeGlobal);
+    return DRV->SetPropertyData(D, kObjMicMute, getpid(), &a, 0, NULL, sizeof(on), &on);
+}
+
+static Float32 Convert(AudioObjectPropertySelector sel, Float32 in)
+{
+    Float32 v = in; UInt32 sz = 0;
+    CHECK(GetProp(kObjMicVolume, sel, kAudioObjectPropertyScopeGlobal, sizeof(v), &v, &sz) == 0 && sz == sizeof(v), "convert");
+    return v;
+}
+
+static int Near(Float32 a, Float32 b) { return fabsf(a - b) < 1e-4f; }
+
+static void TestControls(void)
+{
+    SECTION("microphone controls (properties)");
+    CHECK(GetU32(kObjMicVolume, kAudioObjectPropertyClass, kAudioObjectPropertyScopeGlobal) == kAudioVolumeControlClassID, "volume class");
+    CHECK(GetU32(kObjMicVolume, kAudioObjectPropertyBaseClass, kAudioObjectPropertyScopeGlobal) == kAudioLevelControlClassID, "volume base class");
+    CHECK(GetU32(kObjMicMute, kAudioObjectPropertyClass, kAudioObjectPropertyScopeGlobal) == kAudioMuteControlClassID, "mute class");
+    CHECK(GetU32(kObjMicMute, kAudioObjectPropertyBaseClass, kAudioObjectPropertyScopeGlobal) == kAudioBooleanControlClassID, "mute base class");
+    for (AudioObjectID c = kObjMicVolume; c <= kObjMicMute; c++) {
+        CHECK(GetU32(c, kAudioObjectPropertyOwner, kAudioObjectPropertyScopeGlobal) == kObjMic, "control %u owner = mic", c);
+        CHECK(GetU32(c, kAudioControlPropertyScope, kAudioObjectPropertyScopeGlobal) == kAudioObjectPropertyScopeInput, "control %u scope = input", c);
+        CHECK(GetU32(c, kAudioControlPropertyElement, kAudioObjectPropertyScopeGlobal) == kAudioObjectPropertyElementMain, "control %u element = main", c);
+    }
+    CHECK(Near(GetF32(kObjMicVolume, kAudioLevelControlPropertyScalarValue), 1.0f), "default volume 1.0");
+    CHECK(Near(GetF32(kObjMicVolume, kAudioLevelControlPropertyDecibelValue), 0.0f), "default 0 dB");
+    CHECK(GetU32(kObjMicMute, kAudioBooleanControlPropertyValue, kAudioObjectPropertyScopeGlobal) == 0, "default unmuted");
+    AudioValueRange r = {0, 0}; UInt32 sz = 0;
+    CHECK(GetProp(kObjMicVolume, kAudioLevelControlPropertyDecibelRange, kAudioObjectPropertyScopeGlobal, sizeof(r), &r, &sz) == 0 &&
+          r.mMinimum == -64.0 && r.mMaximum == 0.0, "dB range -64..0");
+    CHECK(Near(Convert(kAudioLevelControlPropertyConvertScalarToDecibels, 0.5f), -32.0f), "scalar 0.5 -> -32 dB");
+    CHECK(Near(Convert(kAudioLevelControlPropertyConvertDecibelsToScalar, -16.0f), 0.75f), "-16 dB -> scalar 0.75");
+    CHECK(Near(Convert(kAudioLevelControlPropertyConvertDecibelsToScalar, -200.0f), 0.0f), "dB below range clamps");
+
+    Boolean settable = false;
+    AudioObjectPropertyAddress a = Addr(kAudioLevelControlPropertyScalarValue, kAudioObjectPropertyScopeGlobal);
+    CHECK(DRV->IsPropertySettable(D, kObjMicVolume, getpid(), &a, &settable) == 0 && settable, "scalar settable");
+    a = Addr(kAudioLevelControlPropertyDecibelRange, kAudioObjectPropertyScopeGlobal);
+    CHECK(DRV->IsPropertySettable(D, kObjMicVolume, getpid(), &a, &settable) == 0 && !settable, "range not settable");
+    a = Addr(kAudioBooleanControlPropertyValue, kAudioObjectPropertyScopeGlobal);
+    CHECK(DRV->IsPropertySettable(D, kObjMicMute, getpid(), &a, &settable) == 0 && settable, "mute settable");
+
+    int calls = gPropsChangedCalls;
+    CHECK(SetF32(kObjMicVolume, kAudioLevelControlPropertyScalarValue, 0.5f) == 0, "set scalar");
+    CHECK(Near(GetF32(kObjMicVolume, kAudioLevelControlPropertyDecibelValue), -32.0f), "scalar 0.5 reads -32 dB");
+    CHECK(gPropsChangedCalls == calls + 1, "volume change notified");
+    CHECK(SetF32(kObjMicVolume, kAudioLevelControlPropertyScalarValue, 0.5f) == 0 && gPropsChangedCalls == calls + 1, "same value: no notification");
+    CHECK(SetF32(kObjMicVolume, kAudioLevelControlPropertyDecibelValue, -16.0f) == 0, "set dB");
+    CHECK(Near(GetF32(kObjMicVolume, kAudioLevelControlPropertyScalarValue), 0.75f), "-16 dB reads scalar 0.75");
+    CHECK(SetF32(kObjMicVolume, kAudioLevelControlPropertyScalarValue, 7.0f) == 0 &&
+          Near(GetF32(kObjMicVolume, kAudioLevelControlPropertyScalarValue), 1.0f), "scalar clamps to 1");
+    CHECK(SetF32(kObjMicVolume, kAudioLevelControlPropertyScalarValue, NAN) != 0, "NaN rejected");
+    CHECK(SetF32(kObjMicVolume, kAudioLevelControlPropertyDecibelRange, 1.0f) != 0, "read-only property rejected");
+    calls = gPropsChangedCalls;
+    CHECK(SetMute(1) == 0 && GetU32(kObjMicMute, kAudioBooleanControlPropertyValue, kAudioObjectPropertyScopeGlobal) == 1, "mute on");
+    CHECK(gPropsChangedCalls == calls + 1, "mute change notified");
+    CHECK(SetMute(0) == 0 && GetU32(kObjMicMute, kAudioBooleanControlPropertyValue, kAudioObjectPropertyScopeGlobal) == 0, "mute off");
+    printf("  volume (6): -64..0 dB, scalar linear in dB; mute (7); both input scope, owned by the mic\n");
+}
+
+static void TestControlsIO(void)
+{
+    SECTION("microphone controls (audio)");
+    StartBoth();
+    enum { N = 512 };
+    Float32 w[N], r[N];
+    for (int i = 0; i < N; i++) w[i] = Signal(5000 + i);
+    FeedWrite(5000, w, N);
+    int ok;
+
+    MicRead(5000, r, N);
+    ok = 1; for (int i = 0; i < N; i++) ok &= r[i] == w[i];
+    CHECK(ok, "volume 1, unmuted: bit-exact");
+
+    SetF32(kObjMicVolume, kAudioLevelControlPropertyDecibelValue, -20.0f);
+    MicRead(5000, r, N);
+    ok = 1; for (int i = 0; i < N; i++) ok &= fabsf(r[i] - w[i] * 0.1f) <= 1e-6f;
+    CHECK(ok, "-20 dB: samples x 0.1");
+
+    SetMute(1);
+    MicRead(5000, r, N);
+    ok = 1; for (int i = 0; i < N; i++) ok &= r[i] == 0.0f && !signbit(r[i]);
+    CHECK(ok, "muted: exact +0.0 silence");
+    SetMute(0);
+    MicRead(5000, r, N);
+    ok = 1; for (int i = 0; i < N; i++) ok &= fabsf(r[i] - w[i] * 0.1f) <= 1e-6f;
+    CHECK(ok, "unmuted: volume kept");
+
+    SetF32(kObjMicVolume, kAudioLevelControlPropertyScalarValue, 0.0f);
+    MicRead(5000, r, N);
+    ok = 1; for (int i = 0; i < N; i++) ok &= r[i] == 0.0f;
+    CHECK(ok, "scalar 0: silence");
+
+    SetF32(kObjMicVolume, kAudioLevelControlPropertyScalarValue, 1.0f);
+    MicRead(5000, r, N);
+    ok = 1; for (int i = 0; i < N; i++) ok &= r[i] == w[i];
+    CHECK(ok, "back to volume 1: bit-exact again");
+    StopBoth();
+    printf("  gain applied on the mic side only; full volume stays bit-exact\n");
+}
+
 int main(int argc, char** argv)
 {
     setvbuf(stdout, NULL, _IOLBF, 0);
@@ -764,9 +909,11 @@ int main(int argc, char** argv)
     TestDevice(kObjMic, kObjMicStream, 1);
     TestDevice(kObjFeed, kObjFeedStream, 0);
     TestPropertySweep();
+    TestControls();
     TestIOOperations();
     TestClock();
     TestRingSemantics();
+    TestControlsIO();
     TestRealtimeLoopback(48000.0);
     TestSampleRateChange(44100.0);
     TestClock();

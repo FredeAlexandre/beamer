@@ -19,7 +19,7 @@ Key results were re-checked by independent agents that were not told the expecte
 | Latency (one way, Wi-Fi) | Transport ~30-34 ms (network 3, jitter buffer 20-24, Opus 6.5). End to end: PC mic -> Mac 30 ms (55 ms to the speaker mix); PC sound -> Mac 51-56 ms; Mac sound -> PC headset 96 ms; Mac mic -> PC app via VB-CABLE 108 ms. | W2, W3 |
 | Clock drift | Mac vs PC ~17 ppm (~61 ms per hour). Buffer-level controller + resampler keeps buffers bounded (15 min and 10 min runs). | T6, V3 |
 | Loss | Opus PLC + in-band FEC: 1 % loss fully recovered; FEC useless on bursts. | T6 |
-| Remote mic as a real input | **PC**: VB-CABLE (Microsoft-attested, installed silently) works: Beamer plays into CABLE Input, apps record CABLE Output. **Mac**: `BeamerAudio.driver` built and tested out of process (1526 checks); install blocked on `beamer-hal`. | T5, T3, W2 s1 |
+| Remote mic as a real input | **PC**: VB-CABLE (Microsoft-attested, installed silently) works: Beamer plays into CABLE Input, apps record CABLE Output. **Mac**: `BeamerAudio.driver` installed via `beamer-hal` and validated live (bit-exact loopback, 17.5 ms at 512 frames / 4.2 ms at 128, input volume + mute). | T5, T3, W2 s1 |
 | Local sound to another machine | Works both ways (scenarios 3, 4, 5). | W2 |
 
 ## Things we learned the hard way
@@ -77,8 +77,9 @@ Windows ships the helper exe next to `Beamer.exe`.
 
 ## Open before or during Phase 2
 
-1. `beamer-hal` (Alex) to install and validate `BeamerAudio.driver` for real (9 checks in its README),
-   then add input volume/mute to it.
+1. ~~`beamer-hal` to install and validate `BeamerAudio.driver`, then add input volume/mute~~ done
+   2026-11-08 (`proto/mac-driver/README.md`). Left for Phase 2: the helper must re-translate the feed
+   UID and restart its IO proc after a coreaudiod restart; sleep/wake not tested yet.
 2. Echo policy (AEC vs headset rule) and how the PC's active mic reaches apps (default-device switch vs
    picking CABLE Output once): decisions listed in STATUS.
 3. Cut the PC virtual-mic path: exclusive-mode render into CABLE Input; re-run scenarios 2-5 with the W3
