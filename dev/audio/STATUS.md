@@ -40,14 +40,14 @@ Mac virtual mic validated live 2026-11-08.
 | WP | Where | State |
 |---|---|---|
 | Design `PHASE2.md` | Mac subagent | **done** 2026-11-08 (`03c8066`) |
-| WP1 Python control plane (`core/audio`) | Mac, worktree `beamer-wp1`, branch `audio/wp1` | running (started 2026-11-08) |
+| WP1 Python control plane (`core/audio`) | Mac, worktree `beamer-wp1`, branch `audio/wp1` | **done**, merged (`6321e5a`, `76734fe`): 81 tests pass Mac + PC, cluster convergence ≤ 5 rounds over 3,200 seeds; offer carries `host` (no LAN bind on the Mac) |
 | WP2 Portable C++ media engine (`native/audio/engine`) | Mac `beamer-wp2` / `audio/wp2` (+ PC build) | running |
 | WP3 Mac backend + helper, driver moved to `native/audio/mac-driver` | Mac `beamer-wp3` / `audio/wp3` | running |
 | WP4 Windows backend + helper | PC agent, worktree `C:\Users\Alex\Developer\beamer-wp4`, branch `pc/wp4` | running |
 | WP8 Packaging and permissions | Mac `beamer-wp8` / `audio/wp8` (+ PC via deploy) | running |
-| WP5 Link integration | Mac | waits for WP1 |
-| WP6 Page model + Mac Audio page | Mac | waits for WP1 milestone 1 (`model.py`) |
-| WP7 Qt Audio page | PC | waits for WP1 m1 + WP6 m1 |
+| WP5 Link integration | Mac `beamer-wp5` / `audio/wp5` (+ PC via deploy) | running |
+| WP6 Page model + Mac Audio page | Mac `beamer-wp6` / `audio/wp6` | running; milestone 1 (`view.py`) committed `8102be9` |
+| WP7 Qt Audio page | PC agent, worktree `beamer-wp7`, branch `pc/wp7` | running |
 | WP9 Echo cancellation | Mac + PC | waits for WP2, WP3, WP4 |
 | WP10 Two-machine E2E + soak | Mac + ssh | waits for WP1-5, WP8 (WP9) |
 
