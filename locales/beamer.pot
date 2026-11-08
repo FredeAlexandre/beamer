@@ -1336,7 +1336,7 @@ msgstr ""
 msgid "Computer"
 msgstr ""
 
-#: core/audio/view.py win_app/audio_page_win.py
+#: core/audio/view.py
 msgid "An app here is recording Beamer's microphone."
 msgstr ""
 
