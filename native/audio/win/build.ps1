@@ -1,0 +1,139 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Called by native\audio\build-win.cmd inside a vcvars64 environment. See that file for what it builds.
+param([switch]$clean, [switch]$checkOnly)
+foreach ($a in $args) { if ($a -eq '--clean') { $clean = $true } elseif ($a -eq '--check-only') { $checkOnly = $true } }
+$ErrorActionPreference = 'Stop'
+
+$audio = Split-Path -Parent $PSScriptRoot          # native\audio
+$win = $PSScriptRoot
+$engine = Join-Path $audio 'engine'
+$third = Join-Path $audio 'third_party'
+$build = Join-Path $audio 'build'
+$outDir = Join-Path $build 'win'
+$objDir = Join-Path $build 'obj\win-x64'
+if ($clean -and (Test-Path $objDir)) { Remove-Item -Recurse -Force $objDir }
+New-Item -ItemType Directory -Force $outDir, $objDir | Out-Null
+# Build output is never committed (the repo-level ignore entry is WP2's; this keeps the tree clean meanwhile).
+Set-Content -Path (Join-Path $build '.gitignore') -Value '*' -Encoding ascii
+
+$cxxFlags = @('/nologo', '/c', '/std:c++20', '/O2', '/MT', '/W4', '/utf-8', '/EHsc', '/DUNICODE', '/D_UNICODE', '/DWIN32_LEAN_AND_MEAN', '/DNOMINMAX', '/D_CRT_SECURE_NO_WARNINGS')
+$cFlags = @('/nologo', '/c', '/O2', '/MT', '/W3', '/utf-8', '/D_CRT_SECURE_NO_WARNINGS')
+$libs = @('ole32.lib', 'avrt.lib', 'propsys.lib', 'cfgmgr32.lib', 'shell32.lib', 'advapi32.lib', 'mmdevapi.lib', 'ws2_32.lib', 'user32.lib')
+
+# Newest header that a C++ object depends on (backend + engine headers): an object older than it is rebuilt.
+function NewestHeader([string[]]$dirs) {
+    $t = [datetime]::MinValue
+    foreach ($d in $dirs) {
+        if (Test-Path $d) {
+            Get-ChildItem -Path $d -Recurse -Include *.h, *.hpp, *.inc -File | ForEach-Object { if ($_.LastWriteTime -gt $t) { $t = $_.LastWriteTime } }
+        }
+    }
+    return $t
+}
+
+# Compiles $src to an object under $objDir\$tag; returns the object path.
+function Compile([string]$src, [string]$tag, [string[]]$flags, [datetime]$hdrTime) {
+    $rel = (Resolve-Path -LiteralPath $src).Path.Substring($audio.Length).TrimStart('\') -replace '[\\/:]', '_'
+    $obj = Join-Path $objDir ($tag + '_' + [IO.Path]::ChangeExtension($rel, '.obj'))
+    $srcTime = (Get-Item -LiteralPath $src).LastWriteTime
+    if ((Test-Path $obj) -and (Get-Item $obj).LastWriteTime -ge $srcTime -and (Get-Item $obj).LastWriteTime -ge $hdrTime) { return $obj }
+    & cl.exe @flags "/Fo$obj" $src | Where-Object { $_ -and $_ -notmatch '^\S+\.(c|cpp)$' } | ForEach-Object { Write-Host $_ }
+    if ($LASTEXITCODE -ne 0) { throw "compile failed: $src" }
+    return $obj
+}
+
+function Link([string]$exe, [string[]]$objs) {
+    & link.exe /nologo /SUBSYSTEM:CONSOLE /MACHINE:X64 "/OUT:$exe" @objs @libs | ForEach-Object { Write-Host $_ }
+    if ($LASTEXITCODE -ne 0) { throw "link failed: $exe" }
+    # Static x64 exe: no MSVC runtime DLLs (vcruntime/msvcp/ucrt) may appear among its imports.
+    $deps = & dumpbin.exe /nologo /dependents $exe | Where-Object { $_ -match '\.dll' } | ForEach-Object { $_.Trim() }
+    $bad = $deps | Where-Object { $_ -match '^(vcruntime|msvcp|ucrtbase|api-ms-win-crt|concrt)' }
+    if ($bad) { throw "$exe imports the MSVC runtime: $($bad -join ', ')" }
+    $machine = & dumpbin.exe /nologo /headers $exe | Select-String 'machine \(x64\)'
+    if (-not $machine) { throw "$exe is not x64" }
+    Write-Host ("built {0} ({1:N0} bytes; imports {2})" -f $exe, (Get-Item $exe).Length, ($deps -join ' '))
+}
+
+# ---------------------------------------------------------------- backend + harness
+$backendSrc = @('backend_win.cpp', 'devices_win.cpp', 'loopback_win.cpp', 'mute_journal_win.cpp', 'sessions_win.cpp') | ForEach-Object { Join-Path $win $_ }
+$incEngine = @("/I$audio")
+$hdr = NewestHeader @($win, $engine)
+$backendObjs = @()
+foreach ($s in $backendSrc) { $backendObjs += Compile $s 'win' ($cxxFlags + $incEngine) $hdr }
+$checkObj = Compile (Join-Path $win 'backend_check.cpp') 'win' ($cxxFlags + $incEngine) $hdr
+Link (Join-Path $outDir 'backend_check.exe') ($backendObjs + @($checkObj))
+if ($checkOnly) { exit 0 }
+
+# ---------------------------------------------------------------- engine + third party -> beamer-audio.exe
+$sourcesTxt = Join-Path $engine 'sources.txt'
+if (-not (Test-Path $sourcesTxt)) {
+    Write-Host 'build-win: native\audio\engine\sources.txt not found (engine not merged yet): beamer-audio.exe not linked.'
+    exit 0
+}
+
+# Engine sources: one path per line (# comments), relative to engine\ or to native\audio\.
+$engineSrc = @()
+foreach ($line in Get-Content $sourcesTxt) {
+    $l = ($line -replace '#.*$', '').Trim()
+    if (-not $l) { continue }
+    $p = Join-Path $engine $l
+    if (-not (Test-Path $p)) { $p = Join-Path $audio $l }
+    if (-not (Test-Path $p)) { throw "sources.txt lists a missing file: $l" }
+    $engineSrc += (Resolve-Path $p).Path
+}
+$listed = ($engineSrc -join ';').ToLower()
+
+# Include dirs: engine, every third_party\<lib>\include, plus the library-internal dirs below.
+$inc = @("/I$audio", "/I$engine")
+if (Test-Path $third) { Get-ChildItem $third -Directory | ForEach-Object {
+    foreach ($sub in 'include', 'single_include', 'src') { $d = Join-Path $_.FullName $sub; if (Test-Path $d) { $inc += "/I$d" } } } }
+
+$thirdObjs = @()
+# libopus 1.6.1, float build, from its own *.mk lists (PHASE2 §2.3), unless sources.txt already lists it.
+$opus = Get-ChildItem $third -Directory -Filter 'opus-*' -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($opus -and -not $listed.Contains('\opus-')) {
+    $o = $opus.FullName
+    $opusInc = @("/I$o\include", "/I$o\celt", "/I$o\silk", "/I$o\silk\float", "/I$o")
+    $opusDef = @('/DOPUS_BUILD', '/DUSE_ALLOCA', '/DHAVE_LRINTF', '/wd4244', '/wd4267', '/wd4996')
+    $vars = @('CELT_SOURCES', 'SILK_SOURCES', 'SILK_SOURCES_FLOAT', 'OPUS_SOURCES', 'OPUS_SOURCES_FLOAT')
+    $files = @()
+    foreach ($mk in 'celt_sources.mk', 'silk_sources.mk', 'silk_sources_float.mk', 'opus_sources.mk', 'opus_sources_float.mk') {
+        $mp = Join-Path $o $mk
+        if (-not (Test-Path $mp)) { continue }
+        $text = (Get-Content $mp -Raw) -replace '\\\r?\n', ' '
+        foreach ($m in [regex]::Matches($text, '(?m)^\s*([A-Z_]+)\s*\+?=\s*(.*)$')) {
+            if ($vars -contains $m.Groups[1].Value) { $files += ($m.Groups[2].Value -split '\s+' | Where-Object { $_ -match '\.c$' }) }
+        }
+    }
+    if (-not $files) { throw "no opus sources found in $o\*.mk" }
+    $opusHdr = NewestHeader @("$o\include", "$o\celt", "$o\silk", "$o\src")
+    foreach ($f in ($files | Select-Object -Unique)) { $thirdObjs += Compile (Join-Path $o $f) 'opus' ($cFlags + $opusInc + $opusDef) $opusHdr }
+    $inc += "/I$o\include"
+}
+# Monocypher (crypto primitives), unless listed.
+$mono = Get-ChildItem $third -Directory -Filter 'monocypher-*' -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($mono -and -not $listed.Contains('\monocypher-')) {
+    $mc = Join-Path $mono.FullName 'src\monocypher.c'
+    if (Test-Path $mc) { $thirdObjs += Compile $mc 'mono' $cFlags (NewestHeader @($mono.FullName)) }
+}
+# speexdsp AEC subset (PHASE2 §7), unless listed.
+$speex = Get-ChildItem $third -Directory -Filter 'speexdsp-*' -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($speex -and -not $listed.Contains('\speexdsp-')) {
+    $sd = $speex.FullName
+    $lib = if (Test-Path "$sd\libspeexdsp") { "$sd\libspeexdsp" } else { $sd }
+    $speexDef = @('/DFLOATING_POINT', '/DUSE_KISS_FFT', '/DEXPORT=', '/DHAVE_CONFIG_H', "/I$sd\include", "/I$lib", "/I$sd", '/wd4244', '/wd4305')
+    foreach ($f in 'mdf.c', 'preprocess.c', 'fftwrap.c', 'kiss_fft.c', 'kiss_fftr.c', 'filterbank.c') {
+        $p = Join-Path $lib $f
+        if (Test-Path $p) { $thirdObjs += Compile $p 'speex' ($cFlags + $speexDef) (NewestHeader @($sd)) }
+    }
+    $inc += "/I$sd\include"
+}
+
+$engHdr = NewestHeader @($engine, $win, $third)
+$engineObjs = @()
+foreach ($s in $engineSrc) {
+    if ($s -match '\.c$') { $engineObjs += Compile $s 'eng' ($cFlags + $inc) $engHdr }
+    else { $engineObjs += Compile $s 'eng' ($cxxFlags + $inc) $engHdr }
+}
+$mainObj = Compile (Join-Path $win 'main.cpp') 'win' ($cxxFlags + $inc) $engHdr
+Link (Join-Path $outDir 'beamer-audio.exe') ($backendObjs + $engineObjs + $thirdObjs + @($mainObj))
