@@ -569,6 +569,7 @@ class AudioService:
     def set_output(self, machine: str, to: str | None, device: DeviceRef | None) -> None
     def set_form(self, machine: str, device_key: str, form: str | None) -> None
     def set_aec(self, mode: str) -> None                                       # "auto" | "off"
+    def set_vmic_exclusive(self, on: bool) -> None   # Windows, local: helper restarted with --vmic-exclusive
     def watch(self, on: bool) -> None                                          # page visible
     def test_input(self, machine: str, device_key: str) -> None
     def retry_helper(self) -> None
@@ -584,7 +585,7 @@ class AudioService:
 - **Dev command files** (only when `<state_dir>/audio-dev.enabled` exists; adds `--dev` to the helper; the file
   may hold `{"helper": [argv...]}` to run another helper, e.g. `beamer-audio-null`, without env vars):
   every 1 s read and delete `<state_dir>/audio-dev-cmd.json` (`{"set_mic":...}`, `{"set_output":...}`,
-  `{"test_source":{"kind":"mic","signal":"A"}}`) and write `<state_dir>/audio-dev-status.json` (snapshot +
+  `{"test_source":{"kind":"mic","signal":"A"}}`, `{"set_aec":"off"}`, `{"set_vmic_exclusive":true}`) and write `<state_dir>/audio-dev-status.json` (snapshot +
   last `stats` + `test_source`, the dev source in force: a harness that sets it on one machine waits for it
   there before setting a route that opens the stream, else the stream opens on the real device and opens
   again on the test source). Used by the E2E harness (§11.4); no socket, no listener.
@@ -634,8 +635,14 @@ Pure functions in `model.py`: `merge_route(held, incoming) -> (merged, changed, 
 
 ### 8.4 Persistence: `<state_dir>/audio.json`
 
-`{"version":1,"route":{...§6.2},"own_rev":int,"machines":{"<id>":{...last audio_devices data}},"local":{"aec":"auto"}}`,
-written atomically on every change (debounced 500 ms). A separate file keeps `settings.json`, its schema,
+`{"version":1,"route":{...§6.2},"own_rev":int,"machines":{"<id>":{...last audio_devices data}},"local":{"aec":"auto","vmic_exclusive":false}}`,
+written atomically on every change (debounced 500 ms). `local` is this machine's own and never sent:
+`vmic_exclusive` (Windows; default off = shared render into CABLE Input, ~70 ms; on = exclusive, ~35 ms,
+but no other app can play into CABLE Input meanwhile, WP12) adds `--vmic-exclusive` to the helper's
+command line; changing it restarts the helper (streams drop ~1 s and reopen on `ready`; events of the
+replaced helper are dropped). The helper names `vmic_exclusive` in `ready.features` only when started
+with the flag (and still falls back to shared if the exclusive open is refused, logged).
+`AudioSnapshot.vmic_exclusive` carries the local value. A separate file keeps `settings.json`, its schema,
 migrations and `PeerBook` lock untouched. Loading applies the route at once, so routes come back after a
 restart and are re-applied as soon as links and devices allow.
 
@@ -666,6 +673,11 @@ speakers and a microphone on <M>, and turned down <M>'s sound on <T>. Use headph
 that microphone through its own sound."; when M lists an Elgato/Wave Link device the advice is "or turn off Wave
 Link's monitor to the system output on <M>"), `echo_cross`, `conflict`,
 `peer_no_audio` (a linked machine runs a Beamer without audio).
+`MachinePanel.vmic_exclusive_*`: on this machine's own panel only, when it is Windows with VB-CABLE present,
+a switch "Low-latency virtual microphone" + "About 35 ms instead of 70 ms, but no other app can play into
+CABLE Input meanwhile." (+ "This version of the audio helper cannot do it." when it is on, the helper is
+ready and its features lack `vmic_exclusive`); `apply_vmic_exclusive(service, panel, on)`. Never on a Mac,
+never for a peer: each machine sets its own.
 
 ### 9.2 Layout (both apps, same order and words)
 
@@ -681,7 +693,8 @@ speakers. Choose the microphone your apps hear and where each machine's sound pl
    output line, a thin level bar; arrows for active routes (sound solid, mic dashed, grey when waiting).
    Click a tile = select it (keyboard: arrows/Tab as on the Crossing map).
 4. **Selected machine** module (ledger-like rows): "Sound from <M> plays on" selector; note "Muted on <M>
-   while it plays elsewhere"; status; Inputs rows (name, meter, Test); Outputs rows (name, meter,
+   while it plays elsewhere"; status; on a PC's own panel the "Low-latency virtual microphone" switch and
+   its note (§9.1); Inputs rows (name, meter, Test); Outputs rows (name, meter,
    "Headset" switch).
 Meters: a `LevelMeter` widget (horizontal bar, RMS fill + peak tick, -60..0 dBFS), only for devices with a
 level key in the levels map. While the page is visible the app calls `service.watch(True)`.
@@ -780,7 +793,9 @@ dev mode on both machines (creates `audio-dev.enabled`, restarts Beamer through 
 task), drives routes by writing `audio-dev-cmd.json` (PC over `ssh lebig`), injects signature A/B with the
 helper's dev test source, records sinks with the prototype tools (`proto/mac` `capture-mic --device "Beamer
 Microphone"`, `proto/win` `capture-mic --device "CABLE Output"`, loopback/tap for sound), and analyses
-latency/glitches as in Phase 1. Cases: `mic_mac_pc`, `mic_pc_mac`, `sound_mac_pc`, `sound_pc_mac`,
+latency/glitches as in Phase 1. A PC `test_source` is written first and the harness waits (≤ 15 s, else
+a clear error) until the PC's `audio-dev-status.json` names it before any route is set. Only `both` needs
+the PC's DualSense; without it that case alone stops with a message. Cases: `mic_mac_pc`, `mic_pc_mac`, `sound_mac_pc`, `sound_pc_mac`,
 `both`, `persist` (route survives a restart of both apps, re-applied ≤ 5 s after link up), `linkloss`
 (kill Beamer on the target: source sound audible again ≤ 1.5 s; Windows journal restore), `fallback`
 (block UDP with the helper's dev `drop_udp` switch: stream continues via the link ≤ 2.5 s),
