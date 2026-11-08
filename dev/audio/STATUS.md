@@ -82,7 +82,7 @@ Mac virtual mic validated live 2026-11-08.
 | Deploy of everything merged (`9adc5be`) | operator | **done** 2026-11-08 20:10: both machines, Mac signed "Beamer Dev", real helpers running, `audio_hello` both ways, 14 caps |
 | WP14 PC capture loss | PC agent, `beamer-wp14` / `pc/wp14` | **done**, merged: the PC capture loses **0 samples** (10 min sample-exact ramp, idle and 12 threads busy; encoded frames within ±17 ppm of QPC). WP11's '4-174 ppm lost' were source events (the test player's own underrun inserting 10 ms, other sound on the PC for 300 ms). Added capture-loss counters to the helper log and a `loss-test` |
 | WP15 Low-latency vmic setting + E2E harness race fix | Mac `beamer-wp15` / `audio/wp15` | **done**, merged: local per-machine `vmic_exclusive` (never synced), helper restarted with `--vmic-exclusive`, switch on the PC's own panel when VB-CABLE is present (shown regardless of the helper's feature list, which only names it once on; a missing feature is reported in the note); harness waits for the PC test source, DualSense only needed for the `both` case |
-| WP16 Final E2E + soak with everything merged | Mac + ssh | after WP14, WP15 |
+| WP16 Final E2E + soak with everything merged | Mac `beamer-wp16` / `audio/wp16` (+ ssh) | running |
 
 Coordination: deploys serialized with the lock dir `~/Developer/.beamer-deploy.lock`, live audio tests with `~/Developer/.beamer-audio-lab.lock` (Mac) and `C:\Users\Alex\briefs\lab-lock.txt` (PC); each WP commits its
 report as `dev/audio/reports/<wp>.md`; the operator merges into `feat/audio`.
