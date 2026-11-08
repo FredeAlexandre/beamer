@@ -33,13 +33,11 @@ thread. WP7 requests: extractor + coverage test now read `core/audio`, `TileView
   status reads the planner's `params["to"]`; output selector disabled while "Here" is the only choice.
 - Edited outside WP6 at the operator's request: `tools/i18n_extract.py`, `core/tests/test_i18n_coverage.py`
   (`SOURCES` += `core/audio`; `_error` of fake_helper.py listed as a diagnostic).
-- §9.2 order kept, but notices sit below the fold (driver missing at y≈1200 pt): suggest the strip under the
-  Microphone module in both apps.
+- Notices strip moved right under the Microphone module (accepted by the operator; PHASE2 §0/§9.2 updated).
 
 **Needs from others**
-1. Whoever lands `AUDIO = True` (WP5): `mac_app/tests/test_pages.py` `test_order`/`test_step` must expect "audio".
-2. WP5: the page reads the service as `controller.audio` (looked up again every 2 s while the page is open);
-   py2app `includes` needs `core.audio.view`.
+1. Done by the operator (33bc196): `test_pages.py` expects "audio"; py2app includes `core.audio.view`.
+2. WP5: the page reads the service as `controller.audio` (looked up again every 2 s while the page is open).
 3. WP7: `TileView.listen_line`/`input_line`/`recording_line` and `FIXTURES_PC` are new since its merge.
 4. Translator: the audio strings in `it.po`. model.py: nothing needed.
 
