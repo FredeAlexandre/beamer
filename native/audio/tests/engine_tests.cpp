@@ -405,11 +405,13 @@ struct SimSpec {
   double burst = 1;        // Gilbert mean burst length (> 1)
   double jitter_ms = 0;    // uniform 0..J
   double stall_at = -1, stall_s = 0;
+  double spike_every_s = 0, spike_ms = 0;  // periodic transit spikes: held, then a burst
+  double step_at = -1, step_ms = 0;        // the path gets slower for good
   int block = 128;         // render period (samples)
   uint64_t seed = 1;
 };
 struct SimOut {
-  std::vector<double> sec_level, sec_target, sec_max;
+  std::vector<double> sec_level, sec_target, sec_max, sec_integ, sec_est;
   JbCounters c;
   uint64_t sent = 0;
   double wall_s = 0;
@@ -422,7 +424,9 @@ static SimOut simulate(const SimSpec& sp) {
   if (std::getenv("BA_SIM_REFERENCE")) {  // exactly media.py
     cfg.merge_expand = false;
     cfg.jitter_recalc_ms = 0;
+    cfg.drift_est = false;
   }
+  if (std::getenv("BA_SIM_NO_DRIFT_EST")) cfg.drift_est = false;
   JitterBuffer jb(cfg);
   std::string err;
   jb.init(&err);
@@ -450,6 +454,11 @@ static SimOut simulate(const SimSpec& sp) {
     double a = ts + 0.003 + sp.jitter_ms * 1e-3 * uni(rng);
     if (sp.stall_at >= 0 && ts >= sp.stall_at && ts < sp.stall_at + sp.stall_s)
       a = std::max(a, sp.stall_at + sp.stall_s + 0.001 * uni(rng));  // held, then a burst
+    if (sp.step_at >= 0 && ts >= sp.step_at) a += sp.step_ms * 1e-3;
+    if (sp.spike_every_s > 0) {
+      double k0 = std::floor(ts / sp.spike_every_s) * sp.spike_every_s + sp.spike_every_s / 2;
+      if (ts >= k0 && ts < k0 + sp.spike_ms * 1e-3) a = std::max(a, k0 + sp.spike_ms * 1e-3 + 0.001 * uni(rng));
+    }
     arr.push_back({a, k});
   }
   std::sort(arr.begin(), arr.end(), [](const Arr& x, const Arr& y) { return x.t < y.t; });
@@ -497,6 +506,8 @@ static SimOut simulate(const SimSpec& sp) {
       out.sec_level.push_back(acc_l / acc_n);
       out.sec_target.push_back(acc_t / acc_n);
       out.sec_max.push_back(mx);
+      out.sec_integ.push_back(jb.integ_ppm());
+      out.sec_est.push_back(jb.drift_est_ppm());
       acc_l = acc_t = mx = 0;
       acc_n = 0;
       sec = int(now);
@@ -550,6 +561,8 @@ static void test_jb_loss_jitter_drift_10min() {
   SimOut o = simulate(sp);
   check_tracking(o, "2% loss +100ppm 0-20ms", 30, 10);
   CHECK(o.c.fec > 0);
+  CHECKF(std::fabs(o.sec_est.back() - 100) < 5 && std::fabs(o.sec_integ.back() - 100) < 5,
+         "clock estimate %.1f / integral %.1f ppm for +100", o.sec_est.back(), o.sec_integ.back());
   CHECKF(SANITIZED || o.wall_s < 10.0, "10 min simulated in %.1f s", o.wall_s);
 }
 
@@ -566,6 +579,7 @@ static void test_jb_gilbert_negative_drift() {
   // media.py, tests/jb_crosscheck.py) each such loss adds a frame of level and the buffer sits
   // 10-20 ms above target here; with it, the expansion is the loss's concealment.
   check_tracking(o, "Gilbert 2%/3 -100ppm", 30, 10);
+  CHECKF(std::fabs(o.sec_est.back() + 100) < 10, "clock estimate %.1f ppm for -100", o.sec_est.back());
   CHECK(o.c.merged > 0);
   CHECK(o.c.plc > 0);
 }
@@ -582,6 +596,59 @@ static void test_jb_stall_flush() {
   CHECK(o.c.rebuffer >= 1);
   // back on target within 2 s of the stall's end
   CHECKF(std::fabs(o.sec_level[43] - o.sec_target[43]) < 10, "after stall %.1f vs %.1f", o.sec_level[43], o.sec_target[43]);
+}
+
+// WP11: late bursts that make the buffer run dry (an expansion, then the late frame arrives) add a
+// frame of level each time. Live (WP10 soak, PC sound -> Mac) ~3.7/min pinned the drift integral at its
+// +200 ppm clamp while the clocks differed by ~20 ppm. The integral must track the clock, and the
+// rate estimate (stats `drift_est_ppm`) must find it from timestamps alone.
+static void test_jb_drift_integral_with_expansions() {
+  for (double ppm : {20.0, -60.0}) {
+    SimSpec sp;
+    sp.seconds = 600;
+    sp.ppm = ppm;
+    sp.jitter_ms = 3;
+    sp.spike_every_s = 20;
+    sp.spike_ms = 30;
+    sp.seed = 11;
+    SimOut o = simulate(sp);
+    char name[64];
+    std::snprintf(name, sizeof name, "spikes/20 s %+.0fppm", ppm);
+    // each late burst leaves its expansions as level for several seconds (catch-up drains them):
+    // the 10 ms tracking bound of the other cases does not hold here, by design and before WP11 too
+    check_tracking(o, name, 60, 20);
+    CHECKF(o.c.expand >= 25, "%s: %llu expansions (the case needs them)", name, (unsigned long long)o.c.expand);
+    double worst_i = 0, worst_e = 0;
+    for (size_t s = 120; s < o.sec_integ.size(); ++s) {
+      worst_i = std::max(worst_i, std::fabs(o.sec_integ[s] - ppm));
+      worst_e = std::max(worst_e, std::fabs(o.sec_est[s] - ppm));
+    }
+    std::printf("    %-22s integral %.1f ppm at the end (worst |integ-drift| after 120 s %.1f), estimate %.1f (worst %.1f)\n",
+                name, o.sec_integ.back(), worst_i, o.sec_est.back(), worst_e);
+    CHECKF(worst_i < 30, "%s: drift integral off the clock drift by %.1f ppm", name, worst_i);
+    CHECKF(worst_e < 10, "%s: drift estimate off by %.1f ppm", name, worst_e);
+  }
+}
+
+// A lasting step in transit (route change, link fallback, a capture restart) is not a clock ratio:
+// the estimate starts over instead of bending its line through the step.
+static void test_jb_drift_estimate_step() {
+  SimSpec sp;
+  sp.seconds = 300;
+  sp.ppm = 30;
+  sp.jitter_ms = 5;
+  sp.step_at = 100;
+  sp.step_ms = 60;
+  SimOut o = simulate(sp);
+  check_tracking(o, "+60 ms step at 100 s", 30, 10, 99, 110);
+  double worst_e = 0, worst_i = 0;
+  for (size_t s = 140; s < o.sec_est.size(); ++s) {
+    worst_e = std::max(worst_e, std::fabs(o.sec_est[s] - 30));
+    worst_i = std::max(worst_i, std::fabs(o.sec_integ[s] - 30));
+  }
+  std::printf("    estimate after the step: worst |est-drift| %.1f, |integ-drift| %.1f ppm (est at 99 s %.1f)\n", worst_e,
+              worst_i, o.sec_est[99]);
+  CHECKF(worst_e < 10 && worst_i < 30, "after a transit step: estimate off by %.1f, integral by %.1f ppm", worst_e, worst_i);
 }
 
 static void test_jb_quiet_and_fixed() {
@@ -1060,6 +1127,8 @@ int main(int argc, char** argv) {
       {"jb_loss_jitter_drift_10min", test_jb_loss_jitter_drift_10min},
       {"jb_gilbert_negative_drift", test_jb_gilbert_negative_drift},
       {"jb_stall_flush", test_jb_stall_flush},
+      {"jb_drift_integral_with_expansions", test_jb_drift_integral_with_expansions},
+      {"jb_drift_estimate_step", test_jb_drift_estimate_step},
       {"spsc_threads", test_spsc_threads},
       {"rr_timing", test_rr_timing},
       {"flow_fallback_and_back", test_flow_fallback_and_back},

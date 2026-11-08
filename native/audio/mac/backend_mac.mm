@@ -84,6 +84,56 @@ void disable_scope(AudioObjectID dev, AudioDeviceIOProcID proc, bool input_scope
 }
 
 // ---------------------------------------------------------------------------------------------
+// IO buffer size. kAudioDevicePropertyBufferFrameSize is per process: it sets the IO cycle of this
+// helper's IOProcs on the device, other apps keep theirs (the HAL runs each client at its own size;
+// checked live, WP11). The helper asks for a small one (latency: our render is one IO buffer ahead
+// of the device, and the jitter buffer target includes one buffer), and puts the value it found back
+// when its last Port on that device closes.
+
+class BufferSizes {
+ public:
+  static void acquire(AudioObjectID dev, UInt32 frames) {
+    std::lock_guard<std::mutex> lock(mu());
+    auto& m = held();
+    auto it = m.find(dev);
+    if (it == m.end()) {
+      UInt32 orig = 0, size = sizeof(orig);
+      auto a = addr(kAudioDevicePropertyBufferFrameSize);
+      if (AudioObjectGetPropertyData(dev, &a, 0, nullptr, &size, &orig) != noErr) orig = 0;
+      it = m.emplace(dev, Held{0, orig}).first;
+    }
+    it->second.refs++;
+    auto a = addr(kAudioDevicePropertyBufferFrameSize);
+    AudioObjectSetPropertyData(dev, &a, 0, nullptr, sizeof(frames), &frames);
+  }
+  static void release(AudioObjectID dev) {
+    std::lock_guard<std::mutex> lock(mu());
+    auto& m = held();
+    auto it = m.find(dev);
+    if (it == m.end() || --it->second.refs > 0) return;
+    if (it->second.orig) {
+      auto a = addr(kAudioDevicePropertyBufferFrameSize);
+      AudioObjectSetPropertyData(dev, &a, 0, nullptr, sizeof(it->second.orig), &it->second.orig);
+    }
+    m.erase(it);
+  }
+
+ private:
+  struct Held {
+    int refs;
+    UInt32 orig;
+  };
+  static std::mutex& mu() {
+    static std::mutex m;
+    return m;
+  }
+  static std::map<AudioObjectID, Held>& held() {
+    static std::map<AudioObjectID, Held> m;
+    return m;
+  }
+};
+
+// ---------------------------------------------------------------------------------------------
 // Port: one IOProc on one device, one direction, converting to/from 48 kHz float32 interleaved.
 
 class Port {
@@ -107,9 +157,8 @@ class Port {
       return nullptr;
     }
     if (buffer_frames > 0) {
-      UInt32 n = UInt32(buffer_frames);
-      auto a = addr(kAudioDevicePropertyBufferFrameSize);
-      AudioObjectSetPropertyData(dev, &a, 0, nullptr, sizeof(n), &n);
+      BufferSizes::acquire(dev, UInt32(buffer_frames));
+      p->buffer_held_ = true;
     }
     AudioValueRange range{0, 4096};
     {
@@ -164,6 +213,7 @@ class Port {
       if (running_) AudioDeviceStop(dev_, proc_);  // synchronous: the IOProc is not called afterwards
       AudioDeviceDestroyIOProcID(dev_, proc_);
     }
+    if (buffer_held_) BufferSizes::release(dev_);
     if (conv_) AudioConverterDispose(conv_);
   }
 
@@ -317,7 +367,7 @@ class Port {
   CaptureSink* sink_ = nullptr;
   RenderSource* source_ = nullptr;
   AudioDeviceIOProcID proc_ = nullptr;
-  bool running_ = false;
+  bool running_ = false, buffer_held_ = false;
   AudioConverterRef conv_ = nullptr;
   std::vector<float> dev_buf_, client_buf_, conv_buf_;
   const float* push_ptr_ = nullptr;
@@ -916,7 +966,9 @@ class MacBackend final : public Backend {
   std::map<AudioObjectID, AudioObjectPropertyListenerBlock> dev_blocks_;
   std::string signature_;
   uint64_t debounce_gen_ = 0, tick_count_ = 0;
-  int buffer_frames_ = 480;
+  // Phase 1's size (W2/W3: tap delivery 8 ms at 128 vs 21 ms at 480; the WP10 PC sound -> Mac run
+  // at 480 was 25 ms slower than Phase 1). BEAMER_AUDIO_MAC_BUFFER_FRAMES overrides, 0 = leave it.
+  int buffer_frames_ = 128;
   bool alive_ = true;
   std::mutex live_mu_;
   std::set<MacStream*> live_;

@@ -365,6 +365,8 @@ void RecvStream::publish() {
   target_ms_.store(jb_.target_ms(), R);
   ppm_.store(jb_.ppm(), R);
   integ_.store(jb_.integ_ppm(), R);
+  est_.store(jb_.drift_est_ppm(), R);
+  est_valid_.store(jb_.drift_est_valid(), R);
   playing_.store(jb_.playing(), R);
   c_late_.store(c.late, R);
   c_expand_.store(c.expand, R);
@@ -440,6 +442,8 @@ Json RecvStream::stats(double dt) {
   j["dec_err"] = delta(c_dec_err_.load(), &p_dec_err_);
   j["ppm"] = round1(ppm_.load());
   j["ppm_i"] = round1(integ_.load());
+  // clock ratio sender/render measured from timestamps (the integral follows it once valid)
+  j["ppm_est"] = est_valid_.load() ? Json(round1(est_.load())) : Json(nullptr);
   double rtt = flow_->rtt_ms();
   j["rtt_ms"] = rtt >= 0 ? Json(round1(rtt)) : Json(nullptr);
   j["kbps"] = round1(kbps);

@@ -103,6 +103,7 @@ int JitterBuffer::clear_slots() {
 }
 
 void JitterBuffer::reset_timeline() {
+  est_reset();  // a timestamp jump would read as a clock step
   c_.skipped += clear_slots();
   has_base_ = false;
   has_next_ = false;
@@ -182,6 +183,10 @@ void JitterBuffer::push(const MediaFrame& p) {
     tr_n_--;
   }
   jit_dirty_ = true;
+  if (!est_has_tr_ || tr < est_tr_min_) {
+    est_tr_min_ = tr;
+    est_has_tr_ = true;
+  }
 
   if (p.nsamp > 0 && p.nsamp != frame_ && p.nsamp <= kMaxDecode) frame_ = p.nsamp;
   if (has_next_ && ts < next_ts_) {
@@ -390,7 +395,14 @@ void JitterBuffer::control(double now, double block_s) {
   level_avg_ = has_avg_ ? level_avg_ + a * (lv - level_avg_) : lv;
   has_avg_ = true;
   const double err = level_avg_ - target_ms_;
-  if (cfg_.drift) drift_.update(err, block_s);
+  if (cfg_.drift) {
+    // The integral term is the clock difference. Once measured from the timestamps it is taken from
+    // there: integrating the level error also integrates the level that expansions add (a late frame
+    // played after its concealment), which pinned the integral at +200 ppm live (WP11).
+    drift_.hold_integ = cfg_.drift_est && est_valid_;
+    if (drift_.hold_integ) drift_.integ = std::max(-200.0, std::min(200.0, est_ppm_));
+    drift_.update(err, block_s);
+  }
   // big excursion: drop a frame; a silent one as soon as the excess exceeds max(5 ms, 0.75 frame),
   // a non-silent one only after 2 s above max(drop_ms, frame) (catch-up resampling does the rest)
   const double fms = frame_ * kMsPerSample;
@@ -417,10 +429,96 @@ void JitterBuffer::control(double now, double block_s) {
   }
 }
 
+void JitterBuffer::est_reset() {
+  est_has_bucket_ = est_has_tr_ = est_has_pl_ = est_valid_ = est_has_fit_ = false;
+  est_ppm_ = 0;
+  est_head_ = est_n_ = est_miss_ = 0;
+}
+
+// A step in (lag - transit) is not a clock ratio: the sender's capture or our render restarted, the
+// path changed, the flow fell back to the link. One second off the line is left out; three in a row
+// start the estimate over from there (the drift integral meanwhile integrates again).
+void JitterBuffer::est_add(double t, double d) {
+  if (est_n_ > 0) {
+    const int last = (est_head_ + est_n_ - 1) % kEstCap;
+    const double pred = est_has_fit_ ? est_d0_ + est_icpt_ + est_slope_ * (t - est_t0_) : est_d_[last];
+    if (std::fabs(d - pred) > kEstStep) {
+      if (++est_miss_ < 3) return;
+      est_reset();  // (est_pull sets the bucket again right after)
+    }
+  }
+  est_miss_ = 0;
+  if (est_n_ == kEstCap) {
+    est_head_ = (est_head_ + 1) % kEstCap;
+    est_n_--;
+  }
+  const int w = (est_head_ + est_n_) % kEstCap;
+  est_t_[w] = t;
+  est_d_[w] = d;
+  est_n_++;
+  est_fit();
+}
+
+void JitterBuffer::est_pull(double now, int n) {
+  const int64_t b = static_cast<int64_t>(std::floor(now));
+  if (!est_has_bucket_ || b != est_bucket_) {
+    if (est_has_bucket_ && est_has_tr_ && est_has_pl_) est_add(static_cast<double>(est_bucket_), est_pl_min_ - est_tr_min_);
+    est_has_bucket_ = true;
+    est_bucket_ = b;
+    est_has_tr_ = est_has_pl_ = false;
+  }
+  const double lag = now - static_cast<double>(pulled_ - n) / kRate;
+  if (!est_has_pl_ || lag < est_pl_min_) {
+    est_pl_min_ = lag;
+    est_has_pl_ = true;
+  }
+}
+
+// Least squares of (lag - transit) over time, twice: the second pass leaves out the seconds whose
+// minimum was itself late (a whole second inside a Wi-Fi episode).
+void JitterBuffer::est_fit() {
+  if (est_n_ < 20) return;
+  const double t0 = est_t_[est_head_], d0 = est_d_[est_head_];
+  double slope = 0, icpt = 0, clip = 1e9;
+  for (int pass = 0; pass < 2; ++pass) {
+    double st = 0, sd = 0, stt = 0, std_ = 0, m = 0;
+    for (int k = 0; k < est_n_; ++k) {
+      const int i = (est_head_ + k) % kEstCap;
+      const double t = est_t_[i] - t0, d = est_d_[i] - d0;
+      if (pass && std::fabs(d - (icpt + slope * t)) > clip) continue;
+      st += t;
+      sd += d;
+      stt += t * t;
+      std_ += t * d;
+      m += 1;
+    }
+    const double den = m * stt - st * st;
+    if (m < 20 || den <= 0) return;
+    slope = (m * std_ - st * sd) / den;
+    icpt = (sd - slope * st) / m;
+    double ss = 0;
+    for (int k = 0; k < est_n_; ++k) {
+      const int i = (est_head_ + k) % kEstCap;
+      const double r = (est_d_[i] - d0) - (icpt + slope * (est_t_[i] - t0));
+      ss += r * r;
+    }
+    clip = std::max(0.001, 3.0 * std::sqrt(ss / est_n_));
+  }
+  est_has_fit_ = true;
+  est_t0_ = t0;
+  est_d0_ = d0;
+  est_slope_ = slope;
+  est_icpt_ = icpt;
+  if (est_t_[(est_head_ + est_n_ - 1) % kEstCap] - t0 < 19.5) return;
+  est_ppm_ = slope * 1e6;
+  est_valid_ = true;
+}
+
 void JitterBuffer::pull(float* out, int n, double now) {
   block_ = n;
   c_.pulls++;
   pulled_ += n;
+  est_pull(now, n);
   if (!playing_ && !start_if_ready()) {
     c_.silent_pulls++;
     last_level_ = level_ms();

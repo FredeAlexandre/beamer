@@ -144,7 +144,7 @@ void Resampler::out(float* y, int n, double step) {
 }
 
 double DriftController::update(double err, double block_s) {
-  integ = std::max(-200.0, std::min(200.0, integ + 0.1 * err * block_s));
+  if (!hold_integ) integ = std::max(-200.0, std::min(200.0, integ + 0.1 * err * block_s));
   double p = std::max(-max_ppm, std::min(max_ppm, 40.0 * err + integ));
   if (err > 4.0) p = std::min(std::max(catchup_ppm, max_ppm), std::max(p, 200.0 * (err - 4.0) + 40.0 * 4.0));
   ppm = p;
