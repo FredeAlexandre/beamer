@@ -18,7 +18,7 @@ from pathlib import Path
 
 PC = os.environ.get("BEAMER_PC", "lebig")
 MAC_DIR = Path.home() / "Library" / "Application Support" / "Beamer"
-PC_HOME = r"C:\Users\Alex\audio-wp10"
+PC_HOME = os.environ.get("BEAMER_E2E_PC_HOME", r"C:\Users\Alex\audio-wp10")
 PC_DIR = r"C:\Users\Alex\AppData\Local\Beamer"
 PC_PY = PC_HOME + r"\venv\Scripts\python.exe"
 
