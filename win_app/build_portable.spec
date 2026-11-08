@@ -52,10 +52,19 @@ executable = EXE(
     contents_directory="_internal",
 )
 
+# Audio (PHASE2 10.2): the helper from native\audio\build-win.cmd goes beside Beamer.exe, where
+# core\audio\helper.py looks for it; COLLECT puts EXECUTABLE entries at the top of the folder rather
+# than in _internal. A tree without the native build makes a portable Beamer without audio.
+audio_helper = source_dir.parent / "native" / "audio" / "build" / "win" / "beamer-audio.exe"
+audio_toc = [("beamer-audio.exe", str(audio_helper), "EXECUTABLE")] if audio_helper.is_file() else []
+if not audio_toc:
+    print(f"WARNING: no {audio_helper}: the portable build carries no audio helper")
+
 portable = COLLECT(
     executable,
     filtered_binaries,
     analysis.datas,
+    audio_toc,
     strip=False,
     upx=False,
     name="Beamer-portable",

@@ -55,6 +55,7 @@ setup(
         "wake",
         "widgets",
         "windows_input",
+        "audio_driver",
     ],
     # No Mac ships Hanken Grotesk or B612 Mono. macOS registers anything under
     # ATSApplicationFontsPath before the app runs, so the bundle carries the same files the
@@ -99,6 +100,9 @@ setup(
                 "ATSApplicationFontsPath": "Fonts",
                 "NSHumanReadableCopyright": "Copyright 2026 Toby Kalkman",
                 "NSLocalNetworkUsageDescription": "Beamer needs to reach your other computers on your local network to share keyboard and mouse input.",
+                # Audio (PHASE2 §10.1): the helper is Beamer's child, so these prompts name Beamer.
+                "NSMicrophoneUsageDescription": "Beamer sends this Mac's microphone to the machine you are working on when you choose it on the Audio page.",
+                "NSAudioCaptureUsageDescription": "Beamer sends this Mac's sound to another machine when you choose it on the Audio page.",
                 "CFBundleLocalizations": ["en", "it"],
                 "CFBundleDevelopmentRegion": "en_GB",
             },
