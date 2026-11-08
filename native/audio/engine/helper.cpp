@@ -640,7 +640,8 @@ class Helper : public BackendListener {
       if (!streams_.empty()) {
         Json st = Json::object();
         for (auto& kv : streams_) st[std::to_string(kv.first)] = kv.second.base->stats(dt);
-        ev_->emit(Json{{"ev", "stats"}, {"t", wall_ms()}, {"cpu_pct", std::round(cpu_pct * 100) / 100}, {"streams", st}});
+        ev_->emit(Json{{"ev", "stats"}, {"t", wall_ms()}, {"now_ns", now_ns()},
+                       {"cpu_pct", std::round(cpu_pct * 100) / 100}, {"streams", st}});
       }
     }
   }

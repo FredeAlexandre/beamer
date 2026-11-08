@@ -141,6 +141,7 @@ void SendStream::test_source_loop() {
   std::vector<float> mono(block), buf(size_t(block) * C);
   int64_t s = 0;
   const auto t0 = std::chrono::steady_clock::now();
+  test_t0_ns_.store(std::chrono::duration_cast<std::chrono::nanoseconds>(t0.time_since_epoch()).count());
   while (!stop_.load()) {
     auto due = t0 + std::chrono::nanoseconds((s + block) * 1'000'000'000LL / kRate);
     std::this_thread::sleep_until(due);
@@ -236,6 +237,7 @@ Json SendStream::stats(double dt) {
   j["dev_dropped"] = dev_dropped_.load();
   j["rr_rx"] = rr_rx_.load();
   j["enc_err"] = enc_err_.load();
+  if (const int64_t t0 = test_t0_ns_.load()) j["test_t0_ns"] = t0;  // sample k is due at t0 + k/48 kHz
   return j;
 }
 
