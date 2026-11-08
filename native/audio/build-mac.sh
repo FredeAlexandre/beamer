@@ -25,6 +25,7 @@ TP="$HERE/third_party"
 OPUS="$TP/opus-1.6.1"
 MONO="$TP/monocypher-4.0.2"
 JSON="$TP/nlohmann-json-3.11.3"
+SPEEX="$TP/speexdsp-1.2.1"
 FRAMEWORKS=(-framework CoreAudio -framework AudioToolbox -framework CoreFoundation -framework Foundation
             -framework AVFoundation)
 
@@ -32,10 +33,13 @@ ROOT="$(cd "$HERE/../.." && pwd)"
 # No home-folder path may end up in a binary (the app build refuses them): __FILE__ and debug info
 # are made repo-relative, and the link strips the debug map (-Wl,-S).
 COMMON=(-O2 -g -ffile-prefix-map="$ROOT/"= -mmacosx-version-min=$MIN -fvisibility=hidden -Wall -Wextra)
-OPUS_FLAGS=(-std=c11 -w -DOPUS_BUILD -DUSE_ALLOCA -DHAVE_LRINTF -I"$OPUS/include" -I"$OPUS/celt" -I"$OPUS/silk"
+OPUS_FLAGS=(-std=c11 -w -DOPUS_BUILD -DUSE_ALLOCA -DHAVE_LRINTF '-DPACKAGE_VERSION="1.6.1"' -I"$OPUS/include" -I"$OPUS/celt" -I"$OPUS/silk"
             -I"$OPUS/silk/float" -I"$OPUS/src" -I"$OPUS")
 C_FLAGS=(-std=c11 -I"$MONO/src")
-CXX_FLAGS=(-std=c++17 -I"$ENGINE" -I"$HERE" -I"$OPUS/include" -I"$MONO/src" -I"$JSON/include" -I"$JSON/single_include")
+# vendored speexdsp (echo canceller, PHASE2 §7): float, kiss FFT, no config.h; its warnings off
+SPEEX_FLAGS=(-std=c11 -w -DFLOATING_POINT -DUSE_KISS_FFT -DEXPORT= -I"$SPEEX/include" -I"$ENGINE")
+CXX_FLAGS=(-std=c++17 -I"$ENGINE" -I"$HERE" -I"$OPUS/include" -I"$MONO/src" -I"$JSON/include" -I"$JSON/single_include"
+           -I"$SPEEX/include")
 MM_FLAGS=(-std=c++17 -fobjc-arc -I"$HERE" -Werror=unguarded-availability-new -Werror=return-type)
 
 # ---- one compile, run by xargs: --cc <group> <arch> <src> <obj> ----
@@ -44,6 +48,7 @@ if [ "${1:-}" = "--cc" ]; then
     case "$group" in
         opus) flags=("${COMMON[@]}" "${OPUS_FLAGS[@]}"); cc=clang ;;
         c)    flags=("${COMMON[@]}" "${C_FLAGS[@]}"); cc=clang ;;
+        sx)   flags=("${COMMON[@]}" "${SPEEX_FLAGS[@]}"); cc=clang ;;
         cxx)  flags=("${COMMON[@]}" "${CXX_FLAGS[@]}"); cc=clang++ ;;
         mm)   flags=("${COMMON[@]}" "${CXX_FLAGS[@]}" "${MM_FLAGS[@]}"); cc=clang++ ;;
         *) echo "unknown group $group" >&2; exit 1 ;;
@@ -67,7 +72,7 @@ command -v clang++ >/dev/null || { echo "clang++ not found (install the Command 
 mkdir -p "$OUT"
 
 # A changed flag set invalidates every object.
-stamp="$(printf '%s\n' "${COMMON[@]}" "${OPUS_FLAGS[@]}" "${C_FLAGS[@]}" "${CXX_FLAGS[@]}" "${MM_FLAGS[@]}" | shasum | cut -c1-16)"
+stamp="$(printf '%s\n' "${COMMON[@]}" "${OPUS_FLAGS[@]}" "${C_FLAGS[@]}" "${SPEEX_FLAGS[@]}" "${CXX_FLAGS[@]}" "${MM_FLAGS[@]}" | shasum | cut -c1-16)"
 if [ "$(cat "$OBJ/flags.stamp" 2>/dev/null)" != "$stamp" ]; then
     rm -rf "$OBJ"
     mkdir -p "$OBJ"
@@ -135,6 +140,7 @@ for arch in "${ARCHS[@]}"; do
         add mm "$HERE/mac/main.mm" helper_objs
         while IFS= read -r src; do
             case "$src" in
+                */speexdsp-*.c) add sx "$src" helper_objs ;;
                 *.c) add c "$src" helper_objs ;;
                 *.mm) add mm "$src" helper_objs ;;
                 *) add cxx "$src" helper_objs ;;

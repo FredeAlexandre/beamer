@@ -81,6 +81,18 @@ bool valid_flow_id(const std::string& s) {
   return true;
 }
 
+// optional {"<field>": key|null} -> key ("" = default)
+bool parse_device_ref_field(const Json& obj, const char* field, std::string* key) {
+  auto it = obj.find(field);
+  if (it == obj.end() || it->is_null()) {
+    key->clear();
+    return true;
+  }
+  if (!it->is_string() || it->get<std::string>().size() > 200) return false;
+  *key = it->get<std::string>();
+  return true;
+}
+
 // optional {"device": key|null} -> key ("" = default)
 bool parse_device_ref(const Json& obj, std::string* key) {
   if (!obj.is_object()) return false;
@@ -103,7 +115,7 @@ class Helper : public BackendListener {
     net_.start();
     const int restored = backend_.restore_journal();
     ev_->emit(Json{{"ev", "ready"}, {"proto", kControlProto}, {"version", kEngineVersion},
-                   {"platform", kPlatform}, {"features", backend_.features()}, {"restored", restored}});
+                   {"platform", kPlatform}, {"features", engine_features(backend_)}, {"restored", restored}});
     emit_devices(true);
     ev_->emit(Json{{"ev", "permission"}, {"mic", backend_.permission("mic")},
                    {"system_audio", backend_.permission("system_audio")}});
@@ -414,7 +426,7 @@ class Helper : public BackendListener {
       throw CmdError{"bad_args", "source"};
     }
     jget_bool(j, "mute_local", &cfg.mute_local);
-    // `aec` is accepted and ignored until WP9 lands the echo canceller.
+    parse_aec(j, &cfg);
     auto s = std::make_shared<SendStream>(cfg, f);
     std::string code, msg;
     f->attach_send(s);
@@ -428,6 +440,32 @@ class Helper : public BackendListener {
     streams_[cfg.id] = Entry{s, s, nullptr, nullptr, f->id()};
     ok(req);
     emit_running(*s);
+  }
+
+  // `aec`: {"reference": key|null} (null = the default output) or null/absent = off. Mic only (a
+  // system stream ignores it). With --dev also "lead_ms", "max_wait_ms" and "exclude_pids" (processes
+  // left out of the reference: the live test plays its near-end talker through the same speakers).
+  void parse_aec(const Json& j, SendStream::Config* cfg) {
+    auto a = j.find("aec");
+    if (a == j.end() || a->is_null()) return;
+    if (!a->is_object()) throw CmdError{"bad_args", "aec: object or null"};
+    if (cfg->kind != "mic") return;
+    cfg->aec = true;
+    if (!parse_device_ref_field(*a, "reference", &cfg->aec_opt.reference)) throw CmdError{"bad_args", "aec.reference"};
+    if (!opt_.dev) return;
+    double v;
+    if (jget_num(*a, "lead_ms", &v)) {
+      if (v < -40 || v > 80) throw CmdError{"bad_args", "aec.lead_ms: -40..80"};
+      cfg->aec_opt.lead_ms = v;
+    }
+    if (jget_num(*a, "max_wait_ms", &v)) {
+      if (v < 0 || v > 200) throw CmdError{"bad_args", "aec.max_wait_ms: 0..200"};
+      cfg->aec_opt.max_wait_ms = v;
+    }
+    auto p = a->find("exclude_pids");
+    if (p != a->end() && p->is_array())
+      for (auto& x : *p)
+        if (x.is_number_integer()) cfg->aec_opt.exclude_pids.push_back(x.get<int64_t>());
   }
 
   void cmd_recv(const Json& j, const Json& req) {
@@ -457,6 +495,8 @@ class Helper : public BackendListener {
     emit_running(*s);
   }
 
+  // No echo cancellation on the loop (§6.4 rule 1: apps on this machine cancel their own playback);
+  // an `aec` field is ignored.
   void cmd_loop(const Json& j, const Json& req) {
     uint32_t id;
     if (!parse_stream_id(j, &id)) throw CmdError{"bad_args", "stream"};
@@ -861,7 +901,8 @@ int run_helper(Backend& given, int argc, char** argv) {
 
   if (mode == "version") {
     write_stdout_line(Json{{"version", kEngineVersion}, {"proto", kControlProto}, {"platform", kPlatform},
-                           {"opus", opus_version()}}.dump());
+                           {"opus", opus_version()},
+                           {"aec", kAecCompiled ? Json("speexdsp 1.2.1") : Json(nullptr)}}.dump());
     return 0;
   }
   if (mode == "restore") {
@@ -881,7 +922,7 @@ int run_helper(Backend& given, int argc, char** argv) {
     }
     write_stdout_line(Json{{"devices", devs}, {"default_input", s.default_input}, {"default_output", s.default_output},
                            {"virtual_mic", Json{{"kind", s.vmic_kind}, {"present", s.vmic_present}, {"in_use", s.vmic_in_use}}},
-                           {"features", backend.features()}, {"permission_mic", backend.permission("mic")}}
+                           {"features", engine_features(backend)}, {"permission_mic", backend.permission("mic")}}
                           .dump(2));
     return 0;
   }

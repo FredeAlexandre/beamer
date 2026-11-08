@@ -7,7 +7,7 @@
 #               skipped, order is kept. "*" = any value, "$NAME" = capture (first use) or compare,
 #               "...": "*" in an object allows extra fields.
 # Predefined: $FK (flow key), $SK1, $SK2 (stream keys).
-A<- {"ev":"ready","proto":1,"version":"0.1.0","platform":"*","features":["system_capture","mic_demand","virtual_mic"],"restored":0}
+A<- {"ev":"ready","proto":1,"version":"0.1.0","platform":"*","features":["system_capture","mic_demand","virtual_mic","aec"],"restored":0}
 A<- {"ev":"devices","inputs":[{"key":"null-mic","name":"Null Microphone","transport":"builtin","channels":1,"form":"microphone"}],"outputs":[{"key":"null-out","name":"Null Speakers","transport":"builtin","channels":2,"form":"speakers"}],"default_input":"null-mic","default_output":"null-out","virtual_mic":{"kind":null,"present":false,"in_use":false}}
 A<- {"ev":"permission","mic":"granted","system_audio":"granted"}
 B<- {"ev":"ready","proto":1,"version":"0.1.0","platform":"*","features":"*","restored":0}

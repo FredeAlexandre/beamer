@@ -11,6 +11,7 @@
 #include <string>
 #include <thread>
 
+#include "aec.h"
 #include "codec.h"
 #include "engine.h"
 #include "jitter.h"
@@ -65,6 +66,8 @@ class SendStream : public StreamBase, public CaptureSink {
     std::string device;        // mic: key or "" (default)
     std::string test_signal;   // dev: "A" | "B" | sine spec -> synthetic source, no capture
     bool mute_local = false;
+    bool aec = false;          // mic only: echo cancellation against aec_opt.reference (§7)
+    AecOptions aec_opt;
   };
   SendStream(const Config& cfg, std::shared_ptr<Flow> flow);
   ~SendStream() override;
@@ -83,7 +86,9 @@ class SendStream : public StreamBase, public CaptureSink {
  private:
   void encoder_loop();
   void test_source_loop();
-  void push_samples(const float* x, int frames);  // codec channels, IO thread
+  void push_samples(const float* x, int frames, uint64_t host_ns);  // codec channels, IO thread
+  void encode_frame(const float* pcm, std::uniform_real_distribution<double>& uni, int link_cap);
+  void aec_drain(std::vector<float>& pcm, std::uniform_real_distribution<double>& uni, int link_cap);
 
   Config cfg_;
   std::shared_ptr<Flow> flow_;
@@ -101,6 +106,13 @@ class SendStream : public StreamBase, public CaptureSink {
   bool first_ = true;
   std::mt19937 rng_;
   ReplayWindow rr_window_;  // net thread
+  // echo cancellation (null when off or when the reference could not be opened)
+  std::unique_ptr<AecPath> aec_;
+  std::string aec_error_;
+  uint64_t mic_written_ = 0;  // IO thread: frames written to ring_
+  uint64_t mic_read_ = 0;     // encoder thread: frames read from ring_
+  std::vector<float> aec_in_, aec_out_, aec_pend_;  // encoder thread
+  size_t aec_pend_n_ = 0;
 
   std::atomic<uint64_t> tx_{0}, tx_bytes_{0}, frames_{0}, overflow_{0}, dev_dropped_{0}, rr_rx_{0},
       enc_err_{0}, enc_ns_{0};

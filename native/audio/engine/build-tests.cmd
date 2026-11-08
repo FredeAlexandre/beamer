@@ -59,9 +59,12 @@ set "CSRCS="
 for /f "usebackq eol=# tokens=* delims=" %%S in ("%HERE%\sources.txt") do (
   if /i "%%~xS"==".c" (set "CSRCS=!CSRCS! "%HERE%\%%S"") else (set "SRCS=!SRCS! "%HERE%\%%S"")
 )
-set "INC=/I"%HERE%" /I"%OPUS%\include" /I"%ROOT%\third_party\monocypher-4.0.2\src" /I"%ROOT%\third_party\nlohmann-json-3.11.3\single_include""
+set "SPEEX=%ROOT%\third_party\speexdsp-1.2.1"
+set "INC=/I"%HERE%" /I"%OPUS%\include" /I"%ROOT%\third_party\monocypher-4.0.2\src" /I"%ROOT%\third_party\nlohmann-json-3.11.3\single_include" /I"%SPEEX%\include""
 echo compiling engine
-cl /nologo /c /O2 /MT /W3 /utf-8 /D_CRT_SECURE_NO_WARNINGS /Fo"%OBJ%\engine\\" %CSRCS% || exit /b 1
+rem C sources: Monocypher and the speexdsp echo canceller (float, kiss FFT, no config.h; defines harmless for the rest)
+cl /nologo /c /O2 /MT /W3 /utf-8 /D_CRT_SECURE_NO_WARNINGS /DFLOATING_POINT /DUSE_KISS_FFT /DEXPORT= /wd4244 /wd4305 ^
+   /I"%SPEEX%\include" /Fo"%OBJ%\engine\\" %CSRCS% || exit /b 1
 cl /nologo /c /MP /std:c++20 /O2 /MT /W4 /utf-8 /EHsc /D_CRT_SECURE_NO_WARNINGS /DNOMINMAX /DWIN32_LEAN_AND_MEAN ^
    /wd4100 /wd4244 /wd4267 %INC% /Fo"%OBJ%\engine\\" %SRCS% "%ROOT%\tests\engine_tests.cpp" "%ROOT%\tests\null_main.cpp" || exit /b 1
 

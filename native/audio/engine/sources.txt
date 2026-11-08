@@ -2,7 +2,10 @@
 # Engine sources, relative to native/audio/engine/. One per line; '#' starts a comment.
 # .cpp = C++17, .c = C (vendored Monocypher; listing it tells build-mac/build-win not to add it again).
 # Include paths: engine/, third_party/opus-1.6.1/include, third_party/monocypher-4.0.2/src,
-# third_party/nlohmann-json-3.11.3/single_include. Link with libopus built from its .mk lists.
+# third_party/nlohmann-json-3.11.3/single_include, third_party/speexdsp-1.2.1/include. Link with libopus
+# built from its .mk lists. The speexdsp .c files (echo canceller, PHASE2 §7) are compiled with
+# -DFLOATING_POINT -DUSE_KISS_FFT -DEXPORT= (no config.h; engine/speexdsp_config_types.h on non-Windows).
+aec.cpp
 codec.cpp
 crypto.cpp
 flow.cpp
@@ -16,3 +19,9 @@ streams.cpp
 test_signal.cpp
 util.cpp
 ../third_party/monocypher-4.0.2/src/monocypher.c
+../third_party/speexdsp-1.2.1/libspeexdsp/mdf.c
+../third_party/speexdsp-1.2.1/libspeexdsp/preprocess.c
+../third_party/speexdsp-1.2.1/libspeexdsp/fftwrap.c
+../third_party/speexdsp-1.2.1/libspeexdsp/kiss_fft.c
+../third_party/speexdsp-1.2.1/libspeexdsp/kiss_fftr.c
+../third_party/speexdsp-1.2.1/libspeexdsp/filterbank.c

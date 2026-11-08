@@ -94,7 +94,9 @@ $opus = Get-ChildItem $third -Directory -Filter 'opus-*' -ErrorAction SilentlyCo
 if ($opus -and -not $listed.Contains('\opus-')) {
     $o = $opus.FullName
     $opusInc = @("/I$o\include", "/I$o\celt", "/I$o\silk", "/I$o\silk\float", "/I$o")
-    $opusDef = @('/DOPUS_BUILD', '/DUSE_ALLOCA', '/DHAVE_LRINTF', '/wd4244', '/wd4267', '/wd4996')
+    # PACKAGE_VERSION is a string literal in opus_get_version_string(); Windows PowerShell 5.1 passes the
+    # backslashes through and cl's argument parser turns \" into a quote.
+    $opusDef = @('/DOPUS_BUILD', '/DUSE_ALLOCA', '/DHAVE_LRINTF', '/DPACKAGE_VERSION=\"1.6.1\"', '/wd4244', '/wd4267', '/wd4996')
     $vars = @('CELT_SOURCES', 'SILK_SOURCES', 'SILK_SOURCES_FLOAT', 'OPUS_SOURCES', 'OPUS_SOURCES_FLOAT')
     $files = @()
     foreach ($mk in 'celt_sources.mk', 'silk_sources.mk', 'silk_sources_float.mk', 'opus_sources.mk', 'opus_sources_float.mk') {
@@ -116,23 +118,15 @@ if ($mono -and -not $listed.Contains('\monocypher-')) {
     $mc = Join-Path $mono.FullName 'src\monocypher.c'
     if (Test-Path $mc) { $thirdObjs += Compile $mc 'mono' $cFlags (NewestHeader @($mono.FullName)) }
 }
-# speexdsp AEC subset (PHASE2 §7), unless listed.
-$speex = Get-ChildItem $third -Directory -Filter 'speexdsp-*' -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($speex -and -not $listed.Contains('\speexdsp-')) {
-    $sd = $speex.FullName
-    $lib = if (Test-Path "$sd\libspeexdsp") { "$sd\libspeexdsp" } else { $sd }
-    $speexDef = @('/DFLOATING_POINT', '/DUSE_KISS_FFT', '/DEXPORT=', '/DHAVE_CONFIG_H', "/I$sd\include", "/I$lib", "/I$sd", '/wd4244', '/wd4305')
-    foreach ($f in 'mdf.c', 'preprocess.c', 'fftwrap.c', 'kiss_fft.c', 'kiss_fftr.c', 'filterbank.c') {
-        $p = Join-Path $lib $f
-        if (Test-Path $p) { $thirdObjs += Compile $p 'speex' ($cFlags + $speexDef) (NewestHeader @($sd)) }
-    }
-    $inc += "/I$sd\include"
-}
+# speexdsp echo canceller (PHASE2 §7): its files are listed in sources.txt; float build, kiss FFT, no
+# config.h (speexdsp_types.h has its own _WIN32 branch), its own include dir.
+$speexDef = @('/DFLOATING_POINT', '/DUSE_KISS_FFT', '/DEXPORT=', '/wd4244', '/wd4305', '/wd4267', '/wd4100', '/wd4127', '/wd4456')
 
 $engHdr = NewestHeader @($engine, $win, $third)
 $engineObjs = @()
 foreach ($s in $engineSrc) {
-    if ($s -match '\.c$') { $engineObjs += Compile $s 'eng' ($cFlags + $inc) $engHdr }
+    if ($s -match '\\speexdsp-[^\\]+\\.*\.c$') { $engineObjs += Compile $s 'eng' ($cFlags + $inc + $speexDef) $engHdr }
+    elseif ($s -match '\.c$') { $engineObjs += Compile $s 'eng' ($cFlags + $inc) $engHdr }
     else { $engineObjs += Compile $s 'eng' ($cxxFlags + $inc) $engHdr }
 }
 $mainObj = Compile (Join-Path $win 'main.cpp') 'win' ($cxxFlags + $inc) $engHdr

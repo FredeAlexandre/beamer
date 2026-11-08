@@ -21,6 +21,7 @@
 #include <thread>
 #include <vector>
 
+#include "aec.h"
 #include "codec.h"
 #include "crypto.h"
 #include "engine.h"
@@ -1011,6 +1012,341 @@ static void test_run_helper_cli() {
   CHECK(run_helper(*be, 4, const_cast<char**>(argv2)) == 0);
 }
 
+// ===================================================================== AEC (§7, §11.2)
+
+// Speech-like test signal: syllables (120-350 ms) of a gliding harmonic voice with two formants and a
+// little breath noise, Hann-shaped, separated by pauses; RMS -20 dBFS over the active parts.
+static std::vector<float> speechlike(size_t n, uint32_t seed, std::vector<uint8_t>* active = nullptr) {
+  std::mt19937 rng(seed);
+  std::uniform_real_distribution<double> u(0.0, 1.0);
+  std::normal_distribution<double> g(0.0, 1.0);
+  std::vector<float> x(n, 0.0f);
+  std::vector<uint8_t> act(n, 0);
+  size_t i = size_t(u(rng) * 0.2 * kRate);
+  while (i < n) {
+    const size_t len = size_t((0.12 + 0.23 * u(rng)) * kRate);
+    const double f0 = 90 + 130 * u(rng), glide = (u(rng) - 0.5) * 0.2;
+    const double F1 = 300 + 500 * u(rng), F2 = 900 + 1600 * u(rng);
+    double ph = 0;
+    for (size_t k = 0; k < len && i + k < n; ++k) {
+      const double t = double(k) / len;
+      const double f = f0 * (1 + glide * t);
+      ph += 2 * M_PI_ * f / kRate;
+      double v = 0;
+      for (int h = 1; h * f < 4000; ++h) {
+        const double fh = h * f;
+        const double a = (1.0 + 3.0 * std::exp(-std::pow((fh - F1) / 150, 2)) + 2.0 * std::exp(-std::pow((fh - F2) / 250, 2))) / h;
+        v += a * std::sin(h * ph);
+      }
+      v += 0.3 * g(rng);
+      const double w = 0.5 - 0.5 * std::cos(2 * M_PI_ * t);
+      x[i + k] = float(v * w);
+      act[i + k] = w > 0.3;
+    }
+    i += len + size_t((0.05 + 0.25 * u(rng)) * kRate);
+  }
+  double ss = 0;
+  size_t na = 0;
+  for (size_t k = 0; k < n; ++k)
+    if (act[k]) ss += double(x[k]) * x[k], ++na;
+  const float gain = na ? float(0.1 / std::sqrt(ss / na)) : 1.0f;
+  for (float& v : x) v *= gain;
+  if (active) *active = std::move(act);
+  return x;
+}
+
+// Sparse room: direct path after `delay_ms`, then 30 reflections over the next 40 ms decaying with
+// tau 8 ms; scaled so that the echo is `gain_db` below its source.
+static std::vector<std::pair<int, float>> room_ir(double delay_ms, double gain_db, uint32_t seed) {
+  std::mt19937 rng(seed);
+  std::uniform_real_distribution<double> u(0.0, 1.0);
+  std::vector<std::pair<int, double>> taps{{0, 1.0}};
+  for (int k = 0; k < 30; ++k) {
+    int d = 1 + int(u(rng) * 0.040 * kRate);
+    taps.push_back({d, (u(rng) < 0.5 ? -1 : 1) * 0.6 * std::exp(-d / (0.008 * kRate))});
+  }
+  double e = 0;
+  for (auto& t : taps) e += t.second * t.second;
+  const double scale = std::sqrt(std::pow(10.0, gain_db / 10.0) / e);
+  std::vector<std::pair<int, float>> out;
+  const int d0 = int(std::lround(delay_ms * kRate / 1000.0));
+  for (auto& t : taps) out.push_back({d0 + t.first, float(t.second * scale)});
+  return out;
+}
+
+static std::vector<float> convolve(const std::vector<float>& x, const std::vector<std::pair<int, float>>& ir) {
+  std::vector<float> y(x.size(), 0.0f);
+  for (auto& t : ir)
+    for (size_t i = size_t(t.first); i < x.size(); ++i) y[i] += t.second * x[i - size_t(t.first)];
+  return y;
+}
+
+static std::vector<float> white(size_t n, double dbfs, uint32_t seed) {
+  std::mt19937 rng(seed);
+  std::normal_distribution<double> g(0.0, std::pow(10.0, dbfs / 20.0));
+  std::vector<float> v(n);
+  for (float& s : v) s = float(g(rng));
+  return v;
+}
+
+static double energy(const std::vector<float>& x, size_t a, size_t b) {
+  double s = 0;
+  for (size_t i = a; i < b && i < x.size(); ++i) s += double(x[i]) * x[i];
+  return s;
+}
+
+// Runs the canceller over whole signals (ref already aligned: the echo lags it by the IR delay).
+static std::vector<float> run_canceller(const std::vector<float>& mic, const std::vector<float>& ref, double* us_per_frame = nullptr) {
+  auto ec = make_echo_canceller();
+  std::vector<float> out(mic.size(), 0.0f);
+  const auto t0 = std::chrono::steady_clock::now();
+  size_t frames = 0;
+  for (size_t i = 0; i + kAecFrame <= mic.size(); i += kAecFrame, ++frames) ec->process(&mic[i], &ref[i], &out[i]);
+  if (us_per_frame)
+    *us_per_frame = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count() / double(frames);
+  return out;
+}
+
+// ERLE over frames where the echo is active: 10 log10(mic energy / output energy).
+static double erle_db(const std::vector<float>& mic, const std::vector<float>& out, const std::vector<float>& echo, size_t a, size_t b) {
+  double em = 0, eo = 0;
+  for (size_t i = a; i + kAecFrame <= b; i += kAecFrame) {
+    if (energy(echo, i, i + kAecFrame) / kAecFrame < 1e-6) continue;  // echo quieter than -60 dBFS
+    em += energy(mic, i, i + kAecFrame);
+    eo += energy(out, i, i + kAecFrame);
+  }
+  return eo > 0 ? 10 * std::log10(em / eo) : 99;
+}
+
+static void test_aec_synthetic_echo() {
+  // §11.2: echo -11 dB, 44 ms + room IR, noise: ERLE >= 20 dB after 5 s.
+  const size_t n = size_t(12 * kRate);
+  auto far = speechlike(n, 11);
+  auto echo = convolve(far, room_ir(44, -11, 5));
+  auto noise = white(n, -65, 7);
+  std::vector<float> mic(n);
+  for (size_t i = 0; i < n; ++i) mic[i] = echo[i] + noise[i];
+  double us = 0;
+  auto out = run_canceller(mic, far, &us);
+  const double e1 = erle_db(mic, out, echo, size_t(1 * kRate), size_t(3 * kRate));
+  const double e5 = erle_db(mic, out, echo, size_t(5 * kRate), n);
+  std::printf("    ERLE 1-3 s %.1f dB, 5-12 s %.1f dB; %.0f us per 10 ms frame (%.2f %% of a core)\n", e1, e5, us, us / 100.0);
+  CHECKF(e5 >= 20.0, "ERLE after 5 s %.1f dB (< 20)", e5);
+  if (!SANITIZED) CHECKF(us < 300.0, "%.0f us per 10 ms frame (3 %% of a core = 300)", us);
+}
+
+static void test_aec_near_end_only() {
+  // §11.2: near-end-only speech attenuated < 1 dB: (a) fresh canceller, far end silent; (b) after 5 s
+  // of echo-only adaptation, then the far end stops and the near end talks.
+  const size_t n = size_t(10 * kRate), half = size_t(5 * kRate);
+  auto near = speechlike(n, 21);
+  auto noise = white(n, -65, 8);
+  std::vector<float> mic(n), ref(n, 0.0f);
+  for (size_t i = 0; i < n; ++i) mic[i] = near[i] + noise[i];
+  auto out = run_canceller(mic, ref);
+  const double a = 10 * std::log10(energy(mic, size_t(kRate), n) / energy(out, size_t(kRate), n));
+  // (b)
+  auto far = speechlike(n, 22);
+  auto echo = convolve(far, room_ir(44, -11, 6));
+  std::vector<float> mic2(n), ref2(n, 0.0f);
+  for (size_t i = 0; i < n; ++i) {
+    ref2[i] = i < half ? far[i] : 0.0f;
+    const float e = i < half + size_t(0.1 * kRate) ? echo[i] * (i < half ? 1.0f : 0.0f) : 0.0f;
+    mic2[i] = (i < half ? e : near[i]) + noise[i];
+  }
+  auto out2 = run_canceller(mic2, ref2);
+  const size_t b0 = half + size_t(0.2 * kRate);
+  const double b = 10 * std::log10(energy(mic2, b0, n) / energy(out2, b0, n));
+  std::printf("    near-end attenuation: fresh %.2f dB, after echo adaptation %.2f dB\n", a, b);
+  CHECKF(std::fabs(a) < 1.0, "near end changed by %.2f dB (fresh)", a);
+  CHECKF(std::fabs(b) < 1.0, "near end changed by %.2f dB (adapted)", b);
+}
+
+static void test_aec_double_talk() {
+  // Not a §11.2 bound: describes double talk. 5 s echo only, then 5 s near + far together.
+  const size_t n = size_t(10 * kRate), half = size_t(5 * kRate);
+  auto far = speechlike(n, 31);
+  auto near = speechlike(n, 32);
+  auto echo = convolve(far, room_ir(44, -11, 9));
+  auto noise = white(n, -65, 10);
+  std::vector<float> mic(n), nearpart(n, 0.0f);
+  for (size_t i = 0; i < n; ++i) {
+    nearpart[i] = i >= half ? near[i] : 0.0f;
+    mic[i] = echo[i] + nearpart[i] + noise[i];
+  }
+  auto out = run_canceller(mic, far);
+  // near-end level in the output: frames where the near end is active, output vs near alone
+  double en = 0, eo = 0, ee = 0, eeo = 0;
+  for (size_t i = half; i + kAecFrame <= n; i += kAecFrame) {
+    const double fn = energy(nearpart, i, i + kAecFrame), fe = energy(echo, i, i + kAecFrame);
+    if (fn > 10 * fe && fn / kAecFrame > 1e-4) {  // near end dominates
+      en += fn;
+      eo += energy(out, i, i + kAecFrame);
+    } else if (fe > 10 * fn && fe / kAecFrame > 1e-5) {  // far end alone in the double-talk period
+      ee += energy(mic, i, i + kAecFrame);
+      eeo += energy(out, i, i + kAecFrame);
+    }
+  }
+  const double near_change = 10 * std::log10(eo / en), echo_red = 10 * std::log10(ee / eeo);
+  const double overall = erle_db(mic, out, echo, size_t(2 * kRate), half);
+  std::printf("    double talk: near-end-dominated frames %+.2f dB, echo-only frames -%.1f dB (single talk before: -%.1f dB)\n",
+              near_change, echo_red, overall);
+  CHECKF(near_change > -3.0, "near end lost %.2f dB in double talk", near_change);
+  CHECKF(echo_red > 10.0, "echo reduction during double talk %.1f dB", echo_red);
+}
+
+// AecPath end to end without threads: mic and reference capture blocks with their own clocks and
+// host timestamps (+-jitter), the reference device running `ppm` fast, the echo `acoustic_ms` after
+// the reference's timestamp; the stream is processed like SendStream's encoder does.
+struct PathRun {
+  double erle_late = 0, echo_ms = -1, err_ms = 0, ppm = 0;
+  uint64_t resync = 0, ref_short = 0, waits = 0, no_ref = 0;
+};
+
+static PathRun run_path(double ppm, double acoustic_ms, double jitter_ms, double jump_at_s, int ref_block, double seconds) {
+  const size_t n = size_t(seconds * kRate);
+  // far end on the reference device's grid, room on that grid too
+  auto far = speechlike(n + kRate, 41);
+  auto y = convolve(far, room_ir(0, -11, 12));
+  // mic hears y at reference index n(t) = (t - tr0) * kRate * (1 + ppm): resample y with step 1+ppm
+  const double step = 1.0 + ppm * 1e-6;
+  const double tm0 = 5e9, tr0 = 5e9 - 0.2e9;  // the reference stream started 200 ms earlier
+  // mic sample i at time tm0 + i/kRate hears y at index ((tm0 + i/kRate - acoustic) - tr0) * kRate * step
+  const double start_idx = ((tm0 - acoustic_ms * 1e6) - tr0) * 1e-9 * kRate * step;
+  // each echo sample by direct windowed-sinc interpolation of y (32 taps, Hann)
+  std::vector<float> echo(n);
+  const int H = 16;
+  for (size_t i = 0; i < n; ++i) {
+    const double p = start_idx + double(i) * step;
+    const int64_t b = int64_t(std::floor(p));
+    const double fr = p - double(b);
+    double acc = 0;
+    for (int k = -H + 1; k <= H; ++k) {
+      const int64_t j = b + k;
+      if (j < 0 || j >= int64_t(y.size())) continue;
+      const double x = double(k) - fr;
+      const double w = 0.5 + 0.5 * std::cos(M_PI_ * x / H);
+      const double s = x == 0 ? 1.0 : std::sin(M_PI_ * x) / (M_PI_ * x);
+      acc += y[size_t(j)] * s * w;
+    }
+    echo[i] = float(acc);
+  }
+  auto noise = white(n, -65, 13);
+  std::vector<float> mic(n);
+  for (size_t i = 0; i < n; ++i) mic[i] = echo[i] + noise[i];
+
+  AecOptions opt;  // lead -1 ms, max wait 30 ms
+  AecPath path(opt);
+  std::mt19937 rng(77);
+  std::uniform_real_distribution<double> jit(-jitter_ms * 1e6, jitter_ms * 1e6);
+  std::vector<float> out(n, 0.0f);
+  const int mic_block = 480;
+  // event-driven: each block is delivered at the end of its duration (+1 ms), timestamped with
+  // its first sample's time (+ jitter); a reference jump shifts its timestamps by 50 ms.
+  size_t mi = 0, ri = 0, m = 0;
+  std::vector<float> ring;  // the mic ring (SendStream's ring_)
+  size_t ring_r = 0;
+  const double ref_rate = kRate * step;
+  for (;;) {
+    const double t_mic = tm0 + double(mi + mic_block) / kRate * 1e9 + 1e6;
+    const double t_ref = tr0 + double(ri + size_t(ref_block)) / ref_rate * 1e9 + 1e6;
+    if (mi + mic_block > n) break;
+    if (t_ref <= t_mic) {
+      std::vector<float> blk(static_cast<size_t>(ref_block));
+      for (int k = 0; k < ref_block; ++k) blk[size_t(k)] = ri + size_t(k) < far.size() ? far[ri + size_t(k)] : 0.0f;
+      const double ts = tr0 + double(ri) / ref_rate * 1e9 + jit(rng);
+      ri += size_t(ref_block);
+      // a reference restart: 60 ms of blocks never delivered (timestamps stay true)
+      if (jump_at_s > 0 && ts - tr0 > jump_at_s * 1e9 && ts - tr0 < jump_at_s * 1e9 + 60e6) continue;
+      path.on_capture(blk.data(), ref_block, 1, uint64_t(ts));
+      continue;
+    }
+    path.mic_mark(mi, uint64_t(tm0 + double(mi) / kRate * 1e9 + jit(rng)));
+    ring.insert(ring.end(), mic.begin() + long(mi), mic.begin() + long(mi + mic_block));
+    mi += mic_block;
+    while (ring.size() - ring_r >= size_t(kAecFrame)) {
+      if (!path.ready(m, ring.size() - ring_r - kAecFrame)) break;
+      path.process(&ring[ring_r], m, &out[m]);
+      ring_r += kAecFrame;
+      m += kAecFrame;
+    }
+  }
+  Json st = path.stats(1.0);
+  PathRun r;
+  if (std::getenv("BA_AEC_TRACE")) {
+    std::printf("      ERLE per 2 s:");
+    for (size_t a0 = 0; a0 + size_t(2 * kRate) <= m; a0 += size_t(2 * kRate))
+      std::printf(" %.1f", erle_db(mic, out, echo, a0, a0 + size_t(2 * kRate)));
+    std::printf("\n");
+  }
+  const size_t a = n > size_t(8 * kRate) ? n - size_t(4 * kRate) : n / 2;
+  r.erle_late = erle_db(mic, out, echo, a, m);
+  r.echo_ms = st["echo_ms"].get<double>();
+  r.err_ms = st["err_ms"].get<double>();
+  r.ppm = st["ppm"].get<double>();
+  r.resync = st["resync"].get<uint64_t>();
+  r.ref_short = st["ref_short"].get<uint64_t>();
+  r.waits = st["waits"].get<uint64_t>();
+  r.no_ref = st["no_ref"].get<uint64_t>();
+  return r;
+}
+
+static void test_aec_path_alignment() {
+  struct C { double ppm, acoustic, jitter, jump; int ref_block; const char* what; };
+  const C cases[] = {
+      {0, 44, 0, 0, 480, "same clock, 44 ms"},
+      {0, 25, 0.5, 0, 512, "Windows-like blocks, 0.5 ms timestamp jitter"},
+      {+100, 44, 0.3, 0, 441, "reference +100 ppm"},
+      {-100, 44, 0.3, 0, 480, "reference -100 ppm"},
+      {0, 44, 0.2, 5, 480, "reference loses 60 ms at 5 s (restart)"},
+  };
+  for (const C& c : cases) {
+    PathRun r = run_path(c.ppm, c.acoustic, c.jitter, c.jump, c.ref_block, 14);
+    std::printf("    %-46s ERLE %.1f dB, echo at %.1f ms, err %.2f ms, ppm %.0f, resync %llu, short %llu, waits %llu, no_ref %llu\n",
+                c.what, r.erle_late, r.echo_ms, r.err_ms, r.ppm, (unsigned long long)r.resync, (unsigned long long)r.ref_short,
+                (unsigned long long)r.waits, (unsigned long long)r.no_ref);
+    CHECKF(r.erle_late >= 20.0, "%s: ERLE %.1f dB", c.what, r.erle_late);
+    CHECKF(std::fabs(r.echo_ms - c.acoustic) < 4.0, "%s: echo found at %.1f ms, placed at %.0f", c.what, r.echo_ms, c.acoustic);
+    CHECKF(r.resync == (c.jump > 0 ? 2u : 1u), "%s: %llu resyncs", c.what, (unsigned long long)r.resync);
+  }
+}
+
+static void test_aec_wiring() {
+  // features: "aec" only when compiled and the backend can capture a reference
+  auto nb = make_null_backend("");
+  auto f = engine_features(*nb);
+  CHECK(std::find(f.begin(), f.end(), "aec") != f.end());
+  // send with aec through the control loop: the reference opens on null-out, frames flow through
+  // the canceller; without null-out the mic still runs, without echo cancellation.
+  for (int variant = 0; variant < 2; ++variant) {
+    InProc a(variant == 0 ? "mic=sine:440:0.2;ref=sine:1000:0.2" : "out=absent");
+    size_t c = 0;
+    a.send(R"({"cmd":"flow_open","req":1,"flow":"0000aec0","peer":"p","role":"offer","port":0,"remote":null,"key":")" +
+           b64key(3) + R"(","udp":false})");
+    CHECK(a.wait(&c, [](const Json& e) { return e.value("ev", "") == "ok" && e.value("req", 0) == 1; }, 3000));
+    a.send(R"({"cmd":"send","req":2,"stream":77,"flow":"0000aec0","kind":"mic","source":{"device":null},"key":")" +
+           b64key(4) + R"(","aec":{"reference":null,"lead_ms":5}})");
+    CHECK(a.wait(&c, [](const Json& e) { return e.value("ev", "") == "ok" && e.value("req", 0) == 2; }, 3000));
+    Json st;
+    bool got = a.wait(&c, [](const Json& e) {
+      if (e.value("ev", "") != "stats" || !e["streams"].contains("77")) return false;
+      const Json& s = e["streams"]["77"];
+      return s.contains("aec") && s["frames"].get<uint64_t>() > 40;
+    }, 5000, &st);
+    CHECK(got);
+    if (!got) continue;
+    const Json& s = st["streams"]["77"]["aec"];
+    std::printf("    %s: %s\n", variant == 0 ? "reference" : "no null-out", s.dump().c_str());
+    if (variant == 0) {
+      CHECK(s.value("on", false));
+      CHECK(s.value("ref", std::string()) == "null-out");
+    } else {
+      CHECK(!s.value("on", true));
+      CHECK(s.value("error", std::string()) == "no_device");
+    }
+  }
+}
+
 // ===================================================================== main
 
 struct Case {
@@ -1048,6 +1384,11 @@ int main(int argc, char** argv) {
       {"flow_fallback_and_back", test_flow_fallback_and_back},
       {"golden_control", test_golden_control},
       {"run_helper_cli", test_run_helper_cli},
+      {"aec_synthetic_echo", test_aec_synthetic_echo},
+      {"aec_near_end_only", test_aec_near_end_only},
+      {"aec_double_talk", test_aec_double_talk},
+      {"aec_path_alignment", test_aec_path_alignment},
+      {"aec_wiring", test_aec_wiring},
   };
   int run = 0;
   for (const Case& c : cases) {
