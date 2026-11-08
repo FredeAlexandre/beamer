@@ -145,7 +145,7 @@ runs 10 ms mono frames through the canceller before Opus:
   restarts it). The reference sample fed with mic sample `m` is the one captured at host time
   `t_mic(m) + lead_ms` (default -1 ms), so the filter sees the echo at the acoustic delay by
   timestamps (MacBook Air: ~44-60 ms) inside its 100 ms.
-- Drift: the reference is read through the engine's `Resampler`; a PI loop (wn 0.5 rad/s) on the
+- Drift: the reference is read through the engine's `Resampler`; a PI loop (wn 0.2 rad/s) on the
   position error steers its step, so devices on different clocks stay aligned (tested at +-100 ppm
   with 0.5 ms timestamp jitter). An error > 20 ms (restart, lost blocks) re-aligns at once.
 - A mic frame waits for its reference at most `max_wait_ms` (30) of mic backlog; missing samples are

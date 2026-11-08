@@ -195,7 +195,7 @@ void AecPath::align(uint64_t m) {
     return;
   }
   // PI on the position error (ms). The error moves at (true ppm - applied ppm) / 1000 ms per second,
-  // so these gains give a second-order loop with wn 0.5 rad/s, zeta 0.7: a 100 ppm clock offset is
+  // so these gains give a second-order loop with wn 0.2 rad/s, zeta 1: a 100 ppm clock offset is
   // locked in a few seconds with no steady error (the jitter buffer's DriftController, tuned for
   // buffer levels, would take ~25 s and leave 2.5 ms).
   const double err_ms = err * 1000.0 / kRate, dt = double(kAecFrame) / kRate;
