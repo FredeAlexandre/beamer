@@ -59,12 +59,42 @@ static HRESULT finish(Client* c, ClientKind kind) {
     c->event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     if (FAILED(hr = c->client->SetEventHandle(c->event))) return hr;
     if (FAILED(hr = c->client->GetBufferSize(&c->buffer_frames))) return hr;
+    if (!c->period_frames) {  // the period events come at (IAudioClient3 streams set it from the engine)
+        REFERENCE_TIME def = 0, mn = 0;
+        c->client->GetDevicePeriod(&def, &mn);
+        REFERENCE_TIME p = c->exclusive ? (mn ? mn : def) : def;
+        c->period_frames = p ? (UINT32)((p * kRate + 5000000) / 10000000) : kRate / 100;
+    }
     if (kind == ClientKind::Render) hr = c->client->GetService(IID_PPV_ARGS(&c->render));
     else hr = c->client->GetService(IID_PPV_ARGS(&c->capture));
     return hr;
 }
 
-HRESULT open_endpoint_client(IMMDevice* d, ClientKind kind, int channels, Client* c) {
+// Shared stream at a smaller engine period (IAudioClient3, Windows 10+). Only drivers that report a period range
+// allow it: on lebig only VB-CABLE's render endpoints (128..480 frames); USB audio class devices are fixed at 480.
+// The engine period is per endpoint and set by the first stream: when another stream already runs the engine at
+// another period, InitializeSharedAudioStream fails (AUDCLNT_E_ENGINE_PERIODICITY_LOCKED) or gives the current one.
+// Returns S_FALSE (nothing initialized, `ac` untouched) when the device has no smaller period than its default.
+static HRESULT init_low_latency(IAudioClient* ac, DWORD flags, const WAVEFORMATEX* fmt, const WAVEFORMATEX* mix, UINT32 want, Client* c) {
+    ComPtr<IAudioClient3> ac3;
+    HRESULT hr = ac->QueryInterface(IID_PPV_ARGS(&ac3));
+    if (FAILED(hr)) return S_FALSE;
+    UINT32 def = 0, fund = 0, mn = 0, mx = 0;
+    if (FAILED(hr = ac3->GetSharedModeEnginePeriod(mix, &def, &fund, &mn, &mx)) || !fund || mn >= def) return S_FALSE;
+    UINT32 p = std::clamp(want, mn, def);
+    p = std::min(def, (p + fund - 1) / fund * fund);  // a multiple of the fundamental period
+    if (p >= def) return S_FALSE;
+    if (FAILED(hr = ac3->InitializeSharedAudioStream(flags, p, fmt, nullptr))) return hr;
+    WAVEFORMATEX* cf = nullptr;
+    UINT32 cur = 0;
+    if (SUCCEEDED(ac3->GetCurrentSharedModeEnginePeriod(&cf, &cur)) && cur) p = cur;
+    CoTaskMemFree(cf);
+    c->period_frames = p;
+    c->low_latency = p < def;
+    return S_OK;
+}
+
+HRESULT open_endpoint_client(IMMDevice* d, ClientKind kind, int channels, Client* c, UINT32 period_frames) {
     HRESULT hr;
     ComPtr<IAudioClient> ac;
     if (FAILED(hr = d->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, &ac))) return hr;
@@ -92,14 +122,30 @@ HRESULT open_endpoint_client(IMMDevice* d, ClientKind kind, int channels, Client
         flags |= AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
         c->wasapi_convert = true;
     }
-    hr = ac->Initialize(AUDCLNT_SHAREMODE_SHARED, flags, 0, 0, fmt, nullptr);
+    hr = S_FALSE;
+    std::string ll_note;
+    if (period_frames && kind != ClientKind::EndpointLoopback) {
+        hr = init_low_latency(ac.Get(), flags, fmt, mix, period_frames, c);
+        if (FAILED(hr)) {
+            // A failed Initialize leaves the client unusable on some drivers: start over with a fresh one.
+            ll_note = " (low-latency period refused: " + hr_text(hr) + ")";
+            ac.Reset();
+            if (FAILED(hr = d->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, &ac))) { CoTaskMemFree(mix); return hr; }
+            hr = S_FALSE;
+        }
+    }
+    if (hr == S_FALSE) hr = ac->Initialize(AUDCLNT_SHAREMODE_SHARED, flags, 0, 0, fmt, nullptr);
     CoTaskMemFree(mix);
     if (FAILED(hr)) return hr;
     c->client = ac;
     c->channels = stream_ch;
     c->path = std::string(kind == ClientKind::Render ? "render" : kind == ClientKind::Capture ? "capture" : "endpoint-loopback") +
               (c->wasapi_convert ? "+autoconvert" : "");
-    return finish(c, kind);
+    hr = finish(c, kind);
+    char p[64];
+    snprintf(p, sizeof p, "(%s period %u)", c->low_latency ? "low-latency" : "default", c->period_frames);
+    c->path += p + ll_note;
+    return hr;
 }
 
 HRESULT open_exclusive_render(IMMDevice* d, int channels, Client* c) {
@@ -140,6 +186,7 @@ HRESULT open_exclusive_render(IMMDevice* d, int channels, Client* c) {
     c->client = ac;
     c->channels = channels;
     c->exclusive = true;
+    c->period_frames = (UINT32)((period * kRate + 5000000) / 10000000);
     char p[48];
     snprintf(p, sizeof p, "render-exclusive(%.2f ms, %s)", period / 10000.0, kind == 0 ? "f32" : kind == 1 ? "s16" : "s32");
     c->path = p;

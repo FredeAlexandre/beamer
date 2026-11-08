@@ -37,6 +37,17 @@ struct WinOptions {
     // Render into CABLE Input in exclusive mode (PHASE2 risk 6: shorter VB-CABLE path). Off by default: it takes
     // CABLE Input away from any other app using it. `--vmic-exclusive` on the helper's command line.
     bool vmic_exclusive = false;
+    // Shared render (WP12). Period asked for through IAudioClient3 (frames; 0 = the device default) and frames kept
+    // queued, in periods. Measured on lebig (dev/audio/reports/wp12.md): CABLE Input at 128 frames x 3 = 8 ms queued
+    // gives 59-72 ms click-to-app, 0 holes in 4x60 s + 300 s (default 480 x 3: 102-117 ms; 128 x 2: holes in 2 of 4).
+    // USB endpoints (G733, DualSense) have no period range: they keep 480.
+    unsigned vmic_period = 128;
+    double vmic_queue = 3;
+    // Endpoints: 480 x 1.5 = 15 ms queued on the G733: 0 holes in 4x60 s + 300 s (2 periods = Phase 1's 20 ms).
+    // render_period/mic_period ask for 128 frames where a driver allows it (none of lebig's USB devices does).
+    unsigned render_period = 128;
+    double render_queue = 1.5;
+    unsigned mic_period = 128;
 };
 // Parses --state-dir, --log-level and --dev out of the helper's argv (other arguments are ignored).
 WinOptions win_options_from_args(int argc, char** argv);
@@ -186,6 +197,8 @@ struct Client {
     int channels = 0;           // channels of the stream as initialized
     bool wasapi_convert = false;
     bool exclusive = false;     // exclusive-mode render: fill the whole buffer on every event
+    bool low_latency = false;   // shared stream below the engine's default period (IAudioClient3)
+    UINT32 period_frames = 0;   // frames per period event
     int sample_kind = 0;        // buffer samples: 0 float32, 1 int16, 2 int32 (exclusive mode only uses 1 and 2)
     std::string path;           // diagnostics
     Client() = default;
@@ -195,7 +208,10 @@ struct Client {
 };
 // Shared-mode, event-driven, 48 kHz float32. Capture/EndpointLoopback stream the mix's channels (fold-down is ours);
 // Render uses `channels` (WASAPI converts when the mix differs: unity gain, unlike direct writes into an 8-ch mix).
-HRESULT open_endpoint_client(IMMDevice* d, ClientKind kind, int channels, Client* c);
+// period_frames > 0: ask for that shared engine period (rounded to what the driver allows, never below its minimum)
+// through IAudioClient3; devices without a period range, and endpoint loopback, keep the default. 0 = the default
+// period, as an ordinary app opens a device.
+HRESULT open_endpoint_client(IMMDevice* d, ClientKind kind, int channels, Client* c, UINT32 period_frames = 0);
 // Exclusive-mode, event-driven render at the device's minimum period, 48 kHz float32 with `channels`.
 HRESULT open_exclusive_render(IMMDevice* d, int channels, Client* c);
 // Process loopback excluding (or including) the tree of `pid`; `channels` as requested.

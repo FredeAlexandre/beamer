@@ -186,6 +186,7 @@ class WinBackend : public Backend {
         f.push_back("mic_demand");
         f.push_back("virtual_mic");
         f.push_back("aec");  // the backend provides CaptureKind::Reference (endpoint loopback); the canceller is the engine's
+        if (opt_.vmic_exclusive) f.push_back("vmic_exclusive");  // started with --vmic-exclusive (falls back to shared if refused)
         return f;
     }
 
@@ -442,7 +443,12 @@ bool WinStream::open(IMMDeviceEnumerator* e, const std::string& id, std::string*
                 c = std::make_unique<Client>();
             }
         }
-        if (FAILED(hr)) hr = open_endpoint_client(d.Get(), ck, channels, c.get());
+        if (FAILED(hr)) {
+            const WinOptions& o = b_->opt_;
+            // Endpoint loopback (AEC reference) keeps the default: it follows the render engine's period anyway.
+            UINT32 period = kind_ == StreamKind::Mic ? o.mic_period : kind_ != StreamKind::Render ? 0 : virtual_mic ? o.vmic_period : o.render_period;
+            hr = open_endpoint_client(d.Get(), ck, channels, c.get(), period);
+        }
     }
     if (FAILED(hr)) {
         *err = (hr == E_ACCESSDENIED ? "permission: " : hr == AUDCLNT_E_DEVICE_IN_USE ? "device_busy: " : hr == AUDCLNT_E_DEVICE_INVALIDATED ? "no_device: " : "internal: ") +
@@ -454,6 +460,9 @@ bool WinStream::open(IMMDeviceEnumerator* e, const std::string& id, std::string*
     if (kind_ == StreamKind::Reference) keepalive_ = std::make_unique<KeepAlive>(id);
     BLOG_I("%s stream on %s: %s, %d ch from the device, %d ch to the engine, buffer %u frames", kind_name(kind_), id.empty() ? "(process loopback)" : id.c_str(),
            c->path.c_str(), c->channels, channels, c->buffer_frames);
+    if (kind_ == StreamKind::Render && !c->exclusive)
+        BLOG_I("render queue %.2f periods = %.1f ms", virtual_mic ? b_->opt_.vmic_queue : b_->opt_.render_queue,
+               (virtual_mic ? b_->opt_.vmic_queue : b_->opt_.render_queue) * c->period_frames * 1000.0 / kRate);
     client_ = std::move(c);
     return true;
 }
@@ -497,12 +506,11 @@ WinStream::End WinStream::pump_capture() {
 
 WinStream::End WinStream::pump_render() {
     Client& c = *client_;
-    REFERENCE_TIME period = 0;
-    c.client->GetDevicePeriod(&period, nullptr);
-    UINT32 period_frames = period ? (UINT32)(period * kRate / 10000000) : kRate / 100;
-    // Shared: keep 2 periods queued (Phase 1's glitch-free default). Exclusive: the buffer is one period and each event
-    // asks for all of it.
-    const UINT32 target = c.exclusive ? c.buffer_frames : std::min(c.buffer_frames, period_frames * (virtual_mic ? 3 : 2));
+    // Shared: keep `queue` periods queued (WinOptions: endpoints 1.5, CABLE Input 3 at a 128-frame period; see
+    // WP12). Exclusive: the buffer is one period and each event asks for all of it.
+    const double queue = virtual_mic ? b_->opt_.vmic_queue : b_->opt_.render_queue;
+    const UINT32 target = c.exclusive ? c.buffer_frames
+                                      : std::clamp((UINT32)std::lround(c.period_frames * queue), c.period_frames, c.buffer_frames);
     BYTE* p;
     HRESULT hr;
     // The engine always fills float32; integer buffers (exclusive mode) go through scratch_ and are converted here.
@@ -606,7 +614,10 @@ void WinStream::run() {
         close_device();
         bool back = false;
         for (int attempt = 0; attempt < 15 && !stop_; attempt++) {
-            if (WaitForSingleObject(wake_, attempt == 0 ? 50 : 200) == WAIT_OBJECT_0 && stop_) break;
+            // CABLE Input: wait 250 ms first. Another app's exclusive open preempts us (invalidation); one that retries
+            // with another format right after must not find the low-latency stream back already (WP12: it got
+            // AUDCLNT_E_DEVICE_IN_USE when we reopened after 50 ms; default-period streams did not show this).
+            if (WaitForSingleObject(wake_, attempt == 0 ? (virtual_mic ? 250 : 50) : 200) == WAIT_OBJECT_0 && stop_) break;
             gen_seen_ = b_->default_gen(flow());
             std::string nid;
             if (!resolve(e.Get(), &nid, &err)) continue;
