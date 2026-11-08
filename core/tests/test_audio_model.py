@@ -51,7 +51,8 @@ class ShapeTests(unittest.TestCase):
                                                    "jb_ms", "loss_pct", "rtt_ms"])
         self.assertEqual(names(AudioSnapshot), ["own", "machines", "online", "direct", "route", "mic_status",
                                                 "output_status", "streams", "helper", "permission", "aec_mode",
-                                                "aec_active"])
+                                                "aec_active", "howls"])
+        self.assertEqual(names(model.HowlView), ["source", "target", "freq_hz", "active"])
 
     def test_frozen_and_mapping_defaults_never_shared(self):
         one, two = RouteStatus("off"), RouteStatus("off")

@@ -184,6 +184,20 @@ class MalformedTests(unittest.TestCase):
         self.assertEqual(list(read["levels"]), [("in", "k")])
         self.assertEqual(read["streams"], {9: {"path": "", "jb_ms": None, "loss_pct": None, "rtt_ms": None}})
 
+    def test_stats_howls(self):
+        other = protocol.id_text(bytes([9]) * 16)
+        self.assertNotIn("howls", wire.stats(1, {}, {})["data"])  # left out when there is none
+        msg = wire.stats(1, {}, {}, [{"to": other, "freq_hz": 7100.0, "active": True},
+                                     {"to": "not an id", "freq_hz": 7100.0, "active": True},
+                                     {"to": other, "freq_hz": "loud", "active": True},
+                                     {"to": other, "freq_hz": 99999, "active": False},
+                                     {"to": other, "freq_hz": 1000, "active": None}])
+        self.assertEqual(wire.read(msg, now=NOW)[1]["howls"], [{"to": other, "freq_hz": 7100.0, "active": True}])
+        msg["data"]["howls"] = "many"
+        self.assertEqual(wire.read(msg, now=NOW)[1]["howls"], [])
+        msg["data"]["howls"] = [{"to": other, "freq_hz": 500, "active": False}] * 20
+        self.assertEqual(len(wire.read(msg, now=NOW)[1]["howls"]), wire.MAX_HOWLS)
+
 
 if __name__ == "__main__":
     unittest.main()

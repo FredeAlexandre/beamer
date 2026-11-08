@@ -112,7 +112,8 @@ def _mic(own, machines, route, direct, online, aec_mode, now, demand_hold, sends
         if device is None:
             return RouteStatus("waiting_device", None, {"machine": source, "device": mic.device.name}), None
         source_key = device.key
-    aec = aec_mode == "auto" and output_form(route, holder) not in HEADSET_FORMS
+    # Only a helper that lists `aec` cancels echo (§3.3 `ready`); an older one would ignore the field.
+    aec = aec_mode == "auto" and "aec" in holder.features and output_form(route, holder) not in HEADSET_FORMS
     reference = holder.default_output if aec else None
     reachable = peers_of(own, source, direct, machines)
     streaming, problems = [], {}

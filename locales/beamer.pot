@@ -1388,6 +1388,16 @@ msgid "No audio"
 msgstr ""
 
 #: core/audio/view.py
+#, python-brace-format
+msgid "Beamer heard feedback between {target}'s speakers and a microphone on {source}, and turned down {source}'s sound on {target}. Use headphones on {target}, or turn off Wave Link's monitor to the system output on {source}."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Beamer heard feedback between {target}'s speakers and a microphone on {source}, and turned down {source}'s sound on {target}. Use headphones on {target}, or stop {source} from playing that microphone through its own sound."
+msgstr ""
+
+#: core/audio/view.py
 msgid "Beamer may not use this Mac's microphones. Allow it in System Settings, Privacy & Security, Microphone."
 msgstr ""
 
@@ -1667,11 +1677,6 @@ msgstr ""
 
 #: core/audio/view.py
 #, python-brace-format
-msgid "Beamer cancels the echo of {machine}'s speakers. A headset on {machine} sounds better."
-msgstr ""
-
-#: core/audio/view.py
-#, python-brace-format
 msgid "{names} runs a Beamer without audio. Update Beamer there to use its microphones and speakers."
 msgid_plural "{names} run a Beamer without audio. Update Beamer there to use their microphones and speakers."
 msgstr[0] ""
@@ -1703,12 +1708,27 @@ msgstr ""
 
 #: core/audio/view.py
 #, python-brace-format
+msgid "Beamer cancels the echo of {machine}'s speakers. A headset on {machine} sounds better."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{machine}'s microphone can hear its speakers, and Beamer does not cancel that echo there. Use a headset on {machine}."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
 msgid "If {target}'s speakers can be heard by {mic}, people in a call on {target} hear themselves. Use a headset, or send {target}'s sound to {source}, where Beamer cancels it."
 msgstr ""
 
 #: core/audio/view.py
 #, python-brace-format
 msgid "Send {target}'s sound to {source}"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "If {target}'s speakers can be heard by {mic}, people in a call on {target} hear themselves. Use a headset on {target}."
 msgstr ""
 
 #: mac_app/audio_page.py

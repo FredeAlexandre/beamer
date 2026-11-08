@@ -335,6 +335,152 @@ class PairTests(unittest.TestCase):
         self.assertEqual(self.pc.snapshot().machines[self.mac.id].outputs[0].form, "headset")
 
 
+class RestartTests(unittest.TestCase):
+    """A route entry change restarts only the streams whose spec it changes (§6.4 rule 3)."""
+
+    def setUp(self):
+        self.net = Net()
+        self.addCleanup(self.net.close)
+        self.mac = self.net.add(1, "mac", "macos")
+        self.pc = self.net.add(2, "lebig", "windows")
+        self.net.link(self.mac, self.pc)
+        self.mac.helper.set_in_use(True)
+        self.net.settle()
+
+    def sends(self, kind):
+        return [command for command in self.pc.helper.commands("send") if command["kind"] == kind]
+
+    def test_pc_mic_and_output_in_one_change_open_each_stream_once(self):
+        # WP10 saw the PC's mic open twice when both were set together. Set from either machine,
+        # delivered together or one by one, each stream opens once.
+        wave = DeviceRef("{mic-wave3}", "Wave:3 Mic In")
+        for setter, together in ((self.mac, True), (self.pc, False), (self.mac, False)):
+            with self.subTest(setter=setter.name, together=together):
+                setter.service.set_mic(None, None)
+                setter.service.set_output(self.pc.id, None, None)
+                self.net.settle()
+                mics, systems = len(self.sends("mic")), len(self.sends("system"))
+                stops = len(self.pc.helper.commands("stop"))
+                setter.service.set_mic(self.pc.id, wave)
+                if not together:
+                    self.net.settle()
+                setter.service.set_output(self.pc.id, self.mac.id, None)
+                self.net.settle()
+                self.assertEqual(len(self.sends("mic")) - mics, 1)
+                self.assertEqual(len(self.sends("system")) - systems, 1)
+                self.assertEqual(len(self.pc.helper.commands("stop")), stops)
+                self.assertEqual({s.kind for s in self.pc.snapshot().streams if s.state == "running"},
+                                 {"mic", "system"})
+
+    def test_unrelated_entries_never_restart_a_running_stream(self):
+        wave = DeviceRef("{mic-wave3}", "Wave:3 Mic In")
+        self.mac.service.set_mic(self.pc.id, wave)
+        self.mac.service.set_output(self.pc.id, self.mac.id, None)
+        self.net.settle()
+        sent = len(self.pc.helper.commands("send"))
+        running = {command["stream"] for command in self.pc.helper.commands("send")}
+        changes = [
+            lambda: self.mac.service.set_output(self.mac.id, self.pc.id, DeviceRef("{out-hdmi}", "LG HDR 4K")),
+            lambda: self.mac.service.set_output(self.mac.id, None, None),
+            lambda: self.pc.service.set_form(self.pc.id, "{out-hdmi}", "headset"),   # not the default output
+            lambda: self.mac.service.set_form(self.mac.id, "BuiltInSpeakerDevice", "headset"),
+            lambda: self.mac.service.set_mic(self.pc.id, wave),                      # same mic, newer stamp
+            lambda: self.pc.service.set_output(self.pc.id, self.mac.id, None),       # same output, newer stamp
+            lambda: self.mac.service.set_aec("off"),
+        ]
+        for change in changes:
+            change()
+            self.net.settle()
+        self.assertEqual(len(self.pc.helper.commands("send")), sent)
+        self.assertFalse(running & {command["stream"] for command in self.pc.helper.commands("stop")})
+        self.assertEqual(types(self.pc.host.posted, wire.CLOSE), [])
+        self.assertEqual(len(self.mac.helper.commands("recv")), 2)  # the PC's mic and sound, opened once
+
+    def test_a_late_dev_test_source_is_what_restarts_the_mic(self):
+        # The WP10 double open: the harness's PC `test_source` reached the PC after the route (scp +
+        # ssh + the 1 s poll), so the mic opened on the real device, then again on the test source.
+        # The dev status names the source in force, for the harness to wait on.
+        Path(self.pc.state_dir, "audio-dev.enabled").write_text("{}")
+        self.pc.restart()
+        self.net.unlink(self.mac, self.pc)
+        self.net.link(self.mac, self.pc)
+        self.net.settle()
+        self.mac.service.set_mic(self.pc.id, DeviceRef("{mic-wave3}", "Wave:3 Mic In"))
+        self.net.settle()
+        self.assertEqual(self.sends("mic")[-1]["source"], {"device": "{mic-wave3}"})
+        Path(self.pc.state_dir, service_module.DEV_CMD).write_text(json.dumps({"test_source": {"kind": "mic", "signal": "B"}}))
+        self.net.clock.advance(1.1)
+        self.net.settle()
+        self.assertEqual(self.sends("mic")[-1]["source"], {"test": "B"})
+        status = json.loads(Path(self.pc.state_dir, service_module.DEV_STATUS).read_text())
+        self.assertEqual(status["test_source"], "B")
+
+
+class HowlTests(unittest.TestCase):
+    """The howl guard's `howl` event (§3.3): in the sender's snapshot, and in a watching peer's."""
+
+    def setUp(self):
+        self.net = Net()
+        self.addCleanup(self.net.close)
+        self.mac = self.net.add(1, "mac", "macos")
+        self.pc = self.net.add(2, "lebig", "windows")
+        self.net.link(self.mac, self.pc)
+        self.net.settle()
+        self.pc.service.set_output(self.pc.id, self.mac.id, None)
+        self.net.settle()
+        self.stream = self.pc.helper.commands("send")[-1]["stream"]
+
+    def howl(self, active, stream=None):
+        self.pc.helper.emit({"ev": "howl", "stream": stream or self.stream, "active": active, "freq_hz": 7100.0,
+                             "duck_db": -20.0 if active else 0.0})
+        self.net.settle()
+
+    def test_howl_shows_on_the_sender_and_a_watching_receiver(self):
+        self.mac.service.watch(True)
+        self.net.settle()
+        self.howl(True)
+        expected = (model.HowlView(self.pc.id, self.mac.id, 7100.0, True),)
+        self.assertEqual(self.pc.snapshot().howls, expected)
+        self.net.clock.advance(0.3)
+        self.net.settle()
+        self.net.clock.advance(0.3)
+        self.net.settle()
+        self.assertEqual(self.mac.snapshot().howls, expected)
+        # Released: the notice stays for the hold, then goes, on both.
+        self.howl(False)
+        self.assertEqual(self.pc.snapshot().howls, (model.HowlView(self.pc.id, self.mac.id, 7100.0, False),))
+        self.net.clock.advance(service_module.HOWL_NOTICE_HOLD - 1)
+        self.net.settle()
+        self.assertEqual(len(self.pc.snapshot().howls), 1)
+        self.net.clock.advance(1.5)
+        self.net.settle()
+        self.net.clock.advance(0.3)
+        self.net.settle()
+        self.assertEqual(self.pc.snapshot().howls, ())
+        self.assertEqual(self.mac.snapshot().howls, ())
+        # Without watching, the receiver drops what it held.
+        self.howl(True)
+        self.mac.service.watch(False)
+        self.net.settle()
+        self.assertEqual(self.mac.snapshot().howls, ())
+
+    def test_stream_closed_while_ducked_ends_the_howl(self):
+        self.howl(True)
+        self.pc.service.set_output(self.pc.id, None, None)
+        self.net.settle()
+        self.assertEqual(self.pc.snapshot().howls, (model.HowlView(self.pc.id, self.mac.id, 7100.0, False),))
+
+    def test_unknown_streams_and_mic_streams_are_ignored(self):
+        self.howl(True, stream=12345)
+        self.assertEqual(self.pc.snapshot().howls, ())
+        self.pc.service.set_mic(self.pc.id, None)
+        self.mac.helper.set_in_use(True)
+        self.net.settle()
+        mic = [c for c in self.pc.helper.commands("send") if c["kind"] == "mic"][-1]["stream"]
+        self.howl(True, stream=mic)
+        self.assertEqual(self.pc.snapshot().howls, ())
+
+
 class StoreTests(unittest.TestCase):
     def setUp(self):
         self.net = Net()

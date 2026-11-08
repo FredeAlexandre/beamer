@@ -124,6 +124,15 @@ class MicTests(unittest.TestCase):
                 self.assertEqual(spec.aec_reference, "spk" if aec else None)
                 self.assertEqual(spec.sink, {"virtual_mic": True})
 
+    def test_aec_only_where_the_helper_has_it(self):
+        # A helper without `aec` in its features (an older one) would ignore the field: no AEC, so
+        # the page does not say Beamer cancels the echo.
+        result = run(MAC, [mac(features=MAC_FEATURES - {"aec"}), pc(in_use=True)], route(MAC, None))
+        spec = result.sends[("mic", PC)]
+        self.assertEqual((spec.aec, spec.aec_reference), (False, None))
+        result = run(MAC, [mac(), pc(in_use=True, features=PC_FEATURES - {"aec"})], route(MAC, None))
+        self.assertTrue(result.sends[("mic", PC)].aec)  # the receiver's features do not matter
+
     def test_no_aec_on_the_loop(self):
         result = run(MAC, [mac(in_use=True), pc()], route(MAC, None))
         self.assertEqual(result.loop, planner.LoopSpec(None))

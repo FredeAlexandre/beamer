@@ -41,6 +41,7 @@ MAX_ROUTE_MACHINES = 33
 MAX_FRAME_PACKETS = 4
 MAX_PACKET_TEXT = 2048
 MAX_STREAM = 2 ** 31 - 1
+MAX_HOWLS = 8
 KEY_SIZE = 32
 HELPER_STATES = ("ok", "starting", "failed")
 OPEN_ERRORS = ("no_device", "no_virtual_mic", "conflict", "helper", "unsupported")
@@ -123,8 +124,13 @@ def watch(on):
     return message(WATCH, {"on": bool(on)})
 
 
-def stats(t, levels, streams):
-    return message(STATS, {"t": int(t), "levels": levels, "streams": streams})
+def stats(t, levels, streams, howls=()):
+    """`howls`: the sender's howl guard notices (§3.3 `howl`), `{"to": machine, "freq_hz", "active"}`
+    each; the field is left out when there is none."""
+    data = {"t": int(t), "levels": levels, "streams": streams}
+    if howls:
+        data["howls"] = [dict(howl) for howl in howls]
+    return message(STATS, data)
 
 
 def test(device, seconds=10):
@@ -420,7 +426,13 @@ def read_stats(data):
             streams[int(name)] = {"path": path if path in ("udp", "link") else "",
                                   "jb_ms": _number(value.get("jb_ms")), "loss_pct": _number(value.get("loss_pct")),
                                   "rtt_ms": _number(value.get("rtt_ms"))}
-    return {"t": data["t"], "levels": levels, "streams": streams}
+    howls = []
+    howls_data = data.get("howls", [])
+    for value in howls_data[:MAX_HOWLS] if isinstance(howls_data, list) else ():
+        if (isinstance(value, dict) and _machine(value.get("to")) and isinstance(value.get("active"), bool)
+                and _number(value.get("freq_hz")) is not None and 0 <= value["freq_hz"] <= 24000):
+            howls.append({"to": value["to"], "freq_hz": float(value["freq_hz"]), "active": value["active"]})
+    return {"t": data["t"], "levels": levels, "streams": streams, "howls": howls}
 
 
 def read_test(data):

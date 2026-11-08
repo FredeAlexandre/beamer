@@ -765,7 +765,7 @@ msgstr "Usa le vie della scrivania"
 msgid "Older"
 msgstr "Datato"
 
-#: core/profiles.py mac_app/diagram.py
+#: core/profiles.py core/audio/view.py mac_app/diagram.py
 msgid "Offline"
 msgstr "Non in linea"
 
@@ -1253,6 +1253,572 @@ msgstr "l'angolo {corner}"
 msgid "the {edge} edge"
 msgstr "il bordo {edge}"
 
+#: core/audio/view.py mac_app/ledger.py win_app/crossing_ledger.py
+msgid "macOS"
+msgstr "macOS"
+
+#: core/audio/view.py mac_app/ledger.py mac_app/machines.py mac_app/widgets.py win_app/crossing_ledger.py win_app/peers_view.py
+msgid "Windows"
+msgstr "Windows"
+
+#: core/audio/view.py mac_app/ledger.py mac_app/machines.py win_app/crossing_ledger.py win_app/peers_view.py
+msgid "Linux"
+msgstr "Linux"
+
+#: core/audio/view.py
+msgid "the device is gone"
+msgstr ""
+
+#: core/audio/view.py
+msgid "Beamer does not use that device"
+msgstr ""
+
+#: core/audio/view.py
+msgid "no virtual microphone there"
+msgstr ""
+
+#: core/audio/view.py
+msgid "another app holds the device"
+msgstr ""
+
+#: core/audio/view.py
+msgid "the system does not allow it"
+msgstr ""
+
+#: core/audio/view.py
+msgid "that machine cannot do it"
+msgstr ""
+
+#: core/audio/view.py
+msgid "the network port is taken"
+msgstr ""
+
+#: core/audio/view.py
+msgid "the audio helper stopped"
+msgstr ""
+
+#: core/audio/view.py
+msgid "its output is muted there"
+msgstr ""
+
+#: core/audio/view.py
+msgid "that machine cannot capture its sound"
+msgstr ""
+
+#: core/audio/view.py
+msgid "its default microphone"
+msgstr ""
+
+#: core/audio/view.py
+msgid "its default output"
+msgstr ""
+
+#: core/audio/view.py
+msgid "Every app on this Mac goes quiet for about a second while it installs."
+msgstr ""
+
+#: core/audio/view.py
+msgid "Beamer is sending or playing sound now; it can be installed once that stops."
+msgstr ""
+
+#: core/audio/view.py
+msgid "No microphone is shared: apps that record it hear silence."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Playing on {device} on {target}."
+msgstr ""
+
+#: core/audio/view.py
+msgid "Here"
+msgstr ""
+
+#: core/audio/view.py mac_app/diagram.py win_app/crossing_ledger.py
+msgid "Computer"
+msgstr "Computer"
+
+#: core/audio/view.py
+msgid "An app here is recording Beamer's microphone."
+msgstr ""
+
+#: core/audio/view.py
+msgid "Beamer Microphone is not installed, so apps on this Mac cannot hear another machine's microphone."
+msgstr ""
+
+#. a device chosen in a selector, after the machine it belongs to: "lebig · Wave:3".
+#: core/audio/view.py
+#, python-brace-format
+msgid "{machine} · {device}"
+msgstr ""
+
+# New in 1.5.5: awaiting Lorenzo's check
+#: core/audio/view.py mac_app/kvm_bridge_app.py win_app/kvm_bridge_win.py
+msgid "Off"
+msgstr "Disattivato"
+
+#: core/audio/view.py
+msgid "Default microphone"
+msgstr ""
+
+#: core/audio/view.py
+msgid "A machine recording it has no virtual microphone."
+msgstr ""
+
+#: core/audio/view.py
+msgid "Sound plays here"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{device} is not connected to {target}. {machine} plays its sound itself until it is back."
+msgstr ""
+
+#: core/audio/view.py
+msgid "Default output"
+msgstr ""
+
+#: core/audio/view.py mac_app/machines.py win_app/peers_view.py
+msgid "Other"
+msgstr "Altro"
+
+#: core/audio/view.py
+msgid "Audio starting…"
+msgstr ""
+
+#: core/audio/view.py
+msgid "No audio"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Beamer heard feedback between {target}'s speakers and a microphone on {source}, and turned down {source}'s sound on {target}. Use headphones on {target}, or turn off Wave Link's monitor to the system output on {source}."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Beamer heard feedback between {target}'s speakers and a microphone on {source}, and turned down {source}'s sound on {target}. Use headphones on {target}, or stop {source} from playing that microphone through its own sound."
+msgstr ""
+
+#: core/audio/view.py
+msgid "Beamer may not use this Mac's microphones. Allow it in System Settings, Privacy & Security, Microphone."
+msgstr ""
+
+#: core/audio/view.py
+msgid "Beamer may not use this PC's microphones. Allow it in Settings, Privacy & security, Microphone."
+msgstr ""
+
+#: core/audio/view.py
+msgid "A microphone here sends only silence. Check that Beamer may use the microphone."
+msgstr ""
+
+#: core/audio/view.py mac_app/audio_page.py
+msgid "Microphone your apps hear"
+msgstr ""
+
+#: core/audio/view.py
+msgid "Apps use 'Beamer Microphone' on a Mac and 'CABLE Output' on a PC."
+msgstr ""
+
+#: core/audio/view.py mac_app/diagram.py
+#, python-brace-format
+msgid "Machine · {id}"
+msgstr "Computer · {id}"
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{device} on {machine} is live for {targets}."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{device} on {machine} is ready. It turns on when an app starts recording."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{device} is not connected to {machine}. Beamer uses it again as soon as it is back."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{machine} is offline. Its microphone comes back with it."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{device} on {machine} could not start: {reason}."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{device} on {machine} could not start."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Sound → {target}, waiting"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{target} is offline. {machine} plays its sound itself until it is back."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Here, on {device}"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{machine} has not listed its devices yet."
+msgstr ""
+
+#: core/audio/view.py mac_app/diagram.py mac_app/ledger.py win_app/crossing_ledger.py
+#, python-brace-format
+msgid "{platform} · {status}"
+msgstr "{platform} · {status}"
+
+#: core/audio/view.py
+msgid "Audio unavailable"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Hears {machine}"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{machine}, {state}."
+msgstr ""
+
+#: core/audio/view.py
+msgid "Beamer's audio helper stopped and did not start again."
+msgstr ""
+
+#: core/audio/view.py
+msgid "Retry"
+msgstr ""
+
+#: core/audio/view.py
+msgid "This build of Beamer does not carry it."
+msgstr ""
+
+#: core/audio/view.py
+msgid "Open privacy settings"
+msgstr ""
+
+#: core/audio/view.py
+msgid "Beamer may not record this Mac's sound, so it cannot play on another machine. Allow it in System Settings, Privacy & Security, Screen & System Audio Recording."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Default ({name})"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{device} (not connected)"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{targets} cannot hear {machine}: they are not linked to it directly."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "A machine recording it is not linked to {machine} directly."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{targets} cannot hear {machine}: no virtual microphone there."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Sound → {target}"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Sound → {target}, blocked"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{machine} and {target} are not linked directly, so {machine} plays its sound itself."
+msgstr ""
+
+#: core/audio/view.py
+msgid "Built-in"
+msgstr ""
+
+#: core/audio/view.py
+msgid "USB"
+msgstr ""
+
+#: core/audio/view.py
+msgid "Bluetooth"
+msgstr ""
+
+#: core/audio/view.py
+msgid "Virtual"
+msgstr ""
+
+#: core/audio/view.py
+msgid "HDMI"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Default · {transport}"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{transport}"
+msgstr ""
+
+#: core/audio/view.py
+msgid "Active microphone"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Plays {machines}"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{machine} is offline."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{machine} cannot send its sound to another machine."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Sound from {machine} plays on"
+msgstr ""
+
+#: core/audio/view.py
+msgid "No microphones."
+msgstr ""
+
+#: core/audio/view.py
+msgid "No outputs."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{name} · {platform}"
+msgstr ""
+
+#: core/audio/view.py mac_app/diagram.py mac_app/ledger.py mac_app/link_state.py mac_app/machines.py win_app/crossing_ledger.py win_app/peers_view.py
+msgid "Linked"
+msgstr "Collegato"
+
+#: core/audio/view.py
+msgid "online"
+msgstr ""
+
+#: core/audio/view.py
+msgid "offline"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Its {device} is the shared microphone."
+msgstr ""
+
+#: core/audio/view.py
+msgid "Install Beamer Microphone"
+msgstr ""
+
+#: core/audio/view.py
+msgid "To use another machine's mic here, install VB-CABLE (vb-audio.com), then choose 'CABLE Output' as the microphone in your apps."
+msgstr ""
+
+#: core/audio/view.py
+msgid "In your call app on this Mac, choose Beamer Microphone as the microphone."
+msgstr ""
+
+#: core/audio/view.py
+msgid "In your call app on this PC, choose CABLE Output as the microphone."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Plays on {device}."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{target} sends its own sound elsewhere, which mutes {device} there. Choose another output on {target}."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Muted on {machine} while it plays elsewhere."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{source}'s sound plays on {target}."
+msgstr ""
+
+#: core/audio/view.py
+msgid "Update Beamer Microphone"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{names} runs a Beamer without audio. Update Beamer there to use its microphones and speakers."
+msgid_plural "{names} run a Beamer without audio. Update Beamer there to use their microphones and speakers."
+msgstr[0] ""
+msgstr[1] ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{machine}'s sound could not be sent to {target} ({reason}). It plays on {machine}."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{machine}'s sound could not be sent to {target}. It plays on {machine}."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{target} hears the microphone of {source}."
+msgstr ""
+
+#: core/audio/view.py
+msgid "This Beamer carries a newer Beamer Microphone."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{machine}'s sound cannot play on {device} on {target}: {target} sends its own sound elsewhere, which mutes that output."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Beamer cancels the echo of {machine}'s speakers. A headset on {machine} sounds better."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{machine}'s microphone can hear its speakers, and Beamer does not cancel that echo there. Use a headset on {machine}."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "If {target}'s speakers can be heard by {mic}, people in a call on {target} hear themselves. Use a headset, or send {target}'s sound to {source}, where Beamer cancels it."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "Send {target}'s sound to {source}"
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "If {target}'s speakers can be heard by {mic}, people in a call on {target} hear themselves. Use a headset on {target}."
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Beamer wants to install Beamer Microphone, the microphone your apps hear from your other machines."
+msgstr ""
+
+#: mac_app/audio_page.py win_app/audio_page_win.py
+msgid "Level"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Machines and where their sound goes"
+msgstr ""
+
+#: mac_app/audio_page.py win_app/audio_page_win.py
+msgid "Microphone"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Shared microphone level"
+msgstr ""
+
+#: mac_app/audio_page.py mac_app/kvm_bridge_app.py mac_app/machines_panel.py win_app/audio_page_win.py win_app/machines_win.py
+msgid "Machines"
+msgstr "Computer"
+
+#: mac_app/audio_page.py
+msgid "Sound plays on"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Inputs"
+msgstr ""
+
+#: mac_app/audio_page.py win_app/audio_page_win.py
+msgid "Outputs"
+msgstr ""
+
+#: mac_app/audio_page.py win_app/audio_page_win.py
+msgid "Sound"
+msgstr ""
+
+#: mac_app/audio_page.py mac_app/link_state.py mac_app/machines.py win_app/audio_page_win.py win_app/kvm_bridge_win.py win_app/peers_view.py
+msgid "Waiting"
+msgstr "In attesa"
+
+#: mac_app/audio_page.py win_app/audio_page_win.py
+msgid "Test"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Show this microphone's level for ten seconds."
+msgstr ""
+
+#: mac_app/audio_page.py win_app/audio_page_win.py
+msgid "Headset"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "A headset cannot be heard by a microphone, so Beamer leaves its echo alone."
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Beamer Microphone could not be installed. The log has the details."
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Click a machine to see its devices and choose where its sound plays."
+msgstr ""
+
+#: mac_app/audio_page.py
+#, python-brace-format
+msgid "{device} level"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Installing…"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Sound started streaming before the install could begin. Try again once it stops."
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "This build of Beamer does not carry Beamer Microphone."
+msgstr ""
+
 #: mac_app/bridge.py
 #, python-brace-format
 msgid "{name} does not accept input from this Mac"
@@ -1452,11 +2018,6 @@ msgstr "Ricentra {name}"
 
 #: mac_app/diagram.py
 #, python-brace-format
-msgid "Machine · {id}"
-msgstr "Computer · {id}"
-
-#: mac_app/diagram.py
-#, python-brace-format
 msgid "{name}, In the shortcut's cycle"
 msgstr "{name}, nel ciclo della scorciatoia"
 
@@ -1497,11 +2058,6 @@ msgstr "Nessuna spinta. La pressione attuale è 0 su {value} unità del puntator
 msgid "{name} · macOS"
 msgstr "{name} · macOS"
 
-#: mac_app/diagram.py mac_app/ledger.py win_app/crossing_ledger.py
-#, python-brace-format
-msgid "{platform} · {status}"
-msgstr "{platform} · {status}"
-
 #: mac_app/diagram.py mac_app/ledger.py
 #, python-brace-format
 msgid "Beamer {version} · only sees which side"
@@ -1512,14 +2068,6 @@ msgstr "Beamer {version} · vede solo il lato"
 #, python-brace-format
 msgid "{name}: drag a corner to resize, or use Option and the arrow keys."
 msgstr "{name}: trascina un angolo per ridimensionare, oppure usa Opzione e i tasti freccia."
-
-#: mac_app/diagram.py win_app/crossing_ledger.py
-msgid "Computer"
-msgstr "Computer"
-
-#: mac_app/diagram.py mac_app/ledger.py mac_app/link_state.py mac_app/machines.py win_app/crossing_ledger.py win_app/peers_view.py
-msgid "Linked"
-msgstr "Collegato"
 
 #: mac_app/diagram.py
 #, python-brace-format
@@ -1745,10 +2293,6 @@ msgstr "Opzione-clic su uno schermo per dividerlo o raggrupparlo · trascina per
 #: mac_app/kvm_bridge_app.py win_app/kvm_bridge_win.py
 msgid "Switching moves every machine to this profile's places and ways."
 msgstr "Passare a questo profilo applica a tutti i computer le sue posizioni e vie."
-
-#: mac_app/kvm_bridge_app.py mac_app/machines_panel.py win_app/audio_page_win.py win_app/machines_win.py
-msgid "Machines"
-msgstr "Computer"
 
 # New in 1.5.5: awaiting Lorenzo's check
 #: mac_app/kvm_bridge_app.py win_app/kvm_bridge_win.py
@@ -2553,11 +3097,6 @@ msgstr "Su un PC, ogni tasto arriva come il tasto nella stessa posizione, quindi
 msgid "On"
 msgstr "Attivato"
 
-# New in 1.5.5: awaiting Lorenzo's check
-#: mac_app/kvm_bridge_app.py win_app/kvm_bridge_win.py
-msgid "Off"
-msgstr "Disattivato"
-
 #: mac_app/kvm_bridge_app.py win_app/kvm_bridge_win.py
 #, python-brace-format
 msgid "Beamer {version} is available."
@@ -2959,18 +3498,6 @@ msgstr "Escluso: reinseriscilo per cambiarne le vie"
 msgid "unavailable"
 msgstr "non disponibile"
 
-#: mac_app/ledger.py win_app/crossing_ledger.py
-msgid "macOS"
-msgstr "macOS"
-
-#: mac_app/ledger.py mac_app/machines.py mac_app/widgets.py win_app/crossing_ledger.py win_app/peers_view.py
-msgid "Windows"
-msgstr "Windows"
-
-#: mac_app/ledger.py mac_app/machines.py win_app/crossing_ledger.py win_app/peers_view.py
-msgid "Linux"
-msgstr "Linux"
-
 #: mac_app/ledger.py
 #, python-brace-format
 msgid "Put back {name}"
@@ -3172,10 +3699,6 @@ msgstr "Non in ascolto"
 msgid "No receiver"
 msgstr "Nessun ricevitore"
 
-#: mac_app/link_state.py mac_app/machines.py win_app/audio_page_win.py win_app/kvm_bridge_win.py win_app/peers_view.py
-msgid "Waiting"
-msgstr "In attesa"
-
 #: mac_app/link_state.py mac_app/machines.py
 msgid "Looking"
 msgstr "Ricerca"
@@ -3308,10 +3831,6 @@ msgstr "iPhone"
 #: mac_app/machines.py win_app/peers_view.py
 msgid "Android"
 msgstr "Android"
-
-#: mac_app/machines.py win_app/peers_view.py
-msgid "Other"
-msgstr "Altro"
 
 #: mac_app/machines.py win_app/peers_view.py
 msgid "Needs re-pair"
@@ -3795,42 +4314,6 @@ msgstr "un angolo"
 msgid "With only the notch or a corner on, input arrives by the notch's or corner's own side, so this choice does nothing on this Mac; the other machine's own push still follows it."
 msgstr "Con solo il notch o un angolo attivo, l'input arriva dal lato del notch o dell'angolo, quindi questa scelta non ha effetto su questo Mac; la spinta dell'altro computer la segue comunque."
 
-#: mac_app/pages.py win_app/pages_win.py
-msgid "Overview"
-msgstr "Panoramica"
-
-#: mac_app/pages.py
-msgid "Where input is, whether each link is up, and the controls you reach for every day. Pair your machines here first."
-msgstr "Dove si trova l'input, se ogni collegamento è attivo, e i controlli che usi ogni giorno. Abbina prima qui i tuoi computer."
-
-#: mac_app/pages.py
-msgid "Permissions"
-msgstr "Permessi"
-
-#: mac_app/pages.py
-msgid "macOS must allow Beamer to read this Mac's input and to move its pointer and type when another machine drives it."
-msgstr "macOS deve consentire a Beamer di leggere l'input di questo Mac e di muoverne il puntatore e scrivere quando lo controlla un altro computer."
-
-#: mac_app/pages.py win_app/pages_win.py
-msgid "Keyboard"
-msgstr "Tastiera"
-
-#: mac_app/pages.py
-msgid "How this Mac's modifier keys arrive on other machines, which keys and buttons stay on this Mac, and how fast another machine's pointer moves here. The switch key is on the Crossing page."
-msgstr "Come arrivano i tasti modificatori di questo Mac sugli altri computer, quali tasti e pulsanti restano su questo Mac, e quanto velocemente si muove qui il puntatore di un altro computer. Il tasto per passare è nella pagina Passaggio."
-
-#: mac_app/pages.py
-msgid "How crossing looks and feels on this Mac: the edge, the corner, the notch and the trackpad."
-msgstr "Come appare e si sente il passaggio su questo Mac: il bordo, l'angolo, il notch e il trackpad."
-
-#: mac_app/pages.py win_app/pages_win.py
-msgid "Connection"
-msgstr "Connessione"
-
-#: mac_app/pages.py
-msgid "Local connection details for the first machine you paired. Pair again to change another machine's entry."
-msgstr "Dettagli della connessione locale per il primo computer abbinato. Abbina di nuovo per cambiare la voce di un altro computer."
-
 #: mac_app/pages.py
 msgid "Changes apply as you make them. Closing this window keeps Beamer running in the menu bar."
 msgstr "Le modifiche si applicano subito. Chiudendo questa finestra Beamer resta attivo nella barra dei menu."
@@ -3863,6 +4346,26 @@ msgstr "Sospende il passaggio del puntatore attraverso questo schermo, compreso 
 msgid "This Mac has no notch, so this only shows how it would look."
 msgstr "Questo Mac non ha il notch, quindi qui vedi solo come apparirebbe."
 
+#: mac_app/pages.py win_app/pages_win.py
+msgid "Keyboard"
+msgstr "Tastiera"
+
+#: mac_app/pages.py
+msgid "How this Mac's modifier keys arrive on other machines, which keys and buttons stay on this Mac, and how fast another machine's pointer moves here. The switch key is on the Crossing page."
+msgstr "Come arrivano i tasti modificatori di questo Mac sugli altri computer, quali tasti e pulsanti restano su questo Mac, e quanto velocemente si muove qui il puntatore di un altro computer. Il tasto per passare è nella pagina Passaggio."
+
+#: mac_app/pages.py
+msgid "How crossing looks and feels on this Mac: the edge, the corner, the notch and the trackpad."
+msgstr "Come appare e si sente il passaggio su questo Mac: il bordo, l'angolo, il notch e il trackpad."
+
+#: mac_app/pages.py win_app/pages_win.py
+msgid "Connection"
+msgstr "Connessione"
+
+#: mac_app/pages.py
+msgid "Local connection details for the first machine you paired. Pair again to change another machine's entry."
+msgstr "Dettagli della connessione locale per il primo computer abbinato. Abbina di nuovo per cambiare la voce di un altro computer."
+
 #: mac_app/pages.py
 #, python-brace-format
 msgid "{names} already cross from the {side} edge of this Mac. The thirds you pick go to {name}; the rest stay where they are."
@@ -3871,6 +4374,22 @@ msgstr "{names} passano già dal bordo {side} di questo Mac. I terzi che scegli 
 #: mac_app/pages.py
 msgid "At the notch, Glow and Beam do not draw: the notch style you choose here plays instead, and their tiles show it."
 msgstr "Nel notch, Bagliore e Raggio non disegnano: al loro posto appare lo stile del notch che scegli qui, e i loro riquadri lo mostrano."
+
+#: mac_app/pages.py win_app/pages_win.py
+msgid "Overview"
+msgstr "Panoramica"
+
+#: mac_app/pages.py
+msgid "Where input is, whether each link is up, and the controls you reach for every day. Pair your machines here first."
+msgstr "Dove si trova l'input, se ogni collegamento è attivo, e i controlli che usi ogni giorno. Abbina prima qui i tuoi computer."
+
+#: mac_app/pages.py
+msgid "Permissions"
+msgstr "Permessi"
+
+#: mac_app/pages.py
+msgid "macOS must allow Beamer to read this Mac's input and to move its pointer and type when another machine drives it."
+msgstr "macOS deve consentire a Beamer di leggere l'input di questo Mac e di muoverne il puntatore e scrivere quando lo controlla un altro computer."
 
 #: mac_app/pages.py
 msgid "Plays Glow"
@@ -3909,6 +4428,14 @@ msgstr "{name} disegna la propria forma attorno al notch."
 #, python-brace-format
 msgid "With only the notch or a corner on, input arrives by the notch's or corner's own side, so this choice does nothing on this Mac; {name}'s own push still follows it."
 msgstr "Con solo il notch o un angolo attivo, l'input arriva dal lato del notch o dell'angolo, quindi questa scelta non ha effetto su questo Mac; la spinta di {name} la segue comunque."
+
+#: mac_app/pages.py win_app/audio_page_win.py win_app/pages_win.py
+msgid "Audio"
+msgstr ""
+
+#: mac_app/pages.py win_app/pages_win.py
+msgid "Every machine's microphones and speakers. Choose the microphone your apps hear and where each machine's sound plays."
+msgstr ""
 
 #: mac_app/pages.py
 #, python-brace-format
@@ -4083,39 +4610,7 @@ msgid "Click a machine, or use the arrow keys, to see its devices and choose whe
 msgstr ""
 
 #: win_app/audio_page_win.py
-msgid "An app here is recording Beamer's microphone."
-msgstr ""
-
-#: win_app/audio_page_win.py
-msgid "Sound"
-msgstr ""
-
-#: win_app/audio_page_win.py
-msgid "Microphone"
-msgstr ""
-
-#: win_app/audio_page_win.py
-msgid "Level"
-msgstr ""
-
-#: win_app/audio_page_win.py win_app/pages_win.py
-msgid "Audio"
-msgstr ""
-
-#: win_app/audio_page_win.py
 msgid "Microphones"
-msgstr ""
-
-#: win_app/audio_page_win.py
-msgid "Outputs"
-msgstr ""
-
-#: win_app/audio_page_win.py
-msgid "Test"
-msgstr ""
-
-#: win_app/audio_page_win.py
-msgid "Headset"
 msgstr ""
 
 #: win_app/audio_page_win.py
@@ -5235,10 +5730,6 @@ msgstr "I computer abbinati a questo PC, dove si trova ora l'input, e i controll
 #: win_app/pages_win.py
 msgid "Choose how the pointer or a key moves input to each machine, and how hard the edge pushes back first."
 msgstr "Scegli come il puntatore o un tasto sposta l'input verso ogni computer, e quanto resiste prima il bordo."
-
-#: win_app/pages_win.py
-msgid "Every machine's microphones and speakers. Choose the microphone your apps hear and where each machine's sound plays."
-msgstr ""
 
 #: win_app/pages_win.py
 msgid "How this PC's Ctrl and Windows keys arrive on another machine, the keys and buttons that stay here, and how fast another machine's pointer moves here."
