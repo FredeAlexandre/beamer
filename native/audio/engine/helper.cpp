@@ -514,6 +514,9 @@ class Helper : public BackendListener {
       if (d < 0 || d > 100) throw CmdError{"bad_args", "loss_pct"};
       for (auto& f : targets) f->dev_loss.store(d / 100.0);
     }
+    if (jget_bool(j, "reset_stats", &b) && b)
+      for (auto& kv : streams_)
+        if (kv.second.recv) kv.second.recv->reset_run_stats();
     auto nb = j.find("null");
     if (nb != j.end() && nb->is_object()) {
       NullBackend* n = as_null_backend(&backend_);
@@ -609,17 +612,17 @@ class Helper : public BackendListener {
         ++it;
       }
     }
-    // permission "suspect": digital zero for 5 s from a real capture
+    // permission "suspect": a mic capture that delivered digital zero for 5 s. Not for system
+    // sound: a silent machine's tap is digital zero too.
     for (auto& kv : streams_) {
       StreamBase& s = *kv.second.base;
-      if (kv.second.send && s.device_in_use().rfind("test:", 0) == 0) continue;
-      if (kv.second.recv) continue;
+      const bool mic = (kv.second.send && kv.second.send->kind() == "mic") || kv.second.loop;
+      if (!mic || s.device_in_use().rfind("test:", 0) == 0) continue;
       if (s.device_meter.take_nonzero()) {
         s.zero_since_ns = now;
       } else if (!s.suspect_reported && s.zero_since_ns && now - s.zero_since_ns > 5'000'000'000LL) {
         s.suspect_reported = true;
-        const char* what = (kv.second.send && kv.second.send->kind() == "system") ? "system_audio" : "mic";
-        ev_->emit(Json{{"ev", "permission"}, {what, "suspect"}});
+        ev_->emit(Json{{"ev", "permission"}, {"mic", "suspect"}});
       }
     }
     if (meter_on_ && now >= next_levels_ns_) {

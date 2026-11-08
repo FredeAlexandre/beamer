@@ -52,13 +52,22 @@ bool CodecConfig::parse(const Json& j, CodecConfig* out, std::string* err) {
   }
   bool b;
   if (jget_bool(j, "fec", &b)) c.fec = b;
+  if (j.contains("complexity") && !j["complexity"].is_null()) {
+    if (!jget_int(j, "complexity", &v) || v < 0 || v > 10) {
+      *err = "codec.complexity must be 0..10";
+      return false;
+    }
+    c.complexity = static_cast<int>(v);
+  }
   *out = c;
   return true;
 }
 
 Json CodecConfig::to_json() const {
-  return Json{{"name", name}, {"app", app}, {"channels", channels},
-              {"bitrate", bitrate}, {"frame_ms", frame_ms}, {"fec", fec}};
+  Json j{{"name", name}, {"app", app}, {"channels", channels},
+         {"bitrate", bitrate}, {"frame_ms", frame_ms}, {"fec", fec}};
+  if (complexity >= 0) j["complexity"] = complexity;
+  return j;
 }
 
 OpusEnc::~OpusEnc() {
@@ -79,7 +88,7 @@ bool OpusEnc::init(const CodecConfig& cfg, std::string* err) {
   frame_ = cfg.frame();
   bitrate_ = cfg.bitrate;
   opus_encoder_ctl(enc_, OPUS_SET_BITRATE(cfg.bitrate));
-  opus_encoder_ctl(enc_, OPUS_SET_COMPLEXITY(9));
+  opus_encoder_ctl(enc_, OPUS_SET_COMPLEXITY(cfg.effective_complexity()));
   opus_encoder_ctl(enc_, OPUS_SET_INBAND_FEC(cfg.fec ? 1 : 0));
   opus_encoder_ctl(enc_, OPUS_SET_PACKET_LOSS_PERC(cfg.fec ? 10 : 0));
   opus_encoder_ctl(enc_, OPUS_SET_DTX(0));

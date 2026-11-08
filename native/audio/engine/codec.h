@@ -19,6 +19,10 @@ struct CodecConfig {
   int bitrate = 32000;
   double frame_ms = 10;
   bool fec = true;
+  // Opus complexity 0..10; -1 = default: 5 for voip (mic: half the encoder CPU of 9 for a
+  // log-spectral distance 0.24 dB higher on voiced speech, see the WP2 report), 9 otherwise (§4.4).
+  int complexity = -1;
+  int effective_complexity() const { return complexity >= 0 ? complexity : (app == "voip" ? 5 : 9); }
 
   int frame() const { return static_cast<int>(frame_ms * 48 + 0.5); }  // samples per channel
   static bool parse(const Json& j, CodecConfig* out, std::string* err);
@@ -33,7 +37,7 @@ class OpusEnc {
   ~OpusEnc();
   OpusEnc(const OpusEnc&) = delete;
   OpusEnc& operator=(const OpusEnc&) = delete;
-  // Mic: complexity 9, PACKET_LOSS_PERC 10 when fec, DTX off (§4.4).
+  // PACKET_LOSS_PERC 10 when fec, DTX off (§4.4); complexity from the config.
   bool init(const CodecConfig& cfg, std::string* err);
   // pcm: frame() interleaved samples. Returns bytes written or < 0 on error.
   int encode(const float* pcm, uint8_t* out, int max_bytes);

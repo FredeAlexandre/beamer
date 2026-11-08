@@ -17,7 +17,7 @@ build scripts have their own notes.
 | `engine/packet.*` | 24-byte header, `Sealer`, 128-packet `ReplayWindow`, `open_packet` |
 | `engine/codec.*` | `codec` object (§4.4), Opus encoder/decoder wrappers |
 | `engine/resampler.*` | 16-tap Kaiser sinc, 512 phases; `DriftController` (PI + catch-up) |
-| `engine/jitter.*` | `JitterBuffer`: port of `proto/transport/media.py` (identical output, see Tests) |
+| `engine/jitter.*` | `JitterBuffer`: port of `proto/transport/media.py` (identical in reference mode; two engine additions, see below) |
 | `engine/spsc.h`, `levels.h` | lock-free SPSC rings; level meters (IO thread posts, control thread drains) |
 | `engine/net.*`, `flow.*` | UDP sockets; `Flow` (probe, ping, RR, replay, link mode) and the network thread |
 | `engine/streams.*` | `SendStream`, `RecvStream`, `LoopStream`, `TestInput` |
@@ -82,6 +82,21 @@ the render callback drains before each pull.
   first two channels). Render callbacks of any size are fine (pulled in chunks of up to 2048).
 - `stream_lost` may be called from any thread; the stream is then reported `failed` (`no_device`).
 
+## Jitter buffer: port and additions
+
+`JitterBuffer` reproduces `media.py` exactly with `merge_expand = false, jitter_recalc_ms = 0`:
+`tests/jb_crosscheck.py` replays the arrival traces that `engine_tests` dumps (`BA_SIM_REFERENCE=1
+BA_SIM_DUMP=<prefix>`) through the Python class and finds 0.000 ms difference in level and target
+at every pull (225,001 pulls, 10 min, 2 % loss, 0-20 ms jitter, +100 ppm; and a Gilbert trace), with
+identical counters. Defaults add two things:
+- `merge_expand`: a frame concealed by expansion (nothing newer had arrived) that then proves lost
+  (a newer frame came, it never did) is not concealed a second time: the expansion was its
+  concealment. In media.py every such loss adds a frame of latency that catch-up (<= 2000 ppm)
+  takes ~5 s to remove; with bursty loss the buffer sat 10-20 ms above target. Late frames keep
+  the reference behaviour.
+- `jitter_recalc_ms = 20`: the p97 transit statistic is recomputed at most every 20 ms instead of
+  after every packet (it was most of the render thread's CPU).
+
 ## Protocol details and extensions (beyond the §3 tables)
 
 - `flow_open` takes an optional `host` (the peer's IP from the link). With `host` and `port` 0 (the
@@ -101,13 +116,15 @@ the render callback drains before each pull.
 - On a peer `bye` the flow goes back to `probing` (it closes only on `flow_close`).
 - `stats`: `{"ev":"stats","t":ms,"cpu_pct":x,"streams":{"<id>":{...}}}`, counters are per interval.
   recv: `path jb_ms jb_p99_ms jb_max_ms target_ms late expand drop flushed loss_pct fec plc underrun
-  dec_err ppm ppm_i rtt_ms kbps rx rx_link ring_full playing`; send: `path kbps bitrate jb_ms` (the
+  dec_err ppm ppm_i rtt_ms kbps rx rx_link ring_full playing run_jb_p99_ms run_target_ms` (the
+  last two over the stream's life or since dev `reset_stats`); send: `path kbps bitrate jb_ms` (the
   receiver's level from its RR) `rtt_ms frames overflow dev_dropped rr_rx enc_err`.
 - `levels` keys are device keys (`device_in_use()`), streams by id.
 - `send.aec` is accepted and ignored until WP9.
-- `permission` is emitted once after `ready` (`mic`, `system_audio`), and `suspect` when a capture
-  delivered only digital zeros for 5 s (a silent system tap also does this).
+- `permission` is emitted once after `ready` (`mic`, `system_audio`), and `{"mic":"suspect"}` when a
+  mic capture delivered only digital zeros for 5 s (never for system sound: a silent tap is zero too).
+- `codec.complexity` (0..10, optional): default 5 for `voip` (the mic), 9 otherwise.
 - `dev` (only with `--dev`): `{"cmd":"dev","flow"?:id,"drop_udp":bool,"loss_pct":0..100,
-  "null":{"vmic_in_use":bool,"remove":key,"add":key}}`: block UDP, drop media at send, drive the
-  null backend.
+  "reset_stats":true,"null":{"vmic_in_use":bool,"remove":key,"add":key}}`: block UDP, drop media at
+  send, restart the run statistics, drive the null backend.
 - Errors without a `req` are still emitted (without `req`); `ping` is answered by `pong` only.

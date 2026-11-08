@@ -15,6 +15,9 @@
 #include <ws2tcpip.h>
 #include <mstcpip.h>
 #pragma comment(lib, "ws2_32.lib")
+#ifndef SIO_UDP_CONNRESET
+#define SIO_UDP_CONNRESET _WSAIOW(IOC_VENDOR, 12)
+#endif
 #else
 #include <arpa/inet.h>
 #include <errno.h>

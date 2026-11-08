@@ -9,6 +9,11 @@
 #include <cstring>
 #include <memory>
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4324)  // padded because of alignas(64): intended (no false sharing)
+#endif
+
 namespace beamer::audio {
 
 inline size_t next_pow2(size_t n) {
@@ -135,3 +140,7 @@ class SpscFloatRing {
 };
 
 }  // namespace beamer::audio
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif

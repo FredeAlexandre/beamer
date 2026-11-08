@@ -103,7 +103,8 @@ class SendStream : public StreamBase, public CaptureSink {
   ReplayWindow rr_window_;  // net thread
 
   std::atomic<uint64_t> tx_{0}, tx_bytes_{0}, frames_{0}, overflow_{0}, dev_dropped_{0}, rr_rx_{0},
-      enc_err_{0};
+      enc_err_{0}, enc_ns_{0};
+  uint64_t last_frames_ = 0, last_enc_ns_ = 0;
   std::atomic<int> peer_level_01ms_{-1};
   uint64_t last_tx_ = 0, last_tx_bytes_ = 0;
 };
@@ -159,6 +160,17 @@ class RecvStream : public StreamBase, public RenderSource {
       c_dec_err_{0}, c_underrun_{0}, c_ok_{0}, c_dup_{0};
   std::atomic<bool> playing_{false};
   SpscRing<float> level_samples_;
+  // control thread: cumulative level histogram (0.5 ms bins) since start or dev reset_stats
+  std::vector<uint32_t> hist_ = std::vector<uint32_t>(1024, 0);
+  double hist_target_sum_ = 0;
+  uint64_t hist_target_n_ = 0;
+ public:
+  void reset_run_stats() {
+    std::fill(hist_.begin(), hist_.end(), 0u);
+    hist_target_sum_ = 0;
+    hist_target_n_ = 0;
+  }
+ private:
   // control thread (previous snapshot for deltas)
   uint64_t p_late_ = 0, p_expand_ = 0, p_drop_ = 0, p_flushed_ = 0, p_fec_ = 0, p_plc_ = 0,
            p_dec_err_ = 0, p_underrun_ = 0, p_rx_ = 0, p_bytes_ = 0, p_seq_hi_ = 0;

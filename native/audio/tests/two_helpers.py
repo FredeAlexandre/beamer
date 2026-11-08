@@ -160,6 +160,7 @@ def main() -> int:
     for h in (A, B):
         h.call({"cmd": "dev", "loss_pct": a_.loss})
     t_start = time.monotonic()
+    threading.Timer(10.0, lambda: [h.send({"cmd": "dev", "reset_stats": True}) for h in (A, B)]).start()
     print(f"streaming {a_.seconds:.0f} s: 4 streams, {a_.loss}% loss, A at {a_.ppm:+g} ppm", file=sys.stderr)
     time.sleep(a_.seconds)
     t_end = time.monotonic()
@@ -176,13 +177,18 @@ def main() -> int:
         for sid in recv_ids:
             rows = [e["streams"][sid] for e in stats if sid in e["streams"]]
             over = sorted(r["jb_p99_ms"] - r["target_ms"] for r in rows)
-            p99_over = over[int(0.99 * (len(over) - 1))] if over else None
+            p99_of_seconds = over[int(0.99 * (len(over) - 1))] if over else None
+            # the criterion: level p99 over the run (histogram since t+10 s) vs the mean target
+            p99_over = rows[-1]["run_jb_p99_ms"] - rows[-1]["run_target_ms"] if rows else None
             dec = sum(r["dec_err"] for r in rows)
             st = {
                 "seconds": len(rows),
                 "jb_mean_ms": round(sum(r["jb_ms"] for r in rows) / max(1, len(rows)), 1),
                 "target_mean_ms": round(sum(r["target_ms"] for r in rows) / max(1, len(rows)), 1),
+                "run_level_p99_ms": rows[-1]["run_jb_p99_ms"] if rows else None,
+                "run_target_ms": rows[-1]["run_target_ms"] if rows else None,
                 "p99_level_minus_target_ms": None if p99_over is None else round(p99_over, 1),
+                "p99_of_per_second_p99_minus_target_ms": None if p99_of_seconds is None else round(p99_of_seconds, 1),
                 "max_level_ms": max((r["jb_max_ms"] for r in rows), default=None),
                 "dec_err": dec,
                 "loss_pct_mean": round(sum(r["loss_pct"] for r in rows) / max(1, len(rows)), 2),

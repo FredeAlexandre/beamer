@@ -168,7 +168,9 @@ void SendStream::encoder_loop() {
       const uint32_t ts = ts_;
       ts_ += static_cast<uint32_t>(frame_);
       enc_.set_bitrate(flow_->link_mode() ? std::min(cfg_.codec.bitrate, link_cap) : cfg_.codec.bitrate);
+      const int64_t t0 = now_ns();
       int n = enc_.encode(pcm.data(), payload, static_cast<int>(sizeof payload));
+      enc_ns_.fetch_add(static_cast<uint64_t>(now_ns() - t0), std::memory_order_relaxed);
       if (n < 0) {
         enc_err_.fetch_add(1, std::memory_order_relaxed);
         continue;
@@ -225,7 +227,11 @@ Json SendStream::stats(double dt) {
   j["jb_ms"] = pl >= 0 ? Json(pl / 10.0) : Json(nullptr);
   double rtt = flow_->rtt_ms();
   j["rtt_ms"] = rtt >= 0 ? Json(round1(rtt)) : Json(nullptr);
-  j["frames"] = frames_.load();
+  const uint64_t fr = frames_.load(), en = enc_ns_.load();
+  j["enc_us"] = fr > last_frames_ ? round1((en - last_enc_ns_) / 1000.0 / double(fr - last_frames_)) : 0.0;
+  last_frames_ = fr;
+  last_enc_ns_ = en;
+  j["frames"] = fr;
   j["overflow"] = overflow_.load();
   j["dev_dropped"] = dev_dropped_.load();
   j["rr_rx"] = rr_rx_.load();
@@ -373,7 +379,10 @@ void RecvStream::publish() {
 Json RecvStream::stats(double dt) {
   std::vector<float> lv;
   float v;
-  while (level_samples_.pop(&v)) lv.push_back(v);
+  while (level_samples_.pop(&v)) {
+    lv.push_back(v);
+    hist_[std::min<size_t>(hist_.size() - 1, static_cast<size_t>(std::max(0.0f, v) * 2))]++;
+  }
   double mean = 0, p99 = 0, mx = 0;
   if (!lv.empty()) {
     for (float x : lv) mean += x;
@@ -402,6 +411,21 @@ Json RecvStream::stats(double dt) {
   j["jb_p99_ms"] = round1(p99);
   j["jb_max_ms"] = round1(mx);
   j["target_ms"] = round1(target_ms_.load());
+  // over the run (since start or dev reset_stats): level p99 from the histogram, mean target
+  hist_target_sum_ += target_ms_.load();
+  hist_target_n_++;
+  uint64_t total = 0, acc = 0;
+  for (uint32_t c : hist_) total += c;
+  double run_p99 = 0;
+  for (size_t i = 0; i < hist_.size() && total; ++i) {
+    acc += hist_[i];
+    if (acc * 100 >= total * 99) {
+      run_p99 = (i + 1) * 0.5;
+      break;
+    }
+  }
+  j["run_jb_p99_ms"] = round1(run_p99);
+  j["run_target_ms"] = round1(hist_target_n_ ? hist_target_sum_ / hist_target_n_ : 0);
   j["late"] = delta(c_late_.load(), &p_late_);
   j["expand"] = delta(c_expand_.load(), &p_expand_);
   uint64_t dr = delta(c_drop_.load(), &p_drop_), fl = delta(c_flushed_.load(), &p_flushed_);
