@@ -88,7 +88,7 @@ setup(
                 "core.fx_ink", "core.fx_instrument", "core.fx_membrane", "core.fx_sparks", "core.fx_warp",
                 "core.fx_light", "core.fx_material", "core.fx_folio", "core.fx_selvedge",
                 "core.audio", "core.audio.helper", "core.audio.model", "core.audio.planner", "core.audio.service",
-                "core.audio.store", "core.audio.wire",
+                "core.audio.store", "core.audio.view", "core.audio.wire",
             ],
             "iconfile": "../Beamer.icns",
             "plist": {
