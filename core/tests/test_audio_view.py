@@ -88,12 +88,17 @@ class FixturePages(unittest.TestCase):
         self.assertEqual(page.mic_meter, f"{fx.MAC}/in/{fx.MAC_MIC.key}")
         chosen = view.choice_by_key(page.mic_choices, page.mic_selected)
         self.assertEqual((chosen.machine, chosen.device), (fx.MAC, None))
-        self.assertEqual(chosen.title, "Default microphone (MacBook Air Microphone) on This Mac")
+        self.assertEqual(chosen.title, "This Mac · Default (MacBook Air Microphone)")
         # This machine's group comes first, after Off.
         self.assertEqual([choice.label for choice in page.mic_choices if choice.header], ["This Mac", "lebig"])
         tiles = {tile.machine: tile for tile in page.tiles}
         self.assertTrue(tiles[fx.MAC].has_active_mic)
         self.assertEqual(tiles[fx.MAC].mic_line, "MacBook Air Microphone")
+        self.assertEqual(tiles[fx.MAC].input_line, "")
+        self.assertEqual(tiles[fx.PC].input_line, "Microphone (Wave:3)")
+        self.assertEqual(tiles[fx.PC].mic_line, "")
+        self.assertEqual(tiles[fx.PC].listen_line, "Hears This Mac")
+        self.assertEqual(tiles[fx.MAC].listen_line, "")
         self.assertTrue(tiles[fx.PC].recording)
         self.assertEqual(tiles[fx.PC].subtitle, "Windows · Linked")
         self.assertEqual([(a.source, a.target, a.kind, a.state) for a in page.arrows], [(fx.MAC, fx.PC, "mic", "active")])
@@ -335,8 +340,9 @@ class States(unittest.TestCase):
         self.assertEqual(view.meter_key("M", "output", "K"), "M/out/K")
 
     def test_layout_tiles(self):
-        self.assertEqual(view.layout_tiles({"a": {"x": 1, "y": 2, "w": 3, "h": 4}, "b": {"x": 1}, "c": None}),
-                         {"a": (1.0, 2.0, 3.0, 4.0)})
+        self.assertEqual(view.layout_tiles({"a": {"x": 1, "y": 2, "w": 3, "h": 4}, "b": {"x": 1}, "c": None,
+                                            "d": (1, 2, 3, 4), "e": (1, 2)}),
+                         {"a": (1.0, 2.0, 3.0, 4.0), "d": (1.0, 2.0, 3.0, 4.0)})
 
 
 class Actions(unittest.TestCase):

@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 
 from core import effects
+from core import feature_flags
 from core.i18n import N_, joined, tr
 from core import peerlist
 from core.ways import DIAGRAM_GAP, DIAGRAM_THIS, diagram_layout, part_names, parts_phrase, toggle_part
@@ -23,6 +24,10 @@ PAGES = (
      N_("macOS must allow Beamer to read this Mac's input and to move its pointer and type when another machine drives it.")),
     ("crossing", N_("Crossing"), "cursorarrow.motionlines",
      N_("Drag a machine on the map to where it sits. The ledger says how each one is reached; click a row to pick it on the map.")),
+) + ((
+    ("audio", N_("Audio"), "speaker.wave.2",
+     N_("Every machine's microphones and speakers. Choose the microphone your apps hear and where each machine's sound plays.")),
+) if getattr(feature_flags, "AUDIO", False) else ()) + (
     ("keyboard", N_("Keyboard"), "keyboard",
      N_("How this Mac's modifier keys arrive on other machines, which keys and buttons stay on this Mac, "
      "and how fast another machine's pointer moves here. The switch key is on the Crossing page.")),

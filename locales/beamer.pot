@@ -1251,6 +1251,75 @@ msgstr ""
 msgid "the {edge} edge"
 msgstr ""
 
+#: mac_app/audio_page.py
+msgid "Level"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Machines and where their sound goes"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Microphone"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Microphone your apps hear"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Shared microphone level"
+msgstr ""
+
+#: mac_app/audio_page.py mac_app/kvm_bridge_app.py mac_app/machines_panel.py win_app/machines_win.py
+msgid "Machines"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Sound plays on"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Sound"
+msgstr ""
+
+#: mac_app/audio_page.py mac_app/link_state.py mac_app/machines.py win_app/kvm_bridge_win.py win_app/peers_view.py
+msgid "Waiting"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Test"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Show this microphone's level for ten seconds."
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Headset"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "A headset cannot be heard by a microphone, so Beamer leaves its echo alone."
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Inputs"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Outputs"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Click a machine to see its devices and choose where its sound plays."
+msgstr ""
+
+#: mac_app/audio_page.py
+#, python-brace-format
+msgid "{device} level"
+msgstr ""
+
 #: mac_app/bridge.py
 #, python-brace-format
 msgid "{name} does not accept input from this Mac"
@@ -1731,10 +1800,6 @@ msgstr ""
 
 #: mac_app/kvm_bridge_app.py win_app/kvm_bridge_win.py
 msgid "Switching moves every machine to this profile's places and ways."
-msgstr ""
-
-#: mac_app/kvm_bridge_app.py mac_app/machines_panel.py win_app/machines_win.py
-msgid "Machines"
 msgstr ""
 
 #: mac_app/kvm_bridge_app.py win_app/kvm_bridge_win.py
@@ -3112,10 +3177,6 @@ msgstr ""
 msgid "No receiver"
 msgstr ""
 
-#: mac_app/link_state.py mac_app/machines.py win_app/kvm_bridge_win.py win_app/peers_view.py
-msgid "Waiting"
-msgstr ""
-
 #: mac_app/link_state.py mac_app/machines.py
 msgid "Looking"
 msgstr ""
@@ -3735,42 +3796,6 @@ msgstr ""
 msgid "With only the notch or a corner on, input arrives by the notch's or corner's own side, so this choice does nothing on this Mac; the other machine's own push still follows it."
 msgstr ""
 
-#: mac_app/pages.py win_app/pages_win.py
-msgid "Overview"
-msgstr ""
-
-#: mac_app/pages.py
-msgid "Where input is, whether each link is up, and the controls you reach for every day. Pair your machines here first."
-msgstr ""
-
-#: mac_app/pages.py
-msgid "Permissions"
-msgstr ""
-
-#: mac_app/pages.py
-msgid "macOS must allow Beamer to read this Mac's input and to move its pointer and type when another machine drives it."
-msgstr ""
-
-#: mac_app/pages.py win_app/pages_win.py
-msgid "Keyboard"
-msgstr ""
-
-#: mac_app/pages.py
-msgid "How this Mac's modifier keys arrive on other machines, which keys and buttons stay on this Mac, and how fast another machine's pointer moves here. The switch key is on the Crossing page."
-msgstr ""
-
-#: mac_app/pages.py
-msgid "How crossing looks and feels on this Mac: the edge, the corner, the notch and the trackpad."
-msgstr ""
-
-#: mac_app/pages.py win_app/pages_win.py
-msgid "Connection"
-msgstr ""
-
-#: mac_app/pages.py
-msgid "Local connection details for the first machine you paired. Pair again to change another machine's entry."
-msgstr ""
-
 #: mac_app/pages.py
 msgid "Changes apply as you make them. Closing this window keeps Beamer running in the menu bar."
 msgstr ""
@@ -3803,6 +3828,26 @@ msgstr ""
 msgid "This Mac has no notch, so this only shows how it would look."
 msgstr ""
 
+#: mac_app/pages.py win_app/pages_win.py
+msgid "Keyboard"
+msgstr ""
+
+#: mac_app/pages.py
+msgid "How this Mac's modifier keys arrive on other machines, which keys and buttons stay on this Mac, and how fast another machine's pointer moves here. The switch key is on the Crossing page."
+msgstr ""
+
+#: mac_app/pages.py
+msgid "How crossing looks and feels on this Mac: the edge, the corner, the notch and the trackpad."
+msgstr ""
+
+#: mac_app/pages.py win_app/pages_win.py
+msgid "Connection"
+msgstr ""
+
+#: mac_app/pages.py
+msgid "Local connection details for the first machine you paired. Pair again to change another machine's entry."
+msgstr ""
+
 #: mac_app/pages.py
 #, python-brace-format
 msgid "{names} already cross from the {side} edge of this Mac. The thirds you pick go to {name}; the rest stay where they are."
@@ -3810,6 +3855,22 @@ msgstr ""
 
 #: mac_app/pages.py
 msgid "At the notch, Glow and Beam do not draw: the notch style you choose here plays instead, and their tiles show it."
+msgstr ""
+
+#: mac_app/pages.py win_app/pages_win.py
+msgid "Overview"
+msgstr ""
+
+#: mac_app/pages.py
+msgid "Where input is, whether each link is up, and the controls you reach for every day. Pair your machines here first."
+msgstr ""
+
+#: mac_app/pages.py
+msgid "Permissions"
+msgstr ""
+
+#: mac_app/pages.py
+msgid "macOS must allow Beamer to read this Mac's input and to move its pointer and type when another machine drives it."
 msgstr ""
 
 #: mac_app/pages.py
@@ -3848,6 +3909,14 @@ msgstr ""
 #: mac_app/pages.py
 #, python-brace-format
 msgid "With only the notch or a corner on, input arrives by the notch's or corner's own side, so this choice does nothing on this Mac; {name}'s own push still follows it."
+msgstr ""
+
+#: mac_app/pages.py
+msgid "Audio"
+msgstr ""
+
+#: mac_app/pages.py
+msgid "Every machine's microphones and speakers. Choose the microphone your apps hear and where each machine's sound plays."
 msgstr ""
 
 #: mac_app/pages.py

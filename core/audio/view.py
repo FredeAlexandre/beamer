@@ -82,6 +82,8 @@ class TileView:
     output_tone: str
     meter: Optional[str]            # the level key of the tile's thin bar
     description: str                # one sentence for screen readers
+    input_line: str = ""            # the machine's own default microphone, shown when it is not the active one
+    listen_line: str = ""           # "Hears This Mac": an app here records the shared mic from another machine
 
 
 @dataclass(frozen=True)
@@ -178,18 +180,28 @@ def meter_reading(levels: Mapping, key: Optional[str]) -> Optional[tuple]:
 
 
 def layout_tiles(layout: Mapping) -> dict:
-    """settings["layout"] (tiles as {x, y, w, h, ...}) as page_model's `tiles`."""
+    """settings["layout"] (tiles as {x, y, w, h, ...}) as page_model's `tiles`; (x, y, w, h) tuples
+    pass through."""
     tiles = {}
     for machine, tile in (layout or {}).items():
         try:
-            tiles[machine] = (float(tile["x"]), float(tile["y"]), float(tile["w"]), float(tile["h"]))
+            values = (tile["x"], tile["y"], tile["w"], tile["h"]) if isinstance(tile, Mapping) else tuple(tile)[:4]
+            tiles[machine] = tuple(float(value) for value in values)
         except (KeyError, TypeError, ValueError):
             continue
+        if len(tiles[machine]) != 4:
+            del tiles[machine]
     return tiles
 
 
 def _choice_key(*parts) -> str:
     return "\t".join("" if part is None else str(part) for part in parts)
+
+
+def _title(machine: str, device: str) -> str:
+    """A choice on the closed selector, where no header says whose device it is."""
+    # Translators: a device chosen in a selector, after the machine it belongs to: "lebig · Wave:3".
+    return tr("{machine} · {device}").format(machine=machine, device=device)
 
 
 def _headset(form: Optional[str]) -> bool:
@@ -259,10 +271,10 @@ def _mic_choices(snap: AudioSnapshot, names: _Names, order):
         name = names(machine)
         group = [Choice(_choice_key("mic-head", machine), name, name, enabled=False, header=True, machine=machine)]
         default = model.device_by_key(inputs, held.default_input)
-        label = (tr("Default microphone ({name})").format(name=default.name) if default is not None
+        label = (tr("Default ({name})").format(name=default.name) if default is not None
                  else tr("Default microphone"))
         key = _choice_key("mic", machine, "")
-        group.append(Choice(key, label, tr("{device} on {machine}").format(device=label, machine=name),
+        group.append(Choice(key, label, _title(name, label),
                             enabled=usable, machine=machine, device=None))
         if mic.machine == machine and mic.device is None:
             selected = key
@@ -270,7 +282,7 @@ def _mic_choices(snap: AudioSnapshot, names: _Names, order):
         for device in inputs:
             key = _choice_key("mic", machine, device.key)
             ref = DeviceRef(device.key, device.name)
-            group.append(Choice(key, device.name, tr("{device} on {machine}").format(device=device.name, machine=name),
+            group.append(Choice(key, device.name, _title(name, device.name),
                                 enabled=usable, machine=machine, device=ref))
             if chosen is not None and chosen.key == device.key and mic.device is not None:
                 selected = key
@@ -278,7 +290,7 @@ def _mic_choices(snap: AudioSnapshot, names: _Names, order):
             # The chosen mic is unplugged: still the selection, so nothing has to be set again.
             key = _choice_key("mic", machine, mic.device.key)
             label = tr("{device} (not connected)").format(device=mic.device.name)
-            group.append(Choice(key, label, tr("{device} on {machine}").format(device=label, machine=name),
+            group.append(Choice(key, label, _title(name, label),
                                 enabled=False, machine=machine, device=mic.device))
             selected = key
         choices.extend(group)
@@ -288,7 +300,7 @@ def _mic_choices(snap: AudioSnapshot, names: _Names, order):
         key = _choice_key("mic", mic.machine, mic.device.key if mic.device else "")
         choices.append(Choice(_choice_key("mic-head", mic.machine), name, name, enabled=False, header=True,
                               machine=mic.machine))
-        choices.append(Choice(key, label, tr("{device} on {machine}").format(device=label, machine=name),
+        choices.append(Choice(key, label, _title(name, label),
                               enabled=False, machine=mic.machine, device=mic.device))
         selected = key
     return tuple(choices), selected
@@ -428,8 +440,7 @@ def _output_choices(snap: AudioSnapshot, names: _Names, machine: str, order):
     name = names(machine)
     local = model.device_by_key(held.outputs, held.default_output) if held else None
     here = (tr("Here, on {device}").format(device=local.name) if local is not None else tr("Here"))
-    choices = [Choice(HERE, here, tr("{machine} itself").format(machine=name) if local is None else
-                      tr("{device} on {machine}").format(device=local.name, machine=name))]
+    choices = [Choice(HERE, here, name if local is None else _title(name, local.name))]
     selected = HERE
     can_send = held is not None and "system_capture" in held.features and machine in snap.online
     peers = _peers_of(snap, machine)
@@ -440,24 +451,24 @@ def _output_choices(snap: AudioSnapshot, names: _Names, machine: str, order):
         choices.append(Choice(_choice_key("out-head", target), target_name, target_name, enabled=False, header=True,
                               machine=target))
         default = model.device_by_key(other.outputs, other.default_output)
-        label = (tr("Default output ({name})").format(name=default.name) if default is not None
+        label = (tr("Default ({name})").format(name=default.name) if default is not None
                  else tr("Default output"))
         key = _choice_key("out", target, "")
-        choices.append(Choice(key, label, tr("{device} on {machine}").format(device=label, machine=target_name),
+        choices.append(Choice(key, label, _title(target_name, label),
                               enabled=usable, machine=target, device=None))
         if entry.to == target and entry.device is None:
             selected = key
         chosen = model.resolve(entry.device, other.outputs) if entry.to == target else None
         for device in other.outputs:
             key = _choice_key("out", target, device.key)
-            choices.append(Choice(key, device.name, tr("{device} on {machine}").format(device=device.name, machine=target_name),
+            choices.append(Choice(key, device.name, _title(target_name, device.name),
                                   enabled=usable, machine=target, device=DeviceRef(device.key, device.name)))
             if chosen is not None and chosen.key == device.key and entry.device is not None:
                 selected = key
         if entry.to == target and entry.device is not None and chosen is None:
             key = _choice_key("out", target, entry.device.key)
             label = tr("{device} (not connected)").format(device=entry.device.name)
-            choices.append(Choice(key, label, tr("{device} on {machine}").format(device=label, machine=target_name),
+            choices.append(Choice(key, label, _title(target_name, label),
                                   enabled=False, machine=target, device=entry.device))
             selected = key
     if entry.to is not None and selected == HERE:
@@ -467,7 +478,7 @@ def _output_choices(snap: AudioSnapshot, names: _Names, machine: str, order):
         key = _choice_key("out", entry.to, entry.device.key if entry.device else "")
         choices.append(Choice(_choice_key("out-head", entry.to), target_name, target_name, enabled=False, header=True,
                               machine=entry.to))
-        choices.append(Choice(key, label, tr("{device} on {machine}").format(device=label, machine=target_name),
+        choices.append(Choice(key, label, _title(target_name, label),
                               enabled=False, machine=entry.to, device=entry.device))
         selected = key
     return tuple(choices), selected, can_send
@@ -597,6 +608,12 @@ def _tile(snap: AudioSnapshot, names: _Names, machine: str, frame, selected: str
         subtitle = tr("Audio unavailable")
     has_mic = snap.route.mic.machine == machine
     mic_line = _mic_device_name(snap) if has_mic else ""
+    default_input = model.device_by_key(_inputs(held), held.default_input) if held is not None else None
+    input_line = default_input.name if default_input is not None and not has_mic else ""
+    source = snap.route.mic.machine
+    listening = (not has_mic and source is not None and snap.mic_status.state == "streaming"
+                 and machine in _mic_targets(snap))
+    listen_line = tr("Hears {machine}").format(machine=names(source)) if listening else ""
     output_line, output_tone = _tile_output(snap, names, machine)
     if has_mic:
         meter = _mic_meter(snap)
@@ -613,7 +630,8 @@ def _tile(snap: AudioSnapshot, names: _Names, machine: str, frame, selected: str
     return TileView(machine=machine, frame=frame, title=name, subtitle=subtitle, platform=platform, own=own,
                     online=online, selected=machine == selected, has_active_mic=has_mic, mic_line=mic_line,
                     recording=recording, output_line=output_line, output_tone=output_tone if online else QUIET,
-                    meter=meter, description=" ".join(parts))
+                    meter=meter, description=" ".join(parts), input_line=input_line,
+                    listen_line=listen_line)
 
 
 def _arrows(snap: AudioSnapshot, names: _Names, shown) -> tuple:
