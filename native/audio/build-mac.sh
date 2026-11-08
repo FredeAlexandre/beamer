@@ -29,8 +29,8 @@ FRAMEWORKS=(-framework CoreAudio -framework AudioToolbox -framework CoreFoundati
             -framework AVFoundation)
 
 COMMON=(-O2 -g -mmacosx-version-min=$MIN -fvisibility=hidden -Wall -Wextra)
-OPUS_FLAGS=(-std=c11 -DOPUS_BUILD -DUSE_ALLOCA -DHAVE_LRINTF -I"$OPUS/include" -I"$OPUS/celt" -I"$OPUS/silk"
-            -I"$OPUS/silk/float" -I"$OPUS" -Wno-unused-parameter -Wno-sign-compare)
+OPUS_FLAGS=(-std=c11 -w -DOPUS_BUILD -DUSE_ALLOCA -DHAVE_LRINTF -I"$OPUS/include" -I"$OPUS/celt" -I"$OPUS/silk"
+            -I"$OPUS/silk/float" -I"$OPUS/src" -I"$OPUS")
 C_FLAGS=(-std=c11 -I"$MONO/src")
 CXX_FLAGS=(-std=c++17 -I"$ENGINE" -I"$HERE" -I"$OPUS/include" -I"$MONO/src" -I"$JSON/include" -I"$JSON/single_include")
 MM_FLAGS=(-std=c++17 -fobjc-arc -I"$HERE" -Werror=unguarded-availability-new -Werror=return-type)

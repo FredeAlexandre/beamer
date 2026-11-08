@@ -37,8 +37,9 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
-BC = ROOT / "native/audio/build/mac/backend_check"
-HELPER = ROOT / "native/audio/build/mac/beamer-audio"
+BC = Path(os.environ.get("WP3_BUILD", ROOT / "native/audio/build/mac")) / "backend_check"
+BUILT = Path(os.environ.get("WP3_BUILD", ROOT / "native/audio/build/mac"))
+HELPER = BUILT / "beamer-audio"
 PROTO = ROOT / "dev/audio/proto/mac/.build/beamer-audio"
 HAL = "/usr/local/libexec/beamer-hal"
 RATE = 48000
@@ -101,12 +102,36 @@ def tone_wav(path: Path, seconds: float, amp=0.125):
 
 # ------------------------------------------------------------------------------------------------
 
+def helper_devices_event() -> str:
+    """The helper's §3.3 `devices` event (control mode), as text."""
+    p = subprocess.Popen([str(HELPER), "--control", "--parent-pid", str(os.getpid()), "--state-dir",
+                          tempfile.mkdtemp(), "--exclude-pid", str(os.getpid())], stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    try:
+        for line in p.stdout:
+            if '"ev":"devices"' in line.replace(" ", ""):
+                return line
+    finally:
+        p.stdin.close()
+        p.wait(5)
+    return ""
+
+
 def t_list():
+    if HELPER.exists():  # `beamer-audio list` (diagnostics): the virtual mic and feed only with their roles
+        dump = json.loads(subprocess.run([str(HELPER), "list"], capture_output=True, text=True, timeout=20).stdout)
+        bad = [d["key"] for d in dump.get("devices", []) if d["key"].startswith("com.beamer.audio.")
+               and d.get("role") == "normal"]
+        check("list_beamer-audio_roles", not bad, devices=[(d["name"], d.get("role"), d.get("form"))
+                                                         for d in dump.get("devices", [])])
     for name, exe in (("backend_check", BC), ("beamer-audio", HELPER)):
         if not exe.exists():
             check(f"list_{name}", False, error="not built")
             continue
-        out = subprocess.run([str(exe), "list"], capture_output=True, text=True, timeout=20).stdout
+        if exe == HELPER:
+            out = helper_devices_event()
+        else:
+            out = subprocess.run([str(exe), "list"], capture_output=True, text=True, timeout=20).stdout
         ev = next((json.loads(l) for l in out.splitlines() if l.startswith("{") and '"inputs"' in l), None)
         if ev is None:
             check(f"list_{name}", False, output=out[:400])
@@ -318,7 +343,7 @@ def t_cpu():
     if not HELPER.exists():
         check("mic_send_cpu", False, error="beamer-audio not built (engine missing)")
         return
-    a, b = Helper(), Helper()
+    a, b = Helper(), Helper("--backend", "null:out=null;vmic=null")
     try:
         if not (a.wait_ev("ready") and b.wait_ev("ready")):
             check("mic_send_cpu", False, error="no ready")
@@ -334,7 +359,7 @@ def t_cpu():
         b.send({"cmd": "flow_remote", "flow": "0000000b", "host": "127.0.0.1", "port": pa})
         codec = {"name": "opus", "app": "voip", "channels": 1, "bitrate": 32000, "frame_ms": 10, "fec": True}
         r3 = b.send({"cmd": "recv", "stream": 7, "flow": "0000000b", "kind": "mic", "codec": codec, "key": skey,
-                     "sink": {"device": None, "null": True}}) if False else None
+                     "sink": {"virtual_mic": True}})
         r4 = a.send({"cmd": "send", "stream": 7, "flow": "0000000b", "kind": "mic",
                      "source": {"device": "BuiltInMicrophoneDevice"}, "codec": codec, "key": skey,
                      "mute_local": False, "aec": None})
@@ -343,9 +368,9 @@ def t_cpu():
         time.sleep(30)
         pct = 100 * (cpu_of(a.p.pid) - c0) / (time.time() - t0)
         states = [e for e in a.ev if e.get("ev") in ("stream_state", "flow_state")]
-        stats = [e for e in a.ev if e.get("ev") == "stats"][-1:]
+        stats = [e for e in a.ev if e.get("ev") == "stats"][-1:] + [e for e in b.ev if e.get("ev") == "stats"][-1:]
         running = any(e.get("ev") == "stream_state" and e.get("state") == "running" for e in states)
-        check("mic_send_cpu", running and pct < 1.0, cpu_pct=round(pct, 2), replies=[r1, r2, r4],
+        check("mic_send_cpu", running and pct < 1.0, cpu_pct=round(pct, 2), replies=[r1, r2, r3, r4],
               states=[{k: v for k, v in e.items() if k != "_wall"} for e in states], last_stats=stats)
     finally:
         a.close()
