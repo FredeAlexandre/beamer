@@ -127,7 +127,7 @@ def mic_streaming() -> Fixture:
     route_mic = MicRoute(MAC, None, stamp(10))
     streams = (StreamView(2882400018, "mic", MAC, PC, "running", "udp", 23.0, 0.1, 5.2),)
     snap = snapshot([mac(links=(PC,)), pc(in_use=True)], direct=(PC,), mic=route_mic,
-                    mic_status=RouteStatus("streaming", None, {"targets": PC}),
+                    mic_status=RouteStatus("streaming", None, {"to": PC}),
                     output_status={MAC: RouteStatus("local"), PC: RouteStatus("local")}, streams=streams,
                     aec_active=True)
     levels = {f"{MAC}/in/{MAC_MIC.key}": (-22.0, -9.5), f"{MAC}/out/{MAC_SPEAKERS.key}": (-38.0, -27.0),
@@ -145,7 +145,7 @@ def sound_redirected() -> Fixture:
     snap = snapshot([mac(links=(PC,)), pc(in_use=True, outputs=(replace(REALTEK, default=True), replace(G733, default=False),
                                                                DUALSENSE))],
                     direct=(PC,), mic=route_mic, outputs=outputs,
-                    mic_status=RouteStatus("streaming", None, {"targets": PC}),
+                    mic_status=RouteStatus("streaming", None, {"to": PC}),
                     output_status={MAC: RouteStatus("local"), PC: RouteStatus("streaming")}, streams=streams,
                     aec_active=True)
     levels = {f"{MAC}/in/{MAC_MIC.key}": (-25.0, -11.0), f"{MAC}/out/{MAC_SPEAKERS.key}": (-18.0, -6.0),
@@ -171,7 +171,7 @@ def three_machines() -> Fixture:
     outputs = {MAC: OutputRoute(PC, DeviceRef("{gone}", "Headphones (Arctis 7)"), stamp(30))}
     streams = (StreamView(7, "mic", ROG, PC, "running", "udp", 20.0, 0.0, 3.0),)
     snap = snapshot([mac(links=(PC,)), pc(links=(MAC, ROG), in_use=True), rog()], direct=(PC,), mic=route_mic,
-                    outputs=outputs, mic_status=RouteStatus("streaming", None, {"targets": PC}),
+                    outputs=outputs, mic_status=RouteStatus("streaming", None, {"to": PC}),
                     output_status={MAC: RouteStatus("waiting_device"), PC: RouteStatus("local"),
                                    ROG: RouteStatus("local")},
                     streams=streams)

@@ -32,6 +32,7 @@ VIRTUAL_INPUTS = ("Beamer Microphone", "CABLE Output")
 PLATFORMS = {"macos": N_("macOS"), "windows": N_("Windows"), "linux": N_("Linux")}
 OFF = "off"
 HERE = "here"
+STREAMS_RUNNING = ("opening", "starting", "running")
 
 # Inks: what a line or a mark is drawn in, by what it says.
 QUIET, PLAIN, LIVE, WAIT, FAULT = "ink_3", "ink_2", "signal", "amber", "fault"
@@ -49,6 +50,7 @@ REASONS = {
     "bind_failed": N_("the network port is taken"),
     "helper": N_("the audio helper stopped"),
     "conflict": N_("its output is muted there"),
+    "no_system_capture": N_("that machine cannot capture its sound"),
 }
 
 
@@ -307,10 +309,11 @@ def _mic_choices(snap: AudioSnapshot, names: _Names, order):
 
 
 def _mic_targets(snap: AudioSnapshot) -> list:
-    """The machines hearing the active mic: the status's `targets`, else the running mic streams,
+    """The machines hearing the active mic: the status's `to` (planner.py), else the running mic streams,
     and the mic's own machine while an app there records it (the local loop)."""
     source = snap.route.mic.machine
-    targets = _ids(snap.mic_status.params.get("targets"))
+    params = snap.mic_status.params
+    targets = _ids(params.get("to") or params.get("targets"))
     if not targets:
         targets = [stream.target for stream in snap.streams
                    if stream.kind == "mic" and stream.source == source and stream.state in ("running", "starting")]
@@ -324,7 +327,7 @@ def _mic_line(snap: AudioSnapshot, names: _Names) -> str:
     status = snap.mic_status
     source = snap.route.mic.machine
     if source is None or status.state == "off":
-        return tr("No microphone is shared. Apps that record Beamer Microphone or CABLE Output hear silence.")
+        return tr("No microphone is shared: apps that record it hear silence.")
     device, machine = _mic_device_name(snap), names(source)
     targets = joined(names(target) for target in _mic_targets(snap))
     state = status.state
@@ -543,7 +546,8 @@ def _panel(snap: AudioSnapshot, names: _Names, machine: str, order) -> MachinePa
     return MachinePanel(
         machine=machine, heading=name,
         output_label=tr("Sound from {machine} plays on").format(machine=name),
-        output_choices=choices, output_selected=selected, output_enabled=can_send,
+        output_choices=choices, output_selected=selected,
+        output_enabled=selected != HERE or (can_send and any(choice.enabled and choice.key != HERE for choice in choices)),
         mute_note=(tr("Muted on {machine} while it plays elsewhere.").format(machine=name) if entry.to is not None else ""),
         output_line=line, output_tone=tone, inputs=inputs, outputs=outputs,
         inputs_empty=empty or (tr("No microphones.") if not inputs else ""),
@@ -678,18 +682,34 @@ def _speaker_devices(snap: AudioSnapshot, machine: str) -> list:
     return [device for device in devices if device is not None and not _headset(device.form)]
 
 
-def _notices(snap: AudioSnapshot, names: _Names, platform: str, without_audio) -> tuple:
+def _notices(snap: AudioSnapshot, names: _Names, platform: str, without_audio, driver) -> tuple:
     notices = []
     own = snap.machines.get(snap.own)
     if snap.helper == "failed":
         notices.append(Notice("helper_failed", tr("Beamer's audio helper stopped and did not start again."), FAULT,
                               "retry_helper", tr("Retry")))
+    # The Mac driver: installing or updating it restarts coreaudiod, so it is offered only while no
+    # stream runs, and the notice says first that every app goes quiet for a moment.
+    busy = any(stream.state in STREAMS_RUNNING for stream in snap.streams)
+    restart = tr("Every app on this Mac goes quiet for about a second while it installs.")
+    later = tr("Beamer is sending or playing sound now; it can be installed once that stops.")
+    missing = (own is not None and not own.virtual_mic.present and driver not in ("current", "newer")) or driver == "missing"
+    if platform == "macos" and missing:
+        offered = driver != "no_bundle" and not busy
+        text = tr("Beamer Microphone is not installed, so apps on this Mac cannot hear another machine's microphone.")
+        if driver == "no_bundle":
+            text += " " + tr("This build of Beamer does not carry it.")
+        else:
+            text += " " + (later if busy else restart)
+        notices.append(Notice("driver_missing", text, WAIT, "install_driver" if offered else None,
+                              tr("Install Beamer Microphone") if offered else ""))
+    elif platform == "macos" and driver == "outdated":
+        offered = not busy
+        notices.append(Notice("driver_outdated", tr("This Beamer carries a newer Beamer Microphone.") + " "
+                              + (later if busy else restart), PLAIN, "install_driver" if offered else None,
+                              tr("Update Beamer Microphone") if offered else ""))
     if own is not None and not own.virtual_mic.present:
-        if platform == "macos":
-            notices.append(Notice("driver_missing", tr("Beamer Microphone is not installed, so apps on this Mac "
-                                                       "cannot hear another machine's microphone."), WAIT,
-                                  "install_driver", tr("Install Beamer Microphone")))
-        elif platform == "windows":
+        if platform == "windows":
             notices.append(Notice("vbcable_missing", tr("To use another machine's mic here, install VB-CABLE "
                                                         "(vb-audio.com), then choose 'CABLE Output' as the microphone "
                                                         "in your apps."), WAIT))
@@ -746,11 +766,13 @@ def _notices(snap: AudioSnapshot, names: _Names, platform: str, without_audio) -
 
 
 def page_model(snap: AudioSnapshot, tiles: Mapping, selected: Optional[str], own_label: str,
-               peers_without_audio=()) -> AudioPage:
+               peers_without_audio=(), driver: Optional[str] = None) -> AudioPage:
     """Everything the Audio page shows (§9.1). `tiles`: machine id -> (x, y, w, h), or the layout's
     {x, y, w, h} dicts; `selected`: the machine whose panel shows, else this one; `own_label`:
     "This Mac" / "This PC"; `peers_without_audio`: names of linked machines whose Beamer has no
-    audio (the snapshot lists audio machines only)."""
+    audio (the snapshot lists audio machines only); `driver`: the Mac's Beamer Microphone driver as
+    mac_app/audio_driver.py states it ("missing", "outdated", "current", "newer", "no_bundle"), None
+    when unknown (the snapshot's virtual mic then decides)."""
     names = _Names(snap, own_label)
     shown = [snap.own] + [machine for machine in snap.machines if machine != snap.own]
     frames = _frames(shown, tiles or {})
@@ -775,7 +797,7 @@ def page_model(snap: AudioSnapshot, tiles: Mapping, selected: Optional[str], own
         mic_meter=mic_meter,
         mic_hint=tr("Apps use 'Beamer Microphone' on a Mac and 'CABLE Output' on a PC."),
         tiles=tile_views, arrows=arrows, selected=selected, panel=panel,
-        notices=_notices(snap, names, platform, peers_without_audio),
+        notices=_notices(snap, names, platform, peers_without_audio, driver),
         map_description=" ".join([tile.description for tile in tile_views] + [arrow.description for arrow in arrows]),
         meters=frozenset(meters))
 
@@ -814,7 +836,8 @@ def apply_test(service, row: DeviceRow) -> None:
 
 def apply_notice(service, notice: Notice) -> bool:
     """Runs a notice's action through the service; False when the action is the app's own
-    ("install_driver", "open_mic_settings", "open_system_audio_settings") or there is none."""
+    ("install_driver", which installs or updates the Mac driver off the main thread,
+    "open_mic_settings", "open_system_audio_settings") or there is none."""
     if notice.action == "retry_helper":
         service.retry_helper()
         return True

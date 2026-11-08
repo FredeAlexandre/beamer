@@ -54,6 +54,8 @@ def build(fixture, dark=True, width=1000, height=900):
     page.tiles_of = lambda: fixture.tiles
     page.peers_without_audio = lambda: fixture.peers_without_audio
     page.selected = fixture.selected
+    page.driver_of = lambda: None
+    page.installer = lambda **options: (_ for _ in ()).throw(AssertionError("no install in tests"))
     page.call_after = lambda fn, *args: fn(*args)
     control.window.setFrame_display_(((100000, 100000), (width, height)), False)
     page.refresh()
@@ -170,6 +172,43 @@ class AudioPageTests(unittest.TestCase):
         self.assertEqual(service.calls, [("retry_helper", ())])
         self.assertEqual(urls, ["x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"])
 
+    def test_driver_install_runs_off_the_main_thread(self):
+        _control, page, _service = build(fx.driver_missing())
+        hops, calls = [], []
+
+        def installer(**options):
+            calls.append((threading.current_thread() is threading.main_thread(), options["streams_running"]))
+            return mock.Mock(result="cancelled", detail="")
+
+        page.installer = installer
+        page.call_after = lambda fn, *args: hops.append((fn, args))
+        notice, button = page.notice_buttons[0]
+        self.assertIn("goes quiet for about a second", notice.text)
+        button.view.performClick_(None)
+        self.assertTrue(page.installing)
+        self.assertEqual(button.title, "Installing…")
+        self.assertFalse(button.enabled)
+        button.view.performClick_(None)  # a second click while it runs does nothing
+        deadline = time.monotonic() + 5
+        while not hops and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(calls, [(False, False)])
+        for fn, args in hops:
+            fn(*args)
+        self.assertFalse(page.installing)
+        self.assertEqual(page.notice_buttons[0][1].title, "Install Beamer Microphone")
+        page._installed(mock.Mock(result="failed", detail="boom"))
+        self.assertIn("could not be installed", page.install_note.text)
+
+    def test_update_offered_only_while_no_stream_runs(self):
+        fixture = fx.mic_streaming()
+        _control, page, _service = build(fixture)
+        page.driver_of = lambda: mock.Mock(state="outdated")
+        page.driver_loaded = False
+        page.refresh()
+        self.assertEqual([n.code for n in page.page.notices if n.code.startswith("driver")], ["driver_outdated"])
+        self.assertEqual(page.notice_buttons, [])
+
     def test_snapshots_wait_while_a_menu_is_open(self):
         _control, page, service = build(fx.mic_streaming())
         with mock.patch.object(type(page), "visible", new_callable=mock.PropertyMock, return_value=True):
@@ -203,7 +242,11 @@ class AudioPageTests(unittest.TestCase):
         from PyObjCTools import AppHelper
         page.call_after = AppHelper.callAfter
         page.timings = []
-        states = [fx.sound_redirected().snapshot, fx.mic_streaming().snapshot]
+        # What changes while devices stay: a stream stops, the route waits, then streams again.
+        streaming = fx.sound_redirected().snapshot
+        waiting = streaming.__class__(**{**streaming.__dict__, "streams": streaming.streams[:1],
+                                         "output_status": {fx.PC: RouteStatus("waiting_machine")}})
+        states = [waiting, streaming]
         keys = sorted(page.page.meters)
         stop = threading.Event()
 
@@ -231,14 +274,27 @@ class AudioPageTests(unittest.TestCase):
                 thread.join()
         levels = [duration * 1000 for kind, duration in page.timings if kind == "levels"]
         refreshes = [duration * 1000 for kind, duration in page.timings if kind == "refresh"]
+        # A click on another machine builds its rows the first time (reported, a click rather than
+        # the meter run), and shows the kept ones on a later visit.
+        started = time.perf_counter()
+        page._select(fx.MAC)
+        rebuild = (time.perf_counter() - started) * 1000
+        page._select(fx.PC)
+        started = time.perf_counter()
+        page._select(fx.MAC)
+        revisit = (time.perf_counter() - started) * 1000
         report = (f"{seconds:g} s: {len(levels)} level updates, max {max(levels):.2f} ms, median "
                   f"{statistics.median(levels):.2f} ms; {len(refreshes)} snapshot refreshes, max "
-                  f"{max(refreshes) if refreshes else 0:.2f} ms")
+                  f"{max(refreshes) if refreshes else 0:.2f} ms; click on another machine: first {rebuild:.2f} ms, "
+                  f"again {revisit:.2f} ms")
         print("\n" + report, file=sys.stderr)
+        if os.environ.get("AUDIO_METER_VERBOSE"):
+            print("refreshes", [round(value, 2) for value in refreshes], file=sys.stderr)
         self.assertGreater(len(levels), seconds * 20 * 0.7)
         self.assertLess(max(levels), 16, report)
-        if refreshes:
-            self.assertLess(max(refreshes), 16, report)
+        self.assertGreater(len(refreshes), 0)
+        self.assertLess(max(refreshes), 16, report)
+        self.assertLess(revisit, 16, report)
         self.assertFalse(control.window.isVisible())
 
 

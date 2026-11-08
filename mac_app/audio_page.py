@@ -12,6 +12,7 @@ frames. While the page is on screen the page asks the service to `watch`, which 
 from __future__ import annotations
 
 import logging
+import threading
 import weakref
 
 import AppKit
@@ -678,6 +679,38 @@ def _legend_item(swatch, text, ink="ink_2"):
     return item
 
 
+class _RowView:
+    """One device row's widgets, updated in place while its device stays."""
+
+    def __init__(self, row, line):
+        self.row = row
+        self.line = line
+        self.name = self.detail = self.active = self.meter = self.control = None
+
+    def update(self, row):
+        self.row = row
+        self.name.set(row.name, weight=600 if row.active else 500)
+        self.detail.set(row.detail)
+        self.active.set(row.active_label)
+        self.active.view.setHidden_(not row.active_label)
+        self.meter.key = row.meter
+        if row.kind == "input":
+            self.control.set_enabled(row.test_enabled)
+        else:
+            self.control.value = row.headset
+            self.control.set_enabled(row.headset_enabled)
+
+
+def _driver_status():
+    import audio_driver
+    return audio_driver.status()
+
+
+def _install_driver(**options):
+    import audio_driver
+    return audio_driver.install(**options)
+
+
 def _end_column(control):
     """A row's control in a fixed column at its end, so every row's meter lines up."""
     column = widgets.box()
@@ -722,7 +755,7 @@ class AudioPage:
     thread (AppHelper.callAfter; tests pass their own)."""
 
     def __init__(self, body, service, tiles, own_id, own_label, peers_without_audio=lambda: (),
-                 call_after=None, open_url=None):
+                 call_after=None, open_url=None, driver=None, installer=None):
         self.service_of = service
         self.tiles_of = tiles
         self.own_id = own_id
@@ -731,6 +764,11 @@ class AudioPage:
         self.call_after = call_after or AppHelper.callAfter
         self.open_url = open_url or (lambda url: AppKit.NSWorkspace.sharedWorkspace().openURL_(
             AppKit.NSURL.URLWithString_(url)))
+        self.driver_of = driver or _driver_status
+        self.installer = installer or _install_driver
+        self.driver = None
+        self.driver_loaded = False
+        self.installing = False
         self.service = None
         self.unsubscribe = []
         self.selected = None
@@ -744,9 +782,8 @@ class AudioPage:
         self.service_wait = False
         self.observers = []
         self.observed_window = None
-        self.meters = {}
-        self.row_controls = []
-        self.row_signature = None
+        self.row_views = []
+        self.row_sets = {}
         self.notice_signature = None
         self.timings = None
         self._build(body)
@@ -804,8 +841,11 @@ class AudioPage:
         line, self.output_dot = _dot_line(self.output_status)
         self.output_line = line
         panel.add(line)
+        # One stack of device rows per machine, kept while its devices stay, so going back to a
+        # machine shows its rows at once; only the selected one is in the panel.
         self.rows_host = widgets.stack(spacing=0)
         self.rows_host.setAlignment_(AppKit.NSLayoutAttributeWidth)
+        self.rows_host.setDetachesHiddenViews_(True)
         panel.add(self.rows_host)
         panel.body.setCustomSpacing_afterView_(16, line)
 
@@ -814,21 +854,46 @@ class AudioPage:
         self.notices_host = widgets.stack(spacing=0)
         self.notices_host.setAlignment_(AppKit.NSLayoutAttributeWidth)
         self.notices_module.add(self.notices_host)
+        self.install_note = widgets.note(ink="fault")
+        self.install_note.view.setHidden_(True)
+        self.notices_module.add(self.install_note.view)
         self.notice_buttons = []
 
-    def _device_rows(self, title, rows, empty):
-        widgets.add(self.rows_host, self._section(title))
+    def _row_set(self, panel):
+        """(signature, stack, row views) of `panel`'s machine: updated in place while its devices
+        stay, built again when one comes or goes."""
+        rows = panel.inputs + panel.outputs
+        signature = (tuple((row.kind, row.key) for row in rows), panel.inputs_empty, panel.outputs_empty)
+        held = self.row_sets.get(panel.machine)
+        if held is not None and held[0] == signature:
+            for shown, row in zip(held[2], rows):
+                shown.update(row)
+            return held
+        if held is not None:
+            self.rows_host.removeArrangedSubview_(held[1])
+            held[1].removeFromSuperview()
+        host = widgets.stack(spacing=0)
+        host.setAlignment_(AppKit.NSLayoutAttributeWidth)
+        views = []
+        self._device_rows(host, views, tr("Inputs"), panel.inputs, panel.inputs_empty)
+        self._device_rows(host, views, tr("Outputs"), panel.outputs, panel.outputs_empty)
+        widgets.add(self.rows_host, host)
+        held = self.row_sets[panel.machine] = (signature, host, views)
+        return held
+
+    def _device_rows(self, host, views, title, rows, empty):
+        widgets.add(host, self._section(title))
         if not rows:
             label = widgets.note(empty, ink="ink_3")
             holder = widgets.stack(spacing=0)
             holder.setEdgeInsets_(AppKit.NSEdgeInsets(8, 0, 12, 0))
             widgets.add(holder, label.view)
-            widgets.add(self.rows_host, holder)
+            widgets.add(host, holder)
             return
         for index, row in enumerate(rows):
             if index:
-                widgets.add(self.rows_host, widgets.hairline())
-            widgets.add(self.rows_host, self._device_row(row))
+                widgets.add(host, widgets.hairline())
+            widgets.add(host, self._device_row(row, views))
 
     def _section(self, title):
         holder = widgets.stack(spacing=0)
@@ -836,46 +901,57 @@ class AudioPage:
         widgets.add(holder, widgets.eyebrow(title))
         return holder
 
-    def _device_row(self, row):
+    def _device_row(self, row, views):
         line = widgets.stack(vertical=False, spacing=14)
         line.setEdgeInsets_(AppKit.NSEdgeInsets(8, 0, 8, 0))
         line.heightAnchor().constraintGreaterThanOrEqualToConstant_(52).setActive_(True)
+        shown = _RowView(row, line)
         words = widgets.stack(spacing=2)
-        name = widgets.Label(row.name, theme.TYPE["body"], 600 if row.active else 500)
-        widgets.squeeze(name.view)
-        words.addArrangedSubview_(name.view)
+        shown.name = widgets.Label(row.name, theme.TYPE["body"], 600 if row.active else 500)
+        widgets.squeeze(shown.name.view)
+        words.addArrangedSubview_(shown.name.view)
         detail = widgets.stack(vertical=False, spacing=8)
-        detail.addArrangedSubview_(widgets.Label(row.detail, theme.TYPE["small"], ink="ink_3").view)
-        if row.active_label:
-            detail.addArrangedSubview_(widgets.Label(row.active_label, theme.TYPE["small"], 600, "signal").view)
+        detail.setDetachesHiddenViews_(True)
+        shown.detail = widgets.Label(row.detail, theme.TYPE["small"], ink="ink_3")
+        shown.active = widgets.Label(row.active_label, theme.TYPE["small"], 600, "signal")
+        shown.active.view.setHidden_(not row.active_label)
+        detail.addArrangedSubview_(shown.detail.view)
+        detail.addArrangedSubview_(shown.active.view)
         words.addArrangedSubview_(detail)
         widgets.hug(words, AppKit.NSLayoutPriorityDefaultLow)
         line.addArrangedSubview_(words)
-        meter = level_meter(width=120)
-        meter.setAccessibilityLabel_(tr("{device} level").format(device=row.name))
-        meter.key = row.meter
-        self.meters.setdefault(row.meter, []).append(meter)
-        line.addArrangedSubview_(meter)
+        shown.meter = level_meter(width=120)
+        shown.meter.setAccessibilityLabel_(tr("{device} level").format(device=row.name))
+        line.addArrangedSubview_(shown.meter)
         if row.kind == "input":
-            button = widgets.action_button(tr("Test"), lambda row=row: self._test(row), scale="small")
-            button.set_enabled(row.test_enabled)
+            button = widgets.action_button(tr("Test"), lambda: self._test(shown.row), scale="small")
             button.view.widthAnchor().constraintGreaterThanOrEqualToConstant_(64).setActive_(True)
             button.view.setContentCompressionResistancePriority_forOrientation_(
                 AppKit.NSLayoutPriorityRequired, AppKit.NSLayoutConstraintOrientationHorizontal)
             button.view.setToolTip_(tr("Show this microphone's level for ten seconds."))
             line.addArrangedSubview_(_end_column(button.view))
-            control = button
+            shown.control = button
         else:
-            switch = widgets.Switch(tr("Headset"), on_change=lambda on, row=row: self._headset(row, on))
-            switch.value = row.headset
-            switch.set_enabled(row.headset_enabled)
+            switch = widgets.Switch(tr("Headset"), on_change=lambda on: self._headset(shown.row, on))
             switch.view.setToolTip_(tr("A headset cannot be heard by a microphone, so Beamer leaves its echo alone."))
             widgets.hug(switch.view)
             widgets.hug(switch.words.view)
             line.addArrangedSubview_(_end_column(switch.view))
-            control = switch
-        self.row_controls.append((row, control, line))
+            shown.control = switch
+        shown.update(row)
+        views.append(shown)
         return line
+
+    @property
+    def row_controls(self):
+        return [(shown.row, shown.control, shown.line) for shown in self.row_views]
+
+    @property
+    def meters(self):
+        meters = {}
+        for shown in self.row_views:
+            meters.setdefault(shown.row.meter, []).append(shown.meter)
+        return meters
 
     # Data.
 
@@ -914,8 +990,11 @@ class AudioPage:
             return
         self.dirty = False
         started = Foundation.CFAbsoluteTimeGetCurrent() if self.timings is not None else 0
+        if not self.driver_loaded:
+            self._load_driver()
         page = view.page_model(self.snapshot(), view.layout_tiles(self.tiles_of()), self.selected,
-                               self.own_label, tuple(self.peers_without_audio()))
+                               self.own_label, tuple(self.peers_without_audio()),
+                               getattr(self.driver, "state", None))
         if page != self.page:
             self._show(page)
         if self.timings is not None:
@@ -940,16 +1019,14 @@ class AudioPage:
         self.output_status.set(panel.output_line, ink="ink" if panel.output_tone == view.LIVE else panel.output_tone)
         widgets.paint(self.output_dot, panel.output_tone)
         self.output_line.setHidden_(not panel.output_line)
-        signature = (panel.machine, panel.inputs, panel.outputs, panel.inputs_empty, panel.outputs_empty)
-        if signature != self.row_signature:
-            self.row_signature = signature
-            for child in list(self.rows_host.arrangedSubviews()):
-                self.rows_host.removeArrangedSubview_(child)
-                child.removeFromSuperview()
-            self.meters = {}
-            self.row_controls = []
-            self._device_rows(tr("Inputs"), panel.inputs, panel.inputs_empty)
-            self._device_rows(tr("Outputs"), panel.outputs, panel.outputs_empty)
+        shown_machines = {tile.machine for tile in page.tiles}
+        for machine in [machine for machine in self.row_sets if machine not in shown_machines]:
+            _signature, host, _views = self.row_sets.pop(machine)
+            self.rows_host.removeArrangedSubview_(host)
+            host.removeFromSuperview()
+        _signature, current, self.row_views = self._row_set(panel)
+        for _signature, host, _views in self.row_sets.values():
+            host.setHidden_(host is not current)
         if page.notices != self.notice_signature:
             self.notice_signature = page.notices
             self._show_notices(page.notices)
@@ -960,7 +1037,7 @@ class AudioPage:
             self.notices_host.removeArrangedSubview_(child)
             child.removeFromSuperview()
         self.notice_buttons = []
-        self.notices_module.view.setHidden_(not notices)
+        self.notices_module.view.setHidden_(not notices and not self.install_note.text)
         for index, notice in enumerate(notices):
             if index:
                 widgets.add(self.notices_host, widgets.hairline())
@@ -976,6 +1053,9 @@ class AudioPage:
             if notice.action:
                 button = widgets.action_button(notice.action_label, lambda notice=notice: self._notice_action(notice),
                                                scale="small", style="primary" if notice.tone == view.WAIT else "plain")
+                if notice.action == "install_driver" and self.installing:
+                    button.set_title(tr("Installing…"))
+                    button.set_enabled(False)
                 line.addArrangedSubview_(widgets.hug(button.view))
                 self.notice_buttons.append((notice, button))
             widgets.add(self.notices_host, line)
@@ -987,10 +1067,8 @@ class AudioPage:
         started = Foundation.CFAbsoluteTimeGetCurrent() if self.timings is not None else 0
         levels = self.levels
         self.mic_meter.set_reading(view.meter_reading(levels, self.mic_meter.key))
-        for key, meters in self.meters.items():
-            reading = view.meter_reading(levels, key)
-            for meter in meters:
-                meter.set_reading(reading)
+        for shown in self.row_views:
+            shown.meter.set_reading(view.meter_reading(levels, shown.meter.key))
         self.map.set_levels(levels)
         if self.timings is not None:
             self.timings.append(("levels", Foundation.CFAbsoluteTimeGetCurrent() - started))
@@ -1036,6 +1114,10 @@ class AudioPage:
     def update_watch(self):
         service = self._ensure_service()
         visible = self.visible
+        if visible and not self.watching and not self.installing:
+            # Installed or removed by hand since the page was last open.
+            self.driver_loaded = False
+            self.dirty = True
         if visible and self.dirty:
             self.refresh()
         if service is None and visible and not self.service_wait:
@@ -1089,14 +1171,56 @@ class AudioPage:
         elif notice.action == "install_driver":
             self.install_driver()
 
-    def install_driver(self):
+    # The Beamer Microphone driver (mac_app/audio_driver.py).
+
+    def _load_driver(self):
+        self.driver_loaded = True
         try:
-            import audio_driver
-        except ImportError:
-            LOG.warning("audio: no audio_driver module in this build; cannot install Beamer Microphone")
+            self.driver = self.driver_of()
+        except Exception:  # an unreadable bundle must not take the page down
+            LOG.exception("audio: driver status")
+            self.driver = None
+
+    def _streams_running(self):
+        snap = self.service.snapshot() if self.service is not None else None
+        return bool(snap and any(stream.state in view.STREAMS_RUNNING for stream in snap.streams))
+
+    def install_driver(self):
+        """Installs or updates the driver on a worker thread: it restarts coreaudiod and may wait on
+        the administrator prompt. The notice said first that sound stops for about a second."""
+        if self.installing:
             return
-        install = getattr(audio_driver, "install", None)
-        if install is None:
-            LOG.warning("audio: audio_driver has no install()")
-            return
-        install()
+        self.installing = True
+        self.install_note.set("")
+        for _notice, button in self.notice_buttons:
+            if _notice.action == "install_driver":
+                button.set_title(tr("Installing…"))
+                button.set_enabled(False)
+        running = self._streams_running()
+        prompt = tr("Beamer wants to install Beamer Microphone, the microphone your apps hear from your other machines.")
+
+        def work():
+            try:
+                result = self.installer(streams_running=running, prompt=prompt)
+            except Exception as error:  # reported on the page, never raised on a worker thread
+                LOG.exception("audio: driver install")
+                result = error
+            self.call_after(self._installed, result)
+
+        threading.Thread(target=work, name="Beamer-audio-driver", daemon=True).start()
+
+    def _installed(self, result):
+        self.installing = False
+        outcome = getattr(result, "result", "failed")
+        LOG.info("audio: driver install %s %s", outcome, getattr(result, "detail", result))
+        self.install_note.set({
+            "installed": "",
+            "cancelled": "",
+            "busy": tr("Sound started streaming before the install could begin. Try again once it stops."),
+            "unavailable": tr("This build of Beamer does not carry Beamer Microphone."),
+        }.get(outcome, tr("Beamer Microphone could not be installed. The log has the details.")))
+        self.install_note.view.setHidden_(not self.install_note.text)
+        self._load_driver()
+        self.notice_signature = None
+        self.page = None
+        self.refresh()

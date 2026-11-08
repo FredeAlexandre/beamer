@@ -75,6 +75,7 @@ class FixturePages(unittest.TestCase):
         self.assertEqual(page.arrows, ())
         # Only "Here" and nothing to send the sound to.
         self.assertEqual([choice.key for choice in page.panel.output_choices], [view.HERE])
+        self.assertFalse(page.panel.output_enabled)
         self.assertEqual(page.panel.output_line, "Plays on MacBook Air Speakers.")
         self.assertEqual(page.notices, ())
         self.assertEqual([row.name for row in page.panel.inputs], ["MacBook Air Microphone", "AirPods Pro"])
@@ -149,6 +150,29 @@ class FixturePages(unittest.TestCase):
         self.assertEqual((chosen.machine, chosen.device), (fx.PC, DeviceRef(fx.WAVE.key, fx.WAVE.name)))
         self.assertTrue({tile.machine: tile for tile in page.tiles}[fx.PC].has_active_mic)
 
+    def test_driver_states(self):
+        fixture = fx.driver_missing()
+        notice = build(fixture).notices[0]
+        self.assertIn("goes quiet for about a second", notice.text)
+        # A stream running here: no install, coreaudiod must not restart under it.
+        busy = replace(fixture.snapshot, streams=(StreamView(1, "system", fx.MAC, fx.PC, "running", "udp", 1, 0, 1),))
+        notice = build(fixture, snapshot=busy).notices[0]
+        self.assertEqual((notice.code, notice.action), ("driver_missing", None))
+        self.assertIn("once that stops", notice.text)
+        self.assertEqual(view.page_model(fixture.snapshot, fixture.tiles, None, "This Mac", (), "no_bundle")
+                         .notices[0].action, None)
+        # Outdated: an update is offered on a Mac whose virtual mic works.
+        current = fx.mic_streaming()
+        quiet = replace(current.snapshot, streams=())
+        page = view.page_model(quiet, current.tiles, None, "This Mac", (), "outdated")
+        notice = next(n for n in page.notices if n.code == "driver_outdated")
+        self.assertEqual((notice.action, notice.action_label), ("install_driver", "Update Beamer Microphone"))
+        page = view.page_model(current.snapshot, current.tiles, None, "This Mac", (), "outdated")
+        self.assertIsNone(next(n for n in page.notices if n.code == "driver_outdated").action)
+        page = view.page_model(quiet, current.tiles, None, "This Mac", (), "current")
+        self.assertNotIn("driver_outdated", codes(page))
+        self.assertNotIn("driver_missing", codes(page))
+
     def test_three_machines(self):
         page = build(fx.three_machines())
         tiles = {tile.machine: tile for tile in page.tiles}
@@ -159,6 +183,7 @@ class FixturePages(unittest.TestCase):
                                                  "This Mac plays its sound itself until it is back.")
         chosen = view.choice_by_key(page.panel.output_choices, page.panel.output_selected)
         self.assertFalse(chosen.enabled)
+        self.assertTrue(page.panel.output_enabled)  # so "Here" can always be chosen again
         self.assertEqual(chosen.label, "Headphones (Arctis 7) (not connected)")
         # The unplugged device sits in lebig's group, which appears once.
         self.assertEqual([c.label for c in page.panel.output_choices if c.header], ["lebig"])
@@ -212,9 +237,9 @@ class States(unittest.TestCase):
         base = fx.mic_streaming()
         cases = [
             (RouteStatus("waiting_machine"), "This Mac is offline. Its microphone comes back with it."),
-            (RouteStatus("unreachable", None, {"targets": fx.ROG}), "Machine · " + fx.ROG[-6:] + " cannot hear This Mac: "
+            (RouteStatus("unreachable", None, {"to": fx.ROG}), "Machine · " + fx.ROG[-6:] + " cannot hear This Mac: "
                                                                     "they are not linked to it directly."),
-            (RouteStatus("no_virtual_mic", None, {"targets": fx.PC}), "lebig cannot hear This Mac: no virtual microphone there."),
+            (RouteStatus("no_virtual_mic", None, {"to": fx.PC}), "lebig cannot hear This Mac: no virtual microphone there."),
             (RouteStatus("error", "device_busy"), "MacBook Air Microphone on This Mac could not start: another app holds the device."),
             (RouteStatus("error", "something_new"), "MacBook Air Microphone on This Mac could not start."),
             (RouteStatus("ready"), "MacBook Air Microphone on This Mac is ready. It turns on when an app starts recording."),
@@ -388,6 +413,35 @@ class Actions(unittest.TestCase):
     def test_keys_are_stable_across_snapshots(self):
         one, two = build(fx.mic_streaming()), build(fx.sound_redirected())
         self.assertEqual([c.key for c in one.mic_choices], [c.key for c in two.mic_choices])
+
+
+class WithTheService(unittest.TestCase):
+    """The model over real AudioService snapshots (core/tests/audio_cluster_harness.py), and the
+    page's actions reaching the other machine through the service."""
+
+    def test_two_machines(self):
+        from core.tests.audio_cluster_harness import Net
+        i18n.install("en")
+        net = Net()
+        self.addCleanup(net.close)
+        mac, pc = net.add(1, "MacBook Air", "macos"), net.add(2, "lebig", "windows")
+        net.link(mac, pc)
+        net.settle()
+        page = view.page_model(mac.snapshot(), {}, None, "This Mac")
+        self.assertEqual([tile.title for tile in page.tiles], ["This Mac", "lebig"])
+        view.apply_mic(mac.service, next(c for c in page.mic_choices if c.machine == pc.id and not c.header))
+        net.settle()
+        page = view.page_model(mac.snapshot(), {}, None, "This Mac")
+        self.assertEqual(view.choice_by_key(page.mic_choices, page.mic_selected).machine, pc.id)
+        self.assertIn("on lebig is ready", page.mic_line)
+        self.assertIn("on This PC is ready", view.page_model(pc.snapshot(), {}, None, "This PC").mic_line)
+        view.apply_output(mac.service, mac.id, next(c for c in page.panel.output_choices
+                                                    if c.machine == pc.id and not c.header))
+        net.settle()
+        page = view.page_model(mac.snapshot(), {}, None, "This Mac")
+        self.assertEqual(page.tiles[0].output_line, "Sound → lebig")
+        self.assertEqual([(a.kind, a.state) for a in page.arrows], [("sound", "active")])
+        self.assertTrue(page.panel.output_line.startswith("Playing on "))
 
 
 class Words(unittest.TestCase):

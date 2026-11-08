@@ -1252,6 +1252,10 @@ msgid "the {edge} edge"
 msgstr ""
 
 #: mac_app/audio_page.py
+msgid "Beamer wants to install Beamer Microphone, the microphone your apps hear from your other machines."
+msgstr ""
+
+#: mac_app/audio_page.py
 msgid "Level"
 msgstr ""
 
@@ -1280,6 +1284,14 @@ msgid "Sound plays on"
 msgstr ""
 
 #: mac_app/audio_page.py
+msgid "Inputs"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Outputs"
+msgstr ""
+
+#: mac_app/audio_page.py
 msgid "Sound"
 msgstr ""
 
@@ -1304,11 +1316,7 @@ msgid "A headset cannot be heard by a microphone, so Beamer leaves its echo alon
 msgstr ""
 
 #: mac_app/audio_page.py
-msgid "Inputs"
-msgstr ""
-
-#: mac_app/audio_page.py
-msgid "Outputs"
+msgid "Beamer Microphone could not be installed. The log has the details."
 msgstr ""
 
 #: mac_app/audio_page.py
@@ -1318,6 +1326,18 @@ msgstr ""
 #: mac_app/audio_page.py
 #, python-brace-format
 msgid "{device} level"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Installing…"
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "Sound started streaming before the install could begin. Try again once it stops."
+msgstr ""
+
+#: mac_app/audio_page.py
+msgid "This build of Beamer does not carry Beamer Microphone."
 msgstr ""
 
 #: mac_app/bridge.py
