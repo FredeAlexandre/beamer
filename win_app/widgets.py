@@ -8,7 +8,7 @@ import math
 from shiboken6 import isValid
 
 from PySide6.QtCore import QEvent, QObject, QPointF, QRect, QRectF, QSignalBlocker, QSize, Qt
-from PySide6.QtGui import QAction, QColor, QFont, QFontMetrics, QLinearGradient, QPainter, QPalette, QPen, QWheelEvent
+from PySide6.QtGui import QAction, QColor, QFont, QFontMetrics, QLinearGradient, QPainter, QPainterPath, QPalette, QPen, QWheelEvent
 from PySide6.QtWidgets import (
     QAbstractButton,
     QAbstractSpinBox,
@@ -1546,6 +1546,14 @@ class PageButton(QPushButton):
                 for col in (4, 8, 12, 16):
                     painter.drawPoint(col, row)
             painter.drawLine(5, 12, 13, 12)
+        elif key == "audio":
+            speaker = QPainterPath(QPointF(1, 7))
+            for x, y in ((5, 7), (10, 3), (10, 15), (5, 11), (1, 11)):
+                speaker.lineTo(x, y)
+            speaker.closeSubpath()
+            painter.drawPath(speaker)
+            painter.drawArc(QRectF(9, 5, 6, 8), -60 * 16, 120 * 16)
+            painter.drawArc(QRectF(9, 2, 10, 14), -60 * 16, 120 * 16)
         elif key == "design":
             painter.drawEllipse(QRectF(2, 2, 14, 14))
             painter.drawLine(9, 2, 9, 16)
