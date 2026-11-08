@@ -16,7 +16,10 @@
 //   backend_check periods                       shared-mode engine periods each endpoint allows (IAudioClient3)
 //   (latency tests take --vmic-period N --vmic-queue Q --render-period N --render-queue Q --seconds S --tone A)
 //   backend_check restore                       restore_journal() (as `beamer-audio restore`)
-// Child modes (spawned by the tests): record, sleeper, hold-mute, exclusive.
+//   backend_check loss-test [--seconds S] [--load N] [--no-mute] [--dump K]
+//                                               sample-exact ramp rendered to the (muted) default output, captured by
+//                                               process loopback: samples lost between the mix and the sink (WP14)
+// Child modes (spawned by the tests): record, sleeper, hold-mute, exclusive, busy.
 // Every command takes --state-dir D (default: %TEMP%\beamer-wp4-check) so the real Beamer journal is never touched.
 #include "backend_win.h"
 
@@ -920,6 +923,144 @@ static int cmd_periods(const Args&) {
     return 0;
 }
 
+// ------------------------------------------------------------------ loss-test (WP14)
+
+// Sample n of the ramp: L = n mod 256, R = (n / 256) mod 64, each on a grid within +-0.4 (no grid value is 0, so
+// inserted silence is told apart). A lost run of samples shows as a jump of the decoded index (period 16384 = 341 ms;
+// process loopback is not bit-exact here: ~0.1 % gain/crosstalk, hence the coarse grid).
+static const int kRampA = 256, kRampB = 64, kRampN = kRampA * kRampB;
+static float ramp_value(int k, int levels) { return (float)(((k + 0.5) / levels) * 0.8 - 0.4); }
+struct Ramp : RenderSource {
+    int64_t n = 0;
+    void on_render(float* x, int frames, int ch, uint64_t) override {
+        for (int i = 0; i < frames; i++, n++) {
+            float l = ramp_value((int)(n % kRampA), kRampA), r = ramp_value((int)((n / kRampA) % kRampB), kRampB);
+            for (int c = 0; c < ch; c++) x[(size_t)i * ch + c] = c == 0 ? l : c == 1 ? r : 0.f;
+        }
+    }
+};
+struct RampCheck : CaptureSink {
+    std::atomic<bool> armed{false};
+    std::mutex m;
+    uint64_t frames = 0, ongrid = 0, offgrid = 0, missing = 0, events = 0, backwards = 0;
+    int prev = -1, dump = 0, since = 0;
+    double t0 = 0;
+    std::vector<std::pair<double, int>> gaps;  // (s since armed, samples)
+    static int decode(float v, int levels, bool* ok) {
+        double k = (v + 0.4) / 0.8 * levels - 0.5;
+        int r = (int)std::lround(k);
+        *ok = r >= 0 && r < levels && std::fabs(k - r) < 0.3;
+        return r;
+    }
+    void on_capture(const float* x, int n, int ch, uint64_t) override {
+        if (!armed) { prev = -1; return; }
+        std::lock_guard<std::mutex> g(m);
+        if (dump > 0) {
+            for (int i = 0; i < n && dump > 0; i++, dump--) {
+                bool oa, ob;
+                int da = decode(x[(size_t)i * ch], kRampA, &oa), db = decode(x[(size_t)i * ch + 1], kRampB, &ob);
+                out("dump %+.7f %+.7f -> %d%s %d%s", x[(size_t)i * ch], x[(size_t)i * ch + 1], da, oa ? "" : "?", db, ob ? "" : "?");
+            }
+        }
+        if (!t0) t0 = secs();
+        for (int i = 0; i < n; i++) {
+            frames++;
+            bool oka, okb;
+            int a = decode(x[(size_t)i * ch], kRampA, &oka), b = decode(x[(size_t)i * ch + 1], kRampB, &okb);
+            if (!oka || !okb) { offgrid++; since++; continue; }
+            ongrid++;
+            int cur = b * kRampA + a;
+            if (prev >= 0) {
+                int d = ((cur - prev - 1) % kRampN + kRampN) % kRampN;
+                d = std::max(0, d - since);  // off-grid samples in between stand for some of the jump
+                if (d && d < kRampN / 2) {
+                    missing += d; events++;
+                    if (gaps.size() < 200) gaps.push_back({secs() - t0, d});
+                } else if (d) backwards++;
+            }
+            prev = cur;
+            since = 0;
+        }
+    }
+};
+static int child_busy(const Args& a) {
+    int threads = (int)a.num("threads", 4);
+    double end = secs() + a.num("seconds", 60);
+    std::vector<std::thread> v;
+    std::atomic<uint64_t> sink{0};
+    for (int i = 0; i < threads; i++)
+        v.emplace_back([&] { uint64_t x = 1; while (secs() < end) for (int k = 0; k < 100000; k++) x = x * 6364136223846793005ull + 1; sink += x; });
+    for (auto& t : v) t.join();
+    return (int)(sink.load() & 0);
+}
+static int cmd_loss_test(const Args& a) {
+    ComScope com;
+    auto before = read_all_levels();
+    WinOptions o = options();
+    if (!a.has("render-queue")) o.render_queue = 4;  // the ramp's own render must never starve (holes show as off-grid)
+    auto b = make_win_backend(o);
+    const double seconds = a.num("seconds", 60), every = a.num("every", 10);
+    const int load = (int)a.num("load", 0);
+    std::string err;
+    Child sleeper;
+    sleeper.start("sleeper --seconds " + std::to_string((int)seconds + 30));
+    RampCheck chk;
+    chk.dump = (int)a.num("dump", 0);
+    CaptureSpec cs{CaptureKind::System, "", 2, !a.has("no-mute"), {(int64_t)sleeper.pid}};
+    auto s = b->open_capture(cs, &chk, &err);
+    if (!s) { check(false, "system capture opens", err); sleeper.kill(); return 1; }
+    Ramp ramp;
+    RenderSpec ps{"", false, 2};
+    auto p = b->open_render(ps, &ramp, &err);
+    if (!p) { check(false, "render opens", err); s.reset(); sleeper.kill(); return 1; }
+    Sleep(1000);
+    Child busy;
+    if (load) busy.start("busy --threads " + std::to_string(load) + " --seconds " + std::to_string((int)seconds + 2));
+    CaptureStats st0 = capture_stats(s.get());
+    chk.armed = true;
+    const double t_start = secs();
+    double next = t_start + every;
+    while (secs() < t_start + seconds) {
+        Sleep(200);
+        if (secs() >= next) {
+            next += every;
+            std::lock_guard<std::mutex> g(chk.m);
+            out("t=%5.0f s: %llu frames, missing %llu samples in %llu gaps, off-grid %llu, backwards %llu", secs() - t_start,
+                (unsigned long long)chk.frames, (unsigned long long)chk.missing, (unsigned long long)chk.events,
+                (unsigned long long)chk.offgrid, (unsigned long long)chk.backwards);
+        }
+    }
+    chk.armed = false;
+    const double dur = secs() - t_start;
+    CaptureStats st = capture_stats(s.get());
+    p.reset();
+    s.reset();
+    busy.kill();
+    sleeper.kill();
+    b.reset();
+    // Counters over the measured window only.
+    st.packets -= st0.packets; st.frames -= st0.frames; st.wakes -= st0.wakes; st.empty_wakes -= st0.empty_wakes;
+    st.silent -= st0.silent; st.discontinuity -= st0.discontinuity; st.ts_error -= st0.ts_error;
+    st.pos_gaps -= st0.pos_gaps; st.pos_gap_frames -= st0.pos_gap_frames; st.late_wakes -= st0.late_wakes;
+    out("capture: %s", capture_stats_text(st).c_str());
+    {
+        std::lock_guard<std::mutex> g(chk.m);
+        for (size_t i = 0; i < chk.gaps.size() && i < 40; i++) out("  gap at %.3f s: %d samples", chk.gaps[i].first, chk.gaps[i].second);
+        const double expect = dur * kRate;
+        out("RESULT seconds %.1f load %d: frames %llu (%.0f ppm vs QPC), missing %llu samples (%.1f ppm) in %llu gaps, "
+            "off-grid %llu, backwards %llu, discontinuity flags %llu, position gaps %llu (%llu frames)",
+            dur, load, (unsigned long long)chk.frames, (chk.frames - expect) / expect * 1e6,
+            (unsigned long long)chk.missing, chk.missing / expect * 1e6, (unsigned long long)chk.events, (unsigned long long)chk.offgrid,
+            (unsigned long long)chk.backwards, (unsigned long long)st.discontinuity, (unsigned long long)st.pos_gaps,
+            (unsigned long long)st.pos_gap_frames);
+        check(chk.ongrid > expect * 0.9, "the ramp is decoded", std::to_string(chk.ongrid) + " of " + std::to_string((uint64_t)expect));
+        check(chk.missing == 0, "no sample lost by the system capture", std::to_string(chk.missing) + " missing");
+    }
+    int diff = compare_levels(before, "after loss-test");
+    check(diff == 0, "all active endpoints back to their state before the test", std::to_string(before.size()) + " endpoints");
+    return g_fail ? 1 : 0;
+}
+
 static int cmd_restore(const Args&) {
     auto b = make_win_backend(options());
     out("restored %d", b->restore_journal());
@@ -956,6 +1097,8 @@ int main(int argc, char** argv) {
     if (cmd == "vmic-latency") return cmd_vmic_latency(a, false);
     if (cmd == "render-latency") return cmd_vmic_latency(a, true);
     if (cmd == "restore") return cmd_restore(a);
+    if (cmd == "loss-test") return cmd_loss_test(a);
+    if (cmd == "busy") return child_busy(a);
     if (cmd == "periods") return cmd_periods(a);
     if (cmd == "record") return child_record(a);
     if (cmd == "sleeper") return child_sleeper(a);

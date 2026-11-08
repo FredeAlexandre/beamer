@@ -239,6 +239,15 @@ DWORD windows_build();
 void inject_invalidation(StreamHandle* stream);
 // How many endpoint mutes the backend holds right now.
 int held_mutes(Backend* backend);
+// Capture-side counters of a capture stream (WP14): packets, flags, device-position gaps, wake timing.
+struct CaptureStats {
+    uint64_t wakes = 0, empty_wakes = 0, packets = 0, frames = 0, silent = 0, discontinuity = 0, ts_error = 0;
+    uint64_t pos_gaps = 0, pos_gap_frames = 0, pos_back = 0;  // device position vs frames delivered so far
+    uint64_t min_packet = 0, max_packet = 0, max_packets_per_wake = 0, max_wake_gap_us = 0, max_qpc_gap_us = 0;
+    uint64_t late_wakes = 0;  // wakes more than one buffer after the previous one
+};
+CaptureStats capture_stats(StreamHandle* stream);
+std::string capture_stats_text(const CaptureStats& s);
 
 }  // namespace win
 }  // namespace beamer::audio
