@@ -24,11 +24,12 @@ from pathlib import Path
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
-DRIVER = HERE.parent
-sys.path.insert(0, str(DRIVER.parent / "scenarios"))
+DRIVER = HERE.parent                      # native/audio/mac-driver
+PROTO = DRIVER.parents[2] / "dev" / "audio" / "proto"
+sys.path.insert(0, str(PROTO / "scenarios"))
 import sig  # noqa: E402  (shared test signals: pilot + chirp markers, lock-in glitch detector)
 
-TOOL = DRIVER.parent / "mac" / ".build" / "beamer-audio"
+TOOL = PROTO / "mac" / ".build" / "beamer-audio"
 CA_UTIL = DRIVER / "build" / "ca_util"
 HELPER = "/usr/local/libexec/beamer-hal"
 MIC, FEED = "com.beamer.audio.mic", "com.beamer.audio.micfeed"
