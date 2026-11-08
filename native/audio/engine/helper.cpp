@@ -16,6 +16,7 @@
 
 #include "codec.h"
 #include "events.h"
+#include "howl.h"
 #include "json.h"
 #include "null_backend.h"
 #include "streams.h"
@@ -675,6 +676,15 @@ class Helper : public BackendListener {
         s.suspect_reported = true;
         ev_->emit(Json{{"ev", "permission"}, {"mic", "suspect"}});
       }
+    }
+    // Howl guard of system send streams: one `howl` event per change (§3.3).
+    for (auto& kv : streams_) {
+      HowlGuard* guard = kv.second.send ? kv.second.send->howl() : nullptr;
+      HowlReport r;
+      if (!guard || !guard->poll(&r)) continue;
+      if (r.active) BA_WARN("stream %u: feedback at %.0f Hz, sound ducked %.0f dB", kv.first, r.freq_hz, r.duck_db);
+      ev_->emit(Json{{"ev", "howl"}, {"stream", kv.first}, {"active", r.active},
+                     {"freq_hz", std::round(r.freq_hz)}, {"duck_db", r.duck_db}});
     }
     if (meter_on_ && now >= next_levels_ns_) {
       next_levels_ns_ = now + meter_period_ns_;

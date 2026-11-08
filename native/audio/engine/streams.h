@@ -25,6 +25,7 @@
 namespace beamer::audio {
 
 class Flow;
+class HowlGuard;  // howl.h
 
 // Channel mapping used by every stream (backends deliver/accept any count).
 void map_channels(const float* in, int in_ch, float* out, int out_ch, int frames);
@@ -77,6 +78,7 @@ class SendStream : public StreamBase, public CaptureSink {
   void stop() override;
   Json stats(double dt_s) override;
   Flow* flow() const override { return flow_.get(); }
+  HowlGuard* howl() const { return howl_.get(); }  // system streams only (howl.h)
 
   // IO thread
   void on_capture(const float* interleaved, int frames, int channels, uint64_t host_ns) override;
@@ -119,6 +121,7 @@ class SendStream : public StreamBase, public CaptureSink {
   uint64_t last_frames_ = 0, last_enc_ns_ = 0;
   std::atomic<int> peer_level_01ms_{-1};
   std::atomic<int64_t> test_t0_ns_{0};  // dev test source: now_ns() of its sample 0 (E2E timeline)
+  std::unique_ptr<HowlGuard> howl_;     // encoder thread: ducks system sound that feeds back
   uint64_t last_tx_ = 0, last_tx_bytes_ = 0;
 };
 
