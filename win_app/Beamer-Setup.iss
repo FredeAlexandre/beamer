@@ -8,6 +8,14 @@
 ; A beta such as 1.5.0-beta.1 names itself in the shown version, but the file version resource
 ; takes four integers, so it carries the release number.
 #define NumericVersion Copy(AppVersion, 1, Pos("-", AppVersion + "-") - 1)
+; Audio (PHASE2 10.2): the helper build_win_app.ps1 built with native\audio\build-win.cmd ships beside
+; Beamer.exe. A tree without the native build makes an installer without it, and says so.
+#define AudioHelperSource AddBackslash(SourcePath) + "..\native\audio\build\win\beamer-audio.exe"
+#if FileExists(AudioHelperSource)
+#define AudioHelper
+#else
+#pragma warning "No " + AudioHelperSource + ": this installer carries no audio helper"
+#endif
 
 [Setup]
 AppId={{9A4E2B1F-4309-4E65-B86D-C7B9F4F64D01}
@@ -49,6 +57,9 @@ Name: "autostart"; Description: "Start Beamer at sign-in"; GroupDescription: "St
 [Files]
 Source: "Invoke-InstallMaintenance.ps1"; Flags: dontcopy
 Source: "dist\Beamer.exe"; DestDir: "{app}"; Flags: ignoreversion
+#ifdef AudioHelper
+Source: "{#AudioHelperSource}"; DestDir: "{app}"; Flags: ignoreversion
+#endif
 Source: "Install-Maintenance.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "Invoke-InstallMaintenance.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
@@ -112,6 +123,13 @@ begin
       ExpandConstant('{app}\Beamer.exe') + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     if (not Started) or (ResultCode <> 0) then
       RaiseException(OperationFailure('Beamer was installed, but administrator maintenance did not complete.', Started, ResultCode));
+#ifdef AudioHelper
+    { Replays the helper's mute journal once, so an endpoint a crashed helper left muted comes back now.
+      Only logged on failure: every helper start replays it again. }
+    if not Exec(ExpandConstant('{app}\beamer-audio.exe'), 'restore', ExpandConstant('{app}'), SW_HIDE,
+      ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
+      Log('beamer-audio.exe restore did not complete: ' + IntToStr(ResultCode));
+#endif
     if not WizardIsTaskSelected('autostart') then Exit;
     Started := Exec(ExpandConstant('{app}\Beamer.exe'), '--enable-autostart', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     if (not Started) or (ResultCode <> 0) then

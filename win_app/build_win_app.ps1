@@ -88,6 +88,21 @@ if (-not (Test-Path $Output)) { throw 'PyInstaller did not create Beamer.exe' }
 Sign-BeamerArtifact $Output
 Write-Output "Built $Output"
 
+# Audio (PHASE2 10.2): native\audio\build-win.cmd builds the helper, which ships beside Beamer.exe.
+# It is not embedded in the one-file exe, which would unpack it to a new temp path at every start.
+# A tree without the native build still makes a working Beamer, without audio, and says so.
+$AudioBuild = Join-Path $ProjectDir 'native\audio\build-win.cmd'
+$AudioHelper = Join-Path $ProjectDir 'native\audio\build\win\beamer-audio.exe'
+if (Test-Path $AudioBuild) {
+    Invoke-Native { & $AudioBuild }
+    if ($LASTEXITCODE -ne 0) { throw 'The audio helper build failed (native\audio\build-win.cmd)' }
+    if (-not (Test-Path $AudioHelper)) { throw "build-win.cmd did not produce $AudioHelper" }
+    Sign-BeamerArtifact $AudioHelper
+    Write-Output "Built $AudioHelper"
+} else {
+    Write-Warning 'No native\audio\build-win.cmd in this tree: Beamer is built without the audio helper (beamer-audio.exe)'
+}
+
 if ($Release) {
     $Version = (Get-Content (Join-Path $ProjectDir 'VERSION') -Raw).Trim()
     $ReleaseDir = [IO.Path]::GetFullPath((Join-Path $ProjectDir "..\docs\beamer-releases\$Version"))
