@@ -106,6 +106,9 @@ class AudioPageTests(unittest.TestCase):
                          ["Microphone (Wave:3)", "Microphone (Logitech G733)", "Speakers (Realtek(R) Audio)",
                           "Speakers (Logitech G733)", "Speakers (DualSense Wireless Controller)"])
         self.assertEqual(page.map.parts[fx.PC]["output"].string(), "Sound → This Mac")
+        self.assertFalse(page.map.parts[fx.PC]["recording"].isHidden())
+        self.assertTrue(page.map.parts[fx.MAC]["recording"].isHidden())
+        self.assertEqual(list(page.map.tooltips.values()), ["An app here is recording Beamer's microphone."])
         # Meters take the fixture's levels.
         self.assertIsNotNone(page.mic_meter.reading)
         self.assertGreater(page.map.parts[fx.MAC]["bar"].frame().size.width, 0)

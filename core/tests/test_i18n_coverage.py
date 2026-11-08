@@ -20,7 +20,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ("core", "mac_app", "win_app")
+SOURCES = ("core", "core/audio", "mac_app", "win_app")
 MARKERS = {"tr", "trn", "trc", "N_"}
 WORD = re.compile(r"[A-Za-z]{2,}")
 # One lowercase word with no space is an identifier (a palette ink, a style role, a selector
@@ -58,6 +58,7 @@ NOT_SHOWN = {
     # XML paths and scheduled-task run levels are Windows data, not translated prose.
     "find", "findall", "findtext", "SubElement", "task_xml",
     "_FlagAsMethod",  # COM method identifiers must retain their registered spelling.
+    "_error",  # core/audio/fake_helper.py: the helper protocol's error message, read by the service only.
 }
 
 

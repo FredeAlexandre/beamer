@@ -86,6 +86,7 @@ class TileView:
     description: str                # one sentence for screen readers
     input_line: str = ""            # the machine's own default microphone, shown when it is not the active one
     listen_line: str = ""           # "Hears This Mac": an app here records the shared mic from another machine
+    recording_line: str = ""        # while `recording`: one sentence saying so, for a badge's tooltip or a reader
 
 
 @dataclass(frozen=True)
@@ -618,6 +619,8 @@ def _tile(snap: AudioSnapshot, names: _Names, machine: str, frame, selected: str
     listening = (not has_mic and source is not None and snap.mic_status.state == "streaming"
                  and machine in _mic_targets(snap))
     listen_line = tr("Hears {machine}").format(machine=names(source)) if listening else ""
+    recording = held is not None and held.virtual_mic.in_use
+    recording_line = tr("An app here is recording Beamer's microphone.") if recording else ""
     output_line, output_tone = _tile_output(snap, names, machine)
     if has_mic:
         meter = _mic_meter(snap)
@@ -625,17 +628,18 @@ def _tile(snap: AudioSnapshot, names: _Names, machine: str, frame, selected: str
         meter = meter_key(machine, "output", held.default_output)
     else:
         meter = None
-    recording = held is not None and held.virtual_mic.in_use
     name = names(machine)
     parts = [tr("{machine}, {state}.").format(machine=name, state=tr("online") if online else tr("offline"))]
     if has_mic:
         parts.append(tr("Its {device} is the shared microphone.").format(device=mic_line))
     parts.append(output_line + ".")
+    if recording_line:
+        parts.append(recording_line)
     return TileView(machine=machine, frame=frame, title=name, subtitle=subtitle, platform=platform, own=own,
                     online=online, selected=machine == selected, has_active_mic=has_mic, mic_line=mic_line,
                     recording=recording, output_line=output_line, output_tone=output_tone if online else QUIET,
                     meter=meter, description=" ".join(parts), input_line=input_line,
-                    listen_line=listen_line)
+                    listen_line=listen_line, recording_line=recording_line)
 
 
 def _arrows(snap: AudioSnapshot, names: _Names, shown) -> tuple:

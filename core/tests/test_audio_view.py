@@ -195,6 +195,34 @@ class FixturePages(unittest.TestCase):
         self.assertEqual([tile.machine for tile in page.tiles], [fx.PC, fx.MAC, fx.ROG])
 
 
+class SeenFromThePC(unittest.TestCase):
+    def setUp(self):
+        i18n.install("en")
+
+    def test_pc_fixtures(self):
+        for name, make in fx.FIXTURES_PC.items():
+            with self.subTest(name):
+                fixture = make()
+                self.assertEqual(fixture.snapshot.own, fx.PC)
+                page = build(fixture)
+                own = next(tile for tile in page.tiles if tile.own)
+                self.assertEqual((own.machine, own.title), (fx.PC, "This PC"))
+        page = build(fx.FIXTURES_PC["mic_streaming"]())
+        self.assertEqual(page.mic_line, "MacBook Air Microphone on MacBook Air is live for This PC.")
+        tiles = {tile.machine: tile for tile in page.tiles}
+        self.assertEqual(tiles[fx.PC].listen_line, "Hears MacBook Air")
+        self.assertEqual(tiles[fx.PC].recording_line, "An app here is recording Beamer's microphone.")
+        self.assertIn(tiles[fx.PC].recording_line, tiles[fx.PC].description)
+        self.assertEqual(tiles[fx.MAC].recording_line, "")
+        self.assertEqual(tiles[fx.MAC].subtitle, "macOS · Linked")
+        page = build(fx.FIXTURES_PC["sound_redirected"]())
+        self.assertEqual(page.panel.machine, fx.PC)
+        self.assertEqual(page.panel.mute_note, "Muted on This PC while it plays elsewhere.")
+        page = build(fx.vbcable_missing())
+        self.assertEqual(codes(page)[0], "vbcable_missing")
+        self.assertEqual(build(fx.no_peers_pc()).notices, ())
+
+
 class States(unittest.TestCase):
     def setUp(self):
         i18n.install("en")
@@ -455,7 +483,7 @@ class Words(unittest.TestCase):
         with mock.patch.dict(os.environ, {"BEAMER_LANGUAGE": i18n.PSEUDO}):
             i18n.install("auto")
         try:
-            fixtures = list(fx.FIXTURES.values()) + [fx.three_machines]
+            fixtures = list(fx.FIXTURES.values()) + list(fx.FIXTURES_PC.values()) + [fx.three_machines]
             for make in fixtures:
                 fixture = make()
                 page = build(fixture, own_label=i18n.tr("This Mac"), peers_without_audio=("Fedora",))

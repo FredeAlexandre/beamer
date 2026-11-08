@@ -280,10 +280,12 @@ class AudioMap(AppKit.NSView):
             "output": _text_layer(theme.TYPE["note"], "ink_2", Quartz.kCAAlignmentLeft),
             "track": _box("well", None, 1.5),
             "bar": _box("signal", None, 1.5),
+            "recording": _glyph("record.circle", 12, "signal"),
         }
         parts["title"].setFont_(theme.font(theme.TYPE["body"], 600))
         parts["mic_text"].setFont_(theme.font(theme.TYPE["note"], 500))
-        for name in ("tile", "title", "dot", "subtitle", "mic", "mic_text", "speaker", "output", "track", "bar"):
+        for name in ("tile", "title", "dot", "subtitle", "mic", "mic_text", "speaker", "output", "track", "bar",
+                     "recording"):
             self.layer().addSublayer_(parts[name])
         self.parts[machine] = parts
         return parts
@@ -299,6 +301,14 @@ class AudioMap(AppKit.NSView):
                 continue
             self._draw_tile(tile, frame)
         self._draw_arrows(frames)
+        self.removeAllToolTips()
+        self.tooltips = {}
+        for tile in self.tiles:
+            frame = frames.get(tile.machine)
+            if frame is not None and tile.recording_line:
+                self.addToolTipRect_owner_userData_(
+                    AppKit.NSMakeRect(frame[0] + frame[2] - 28, frame[1] + 6, 22, 22), self, len(self.tooltips))
+                self.tooltips[len(self.tooltips)] = tile.recording_line
         focus = frames.get(self.selected) if self.keyboard_focus else None
         self.focus_layer.setHidden_(focus is None)
         if focus is not None:
@@ -318,7 +328,11 @@ class AudioMap(AppKit.NSView):
             parts[name].setOpacity_(dim)
         title = parts["title"]
         title.setString_(tile.title)
-        _set_layer_frame_if_changed(title, ((x + 10, y + 10), (max(1, w - 20), 20)))
+        # An app here records Beamer's microphone: a mark in the corner, the title kept centred.
+        inset = 30 if tile.recording else 10
+        _set_layer_frame_if_changed(title, ((x + inset, y + 10), (max(1, w - 2 * inset), 20)))
+        parts["recording"].setHidden_(not tile.recording)
+        _place_glyph(parts["recording"], (x + w - 24, y + 12, 14, 14))
         theme.tint(parts["dot"], background="signal" if tile.online else "ink_3")
         _set_layer_frame_if_changed(parts["dot"], ((x + 12, y + 37), (6, 6)))
         parts["subtitle"].setString_(tile.subtitle)
@@ -406,6 +420,9 @@ class AudioMap(AppKit.NSView):
                 Quartz.CGPathAddQuadCurveToPoint(path, None, control[0], control[1], *end)
             line.setPath_(path)
             head.setPath_(_head_path(tip, end))
+
+    def view_stringForToolTip_point_userData_(self, _view, _tag, _point, data):
+        return getattr(self, "tooltips", {}).get(data, "")
 
     # Input.
 
