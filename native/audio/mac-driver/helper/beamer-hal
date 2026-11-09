@@ -12,6 +12,7 @@ STAGED="__STAGED__"   # set when the helper is installed
 DEST_DIR=/Library/Audio/Plug-Ins/HAL
 DEST="$DEST_DIR/BeamerAudio.driver"
 BUNDLE_ID=com.beamer.audio.driver
+CERT_SHA1="__CERT_SHA1__"   # SHA-1 of the signing cert ("Beamer Dev"), pinned at setup time
 
 die() { echo "beamer-hal: $*" >&2; exit 1; }
 need_root() { [ "$(id -u)" -eq 0 ] || die "$1 needs root: sudo $0 $1"; }
@@ -42,7 +43,9 @@ do_install() {
     [ -f "$new/Contents/Info.plist" ] && [ -f "$new/Contents/MacOS/BeamerAudio" ] || die "staged bundle is incomplete"
     id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$new/Contents/Info.plist" 2>/dev/null || true)"
     [ "$id" = "$BUNDLE_ID" ] || die "unexpected bundle identifier '$id'"
-    codesign --verify --strict -R="identifier \"$BUNDLE_ID\"" "$new" || die "signature check failed"
+    # Pin the leaf certificate: an ad hoc or other-cert signature with the same identifier is refused.
+    codesign --verify --strict -R="identifier \"$BUNDLE_ID\" and certificate leaf = H\"$CERT_SHA1\"" "$new" \
+        || die "signature check failed (expected $BUNDLE_ID signed by cert $CERT_SHA1)"
 
     chown -R root:wheel "$new"
     chmod -R u+rwX,go+rX,go-w "$new"

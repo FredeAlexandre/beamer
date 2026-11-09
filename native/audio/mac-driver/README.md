@@ -148,14 +148,16 @@ installed on this Mac).
 
 `/usr/local/libexec/beamer-hal` (root:wheel 755) with a NOPASSWD sudoers rule
 (`/etc/sudoers.d/beamer-hal`, only `install`, `uninstall`, `restart`). Source and one-time setup in
-`helper/` (`sudo helper/setup-beamer-hal.sh <user> <staged bundle path>`; installed 2026-11-08).
+`helper/` (`sudo helper/setup-beamer-hal.sh <user> <staged bundle path> <cert SHA-1>`; installed
+2026-11-08, cert pinned 2026-11-09).
 
 * `install`: copies the staged bundle into a root-only temp dir, refuses symlinks, checks the
-  bundle id and `codesign --verify --strict`, chowns root:wheel, moves it to
+  bundle id and `codesign --verify --strict` with the leaf certificate pinned (SHA-1 of
+  "Beamer Dev", so an ad hoc signature with the same identifier is refused), chowns root:wheel, moves it to
   `/Library/Audio/Plug-Ins/HAL/BeamerAudio.driver`, restarts coreaudiod (`killall`; launchd
   relaunches it, `launchctl kickstart` is refused under SIP).
 * `uninstall`, `restart`; `status` (no root) compares the staged and installed bundles.
-* The staged path is fixed at setup time; the helper takes no other argument and ignores the
+* The staged path and cert SHA-1 are fixed at setup time; the helper takes no other argument and ignores the
   environment.
 
 Signature: amfid logs "adhoc signed or signed by an unknown certificate chain" for the self-signed

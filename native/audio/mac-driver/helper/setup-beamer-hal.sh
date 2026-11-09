@@ -1,21 +1,23 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only
 # One-time setup, run as root: installs /usr/local/libexec/beamer-hal and its sudoers rule.
-#   sudo ./setup-beamer-hal.sh <user> <staged bundle path>
+#   sudo ./setup-beamer-hal.sh <user> <staged bundle path> <signing cert SHA-1>
+#   SHA-1: security find-certificate -c "Beamer Dev" -Z | sed -n 's/^SHA-1 hash: //p'  (as the user)
 set -euo pipefail
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 [ "$(id -u)" -eq 0 ] || { echo "run as root" >&2; exit 1; }
-[ $# -eq 2 ] || { echo "usage: $0 <user> <staged BeamerAudio.driver path>" >&2; exit 1; }
-USER_NAME="$1"; STAGED="$2"
+[ $# -eq 3 ] || { echo "usage: $0 <user> <staged BeamerAudio.driver path> <signing cert SHA-1>" >&2; exit 1; }
+USER_NAME="$1"; STAGED="$2"; CERT_SHA1="$(echo "$3" | tr a-f A-F)"
 id "$USER_NAME" >/dev/null
 case "$STAGED" in /*) ;; *) echo "staged path must be absolute" >&2; exit 1 ;; esac
 case "$STAGED" in *'"'*|*'$'*|*'`'*|*'\'*) echo "bad characters in staged path" >&2; exit 1 ;; esac
+[[ "$CERT_SHA1" =~ ^[0-9A-F]{40}$ ]] || { echo "cert SHA-1 must be 40 hex digits" >&2; exit 1; }
 HERE="$(cd "$(dirname "$0")" && pwd)"
 HELPER=/usr/local/libexec/beamer-hal
 
 install -d -o root -g wheel -m 755 /usr/local /usr/local/libexec
 tmp="$(mktemp /usr/local/libexec/.beamer-hal.XXXXXX)"
-sed "s|__STAGED__|$STAGED|" "$HERE/beamer-hal" > "$tmp"
+sed -e "s|__STAGED__|$STAGED|" -e "s|__CERT_SHA1__|$CERT_SHA1|" "$HERE/beamer-hal" > "$tmp"
 chown root:wheel "$tmp"; chmod 755 "$tmp"
 bash -n "$tmp"
 mv -f "$tmp" "$HELPER"
