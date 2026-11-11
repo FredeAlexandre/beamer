@@ -27,7 +27,12 @@ PAGES = (
 ) + ((
     ("audio", N_("Audio"), "speaker.wave.2",
      N_("Every machine's microphones and speakers. Choose the microphone your apps hear and where each machine's sound plays.")),
-) if getattr(feature_flags, "AUDIO", False) else ()) + (
+) if getattr(feature_flags, "AUDIO", False) and not getattr(feature_flags, "CAMERA", False) else ()) + ((
+    # Camera (dev/camera/PHASE2.md §8.1): the same page, key and place, renamed for its Camera module.
+    ("audio", N_("Audio & Camera"), "speaker.wave.2",
+     N_("Every machine's microphones, speakers and camera. Choose the microphone your apps hear, the camera they "
+        "see, and where each machine's sound plays.")),
+) if getattr(feature_flags, "AUDIO", False) and getattr(feature_flags, "CAMERA", False) else ()) + (
     ("keyboard", N_("Keyboard"), "keyboard",
      N_("How this Mac's modifier keys arrive on other machines, which keys and buttons stay on this Mac, "
      "and how fast another machine's pointer moves here. The switch key is on the Crossing page.")),

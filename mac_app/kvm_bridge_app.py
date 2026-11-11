@@ -5181,12 +5181,20 @@ class TrayApp(rumps.App):
         self.receive_item = _tray_item(tr("Other machines drive this Mac"), callback=self.toggle_windows_drives)
         self.dock_item = _tray_item(tr("Show in Dock"), callback=self.toggle_dock)
         self.dock_item.state = self.settings_store.current().get("show_in_dock", True)
+        # The camera (dev/camera/PHASE2.md §8.5): who uses this Mac's camera, the Mac-local sharing
+        # switch and the permission item. Created under their keys, hidden, given words by
+        # _camera_items while the camera feature is on and this Mac has a camera.
+        self._camera_line = ""
+        self.camera_line_item = _tray_item("beamer-camera-line", callback=None)
+        self.camera_sharing_item = _tray_item("beamer-camera-sharing", callback=self.toggle_camera_sharing)
+        self.camera_allow_item = _tray_item("beamer-camera-allow", callback=self.allow_camera_access)
         self._symbol = None
         super().__init__(
             "Beamer",
             title=tr("Beamer • Local"),
             menu=[
                 self.status_item,
+                self.camera_line_item,
                 rumps.separator,
                 header,
                 rumps.separator,
@@ -5195,6 +5203,8 @@ class TrayApp(rumps.App):
                 rumps.separator,
                 self.send_item,
                 self.receive_item,
+                self.camera_sharing_item,
+                self.camera_allow_item,
                 rumps.separator,
                 _tray_item(tr("Settings…"), callback=self.open_window),
                 self.dock_item,
@@ -5206,6 +5216,8 @@ class TrayApp(rumps.App):
             ],
             quit_button=None,
         )
+        for item in (self.camera_line_item, self.camera_sharing_item, self.camera_allow_item):
+            item.hidden = True
         self.status_timer = rumps.Timer(self.refresh_status, 0.4)
         self.startup_timer = rumps.Timer(self.show_on_startup, 0.2)
         # Its own timer, slower than the status tick: the window list is a window-server call,
@@ -5296,6 +5308,9 @@ class TrayApp(rumps.App):
         self._machine_items()
         self._profile_items()
         self._direction_items()
+        camera_items = getattr(self, "_camera_items", None)
+        if camera_items is not None:
+            camera_items()
         self._refresh_tray_state()
 
     def _machine_items(self):
@@ -5710,6 +5725,59 @@ class TrayApp(rumps.App):
             return tr("Driven by {name}").format(name=self.controller.driver_label or tr("another machine"))
         return tr("Idle")
 
+    def _camera_menu(self):
+        """core.camera.view.CameraMenu for this Mac, or None while the camera feature is off or the
+        audio service has no camera part. Reads the service's last snapshots only: cheap enough for
+        the status tick."""
+        from core import feature_flags
+        service = getattr(self.controller, "audio", None)
+        if not getattr(feature_flags, "CAMERA", False) or service is None or not hasattr(service, "camera_snapshot"):
+            return None
+        try:
+            from core.camera import view as camera_view
+            return camera_view.menu_model(service.camera_snapshot(), service.snapshot(), tr("This Mac"))
+        except Exception:  # a camera fault must not stop the menu's status tick
+            if not getattr(self, "_camera_menu_failed", False):
+                self._camera_menu_failed = True
+                self.logger.exception("camera: menu")
+            return None
+
+    def _camera_items(self):
+        """The camera's menu items (§8.5): "Camera: <App> on <T>" under the drive status while this
+        Mac sends video, the sharing switch whenever this Mac has a camera, "Allow Camera Access…"
+        while the route names this Mac and macOS has not asked yet."""
+        menu = self._camera_menu()
+        shown = menu is not None and menu.shown
+        self._camera_line = menu.line if shown else ""
+        self.camera_line_item.hidden = not self._camera_line
+        if self._camera_line:
+            _set_tray_title(self.camera_line_item, self._camera_line)
+        self.camera_sharing_item.hidden = not shown
+        if shown:
+            _set_tray_title(self.camera_sharing_item, menu.sharing_title)
+        self.camera_allow_item.hidden = not (shown and menu.allow_shown)
+        if shown and menu.allow_shown:
+            _set_tray_title(self.camera_allow_item, menu.allow_title)
+
+    def toggle_camera_sharing(self, _sender):
+        """"Stop Sharing the Camera" / "Share the Camera": this Mac's own switch, whatever the route."""
+        menu = self._camera_menu()
+        service = getattr(self.controller, "audio", None)
+        if menu is None or not menu.shown or service is None:
+            return
+        from core.camera import view as camera_view
+        camera_view.apply_camera_action(service, camera_view.ACTION_STOP_SHARING if menu.sharing_on
+                                        else camera_view.ACTION_SHARE)
+        self._camera_items()
+
+    def allow_camera_access(self, _sender):
+        """"Allow Camera Access…": the macOS prompt appears because of this click (§9.1)."""
+        service = getattr(self.controller, "audio", None)
+        if service is None:
+            return
+        from core.camera import view as camera_view
+        camera_view.apply_camera_action(service, camera_view.ACTION_ALLOW)
+
     def _refresh_tray_state(self):
         state = self._drive_status()
         previous = getattr(self, "_last_drive_status", None)
@@ -5718,6 +5786,9 @@ class TrayApp(rumps.App):
             self._refusal_notices.reset()
         self._last_drive_status = state
         tooltip = f"{state}\n{self._last_refusal}" if self._last_refusal else state
+        camera_line = getattr(self, "_camera_line", "")
+        if isinstance(camera_line, str) and camera_line:
+            tooltip = f"{tooltip}\n{camera_line}"
         if hasattr(self, "status_item"):
             _set_tray_title(self.status_item, state)
         item = getattr(self, "status_item_view", None)

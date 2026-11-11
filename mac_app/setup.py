@@ -45,6 +45,7 @@ setup(
         "notices",
         "notch_beam",
         "notch_island",
+        "camera_section",
         "audio_page",
         "pages",
         "pointer_hide",

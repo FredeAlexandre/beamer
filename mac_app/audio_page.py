@@ -23,6 +23,7 @@ from PyObjCTools import AppHelper
 
 import theme
 import widgets
+from core import feature_flags
 from core.audio import model, view
 from core.i18n import tr
 from diagram import _box, _rect, _set_layer_frame_if_changed, _text_layer
@@ -34,6 +35,15 @@ SETTINGS_URLS = {
     "open_mic_settings": "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
     "open_system_audio_settings": "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture",
 }
+# Camera (dev/camera/PHASE2.md §8): how each route kind's arrow is drawn, and the order two or three
+# routes between the same tiles run side by side.
+ARROW_DASHES = {"mic": [5, 4], "camera": [0.5, 4.5], "sound": None}
+ARROW_LANES = ("mic", "camera", "sound")
+
+
+def camera_on():
+    """The camera feature flag (core/feature_flags.py CAMERA, set by the fork)."""
+    return bool(getattr(feature_flags, "CAMERA", False))
 
 
 def _quantised(reading):
@@ -281,11 +291,13 @@ class AudioMap(AppKit.NSView):
             "track": _box("well", None, 1.5),
             "bar": _box("signal", None, 1.5),
             "recording": _glyph("record.circle", 12, "signal"),
+            "camera": _glyph("web.camera.fill", 11, "ink_3"),
+            "camera_text": _text_layer(theme.TYPE["note"], "ink_2", Quartz.kCAAlignmentLeft),
         }
         parts["title"].setFont_(theme.font(theme.TYPE["body"], 600))
         parts["mic_text"].setFont_(theme.font(theme.TYPE["note"], 500))
         for name in ("tile", "title", "dot", "subtitle", "mic", "mic_text", "speaker", "output", "track", "bar",
-                     "recording"):
+                     "recording", "camera", "camera_text"):
             self.layer().addSublayer_(parts[name])
         self.parts[machine] = parts
         return parts
@@ -324,7 +336,8 @@ class AudioMap(AppKit.NSView):
         box.setBorderWidth_(2 if tile.selected else 1)
         theme.tint(box, background="well" if tile.own else "panel", border="ink_2" if tile.selected else "edge")
         dim = 0.42 if not tile.online else 1.0
-        for name in ("tile", "title", "dot", "subtitle", "mic", "mic_text", "speaker", "output", "track", "bar"):
+        for name in ("tile", "title", "dot", "subtitle", "mic", "mic_text", "speaker", "output", "track", "bar",
+                     "camera", "camera_text"):
             parts[name].setOpacity_(dim)
         title = parts["title"]
         title.setString_(tile.title)
@@ -337,18 +350,42 @@ class AudioMap(AppKit.NSView):
         _set_layer_frame_if_changed(parts["dot"], ((x + 12, y + 37), (6, 6)))
         parts["subtitle"].setString_(tile.subtitle)
         _set_layer_frame_if_changed(parts["subtitle"], ((x + 24, y + 32), (max(1, w - 34), 16)))
-        # The microphone and the output in two lines over the level bar; a short tile keeps the output.
+        # The microphone and the output in two lines over the level bar, the camera's line above the
+        # microphone's; a short tile keeps the output.
         mic_text = tile.mic_line or tile.listen_line or tile.input_line
         out_y = y + h - 36
         mic_y = out_y - 21
         # Short of room, the shared mic (or who hears it) beats the subtitle, and the subtitle
-        # beats the machine's own default mic.
+        # beats the machine's own default mic; the shared camera (or an app using it) counts as the
+        # shared mic does, and gives way to it.
         important = bool(tile.mic_line or tile.listen_line)
-        show_mic = bool(mic_text) and (mic_y >= y + 50 or (important and mic_y >= y + 30))
-        parts["subtitle"].setHidden_(show_mic and mic_y < y + 50)
-        parts["dot"].setHidden_(show_mic and mic_y < y + 50)
+        camera_text = tile.camera_line or tile.watching_line
+        camera_important = bool(tile.camera_line or (tile.watching_line and self._watched(tile.machine)))
+        lines = sorted(([("mic", important)] if mic_text else []) + ([("camera", camera_important)] if camera_text else []),
+                       key=lambda line: (not line[1], line[0] != "mic"))
+        placed, next_y = {}, mic_y
+        for name, wanted in lines:
+            if next_y >= y + 50 or (wanted and next_y >= y + 30):
+                placed[name] = next_y
+                next_y -= 20
+        show_mic = "mic" in placed
+        mic_y = placed.get("mic", mic_y)
+        squeezed = any(line_y < y + 50 for line_y in placed.values())
+        parts["subtitle"].setHidden_(squeezed)
+        parts["dot"].setHidden_(squeezed)
         for name in ("mic", "mic_text"):
             parts[name].setHidden_(not show_mic)
+        for name in ("camera", "camera_text"):
+            parts[name].setHidden_("camera" not in placed)
+        if "camera" in placed:
+            camera_y = placed["camera"]
+            lit = tile.camera_live or (bool(tile.watching_line) and self._watched(tile.machine))
+            _place_glyph(parts["camera"], (x + 11, camera_y + 1, 15, 14))
+            theme.tint(parts["camera"], background="signal" if lit else "ink_3")
+            parts["camera_text"].setString_(camera_text)
+            parts["camera_text"].setFont_(theme.font(theme.TYPE["note"], 600 if tile.has_active_camera else 400))
+            theme.tint(parts["camera_text"], foreground="ink" if tile.has_active_camera else "signal" if lit else "ink_3")
+            _set_layer_frame_if_changed(parts["camera_text"], ((x + 30, camera_y), (max(1, w - 40), 17)))
         _place_glyph(parts["mic"], (x + 12, mic_y + 1, 12, 14))
         theme.tint(parts["mic"], background="signal" if tile.has_active_mic or tile.listen_line else "ink_3")
         parts["mic_text"].setString_(mic_text)
@@ -363,6 +400,11 @@ class AudioMap(AppKit.NSView):
         _set_layer_frame_if_changed(parts["track"], ((x + 12, y + h - 13), (max(1, w - 24), 3)))
         parts["track"].setHidden_(tile.meter is None)
         self._place_bar(tile, frame)
+
+    @objc.python_method
+    def _watched(self, machine):
+        """A live camera arrow ends at `machine`: an app there sees the camera now."""
+        return any(arrow.kind == "camera" and arrow.target == machine and arrow.state == "active" for arrow in self.arrows)
 
     @objc.python_method
     def _place_bar(self, tile, frame):
@@ -387,8 +429,15 @@ class AudioMap(AppKit.NSView):
             if arrow.source not in frames or arrow.target not in frames:
                 continue
             siblings = pairs[frozenset((arrow.source, arrow.target))]
-            # Two routes between the same machines run side by side, the mic above the sound.
-            lane = 0.0 if len(siblings) == 1 else (-1.0 if arrow.kind == "mic" else 1.0)
+            # Routes between the same machines run side by side: the mic, the camera, the sound.
+            kinds = sorted({sibling.kind for sibling in siblings},
+                           key=lambda kind: ARROW_LANES.index(kind) if kind in ARROW_LANES else len(ARROW_LANES))
+            if len(kinds) == 1:
+                lane = 0.0
+            elif len(kinds) == 2:
+                lane = -1.0 if kinds.index(arrow.kind) == 0 else 1.0
+            else:
+                lane = (kinds.index(arrow.kind) - (len(kinds) - 1) / 2) * 1.6
             wanted.append((arrow, _route(frames[arrow.source], frames[arrow.target], lane * 11)))
         while len(self.arrow_layers) < len(wanted):
             line = Quartz.CAShapeLayer.layer()
@@ -411,7 +460,7 @@ class AudioMap(AppKit.NSView):
             ink = "signal" if arrow.state == "active" else "ink_3"
             theme.tint(line, stroke=ink)
             theme.tint(head, fill=ink)
-            line.setLineDashPattern_([5, 4] if arrow.kind == "mic" else None)
+            line.setLineDashPattern_(ARROW_DASHES.get(arrow.kind))
             path = Quartz.CGPathCreateMutable()
             Quartz.CGPathMoveToPoint(path, None, *start)
             if control is None:
@@ -667,7 +716,7 @@ class _Observer(AppKit.NSObject):
         self.callback()
 
 
-def _legend_swatch(dashed, ink="signal"):
+def _legend_swatch(dashed, ink="signal", dashes=None):
     swatch = widgets.box()
     widgets.size(swatch, 22, 10)
     line = Quartz.CAShapeLayer.layer()
@@ -679,7 +728,9 @@ def _legend_swatch(dashed, ink="signal"):
     line.setLineCap_(Quartz.kCALineCapRound)
     line.setFillColor_(None)
     theme.tint(line, stroke=ink)
-    if dashed:
+    if dashes:
+        line.setLineDashPattern_(dashes)
+    elif dashed:
         line.setLineDashPattern_([4, 3])
     head = Quartz.CAShapeLayer.layer()
     head.setPath_(_head_path((0, 5), (14, 5)))
@@ -803,6 +854,8 @@ class AudioPage:
         self.row_sets = {}
         self.notice_signature = None
         self.timings = None
+        self.camera_snap = None
+        self.camera_model = None
         self._build(body)
 
     # Building.
@@ -845,6 +898,12 @@ class AudioPage:
         self.notices_module.add(self.install_note.view)
         self.notice_buttons = []
 
+        # The camera (dev/camera/PHASE2.md §8.3): its module under the notices strip, hidden until
+        # the camera feature and a machine with a camera side are there.
+        import camera_section
+        self.camera = camera_section.CameraModule(body, self._pick_camera, self._pick_quality, self._camera_action,
+                                                  self._menu)
+
         machines, _ = self._module(body, tr("Machines"))
         self.map = AudioMap.alloc().init().setup()
         self.map.on_select = self._select
@@ -854,6 +913,9 @@ class AudioPage:
         legend = widgets.stack(vertical=False, spacing=18)
         legend.addArrangedSubview_(_legend_item(_legend_swatch(False), tr("Sound")))
         legend.addArrangedSubview_(_legend_item(_legend_swatch(True), tr("Microphone")))
+        self.camera_legend = _legend_item(_legend_swatch(True, dashes=ARROW_DASHES["camera"]), tr("Camera"))
+        self.camera_legend.setHidden_(True)
+        legend.addArrangedSubview_(self.camera_legend)
         legend.addArrangedSubview_(_legend_item(_legend_swatch(False, "ink_3"), tr("Waiting"), "ink_3"))
         machines.add(legend, full_width=False)
         machines.add(widgets.note(tr("Click a machine to see its devices and choose where its sound plays.")).view)
@@ -1013,6 +1075,19 @@ class AudioPage:
             return model.empty_snapshot(self.own_id(), helper="no_helper")
         return service.snapshot()
 
+    def camera_snapshot(self):
+        """The service's camera snapshot (core.camera.model.CameraSnapshot) while the camera feature
+        is on and the service has a camera part, else None."""
+        service = self.service
+        reader = getattr(service, "camera_snapshot", None) if service is not None and camera_on() else None
+        if reader is None:
+            return None
+        try:
+            return reader()
+        except Exception:  # a camera fault must not take the Audio page down
+            LOG.exception("camera: snapshot")
+            return None
+
     def refresh(self):
         """Builds the page model and brings every part of the page up to it; cheap when nothing
         changed. Deferred while a menu of the page is open."""
@@ -1023,11 +1098,25 @@ class AudioPage:
         started = Foundation.CFAbsoluteTimeGetCurrent() if self.timings is not None else 0
         if not self.driver_loaded:
             self._load_driver()
-        page = view.page_model(self.snapshot(), view.layout_tiles(self.tiles_of()), self.selected,
+        audio = self.snapshot()
+        camera = self.camera_snapshot()
+        extras = section = None
+        if camera is not None:
+            from core.camera import view as camera_view
+            extras = camera_view.map_extras(camera)
+            section = camera_view.camera_section(camera, audio, self.own_label, "macos")
+            if not section.shown:
+                extras = None
+        self.camera_snap = camera
+        page = view.page_model(audio, view.layout_tiles(self.tiles_of()), self.selected,
                                self.own_label, tuple(self.peers_without_audio()),
-                               getattr(self.driver, "state", None))
+                               getattr(self.driver, "state", None), camera=extras)
         if page != self.page:
             self._show(page)
+        if section != self.camera_model:
+            self.camera_model = section
+            self.camera.show(section)
+            self.camera_legend.setHidden_(section is None or not section.shown)
         if self.timings is not None:
             self.timings.append(("refresh", Foundation.CFAbsoluteTimeGetCurrent() - started))
 
@@ -1187,6 +1276,24 @@ class AudioPage:
     def _pick_mic(self, choice):
         if self.service is not None:
             view.apply_mic(self.service, choice)
+
+    def _pick_camera(self, choice):
+        if self.service is not None:
+            from core.camera import view as camera_view
+            camera_view.apply_camera(self.service, choice)
+
+    def _pick_quality(self, size):
+        if self.service is not None:
+            from core.camera import view as camera_view
+            camera_view.apply_quality(self.service, size)
+
+    def _camera_action(self, action):
+        """A camera row's, notice's or status line's button: the service's, else this app's own."""
+        from core.camera import view as camera_view
+        if self.service is not None and camera_view.apply_camera_action(self.service, action, self.camera_snap):
+            return
+        if action == camera_view.ACTION_PRIVACY:
+            self.open_url(camera_view.PRIVACY_URL)
 
     def _pick_output(self, choice):
         if self.service is not None and self.page is not None:
