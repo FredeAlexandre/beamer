@@ -41,6 +41,12 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
   shortcut); one quality for the whole cluster, 720p30 default; no 30 fps pinning in low light until Alex's
   test; "Stop Sharing the Camera" on the Mac turns the camera route off cluster-wide (privacy kill switch owned
   by the camera's machine); the Windows multi-app camera setting is only a help link, no automation.
+- D2 decisions accepted (operator): one encode session per receiving PC (same size cluster-wide, independent
+  recovery); the Mac kill switch leaves the route alone and every page shows "Turned off on <Mac>" (replaces the
+  earlier cluster-wide-off default); choosing its own camera on the Mac page counts as the Mac action that may
+  trigger the TCC prompt; a DLL update may need a Windows restart until CW5 measures otherwise; `locales/` is
+  regenerated only at merge time.
+- Next: fold C4's numbers into PHASE2 (§13), then one independent re-check (R2) of the whole contract.
 - Implementation does not start before C4's numbers are folded into PHASE2 and R1's blockers/majors are fixed.
 
 ## How agents work here
@@ -61,4 +67,4 @@ folders `C:\Users\Alex\camera-<wp>\`, never in the PC clone. Reports land in `de
 | C4 | End-to-end prototype chain (synthetic source -> PC virtual camera -> Chrome), latency, real LTR/NACK loop, on-demand start | Mac agent + PC, `proto/e2e/` | started |
 | D1 | `PHASE1.md` synthesis + `PHASE2.md` design contract and work packages | design agent, docs only | **done** (`23319fa`), [C4] placeholders + §13 amendment points; CW1-CW11 in 3 waves |
 | R1 | Independent adversarial review of `PHASE2.md` against the code and reports | review agent, `reviews/r1-phase2.md` | **done** (`3d336c2`): 1 blocker (frame numbering vs dropped AUs -> corrupt frames marked good), 10 majors (sr vs pacer/seq space, sealer nonce reuse across threads, DLL trusts shm fields, no Reconnecting path, double IDR at start, busy undetectable, kill switch overridable from the PC + TCC prompt from a PC action, dev commands without owner WP, non-16:9 cameras, no acks over TCP fallback), 14 minors |
-| D2 | Revise PHASE2 per R1 with operator rulings (#1, #4, #7, #8, #10, #11) | design agent, `PHASE2.md` + `reviews/r1-resolution.md` | started |
+| D2 | Revise PHASE2 per R1 with operator rulings (#1, #4, #7, #8, #10, #11) | design agent, `PHASE2.md` + `reviews/r1-resolution.md` | **done** (`3310a6b`): 24/25 fixed, #21 partly wrong (uninstaller already elevates; `vcam-remove` verb added); new: `time_map` flow-level packet replaces `sr`, RR 28 B with `clean_since`, encoder input pause instead of dropping AUs, DLL copies + validates shm, `shmfuzz` acceptance test, locale extraction must include `core/camera` |
