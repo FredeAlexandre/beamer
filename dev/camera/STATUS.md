@@ -62,10 +62,11 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 | WP | State |
 |---|---|
 | CW1 Python control plane | running |
-| CW2 Engine video transport | running |
+| CW2 Engine video transport | running (`video_backend.h` landed `e0a4ef5`) |
 | CW3 Mac camera backend | running |
 | CW4 Windows video sink | running |
-| CW5 Windows camera source DLL | running (`shm_protocol.h` landed) |
+| CW5 Windows camera source DLL | running (`shm_protocol.h` landed `5adb0d8`) |
+| CW7 Page model, Mac UI, menu (wave 2, started early: CW1 milestones 1+2 landed `b9116dd`, `bf21597`) | running |
 | CW9 Packaging, install, permissions | **part 1 done** (`8e14cb8`, code `d6859c5`): camera entitlement on app + python + helper (checked on a private Beamer Dev build, deleted), Info.plist keys, `build_dmg.sh` guard, Inno script (not compiled: no ISCC on lebig), `Install-Beamer.ps1` camera step, portable build puts `camera\BeamerCameraSource.dll` beside `beamer-audio.exe` (stub binaries), `vcam_install.py` 30 tests Mac + lebig, `Install-Maintenance -Remove` on a fake install. Touched `win_app/build_portable.ps1` outside its list (needed; accepted). **Part 2 (CW9b) after CW4+CW5:** rebuild PC with the real DLL, `-Remove` on a real dev install, README section for vcam-win (text in cw9.md). Inno compile needs Inno Setup 6 on lebig (Alex's call, later) |
 
 ## How agents work here
