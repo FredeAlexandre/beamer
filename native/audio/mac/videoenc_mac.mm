@@ -20,6 +20,7 @@ std::vector<double> g_enc_times;
 struct FrameCtx {
   uint64_t capture_ns = 0, submit_ns = 0;
   bool refresh = false;
+  bool discard = false;  // wake-up frame: its output never leaves the encoder
 };
 }  // namespace
 
@@ -71,6 +72,7 @@ void output_cb(void* refcon, void* frame_ref, OSStatus st, VTEncodeInfoFlags inf
   std::shared_ptr<Encoder::Impl> d = weak->lock();
   if (!d) return;
   const uint64_t out_ns = (uint64_t)now_ns();
+  if (ctx && ctx->discard) return;
   if (st != noErr || !sb || (info & kVTEncodeInfo_FrameDropped)) {
     vlog("warn", "video encoder dropped a frame (status %d, flags 0x%x)", (int)st, (unsigned)info);
     return;
@@ -187,7 +189,7 @@ void Encoder::set_output(std::function<void(const EncOut&)> out) {
 }
 
 bool Encoder::encode(CVPixelBufferRef pb, uint64_t capture_ns, bool force_idr, bool refresh,
-                     const std::vector<int64_t>& acked, std::string* err) {
+                     const std::vector<int64_t>& acked, std::string* err, bool discard) {
   NSMutableDictionary* fo = [NSMutableDictionary dictionary];
   if (force_idr) fo[(id)kVTEncodeFrameOptionKey_ForceKeyFrame] = @YES;
   if (!acked.empty()) {
@@ -196,7 +198,7 @@ bool Encoder::encode(CVPixelBufferRef pb, uint64_t capture_ns, bool force_idr, b
     fo[(id)kVTEncodeFrameOptionKey_AcknowledgedLTRTokens] = a;
   }
   if (refresh && !force_idr) fo[(id)kVTEncodeFrameOptionKey_ForceLTRRefresh] = @YES;
-  auto* ctx = new FrameCtx{capture_ns, (uint64_t)now_ns(), refresh && !force_idr};
+  auto* ctx = new FrameCtx{capture_ns, (uint64_t)now_ns(), refresh && !force_idr, discard};
   // pts in the capture clock (ns), so VideoToolbox's rate control sees the real frame spacing
   CMTime pts = CMTimeMake((int64_t)capture_ns, 1000000000);
   CMTime dur = CMTimeMake(1000000000LL / fps_, 1000000000);

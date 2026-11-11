@@ -46,10 +46,11 @@ class MacVideoBackend;
 // CameraHandle method takes it, so the engine may call any of them from inside on_frame / on_camera_event.
 class MacCameraHandle : public CameraHandle, public FrameListener {
  public:
+  // capture_start_ns: when this stream's capture started (the source's start, or the attach to a running one)
   MacCameraHandle(MacVideoBackend* be, const CameraSpec& spec, EncoderSink* sink, std::unique_ptr<Encoder> enc,
-                  std::shared_ptr<Source> src)
+                  std::shared_ptr<Source> src, int64_t capture_start_ns)
       : be_(be), spec_(spec), sink_(sink), fmt_(spec.fmt), enc_(std::move(enc)), src_(std::move(src)) {
-    open_ns_ = now_ns();
+    open_ns_ = capture_start_ns;
     fps_ = spec.fmt.fps == 15 ? 15 : 30;
     wire_encoder(enc_.get());
   }
@@ -67,6 +68,10 @@ class MacCameraHandle : public CameraHandle, public FrameListener {
       self->tick();
     });
     dispatch_resume(timer_);
+    std::shared_ptr<std::atomic<bool>> alive = alive_;
+    dispatch_async(timer_q_, ^{  // off the caller: the first encode of an idle encoder blocks ~40 ms
+      if (*alive) self->wake();
+    });
   }
 
   // ---- CameraHandle ----
@@ -182,6 +187,42 @@ class MacCameraHandle : public CameraHandle, public FrameListener {
     const int n = captured_.exchange(0);
     emit("fps", fmt1(n));
   }
+  // Encoder wake (timer queue): a hardware encoder that has been idle takes 35-65 ms longer for its first
+  // frame, whatever the session's age (measured, cw3.md). Until the stream's first real frame is submitted
+  // (the camera's start: 0.2-0.8 s), encode a black frame every 200 ms and drop its output inside the
+  // encoder: no AU reaches the engine, the first real frame is still a forced IDR (§2.4 start_encoding).
+  void wake() {
+    {
+      std::lock_guard<std::recursive_mutex> lk(mu_);
+      if (submitted_real_ || woken_ >= 20 || !enc_) return;  // <= 4 s (the engine stops a silent stream at 3 s)
+      if (!wake_buf_ || (int)CVPixelBufferGetWidth(wake_buf_) != fmt_.w || (int)CVPixelBufferGetHeight(wake_buf_) != fmt_.h)
+        make_wake_buffer();
+      if (wake_buf_) {
+        std::string err;
+        // pts before any capture time this stream can see, increasing by 1 ms per wake frame
+        const uint64_t pts = (uint64_t)(open_ns_ - 2000000000LL) + (uint64_t)woken_ * 1000000ULL;
+        enc_->encode(wake_buf_, pts, false, false, {}, &err, true);
+        woken_++;
+      }
+    }
+    MacCameraHandle* self = this;
+    std::shared_ptr<std::atomic<bool>> alive = alive_;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 200 * NSEC_PER_MSEC), timer_q_, ^{
+      if (*alive) self->wake();
+    });
+  }
+  void make_wake_buffer() {  // mu_ held
+    if (wake_buf_) CVPixelBufferRelease(wake_buf_);
+    wake_buf_ = nullptr;
+    if (CVPixelBufferCreate(nullptr, fmt_.w, fmt_.h, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+                            (__bridge CFDictionaryRef) @{(id)kCVPixelBufferIOSurfacePropertiesKey : @{}}, &wake_buf_) != kCVReturnSuccess)
+      return;
+    CVPixelBufferLockBaseAddress(wake_buf_, 0);
+    for (int p = 0; p < 2; p++)
+      memset(CVPixelBufferGetBaseAddressOfPlane(wake_buf_, p), p ? 128 : 16,
+             CVPixelBufferGetBytesPerRowOfPlane(wake_buf_, p) * CVPixelBufferGetHeightOfPlane(wake_buf_, p));
+    CVPixelBufferUnlockBaseAddress(wake_buf_, 0);
+  }
 
   MacVideoBackend* be_;
   CameraSpec spec_;
@@ -193,6 +234,10 @@ class MacCameraHandle : public CameraHandle, public FrameListener {
   bool started_ = false, paused_ = false, want_idr_ = false, want_refresh_ = false;
   int fps_ = 30;
   uint64_t parity_ = 0;  // fps 15: every other captured frame
+  bool submitted_real_ = false;
+  int woken_ = 0;
+  CVPixelBufferRef wake_buf_ = nullptr;
+  std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true);
   std::recursive_mutex sink_mu_;
   bool closed_ = false;
   // out_mu_: token map
@@ -246,11 +291,9 @@ class MacVideoBackend : public VideoBackend {
     }
     start_watching();
   }
-  std::vector<std::string> features() override {
-    std::vector<std::string> f{"camera_capture"};
-    if (dev_) f.push_back("camera_synth");
-    return f;
-  }
+  // camera_synth is added by the engine when the helper runs with --dev (helper.cpp, §3.1); `dev_` here only
+  // gates open_camera(test) as a second line behind the engine's bad_args.
+  std::vector<std::string> features() override { return {"camera_capture"}; }
   CameraSnapshot cameras() override { return camera_snapshot(); }
 
   void request_permission() override {
@@ -566,6 +609,7 @@ MacCameraHandle::~MacCameraHandle() {
     src = src_;
   }
   if (src) src->remove(this);  // no on_captured / on_source_event after this
+  *alive_ = false;               // no further wake
   if (timer_) {
     dispatch_source_cancel(timer_);
     dispatch_sync(timer_q_, ^{});
@@ -582,6 +626,7 @@ MacCameraHandle::~MacCameraHandle() {
   const int64_t t0 = now_ns();
   e.reset();  // VTCompressionSessionInvalidate
   note_stop_ms((now_ns() - t0) / 1e6);
+  if (wake_buf_) CVPixelBufferRelease(wake_buf_);
   {
     std::lock_guard<std::mutex> lk(src_mu_);
     src_.reset();  // the last stream on a camera stops its capture (async, camera_mac.mm)
@@ -652,6 +697,7 @@ void MacCameraHandle::on_captured(const Frame& f) {
   }
   std::string err;
   if (enc_->encode(pb, f.capture_ns, idr, refresh, acks, &err)) {
+    submitted_real_ = true;
     want_idr_ = false;
     if (refresh) want_refresh_ = false;
   } else {
@@ -698,6 +744,7 @@ std::unique_ptr<CameraHandle> MacVideoBackend::open_camera(const CameraSpec& spe
   if (f.w < 16 || f.h < 16 || f.w > 4096 || f.h > 4096 || (f.w & 1) || (f.h & 1))
     return fail("internal: bad output size " + std::to_string(f.w) + "x" + std::to_string(f.h));
   const int bitrate = spec.bitrate > 0 ? spec.bitrate : 2500000;
+  const int64_t capture_start = now_ns();  // camera_ms is measured from here (capture start -> first frame)
   std::shared_ptr<Source> src;
   if (!spec.test.empty()) {
     // The synthetic camera: no AVCaptureDevice, no permission read (§4.11, R2 #4).
@@ -735,7 +782,7 @@ std::unique_ptr<CameraHandle> MacVideoBackend::open_camera(const CameraSpec& spe
   }
   CameraSpec s = spec;
   s.bitrate = bitrate;
-  auto h = std::make_unique<MacCameraHandle>(this, s, sink, std::move(enc), src);
+  auto h = std::make_unique<MacCameraHandle>(this, s, sink, std::move(enc), src, capture_start);
   {
     std::lock_guard<std::mutex> lk(mu_);
     handles_.insert(h.get());

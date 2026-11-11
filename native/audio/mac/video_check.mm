@@ -11,7 +11,7 @@
 //   video_check ltr [--size WxH]               LTR token map across pause and set_format; refresh vs IDR
 //   video_check warm [--n N]                   cold / warm / standby open -> first AU
 //   video_check idle --mode session|prewarm --minutes 1,10,60
-//   video_check idlecost --mode session|none --minutes M
+//   video_check idlecost --mode session|prewarm|none --minutes M
 //   video_check guard [--disclaim]             real-camera open without permission fails `permission`, no prompt
 //
 // --disclaim re-runs the command in a child that is its own TCC responsible process (posix_spawn with
@@ -875,56 +875,69 @@ int cmd_idle(const std::string& mode, const std::vector<double>& minutes) {
   return 0;
 }
 
-// RSS / CPU of this process and of the VTEncoderXPCService instances serving it.
-struct ProcStat { double rss_mb = 0, cpu_s = 0; int n = 0; };
-ProcStat xpc_stat() {
+// RSS / footprint / CPU of VTEncoderXPCService instances (one per client process, spawned with its first
+// session): `only` limits it to the given pids (the instance that appeared with our standby session).
+struct ProcStat { double rss_mb = 0, phys_mb = 0, cpu_s = 0, energy_nj = 0; int n = 0; std::vector<pid_t> pids; };
+ProcStat xpc_stat(const std::set<pid_t>* only = nullptr) {
   ProcStat s;
   int cnt = proc_listpids(PROC_ALL_PIDS, 0, nullptr, 0);
   std::vector<pid_t> pids(cnt + 16);
   cnt = proc_listpids(PROC_ALL_PIDS, 0, pids.data(), (int)(pids.size() * sizeof(pid_t))) / sizeof(pid_t);
+  mach_timebase_info_data_t tb;
+  mach_timebase_info(&tb);
   for (int i = 0; i < cnt; i++) {
-    char name[PROC_PIDPATHINFO_MAXSIZE] = {0};
-    if (proc_name(pids[i], name, sizeof name) <= 0) continue;
-    if (strcmp(name, "VTEncoderXPCService") != 0) continue;
-    proc_taskinfo ti;
-    if (proc_pidinfo(pids[i], PROC_PIDTASKINFO, 0, &ti, sizeof ti) != sizeof ti) continue;
-    mach_timebase_info_data_t tb;
-    mach_timebase_info(&tb);
-    s.rss_mb += ti.pti_resident_size / 1048576.0;
-    s.cpu_s += (double)(ti.pti_total_user + ti.pti_total_system) * tb.numer / tb.denom / 1e9;
+    if (pids[i] <= 0 || (only && !only->count(pids[i]))) continue;
+    char name[2 * MAXCOMLEN + 1] = {0};
+    if (proc_name(pids[i], name, sizeof name) <= 0 || strcmp(name, "VTEncoderXPCService") != 0) continue;
+    rusage_info_v6 ri;
+    if (proc_pid_rusage(pids[i], RUSAGE_INFO_V6, (rusage_info_t*)&ri) != 0) continue;
+    s.rss_mb += ri.ri_resident_size / 1048576.0;
+    s.phys_mb += ri.ri_phys_footprint / 1048576.0;
+    s.cpu_s += (double)(ri.ri_user_time + ri.ri_system_time) * tb.numer / tb.denom / 1e9;
+    s.energy_nj += (double)ri.ri_energy_nj;
     s.n++;
+    s.pids.push_back(pids[i]);
   }
   return s;
 }
 
 int cmd_idlecost(const std::string& mode, double minutes) {
-  auto be = make_backend("standby=session");
+  auto be = make_backend(mode == "prewarm" ? "standby=prewarm" : "standby=session");
   sleep_ms(500);
   const ProcStat x0 = xpc_stat();
+  const std::set<pid_t> before(x0.pids.begin(), x0.pids.end());
   const double rss0 = rss_mb(), phys0 = phys_mb();
-  if (mode == "session") {
+  if (mode == "session" || mode == "prewarm") {  // prewarm: one session created and invalidated
     be->set_encoder_standby(EncoderStandby{true, VideoFormat{1280, 720, 30}, 2500000});
     sleep_ms(1500);
   }
-  const ProcStat x1 = xpc_stat();
+  std::set<pid_t> mine;
+  for (pid_t p : xpc_stat().pids) if (!before.count(p)) mine.insert(p);
+  std::string mine_s = "[";
+  for (pid_t p : mine) mine_s += (mine_s.size() > 1 ? "," : "") + std::to_string(p);
+  mine_s += "]";
+  out(J().str("ev", "idlecost_start").str("mode", mode).i("pid", getpid()).raw("xpc_pids", mine_s));
+  const ProcStat x1 = xpc_stat(&mine);
+  rusage_info_v6 me0;
+  proc_pid_rusage(getpid(), RUSAGE_INFO_V6, (rusage_info_t*)&me0);
   const double rss1 = rss_mb(), phys1 = phys_mb(), cpu1 = cpu_s();
   const int64_t t1 = now_ns();
-  std::vector<double> xrss;
-  const int steps = (int)(minutes * 6);
-  for (int i = 0; i < steps; i++) {
-    sleep_ms(10000);
-    xrss.push_back(xpc_stat().rss_mb);
-  }
-  const ProcStat x2 = xpc_stat();
+  const int steps = (int)std::lround(minutes * 6);
+  for (int i = 0; i < steps; i++) sleep_ms(10000);
+  const ProcStat x2 = xpc_stat(&mine);
+  rusage_info_v6 me1;
+  proc_pid_rusage(getpid(), RUSAGE_INFO_V6, (rusage_info_t*)&me1);
   const double wall = (now_ns() - t1) / 1e9;
   const double cpu = cpu_s() - cpu1;
-  out(J().str("ev", "idlecost").str("mode", mode).num("minutes", minutes, 1)
+  out(J().str("ev", "idlecost").str("mode", mode).num("minutes", wall / 60, 2)
           .num("self_rss_before_mb", rss0, 1).num("self_rss_standby_mb", rss1, 1).num("self_rss_end_mb", rss_mb(), 1)
           .num("self_phys_before_mb", phys0, 1).num("self_phys_standby_mb", phys1, 1).num("self_phys_end_mb", phys_mb(), 1)
           .num("self_cpu_pct", cpu / wall * 100, 4)
-          .i("xpc_before_n", x0.n).num("xpc_before_rss_mb", x0.rss_mb, 1).i("xpc_n", x2.n).num("xpc_rss_mb", x1.rss_mb, 1)
-          .num("xpc_rss_end_mb", x2.rss_mb, 1).num("xpc_cpu_pct", (x2.cpu_s - x1.cpu_s) / wall * 100, 4)
-          .b("standby_ready", mode == "session"));
+          .num("self_energy_mw", (double)(me1.ri_energy_nj - me0.ri_energy_nj) / wall / 1e6, 3)
+          .i("xpc_n", x2.n).num("xpc_rss_mb", x1.rss_mb, 1).num("xpc_rss_end_mb", x2.rss_mb, 1)
+          .num("xpc_phys_mb", x1.phys_mb, 1).num("xpc_phys_end_mb", x2.phys_mb, 1)
+          .num("xpc_cpu_pct", (x2.cpu_s - x1.cpu_s) / wall * 100, 4)
+          .num("xpc_energy_mw", (x2.energy_nj - x1.energy_nj) / wall / 1e6, 3));
   return 0;
 }
 

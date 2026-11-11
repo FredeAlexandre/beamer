@@ -23,7 +23,8 @@
 namespace beamer::audio {
 
 // `options`: ';'-separated words.
-//   dev                 the helper runs with --dev: the synthetic source is available (feature camera_synth)
+//   dev                 the helper runs with --dev: open_camera accepts CameraSpec.test (the engine announces
+//                       camera_synth and refuses `test` without --dev; this is the backend's own second check)
 //   standby=session     keep one idle VTCompressionSession while warm (§4.11, default)
 //   standby=prewarm     create + invalidate one session when warm sets (no idle session; §4.11 fallback)
 // Environment (tests/tuning only): BEAMER_VIDEO_STANDBY=session|prewarm overrides the option.
@@ -158,8 +159,9 @@ class Encoder {
   Encoder(const Encoder&) = delete;
   Encoder& operator=(const Encoder&) = delete;
   void set_output(std::function<void(const EncOut&)> out);  // output thread (VideoToolbox's)
+  // discard: a wake-up frame (see MacCameraHandle::wake): encoded, its output dropped inside the encoder
   bool encode(CVPixelBufferRef pb, uint64_t capture_ns, bool force_idr, bool refresh,
-              const std::vector<int64_t>& acked_tokens, std::string* err);
+              const std::vector<int64_t>& acked_tokens, std::string* err, bool discard = false);
   void flush();  // emits every pending frame
   bool set_bitrate(int bps);
   void set_fps(int fps);
