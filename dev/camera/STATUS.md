@@ -76,7 +76,7 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 - Map: camera glyph `web.camera.fill` reads like a pin at 11 pt -> `video.fill`; arrow lanes are not in the
   order of the tile rows (camera row on top, its arrow is the lower one).
 - `texts.py`: "denied" line should point to System Settings; name the preferred camera instead of "Default camera".
-- "Restart Windows to finish updating Beamer Camera." is wrong in the usual case (CW5): use "Close apps that use the
+- DONE: "Restart Windows to finish updating Beamer Camera." replaced by "Close apps that use the
   camera to finish updating Beamer Camera." (operator decision).
 - `win_app/vcam_install.py:91` hard-coded log string flagged by i18n coverage (CW9b).
 
