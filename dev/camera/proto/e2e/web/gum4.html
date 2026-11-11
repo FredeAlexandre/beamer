@@ -1,0 +1,126 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- C4: getUserMedia consumer for the end-to-end chain. Opens "Beamer Camera" and reads, on every delivered
+     frame (requestVideoFrameCallback), C1's code strip (frame number + Mac capture time, 80 blocks of W/80 px
+     on the top rows); frames without it are classified with C2's stamp (source pattern / placeholder) or
+     counted unreadable. Output: console lines, captured by the launcher from Chrome's stderr log:
+       C4F [[k, ts, t], ...]   per frame, batched: k = Mac frame number (>= 0), -1 pattern, -2 placeholder,
+                               -3 helper stamp, -9 unreadable; ts = strip time (Mac ns / 1e5, u32); t = unix us
+       C4C {...}               per open/close cycle;  C4K {...} clock check;  C4DONE
+     Query: ?mode=latency|cycles&w=1280&h=720&secs=600&n=20&hold=4&gap=3 -->
+<meta charset="utf-8"><title>C4 gum</title>
+<video id="v" muted playsinline></video><canvas id="c"></canvas>
+<script>
+const q = new URLSearchParams(location.search);
+const MODE = q.get("mode") || "latency", W = +(q.get("w") || 1280), H = +(q.get("h") || 720);
+const SECS = +(q.get("secs") || 30), N = +(q.get("n") || 20), HOLD = +(q.get("hold") || 4), GAP = +(q.get("gap") || 3);
+const log = (tag, o) => console.log(tag + " " + JSON.stringify(o));
+const nowUs = () => Math.round((performance.timeOrigin + performance.now()) * 1000);
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const B = Math.floor(W / 80), bw = Math.floor(W / 40), bh = Math.floor(H / 22), RH = Math.max(B, 3 * bh);
+const v = document.getElementById("v"), c = document.getElementById("c");
+c.width = W; c.height = RH;
+const g = c.getContext("2d", { willReadFrequently: true });
+let batch = [], cur = null, counting = false, gen = 0;
+
+function classify() {
+  g.drawImage(v, 0, 0, W, RH, 0, 0, W, RH);
+  const px = g.getImageData(0, 0, W, RH).data;
+  const lum = (x, y) => { const i = (y * W + x) * 4; return (px[i] + px[i + 1] + px[i + 2]) / 3; };
+  const by = new Array(10).fill(0);
+  for (let bit = 0; bit < 80; bit++) if (lum(bit * B + (B >> 1), B >> 1) >= 128) by[bit >> 3] |= 1 << (7 - (bit & 7));
+  let x = 0; for (let i = 1; i < 9; i++) x ^= by[i];
+  if (by[0] === 0xA5 && x === by[9]) {
+    const f = ((by[1] << 24) >>> 0) + (by[2] << 16) + (by[3] << 8) + by[4];
+    const ts = ((by[5] << 24) >>> 0) + (by[6] << 16) + (by[7] << 8) + by[8];
+    return [f, ts];
+  }
+  const rows = [0n, 0n, 0n];
+  for (let r = 0; r < 3; r++) for (let k = 0; k < 40; k++) rows[r] = (rows[r] << 1n) | (lum(k * bw + (bw >> 1), r * bh + (bh >> 1)) >= 128 ? 1n : 0n);
+  if ((rows[0] >> 32n) === 0xA5n && (rows[1] >> 32n) === 0x5An && (rows[2] >> 32n) === 0xC3n) {
+    const org = Number((rows[2] >> 24n) & 0xFFn);
+    return [-org, 0];
+  }
+  return [-9, 0];
+}
+
+const onFrame = (my) => () => {
+  if (!counting || my !== gen) return;
+  const t = nowUs();
+  const [k, ts] = classify();
+  batch.push([k, ts, t]);
+  if (cur) { if (!cur.first_any) cur.first_any = t; if (k >= 0 && !cur.first_mac) { cur.first_mac = t; cur.first_f = k; } }
+  if (batch.length >= 30) { log("C4F", batch); batch = []; }
+  v.requestVideoFrameCallback(onFrame(my));
+};
+
+async function findDevice() {
+  let devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+  let dev = devs.find(d => d.label.includes("Beamer Camera")), probe = "none";
+  if (!dev) {  // labels need a grant: try audio first (does not open the camera), then any camera
+    try { (await navigator.mediaDevices.getUserMedia({ audio: true })).getTracks().forEach(t => t.stop()); probe = "audio"; } catch (e) { }
+    devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+    dev = devs.find(d => d.label.includes("Beamer Camera"));
+  }
+  if (!dev) {
+    try { (await navigator.mediaDevices.getUserMedia({ video: true })).getTracks().forEach(t => t.stop()); probe = "video"; } catch (e) { }
+    devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+    dev = devs.find(d => d.label.includes("Beamer Camera"));
+  }
+  log("C4K", { probe, devices: devs.map(d => d.label), t: nowUs(), date_minus_perf_ms: Date.now() - (performance.timeOrigin + performance.now()) });
+  return dev;
+}
+
+async function open(dev) {
+  const t_call = nowUs();
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: dev.deviceId }, width: { exact: W }, height: { exact: H }, frameRate: 30 } });
+  const t_res = nowUs();
+  v.srcObject = stream;
+  await v.play();
+  counting = true;
+  gen++;
+  v.requestVideoFrameCallback(onFrame(gen));
+  return { stream, t_call, t_res };
+}
+
+async function close(stream) {
+  const t = nowUs();
+  counting = false;
+  stream.getTracks().forEach(tr => tr.stop());
+  v.srcObject = null;
+  if (batch.length) { log("C4F", batch); batch = []; }
+  return t;
+}
+
+(async () => {
+  const dev = await findDevice();
+  if (!dev) { log("C4C", { ok: false, error: "Beamer Camera not found" }); console.log("C4DONE"); return; }
+  if (MODE === "latency") {
+    cur = { c: 0 };
+    const o = await open(dev);
+    Object.assign(cur, { t_call: o.t_call, t_res: o.t_res });
+    const t_end = performance.now() + SECS * 1000;
+    while (performance.now() < t_end) {
+      await sleep(10000);
+      log("C4K", { t: nowUs(), date_minus_perf_ms: Date.now() - (performance.timeOrigin + performance.now()), settings: o.stream.getVideoTracks()[0].getSettings() });
+    }
+    cur.t_close = await close(o.stream);
+    log("C4C", Object.assign({ ok: true }, cur));
+  } else {
+    for (let i = 0; i < N; i++) {
+      cur = { c: i };
+      log("C4K", { t: nowUs(), date_minus_perf_ms: Date.now() - (performance.timeOrigin + performance.now()) });
+      const o = await open(dev);
+      Object.assign(cur, { t_call: o.t_call, t_res: o.t_res });
+      const t0 = performance.now();
+      while (!cur.first_mac && performance.now() - t0 < 10000) await sleep(5);
+      await sleep(HOLD * 1000);
+      cur.t_close = await close(o.stream);
+      cur.t_close_done = nowUs();
+      log("C4C", Object.assign({ ok: !!cur.first_mac }, cur));
+      await sleep(GAP * 1000);
+    }
+  }
+  console.log("C4DONE");
+})().catch(e => { log("C4C", { ok: false, error: String(e) }); console.log("C4DONE"); });
+</script>
