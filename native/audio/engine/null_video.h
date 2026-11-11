@@ -29,7 +29,8 @@ NullVideoBackend* as_null_video(VideoBackend* b);  // nullptr for real backends
 // Counters and records of both sides (encoder handles and the sink), for tests and `dev null_video report`.
 Json null_video_report(NullVideoBackend* nb);
 // Dev controls: {"perm":..., "vcam_in_use":bool, "want":{"w","h","fps"}, "install":..., "loaded_version":n,
-// "dec_err_ms":n, "decoder_errors":n (fail the next n decodes), "reset":true (zero the counters)}.
+// "dec_err_ms":n, "decoder_errors":n (fail the next n decodes), "reset":true (zero the counters),
+// "mark":true (report.mark.kept_after_ms = time to the next correct kept picture)}.
 bool null_video_set(NullVideoBackend* nb, const Json& j, std::string* err);
 
 }  // namespace beamer::audio

@@ -166,7 +166,8 @@ class NullVideoBackend : public VideoBackend {
            presented_ = 0, incorrect_presented_ = 0, backwards_ = 0, holds_ = 0, drops_ = 0, size_rejected_ = 0,
            present_unknown_ = 0, decoded_before_idr_ = 0;
   int last_w_ = 0, last_h_ = 0;
-  std::set<uint32_t> suspects_;          // kept, not correct, not yet revoked
+  std::set<uint32_t> suspects_;
+  int64_t mark_ns_ = 0, kept_after_mark_ns_ = 0;  // tests: first correct kept picture after a mark          // kept, not correct, not yet revoked
   uint64_t kept_wrong_at_decode_ = 0;
   int64_t first_present_ns_ = 0;
   std::vector<std::string> placeholders_shown_;
@@ -594,6 +595,7 @@ class NullSink : public VideoSinkHandle {
         be_->dec_frames_++;
         if (ok) be_->dec_ok_++;
         else be_->dec_err_++;
+        if (ok && j.keep && correct && be_->mark_ns_ && !be_->kept_after_mark_ns_) be_->kept_after_mark_ns_ = now_ns();
         if (ok && j.keep) {
           be_->kept_++;
           if (!correct) {
@@ -666,6 +668,8 @@ Json null_video_report(NullVideoBackend* b) {
                         {"holds", b->holds_}, {"drops", b->drops_}, {"present_unknown", b->present_unknown_},
                         {"w", b->last_w_}, {"h", b->last_h_}, {"placeholders", ph},
                         {"first_present_ns", b->first_present_ns_}}},
+              {"mark", {{"at_ns", b->mark_ns_}, {"kept_after_ms",
+                                                 b->kept_after_mark_ns_ ? Json(double(b->kept_after_mark_ns_ - b->mark_ns_) * 1e-6) : Json(nullptr)}}},
               {"vcam", {{"placeholder_cmds", b->n_placeholder_cmds_}, {"idle", b->idle_}, {"texts", b->texts_.size()}}}};
 }
 
@@ -707,6 +711,10 @@ bool null_video_set(NullVideoBackend* b, const Json& j, std::string* err) {
     if (jget_int(j, "cam_start_ms", &n)) b->opt_.cam_start_ms = int(n);
     if (jget_int(j, "cams", &n)) b->opt_.cams = int(std::max<int64_t>(0, std::min<int64_t>(16, n)));
     bool r;
+    if (jget_bool(j, "mark", &r) && r) {
+      b->mark_ns_ = now_ns();
+      b->kept_after_mark_ns_ = 0;
+    }
     if (jget_bool(j, "reset", &r) && r) {
       b->enc_idr_ = b->enc_refresh_ = b->enc_p_ = b->enc_frames_ = b->enc_number_mismatch_ = b->enc_ack_ = 0;
       b->enc_ack_bad_ = b->refresh_as_idr_ = b->start_encoding_ = 0;

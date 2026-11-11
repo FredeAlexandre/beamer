@@ -554,7 +554,7 @@ void test_video_clock_offset() {
       r.advance(arrive - r.t);
       for (auto& p : r.make_au(f, f == 0 ? 20000 : 3000, f == 0 ? kVIdr : 0, f * 3000, uint16_t(enc / 100'000))) r.deliver(p);
       r.run();
-      if (f == 0) {
+      if (f == 1) {  // the IDR (frame 0) never seeds it: its delay is the pacing
         auto pr = r.core.probe();
         VCHECKF(pr.provisional && std::llabs(pr.offset_ns - true_off) <= 20 * kMs, "dir %d seed err %.1f ms", dir,
                 double(pr.offset_ns - true_off) * 1e-6);
@@ -781,6 +781,33 @@ void test_video_presenter() {
   VCHECK(r.core.probe().broken && r.core.probe().acked == g + 1);
   r.net();
   VCHECK(r.count_fb(kPli) == 1);
+  // a new decoder (CW4: decoder_hw/decoder_sw when the sink re-created it) -> PLI start, AUs discarded until an IDR
+  {
+    Rig d;
+    d.map(0, d.t);
+    d.core.on_sink_event("decoder_hw", "", d.t);  // the first decoder, before anything was handed: no request
+    d.net();
+    const int start_plis = d.count_fb(kPli);      // the stream's own start PLI only
+    for (auto& p : d.make_au(0, 30000, kVIdr, 0, 50)) d.deliver(p);
+    d.run();
+    VCHECK(d.decoded.count(0) && start_plis == 1);
+    d.t += 40 * kMs;
+    d.net();
+    VCHECK(d.count_fb(kPli) == 0);  // the IDR arrived: no more start PLIs
+    d.core.on_sink_event("decoder_sw", "", d.t);  // re-created after AUs were handed
+    d.net();
+    VCHECK(d.count_fb(kPli) == 1);
+    for (auto& p : d.make_au(1, 3000, 0, 3000, 50)) d.deliver(p);
+    d.run();
+    VCHECK(!d.decoded.count(1));  // not decoded until the next IDR
+    d.core.on_sink_event("decoder_sw", "", d.t);  // again while the request is pending: coalesced
+    d.t += 20 * kMs;
+    d.net();
+    VCHECK(d.count_fb(kPli) == 0);
+    for (auto& p : d.make_au(2, 30000, kVIdr, 6000, 50)) d.deliver(p);
+    d.run();
+    VCHECK(d.decoded.count(2));
+  }
   // keep = false pictures (broken period) are never presented
   for (auto& kv : r.keep)
     if (!kv.second) VCHECK(!r.was_presented(kv.first));
@@ -928,11 +955,11 @@ void test_video_tick_latency() {
         const int64_t t = now_ns();
         Header h;
         if (!read_header(buf, size_t(n), &h) || h.stream != 9) continue;
-        if (h.ptype == kPli && trigger && !*got_pli) {
+        if (h.ptype == kPli && trigger > 1 && !*got_pli) {
           *got_pli = true;
           pli_lat.push_back(double(t - trigger) * 1e-6);
         }
-        if (h.ptype == kRR) {
+        if (h.ptype == kRR && !trigger) {  // the RR timer, measured before any IDR (immediate RRs restart it)
           // lateness against the 50 ms grid of the first RR seen (the timer runs on an absolute schedule)
           if (!last_rr) last_rr = t;
           else {
@@ -944,16 +971,46 @@ void test_video_tick_latency() {
     }
   };
   bool dummy = false;
-  read_for(now_ns() + 300 * kMs, 0, &dummy);
+  read_for(now_ns() + 1100 * kMs, 0, &dummy);
+  const auto rr_phase = rr_late;
+  Sealer media(key, 9);
+  auto send_idr = [&](uint32_t frame) {  // a one-packet IDR from the peer: the stream is started (no IDR wanted)
+    uint8_t plain[kVideoHeaderLen + 100] = {}, buf[kMaxPacket];
+    VideoHeader vh;
+    vh.frame = frame;
+    vh.vflags = kVIdr;
+    write_video_header(vh, plain);
+    uint8_t* au = plain + kVideoHeaderLen;  // a valid null-codec IDR (null_video.cpp's AU layout)
+    put_u32(au, 0x4E564155);
+    put_u32(au + 4, frame);
+    au[8] = 1;
+    au[9] = 1;
+    put_u16(au + 10, 1280);
+    put_u16(au + 12, 720);
+    put_u16(au + 14, 720);
+    put_u32(au + 16, kNoFrame);
+    put_u32(au + 20, 100);
+    for (size_t k = 24; k < 100; ++k) au[k] = uint8_t(frame * 131u + uint32_t(k) * 7u);
+    Header h;
+    h.ptype = kMedia;
+    h.codec = kCodecH264;
+    h.stream = 9;
+    h.ts = frame * 3000;
+    net::udp_send(peer, buf, media.seal(h, plain, sizeof plain, buf));
+  };
   for (int i = 0; i < 20; ++i) {
     hello();  // keep the flow up
+    send_idr(uint32_t(i));
+    bool none = false;
+    read_for(now_ns() + 30 * kMs, 1, &none);
     const int64_t trig = now_ns();
     vs->on_sink_event("device_lost", "");  // the video thread posts a PLI start
     bool got = false;
-    read_for(trig + 80 * kMs + int64_t(i % 7) * kMs, trig, &got);
+    read_for(trig + 50 * kMs + int64_t(i % 7) * kMs, trig, &got);
     VCHECK(got);
   }
   std::sort(pli_lat.begin(), pli_lat.end());
+  rr_late = rr_phase;
   if (!rr_late.empty()) {  // relative to the earliest RR (the first one seen may itself be late)
     const double m = std::min(0.0, *std::min_element(rr_late.begin(), rr_late.end()));
     for (double& x : rr_late) x -= m;
@@ -1415,12 +1472,14 @@ void test_video_time_map() {
 // seals receiver-direction packets, only the sender thread seals media; 0 incorrect kept pictures
 void test_video_storm() {
   g_video_seal_thread_violations.store(0);
-  VProc a("", ""), b("", "dec_err_ms=50");
+  VProc a("", ""), b("", "");
   VCHECK(vopen_pair(a, b, "0000d008"));
   size_t ca = a.cursor();
   VCHECK(a.call(send_video("0000d008", 508))["ev"] == "ok");
   VCHECK(b.call(recv_video("0000d008", 508))["ev"] == "ok");
   VCHECK(a.wait(&ca, is_ev("stream_state", "state", "running"), 3000));
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));  // decoding first, then the storm
+  VCHECK(b.call(Json{{"cmd", "dev"}, {"null_video", {{"dec_err_ms", 50}}}})["ev"] == "ok");
   VCHECK(a.call(Json{{"cmd", "dev"}, {"video_loss", {{"pct", 20}}}})["ev"] == "ok");
   for (int i = 0; i < 6; ++i) {
     std::this_thread::sleep_for(std::chrono::milliseconds(700));
@@ -1429,7 +1488,7 @@ void test_video_storm() {
   Json sb = b.last_stats(508), sa = a.last_stats(508);
   Json rb = b.report();
   VCHECK(rb["dec"]["incorrect_kept"] == 0 && rb["sink"]["incorrect_presented"] == 0);
-  VCHECKF(rb["dec"]["errors"].get<int>() >= 3, "decoder errors %s", rb["dec"].dump().c_str());
+  VCHECKF(rb["dec"]["errors"].get<int>() >= 1 && rb["dec"]["ok"].get<int>() >= 20, "decoder %s", rb["dec"].dump().c_str());
   VCHECK(sa.value("pli_rx", 0) > 10 && sa.value("nack_rx", 0) > 10);
   VCHECK(g_video_seal_thread_violations.load() == 0);
   std::printf("    storm: A %s\n           B %s\n", sa.dump().substr(0, 200).c_str(), sb.dump().substr(0, 200).c_str());

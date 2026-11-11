@@ -178,6 +178,7 @@ class VideoRecvCore {
   TimeMapBook map_{90000};
   bool provisional_ = false;
   int64_t prov_offset_ = 0;
+  int prov_samples_ = 0;
   PlayoutTarget playout_;
   double d_now_ms_ = 70;
   int64_t period_ns_ = 33'333'333;

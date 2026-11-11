@@ -125,6 +125,7 @@ void VideoRecvCore::revoke_from(uint32_t frame, std::vector<SinkAction>* acts) {
 
 void VideoRecvCore::need_idr(uint8_t reason, int64_t now) {
   started_ = false;
+  if (idr_wanted_) return;  // coalesced: the pending request (and its IDR, maybe already arriving) answers it
   idr_wanted_ = true;
   idr_reason_ = reason;
   idr_after_valid_ = have_any_;
@@ -136,6 +137,7 @@ void VideoRecvCore::need_idr(uint8_t reason, int64_t now) {
 }
 
 void VideoRecvCore::mark_lost(uint32_t frame, bool hole, int64_t now) {
+  (void)frame;
   lost_++;
   if (hole) holes_++;
   go_broken(kPliLoss, now);
@@ -148,11 +150,15 @@ void VideoRecvCore::complete_frame(uint32_t frame, Frame& f, int64_t now) {
   bool have_off;
   int64_t off = 0, age = 0;
   have_off = offset_source && offset_source(now, &off, &age);
-  if (!have_off && !provisional_) {
-    // stream completed its first frame before any pong (flow in link state): provisional offset, d = 20 ms
-    // (§4.5.3): offset = sender_ns + enc_delay + 20 ms - completion
-    prov_offset_ = map_.to_sender_ns(f.ts) + int64_t(f.enc_delay) * 100'000 + 20'000'000 - now;
+  if (!have_off && !(f.vflags & (kVIdr | kVBehindIdr)) && prov_samples_ < 30) {
+    // no pong yet (stream opened in link state): provisional offset assuming d = 20 ms (§4.5.3):
+    // offset = sender_ns + enc_delay + 20 ms - completion. Taken from frames that measure the network (not an
+    // IDR, nor one behind it: their delay is the deliberate pacing, ~240 ms on the link), and refined over the
+    // first 30 of them by keeping the least delayed one (the largest estimate), like a min-RTT pick.
+    const int64_t est = map_.to_sender_ns(f.ts) + int64_t(f.enc_delay) * 100'000 + 20'000'000 - now;
+    prov_offset_ = provisional_ ? std::max(prov_offset_, est) : est;
     provisional_ = true;
+    prov_samples_++;
   }
   int64_t out;
   if (!mapped_out(f, frame, now, &out)) return;
@@ -451,9 +457,17 @@ void VideoRecvCore::on_decoded(uint32_t frame, bool ok, double ms, int64_t now) 
 
 void VideoRecvCore::on_sink_event(const std::string& what, const std::string& detail, int64_t now) {
   std::lock_guard<std::mutex> lock(mu_);
-  if (what == "decoder_sw") decoder_ = "sw";
-  else if (what == "decoder_hw") decoder_ = "hw";
-  else if (what == "size_rejected") {
+  if (what == "decoder_sw" || what == "decoder_hw") {
+    decoder_ = what == "decoder_sw" ? "sw" : "hw";
+    // a new decoder is ready (§4.6.1): the AUs handed to the old one while it was re-created were discarded, so
+    // ask for an IDR (PLI start). Nothing handed since the last (re)start: the coming IDR reaches the new one.
+    if (started_) {
+      std::vector<SinkAction> drops;
+      revoke_from(0, &drops);
+      pending_.insert(pending_.end(), drops.begin(), drops.end());
+      need_idr(kPliStart, now);
+    }
+  } else if (what == "size_rejected") {
     auto& q = size_rejects_[detail];
     q.push_back(now);
     while (!q.empty() && now - q.front() > 10'000'000'000LL) q.pop_front();
@@ -650,7 +664,8 @@ void VideoRecvCore::pump(int64_t now, bool display_tick, std::vector<SinkAction>
 
 int64_t VideoRecvCore::next_video_deadline(int64_t now) const {
   std::lock_guard<std::mutex> lock(mu_);
-  int64_t d = std::min(now + 10'000'000, (last_tick_ ? last_tick_ : now) + kDisplayTickNs);
+  // packets and decoder results wake the thread; between them: the display tick and the next present time
+  int64_t d = (last_tick_ ? last_tick_ : now) + kDisplayTickNs;
   for (auto& kv : ready_) d = std::min(d, std::max(now, kv.second));
   return d;
 }
@@ -797,6 +812,7 @@ void VideoRecvStream::on_sink_event(const std::string& what, const std::string& 
 void VideoRecvStream::video_loop() {
   set_thread_name("beamer-audio-video");
   set_thread_interactive();
+  enable_fine_timers();  // Windows: 1 ms timer resolution (the pacer's schedule and the presenter need it)
   std::vector<SinkAction> acts;
   auto exec = [this](std::vector<SinkAction>& a) {
     if (frozen_.load()) {

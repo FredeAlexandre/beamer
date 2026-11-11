@@ -630,6 +630,7 @@ void VideoSendStream::send_au(Au& au, int64_t now) {
 void VideoSendStream::sender_loop() {
   set_thread_name("beamer-audio-vsend");
   set_thread_interactive();
+  enable_fine_timers();  // Windows: 1 ms timer resolution (the pacer's schedule and the presenter need it)
   flow_->pacer();  // created with the first video send stream
   int64_t last_idr_seen = 0;
   for (;;) {
@@ -639,7 +640,7 @@ void VideoSendStream::sender_loop() {
     int64_t now = now_ns();
     {
       std::unique_lock<std::mutex> lock(mu_);
-      int64_t wake = now + 10'000'000;
+      int64_t wake = now + 100'000'000;  // every timer below is explicit; AUs, feedback and the pacer notify
       {
         std::lock_guard<std::mutex> pl(pol_mu_);
         const int64_t t = rec_.next_timer();

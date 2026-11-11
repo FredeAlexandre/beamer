@@ -41,6 +41,12 @@
 
 using namespace beamer::audio;
 
+#if defined(_WIN32)  // MSVC names (the BA_HOWL_CLIPS reader below)
+#define popen _popen
+#define pclose _pclose
+#define strdup _strdup
+#endif
+
 static constexpr double M_PI_ = 3.14159265358979323846;
 
 #if defined(__has_feature)

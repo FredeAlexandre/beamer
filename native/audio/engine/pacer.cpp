@@ -86,6 +86,7 @@ size_t Pacer::queued_bytes(uint32_t stream) const {
 void Pacer::run() {
   set_thread_name("beamer-audio-pacer");
   set_thread_interactive();
+  enable_fine_timers();  // Windows: 1 ms timer resolution (the pacer's schedule and the presenter need it)
   std::unique_lock<std::mutex> lock(mu_);
   while (!stop_) {
     if (retx_.empty() && data_.empty()) {
