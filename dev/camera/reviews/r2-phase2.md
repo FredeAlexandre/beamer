@@ -79,7 +79,7 @@ right (#5, #6, #10, #11, #25), see the table.
   "Beamer Camera" title with no detail line for every state (P2:760).
 - **Fix**: move `placeholder_texts` into a CW1-owned pure module (e.g. `core/camera/texts.py`, scanned by
   i18n) with a `names: Callable[[str], str]` argument, add `peer_name(peer)` to `MediaContext` (the hosts
-  already have it: `mac_app/audio_mac.py:178`), state in §7.1 that the part sends `vcam placeholders` on every
+  already have it: `mac_app/audio_mac.py:174`), state in §7.1 that the part sends `vcam placeholders` on every
   `snapshot` change of the texts, and let CW7 only review wording.
 
 ### 4. MAJOR: the dev synthetic source is still gated on camera permission, so the E2E harness cannot run unattended
