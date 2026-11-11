@@ -42,8 +42,8 @@ function Compile([string]$src, [string]$tag, [string[]]$flags, [datetime]$hdrTim
     return $obj
 }
 
-function Link([string]$exe, [string[]]$objs) {
-    & link.exe /nologo /SUBSYSTEM:CONSOLE /MACHINE:X64 "/OUT:$exe" @objs @libs | ForEach-Object { Write-Host $_ }
+function Link([string]$exe, [string[]]$objs, [string[]]$extra = @()) {
+    & link.exe /nologo /SUBSYSTEM:CONSOLE /MACHINE:X64 "/OUT:$exe" @objs @libs @extra | ForEach-Object { Write-Host $_ }
     if ($LASTEXITCODE -ne 0) { throw "link failed: $exe" }
     # Static x64 exe: no MSVC runtime DLLs (vcruntime/msvcp/ucrt) may appear among its imports.
     $deps = & dumpbin.exe /nologo /dependents $exe | Where-Object { $_ -match '\.dll' } | ForEach-Object { $_.Trim() }
@@ -62,6 +62,18 @@ $backendObjs = @()
 foreach ($s in $backendSrc) { $backendObjs += Compile $s 'win' ($cxxFlags + $incEngine) $hdr }
 $checkObj = Compile (Join-Path $win 'backend_check.cpp') 'win' ($cxxFlags + $incEngine) $hdr
 Link (Join-Path $outDir 'backend_check.exe') ($backendObjs + @($checkObj))
+
+# ---------------------------------------------------------------- video sink (camera PHASE2 §4.6, CW4) + its harness
+# Media Foundation is delay-loaded: on Windows N without the Media Feature Pack mfplat.dll is absent, and the helper
+# must still start (audio); the video backend checks for it before any MF call. MFCreateVirtualCamera is resolved at
+# run time (mfsensorgroup.dll exports it only on Windows 11).
+$videoSrc = @('video_backend_win.cpp', 'videodec_win.cpp', 'vcam_win.cpp', 'placeholder_win.cpp', 'app_usage_win.cpp', 'vcam_install_win.cpp') | ForEach-Object { Join-Path $win $_ }
+$videoLibs = @('mfplat.lib', 'mf.lib', 'mfuuid.lib', 'mfreadwrite.lib', 'wmcodecdspuuid.lib', 'd3d11.lib', 'dxgi.lib', 'd2d1.lib', 'dwrite.lib', 'windowscodecs.lib', 'shlwapi.lib', 'version.lib', 'delayimp.lib', '/DELAYLOAD:mfplat.dll')
+$vhdr = NewestHeader @($win, $engine, (Join-Path $audio 'vcam-win'))
+$videoObjs = @()
+foreach ($s in $videoSrc) { $videoObjs += Compile $s 'win' ($cxxFlags + $incEngine) $vhdr }
+$vcheckObj = Compile (Join-Path $win 'video_check.cpp') 'win' ($cxxFlags + $incEngine) $vhdr
+Link (Join-Path $outDir 'video_check.exe') ($backendObjs + $videoObjs + @($vcheckObj)) $videoLibs
 if ($checkOnly) { exit 0 }
 
 # ---------------------------------------------------------------- engine + third party -> beamer-audio.exe
@@ -129,5 +141,19 @@ foreach ($s in $engineSrc) {
     elseif ($s -match '\.c$') { $engineObjs += Compile $s 'eng' ($cFlags + $inc) $engHdr }
     else { $engineObjs += Compile $s 'eng' ($cxxFlags + $inc) $engHdr }
 }
-$mainObj = Compile (Join-Path $win 'main.cpp') 'win' ($cxxFlags + $inc) $engHdr
-Link (Join-Path $outDir 'beamer-audio.exe') ($backendObjs + $engineObjs + $thirdObjs + @($mainObj))
+# run_helper(Backend&, VideoBackend*, ...) comes with CW2's engine: until it is there, main.cpp builds audio only.
+# The define is part of the object's tag, so main.obj is rebuilt when it flips.
+$helperVideo = Select-String -Path (Join-Path $engine 'helper.cpp') -Pattern 'VideoBackend' -Quiet
+$mainTag = if ($helperVideo) { 'winv' } else { 'win' }
+$mainDef = if ($helperVideo) { @('/DBEAMER_HELPER_VIDEO=1') } else { @('/DBEAMER_HELPER_VIDEO=0') }
+$mainObj = Compile (Join-Path $win 'main.cpp') $mainTag ($cxxFlags + $inc + $mainDef) (NewestHeader @($engine, $win, $third, (Join-Path $audio 'vcam-win')))
+Link (Join-Path $outDir 'beamer-audio.exe') ($backendObjs + $videoObjs + $engineObjs + $thirdObjs + @($mainObj)) $videoLibs
+
+# Beamer Camera's source DLL and its tools (CW5's script) -> build\win\camera\BeamerCameraSource.dll (§2.5).
+$vcamBuild = Join-Path $audio 'vcam-win\build.ps1'
+if (Test-Path $vcamBuild) {
+    & $vcamBuild
+    if (-not $?) { throw "vcam-win\build.ps1 failed" }
+} else {
+    Write-Host 'build-win: native\audio\vcam-win\build.ps1 not found (CW5 not merged yet): no camera DLL.'
+}
