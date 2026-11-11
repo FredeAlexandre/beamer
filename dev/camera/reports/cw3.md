@@ -82,7 +82,13 @@ right after open; the process had streamed once before):
 |---|---|---|---|---|
 | 1 min | 19.2 ms (`standby:0.0`) | 40.4 ms (`warm:1.2`) | 33.5 ms | 65.0 ms (`warm:4.2`) |
 | 10 min | 40.4 ms (`standby:0.0`) | 38.1 ms (`warm:1.7`) | 25.3 ms | 69.6 ms (`warm:5.0`) |
-| 60 min | IDLE60S | IDLE60P | OLD60S | OLD60P |
+| 60 min | 37.5 ms (`standby:0.0`) | 45.9 ms (`warm:5.4`) | 20.9 ms | 69.6 ms (`warm:19.3`) |
+
+One sample per cell. With the shipped code, the standby is 19-40 ms and pre-warm 38-46 ms at every idle length.
+The encoder wake narrowed the gap: it removed the idle-encoder penalty that cost pre-warm 65-70 ms before. In this
+`start_ms=0` case, the standby's first frame also waits behind the wake frame (Design notes). What the standby
+still saves is the session creation: 1-5 ms, and 19 ms once after 60 min idle. At equal idle memory (table
+above), that is why the standby ships.
 
 ### Real camera (agent-shell identity, T3 Code's grant; not H1)
 
