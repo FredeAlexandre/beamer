@@ -20,7 +20,12 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 
 ## En attente d'Alex
 
-(nothing yet)
+1. **Camera permission for the measurements on the real camera (C1, optional, ~3 min).** C1's request went out
+   in the name of T3 Code (the app agents run under); a prompt may be on the Mac's screen. Allowing it lets an
+   agent run `dev/camera/proto/mac/experiments/camera_suite.sh` (cold start, capture latency, sharing with
+   another app); revoke afterwards with `tccutil reset Camera com.t3tools.t3code`. Alternative: skip, and
+   measure once Beamer.app itself asks for Camera in Phase 2. Then, with someone present: cover the lens
+   (`experiments/low_light.sh`), toggle Video Effects in Control Center during a capture.
 
 ## How agents work here
 
@@ -34,7 +39,7 @@ folders `C:\Users\Alex\camera-<wp>\`, never in the PC clone. Reports land in `de
 
 | WP | What | Who / where | State |
 |---|---|---|---|
-| C1 | Mac capture + VideoToolbox H.264 low-latency encode, measures | Mac agent, `dev/camera/proto/mac/` | started 16:05 |
+| C1 | Mac capture + VideoToolbox H.264 low-latency encode, measures | Mac agent, `dev/camera/proto/mac/` | **done** (`ff6a921`), real-camera items blocked on permission: hardware low-latency encoder `h264.rtvc` 5.2/5.5 ms p50/p95 at 720p, ~2 % CPU, bitrate ±4 %; no periodic keyframes in low-latency mode -> recovery by LTR refresh (12-38 KB) on PC acks, forced keyframe 120 KB (720p) / 256 KB (1080p); bitrate change effective < 200 ms; recommends a video backend inside `beamer-audio` (same flow, audio can jump ahead of keyframes) |
 | C2 | Windows 11 virtual camera (`MFCreateVirtualCamera`) + H.264 decode + IPC from a user-session process | Mac agent driving the PC, `proto/win/`, PC `~\camera-c2` | started 16:05 |
 | C3 | Video over the Mac<->PC link: packetization, loss/keyframe recovery, Wi-Fi behaviour at 2-6 Mbit/s | Mac agent + PC peer, `proto/transport/`, PC `~\camera-c3` | started 16:05 |
 | C4 | End-to-end prototype chain, glass-to-glass latency (after C1-C3) | | not started |
