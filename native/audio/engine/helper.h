@@ -10,6 +10,7 @@
 
 #include "engine.h"
 #include "flow.h"
+#include "video_backend.h"
 
 namespace beamer::audio {
 
@@ -20,6 +21,7 @@ struct HelperOptions {
   std::vector<int64_t> exclude_pids;
   FlowTiming timing;
   int stats_period_ms = 1000;
+  VideoBackend* video = nullptr;  // camera PHASE2: null = no video (the helper behaves exactly as before)
 };
 
 struct HelperIo {

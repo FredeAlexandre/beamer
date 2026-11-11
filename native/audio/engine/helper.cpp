@@ -19,8 +19,11 @@
 #include "howl.h"
 #include "json.h"
 #include "null_backend.h"
+#include "null_video.h"
 #include "streams.h"
 #include "util.h"
+#include "video_recv.h"
+#include "video_send.h"
 
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -107,18 +110,36 @@ bool parse_device_ref(const Json& obj, std::string* key) {
   return true;
 }
 
-class Helper : public BackendListener {
+bool has_word(const std::vector<std::string>& v, const char* w) { return std::find(v.begin(), v.end(), w) != v.end(); }
+
+std::string fmt_str(const VideoFormat& f) {
+  return std::to_string(f.w) + "x" + std::to_string(f.h) + "@" + std::to_string(f.fps);
+}
+
+class Helper : public BackendListener, public VideoBackendListener {
  public:
-  Helper(Backend& backend, const HelperOptions& opt, EventSink* ev) : backend_(backend), opt_(opt), ev_(ev) {}
+  Helper(Backend& backend, const HelperOptions& opt, EventSink* ev) : backend_(backend), opt_(opt), ev_(ev), video_(opt.video) {
+    if (video_) video_features_ = video_->features();
+  }
 
   int run(const HelperIo& io) {
     backend_.set_listener(this);
+    if (video_) video_->set_listener(this);
     net_.start();
     const int restored = backend_.restore_journal();
+    std::vector<std::string> features = engine_features(backend_);
+    if (video_) {
+      // camera PHASE2 §3.1: video1 (engine has §4) + the backend's words (+ camera_synth with --dev)
+      features.push_back("video1");
+      for (auto& w : video_features_) features.push_back(w);
+      if (opt_.dev && has_word(video_features_, "camera_capture")) features.push_back("camera_synth");
+    }
     ev_->emit(Json{{"ev", "ready"}, {"proto", kControlProto}, {"version", kEngineVersion},
-                   {"platform", kPlatform}, {"features", engine_features(backend_)}, {"restored", restored}});
+                   {"platform", kPlatform}, {"features", features}, {"restored", restored}});
     emit_devices(true);
     emit_permission(true);
+    if (video_ && has_word(video_features_, "camera_capture")) emit_cameras();
+    if (video_ && has_word(video_features_, "virtual_camera")) vcam_refresh(nullptr);
     last_stats_ns_ = now_ns();
 
     // stdin reader (may outlive this object when detached: it posts through ReaderState only)
@@ -181,6 +202,7 @@ class Helper : public BackendListener {
     if (io.detach_reader) reader.detach();
     else reader.join();
     backend_.set_listener(nullptr);
+    if (video_) video_->set_listener(nullptr);
     return 0;
   }
 
@@ -193,6 +215,29 @@ class Helper : public BackendListener {
   }
   void stream_lost(StreamHandle* h, const std::string& why) override {
     post([this, h, why] { on_stream_lost(h, why); });
+  }
+  // VideoBackendListener (any backend thread)
+  void cameras_changed() override {
+    post([this] { emit_cameras(); });
+  }
+  void vcam_changed() override {
+    post([this] { emit_vcam(false); });
+  }
+  void permission_changed() override {
+    post([this] {
+      emit_permission(false);
+      if (has_word(video_features_, "camera_capture")) emit_cameras();
+    });
+  }
+  void camera_lost(CameraHandle* h, const std::string& why) override {
+    post([this, h, why] {
+      for (auto& kv : streams_)
+        if (kv.second.vsend && kv.second.vsend->owns_camera(h)) {
+          BA_WARN("video stream %u lost its camera: %s", kv.first, why.c_str());
+          stop_stream(kv.first, "no_camera");
+          return;
+        }
+    });
   }
 
  private:
@@ -207,6 +252,9 @@ class Helper : public BackendListener {
     std::shared_ptr<RecvStream> recv;
     std::shared_ptr<LoopStream> loop;
     std::string flow;
+    std::shared_ptr<VideoSendStream> vsend;
+    std::shared_ptr<VideoRecvStream> vrecv;
+    bool video() const { return vsend || vrecv; }
   };
 
   void post(std::function<void()> f) {
@@ -294,6 +342,26 @@ class Helper : public BackendListener {
       quit_ = true;
     } else if (cmd == "dev" && opt_.dev) {
       cmd_dev(j, req);
+    } else if (cmd == "video_config") {
+      cmd_video_config(j, req);
+    } else if (cmd == "video_warm") {
+      cmd_video_warm(j, req);
+    } else if (cmd == "video_link") {
+      cmd_video_link(j, req);
+    } else if (cmd == "cameras") {
+      need_video();
+      emit_cameras();
+      ok(req);
+    } else if (cmd == "permission_request") {
+      std::string what;
+      if (!jget_str(j, "what", &what) || what != "camera") throw CmdError{"bad_args", "what: camera"};
+      need_video();
+      if (!has_word(video_features_, "camera_capture")) throw CmdError{"unsupported", "no camera capture here"};
+      ok(req);
+      video_->request_permission();  // the answer comes as a `permission` event
+      next_cam_perm_ns_ = now_ns();
+    } else if (cmd == "vcam") {
+      cmd_vcam(j, req);
     } else {
       throw CmdError{"unknown_cmd", cmd};
     }
@@ -407,7 +475,272 @@ class Helper : public BackendListener {
     return c;
   }
 
+  void need_video() {
+    if (!video_) throw CmdError{"unsupported", "no video backend"};
+  }
+
+  // codec object of a video send/recv (§4.3)
+  void parse_video_codec(const Json& j, int* w, int* h, int* fps, int* bitrate, bool* ltr) {
+    *w = 1280;
+    *h = 720;
+    *fps = 30;
+    *bitrate = 2'500'000;
+    *ltr = true;
+    auto it = j.find("codec");
+    if (it == j.end() || it->is_null()) return;
+    if (!it->is_object()) throw CmdError{"bad_args", "codec"};
+    std::string name;
+    if (jget_str(*it, "name", &name) && name != "h264") throw CmdError{"unsupported", "codec " + name};
+    int64_t v;
+    if (jget_int(*it, "w", &v)) {
+      if (v < 2 || v > 4096 || (v & 1)) throw CmdError{"bad_args", "codec.w"};
+      *w = int(v);
+    }
+    if (jget_int(*it, "h", &v)) {
+      if (v < 2 || v > 4096 || (v & 1)) throw CmdError{"bad_args", "codec.h"};
+      *h = int(v);
+    }
+    if (jget_int(*it, "fps", &v)) {
+      if (v < 1 || v > 60) throw CmdError{"bad_args", "codec.fps"};
+      *fps = int(v);
+    }
+    if (jget_int(*it, "bitrate", &v)) {
+      if (v < 50'000 || v > 50'000'000) throw CmdError{"bad_args", "codec.bitrate"};
+      *bitrate = int(v);
+    }
+    if (jget_int(*it, "mtu", &v) && (v < 600 || v > 1500)) throw CmdError{"bad_args", "codec.mtu"};
+    jget_bool(*it, "ltr", ltr);
+  }
+
+  void cmd_send_video(const Json& j, const Json& req) {
+    need_video();
+    VideoSendStream::Config cfg;
+    if (!parse_stream_id(j, &cfg.id)) throw CmdError{"bad_args", "stream"};
+    check_new_stream(cfg.id);
+    auto f = flow_of(j);
+    if (!parse_key(j, "key", cfg.key)) throw CmdError{"bad_args", "key: base64 of 32 bytes"};
+    int w, h, fps, br;
+    bool ltr;
+    parse_video_codec(j, &w, &h, &fps, &br, &ltr);
+    cfg.spec.fmt = VideoFormat{w, h, fps};
+    cfg.spec.bitrate = br;
+    cfg.spec.ltr = ltr;
+    cfg.fps = fps;
+    auto src = j.find("source");
+    if (src != j.end() && src->is_object()) {
+      std::string test;
+      if (jget_str(*src, "test", &test)) {
+        if (!opt_.dev) throw CmdError{"bad_args", "source.test needs --dev"};
+        if (test.rfind("synth", 0) != 0 || test.size() > 64) throw CmdError{"bad_args", "source.test: synth[:WxH][;start_ms=N]"};
+        cfg.spec.test = test;
+      } else if (!parse_device_ref_field(*src, "camera", &cfg.spec.device)) {
+        throw CmdError{"bad_args", "source.camera"};
+      }
+    } else if (src != j.end() && !src->is_null()) {
+      throw CmdError{"bad_args", "source"};
+    }
+    auto lk = j.find("link");
+    if (lk != j.end() && lk->is_object()) {
+      int64_t v;
+      if (jget_int(*lk, "bitrate", &v) && v >= 50'000 && v <= 50'000'000) cfg.link_bitrate = int(v);
+      if (jget_int(*lk, "fps", &v) && v >= 1 && v <= 60) cfg.link_fps = int(v);
+    }
+    cfg.idr_pace_x = idr_pace_x_;
+    if (opt_.dev) {
+      int64_t v;  // tests: the camera-on guards' timings
+      if (jget_int(j, "dev_no_pli_ms", &v) && v > 0) cfg.no_pli_ns = v * 1'000'000;
+      if (jget_int(j, "dev_no_feedback_ms", &v) && v > 0) cfg.no_feedback_ns = v * 1'000'000;
+    }
+    auto s = std::make_shared<VideoSendStream>(cfg, f, ev_, [this](uint32_t id, const std::string& code) {
+      post([this, id, code] {
+        auto it = streams_.find(id);
+        if (it != streams_.end() && it->second.vsend) stop_stream(id, code);
+      });
+    });
+    f->attach_video_send(s);
+    std::string code, msg;
+    if (!s->start(*video_, &code, &msg)) {
+      f->detach(cfg.id);
+      s->stop();
+      ev_->emit(Json{{"ev", "stream_state"}, {"stream", cfg.id}, {"state", "failed"}, {"device", nullptr}, {"error", code}});
+      throw CmdError{code, msg};
+    }
+    Entry e;
+    e.base = s;
+    e.vsend = s;
+    e.flow = f->id();
+    streams_[cfg.id] = e;
+    ok(req);
+    const std::string dev = s->device_in_use();
+    ev_->emit(Json{{"ev", "stream_state"}, {"stream", cfg.id}, {"state", "starting"},
+                   {"device", dev.empty() ? Json(nullptr) : Json(dev)}});
+  }
+
+  void cmd_recv_video(const Json& j, const Json& req) {
+    need_video();
+    VideoRecvStream::Config cfg;
+    if (!parse_stream_id(j, &cfg.id)) throw CmdError{"bad_args", "stream"};
+    check_new_stream(cfg.id);
+    auto f = flow_of(j);
+    if (!parse_key(j, "key", cfg.key)) throw CmdError{"bad_args", "key: base64 of 32 bytes"};
+    int br;
+    bool ltr;
+    parse_video_codec(j, &cfg.w, &cfg.h, &cfg.fps, &br, &ltr);
+    auto sink = j.find("sink");
+    bool vc = false;
+    if (sink == j.end() || !sink->is_object() || !jget_bool(*sink, "virtual_camera", &vc) || !vc)
+      throw CmdError{"bad_args", "sink must be {\"virtual_camera\": true}"};
+    cfg.floor_ms = playout_floor_ms_;
+    auto s = std::make_shared<VideoRecvStream>(cfg, f, ev_, [this](uint32_t id, const std::string& code, const std::string& detail) {
+      post([this, id, code, detail] {
+        auto it = streams_.find(id);
+        if (it != streams_.end() && it->second.vrecv) stop_stream(id, code, detail);
+      });
+    }, &lipsync_);
+    std::string code, msg;
+    if (!s->start(*video_, &code, &msg)) {
+      s->stop();
+      ev_->emit(Json{{"ev", "stream_state"}, {"stream", cfg.id}, {"state", "failed"}, {"device", nullptr}, {"error", code}});
+      throw CmdError{code, msg};
+    }
+    f->attach_video_recv(s);
+    Entry e;
+    e.base = s;
+    e.vrecv = s;
+    e.flow = f->id();
+    streams_[cfg.id] = e;
+    ok(req);
+    ev_->emit(Json{{"ev", "stream_state"}, {"stream", cfg.id}, {"state", "running"}, {"device", "vcam"}});
+  }
+
+  std::shared_ptr<VideoSendStream> vsend_of(const Json& j) {
+    uint32_t id;
+    if (!parse_stream_id(j, &id)) throw CmdError{"bad_args", "stream"};
+    auto it = streams_.find(id);
+    if (it == streams_.end()) throw CmdError{"unknown_stream", std::to_string(id)};
+    if (!it->second.vsend) throw CmdError{"bad_args", "not a video send stream"};
+    return it->second.vsend;
+  }
+
+  void cmd_video_config(const Json& j, const Json& req) {
+    auto s = vsend_of(j);
+    int64_t w = 0, h = 0, fps = 0, br = 0;
+    if (j.contains("w") && (!jget_int(j, "w", &w) || w < 2 || w > 4096 || (w & 1))) throw CmdError{"bad_args", "w"};
+    if (j.contains("h") && (!jget_int(j, "h", &h) || h < 2 || h > 4096 || (h & 1))) throw CmdError{"bad_args", "h"};
+    if (j.contains("fps") && (!jget_int(j, "fps", &fps) || fps < 1 || fps > 60)) throw CmdError{"bad_args", "fps"};
+    if (j.contains("bitrate") && (!jget_int(j, "bitrate", &br) || br < 50'000 || br > 50'000'000))
+      throw CmdError{"bad_args", "bitrate"};
+    s->configure(int(w), int(h), int(fps), int(br));
+    ok(req);
+  }
+
+  void cmd_video_warm(const Json& j, const Json& req) {
+    need_video();
+    EncoderStandby sb;
+    if (!jget_bool(j, "on", &sb.on)) throw CmdError{"bad_args", "on"};
+    int64_t v;
+    if (jget_int(j, "w", &v)) sb.fmt.w = int(v);
+    if (jget_int(j, "h", &v)) sb.fmt.h = int(v);
+    if (jget_int(j, "bitrate", &v)) sb.bitrate = int(v);
+    if (sb.on && (sb.fmt.w < 2 || sb.fmt.h < 2 || sb.fmt.w > 4096 || sb.fmt.h > 4096)) throw CmdError{"bad_args", "w/h"};
+    video_->set_encoder_standby(sb);
+    ok(req);
+  }
+
+  void cmd_video_link(const Json& j, const Json& req) {
+    auto s = vsend_of(j);
+    bool paused = false, have_p = jget_bool(j, "paused", &paused);
+    std::vector<uint32_t> dropped;
+    auto d = j.find("dropped");
+    if (d != j.end()) {
+      if (!d->is_array() || d->size() > 1024) throw CmdError{"bad_args", "dropped"};
+      for (auto& x : *d) {
+        if (!x.is_number_unsigned()) throw CmdError{"bad_args", "dropped: frame numbers"};
+        dropped.push_back(x.get<uint32_t>());
+      }
+    }
+    s->link_control(have_p ? &paused : nullptr, dropped);
+    ok(req);
+  }
+
+  void cmd_vcam(const Json& j, const Json& req) {
+    need_video();
+    if (!has_word(video_features_, "virtual_camera")) throw CmdError{"unsupported", "no virtual camera here"};
+    auto ph = j.find("placeholders");
+    std::string idle = vcam_idle_;
+    jget_str(j, "idle", &idle);
+    if (ph != j.end() && !ph->is_null()) {
+      if (!ph->is_object() || ph->size() > 16) throw CmdError{"bad_args", "placeholders"};
+      std::map<std::string, Placeholder> texts;
+      for (auto it = ph->begin(); it != ph->end(); ++it) {
+        if (!it.value().is_object()) throw CmdError{"bad_args", "placeholders." + it.key()};
+        Placeholder p;
+        jget_str(it.value(), "title", &p.title);
+        jget_str(it.value(), "line", &p.line);
+        if (p.title.size() > 256 || p.line.size() > 256) throw CmdError{"bad_args", "placeholder text too long"};
+        texts[it.key()] = p;
+      }
+      vcam_texts_ = texts;
+    }
+    if (idle.size() > 32) throw CmdError{"bad_args", "idle"};
+    if ((ph != j.end() && !ph->is_null()) || idle != vcam_idle_) {
+      vcam_idle_ = idle;
+      video_->vcam_placeholders(vcam_texts_, vcam_idle_);
+    }
+    bool enable;
+    const bool have_enable = jget_bool(j, "enable", &enable);
+    vcam_refresh(have_enable ? &enable : nullptr);
+    ok(req);
+  }
+
+  // Every `vcam` command (and `ready`) re-reads the install state and, when it is ok and the camera is not
+  // present, creates/Starts it (async in the backend); always answers with a fresh `vcam` event (§3.2, §4.6.5).
+  void vcam_refresh(const bool* enable) {
+    VcamState v = video_->vcam();
+    std::string err;
+    if (enable && !*enable) {
+      if (!video_->vcam_enable(false, &err)) BA_WARN("vcam disable: %s", err.c_str());
+    } else if (v.install == "ok" && !v.present && !v.creating) {
+      if (!video_->vcam_enable(true, &err)) BA_WARN("vcam enable: %s", err.c_str());
+    }
+    emit_vcam(true);
+  }
+
+  void emit_vcam(bool force) {
+    if (!video_ || !has_word(video_features_, "virtual_camera")) return;
+    VcamState v = video_->vcam();
+    Json ev{{"ev", "vcam"}, {"install", v.install}, {"dll_version", v.dll_version}, {"loaded_version", v.loaded_version},
+            {"bundled_version", v.bundled_version}, {"present", v.present}, {"creating", v.creating}, {"in_use", v.in_use},
+            {"app", v.app.empty() ? Json(nullptr) : Json(v.app)},
+            {"want", v.in_use && v.want.w > 0 ? Json{{"w", v.want.w}, {"h", v.want.h}, {"fps", v.want.fps}} : Json(nullptr)},
+            {"error", v.error.empty() ? Json(nullptr) : Json(v.error)}};
+    std::string text = ev.dump();
+    if (force || text != last_vcam_) {
+      last_vcam_ = text;
+      ev_->emit(ev);
+    }
+  }
+
+  void emit_cameras() {
+    if (!video_) return;
+    CameraSnapshot c = video_->cameras();
+    Json cams = Json::array();
+    for (size_t i = 0; i < c.cameras.size() && i < 16; ++i) {
+      auto& x = c.cameras[i];
+      Json nat = Json::array();
+      for (size_t k = 0; k < x.native.size() && k < 16; ++k) nat.push_back(fmt_str(x.native[k]));
+      cams.push_back(Json{{"key", x.key}, {"name", x.name}, {"transport", x.transport}, {"native", nat}, {"preferred", x.preferred}});
+    }
+    ev_->emit(Json{{"ev", "cameras"}, {"cameras", cams}, {"preferred", c.preferred.empty() ? Json(nullptr) : Json(c.preferred)},
+                   {"permission", c.permission.empty() ? "unknown" : c.permission}});
+  }
+
   void cmd_send(const Json& j, const Json& req) {
+    std::string kind;
+    if (jget_str(j, "kind", &kind) && kind == "video") {
+      cmd_send_video(j, req);
+      return;
+    }
     SendStream::Config cfg;
     if (!parse_stream_id(j, &cfg.id)) throw CmdError{"bad_args", "stream"};
     check_new_stream(cfg.id);
@@ -429,6 +762,7 @@ class Helper : public BackendListener {
       throw CmdError{"bad_args", "source"};
     }
     jget_bool(j, "mute_local", &cfg.mute_local);
+    jget_bool(j, "sr", &cfg.sr);  // camera §4.2: (ts, capture time) pairs into the flow's time map
     parse_aec(j, &cfg);
     auto s = std::make_shared<SendStream>(cfg, f);
     std::string code, msg;
@@ -440,7 +774,7 @@ class Helper : public BackendListener {
       throw CmdError{code, msg};
     }
     s->zero_since_ns = now_ns();
-    streams_[cfg.id] = Entry{s, s, nullptr, nullptr, f->id()};
+    streams_[cfg.id] = Entry{s, s, nullptr, nullptr, f->id(), nullptr, nullptr};
     ok(req);
     emit_running(*s);
   }
@@ -472,6 +806,11 @@ class Helper : public BackendListener {
   }
 
   void cmd_recv(const Json& j, const Json& req) {
+    std::string kind;
+    if (jget_str(j, "kind", &kind) && kind == "video") {
+      cmd_recv_video(j, req);
+      return;
+    }
     RecvStream::Config cfg;
     if (!parse_stream_id(j, &cfg.id)) throw CmdError{"bad_args", "stream"};
     check_new_stream(cfg.id);
@@ -493,7 +832,7 @@ class Helper : public BackendListener {
       throw CmdError{code, msg};
     }
     f->attach_recv(s);
-    streams_[cfg.id] = Entry{s, nullptr, s, nullptr, f->id()};
+    streams_[cfg.id] = Entry{s, nullptr, s, nullptr, f->id(), nullptr, nullptr};
     ok(req);
     emit_running(*s);
   }
@@ -518,7 +857,7 @@ class Helper : public BackendListener {
       throw CmdError{code, msg};
     }
     s->zero_since_ns = now_ns();
-    streams_[id] = Entry{s, nullptr, nullptr, s, ""};
+    streams_[id] = Entry{s, nullptr, nullptr, s, "", nullptr, nullptr};
     ok(req);
     emit_running(*s);
   }
@@ -560,6 +899,72 @@ class Helper : public BackendListener {
     if (jget_bool(j, "reset_stats", &b) && b)
       for (auto& kv : streams_)
         if (kv.second.recv) kv.second.recv->reset_run_stats();
+    // ---- video (camera PHASE2 §3.2)
+    auto vl = j.find("video_loss");
+    if (vl != j.end() && vl->is_object()) {
+      double pct = 0, burst = 0;
+      jget_num(*vl, "pct", &pct);
+      jget_num(*vl, "burst", &burst);
+      if (pct < 0 || pct > 100 || burst < 0 || burst > 1000) throw CmdError{"bad_args", "video_loss"};
+      for (auto& f : targets) {
+        f->dev_video_loss.store(pct / 100.0);
+        f->dev_video_burst.store(burst);
+      }
+    }
+    int64_t iv;
+    if (jget_int(j, "video_drop_ms", &iv)) {
+      if (iv < 0 || iv > 60000) throw CmdError{"bad_args", "video_drop_ms"};
+      for (auto& f : targets) f->dev_video_drop_until.store(now_ns() + iv * 1'000'000);
+    }
+    if (jget_int(j, "video_drop_pk", &iv)) {
+      if (iv < 0 || iv > 100000) throw CmdError{"bad_args", "video_drop_pk"};
+      for (auto& f : targets) f->dev_video_drop_pk.store(iv);
+    }
+    if (jget_int(j, "video_drop_au", &iv)) {
+      if (iv < 0 || iv > 1000) throw CmdError{"bad_args", "video_drop_au"};
+      for (auto& kv : streams_)
+        if (kv.second.vsend && (fid.empty() || kv.second.flow == fid)) kv.second.vsend->dev_drop_au(int(iv));
+    }
+    if (jget_int(j, "video_stall_ms", &iv)) {  // tests: stall the sender thread (forced queue backlog)
+      if (iv < 0 || iv > 10000) throw CmdError{"bad_args", "video_stall_ms"};
+      for (auto& kv : streams_)
+        if (kv.second.vsend && (fid.empty() || kv.second.flow == fid)) kv.second.vsend->dev_stall_ms(int(iv));
+    }
+    if (jget_int(j, "video_stall_nopause_ms", &iv)) {  // tests: the same without backpressure (hard cap)
+      if (iv < 0 || iv > 10000) throw CmdError{"bad_args", "video_stall_nopause_ms"};
+      for (auto& kv : streams_)
+        if (kv.second.vsend && (fid.empty() || kv.second.flow == fid)) kv.second.vsend->dev_stall_ms(int(iv), false);
+    }
+    if (jget_bool(j, "log_time_map", &b))
+      for (auto& f : targets) f->dev_log_time_map.store(b);
+    if (jget_bool(j, "vcam_kill_beat", &b))  // the presenter stops calling the sink: no heartbeat
+      for (auto& kv : streams_)
+        if (kv.second.vrecv) kv.second.vrecv->set_frozen(b);
+    if (jget_num(j, "idr_pace_x", &d)) {
+      if (d < 2.0 || d > 6.0) throw CmdError{"bad_args", "idr_pace_x: 2.0..6.0"};
+      idr_pace_x_ = d;
+      for (auto& kv : streams_)
+        if (kv.second.vsend) kv.second.vsend->set_idr_pace_x(d);
+    }
+    if (jget_num(j, "playout_floor_ms", &d)) {
+      if (d < 20 || d > 150) throw CmdError{"bad_args", "playout_floor_ms: 20..150"};
+      playout_floor_ms_ = d;
+      for (auto& kv : streams_)
+        if (kv.second.vrecv) kv.second.vrecv->set_floor_ms(d);
+    }
+    if (jget_num(j, "sync_offset_ms", &d)) {
+      if (d < 0 || d > 150) throw CmdError{"bad_args", "sync_offset_ms: 0..150"};
+      lipsync_.set_override_ms(d);
+    }
+    auto nv = j.find("null_video");
+    if (nv != j.end() && nv->is_object()) {
+      NullVideoBackend* n = video_ ? as_null_video(video_) : nullptr;
+      if (!n) throw CmdError{"unsupported", "not the null video backend"};
+      std::string err;
+      if (!null_video_set(n, *nv, &err)) throw CmdError{"bad_args", err};
+      bool rep;
+      if (jget_bool(*nv, "report", &rep) && rep) ev_->emit(Json{{"ev", "null_video"}, {"report", null_video_report(n)}});
+    }
     auto nb = j.find("null");
     if (nb != j.end() && nb->is_object()) {
       NullBackend* n = as_null_backend(&backend_);
@@ -578,7 +983,7 @@ class Helper : public BackendListener {
                    {"device", dev.empty() ? Json(nullptr) : Json(dev)}});
   }
 
-  void stop_stream(uint32_t id, const std::string& error_code) {
+  void stop_stream(uint32_t id, const std::string& error_code, const std::string& detail = "") {
     auto it = streams_.find(id);
     if (it == streams_.end()) return;
     Entry e = it->second;
@@ -586,9 +991,14 @@ class Helper : public BackendListener {
     auto fit = flows_.find(e.flow);
     if (fit != flows_.end()) fit->second->detach(id);
     e.base->stop();
+    if (e.vsend) {
+      Json cev;
+      if (e.vsend->take_camera_event(&cev)) ev_->emit(cev);  // `camera` stopped
+    }
     Json ev{{"ev", "stream_state"}, {"stream", id}, {"state", error_code.empty() ? "stopped" : "failed"},
             {"device", nullptr}};
     if (!error_code.empty()) ev["error"] = error_code;
+    if (!detail.empty()) ev["detail"] = detail;
     ev_->emit(ev);
   }
 
@@ -614,10 +1024,18 @@ class Helper : public BackendListener {
   // `permission` after ready and whenever a backend notification finds it changed (a prompt answered).
   void emit_permission(bool force) {
     const std::string mic = backend_.permission("mic"), sys = backend_.permission("system_audio");
-    if (!force && mic == last_perm_mic_ && sys == last_perm_sys_) return;
+    std::string cam;
+    if (video_ && has_word(video_features_, "camera_capture")) {
+      cam = video_->cameras().permission;
+      if (cam.empty()) cam = "unknown";
+    }
+    if (!force && mic == last_perm_mic_ && sys == last_perm_sys_ && cam == last_perm_cam_) return;
     last_perm_mic_ = mic;
     last_perm_sys_ = sys;
-    ev_->emit(Json{{"ev", "permission"}, {"mic", mic}, {"system_audio", sys}});
+    last_perm_cam_ = cam;
+    Json ev{{"ev", "permission"}, {"mic", mic}, {"system_audio", sys}};
+    if (!cam.empty()) ev["camera"] = cam;
+    ev_->emit(ev);
   }
 
   void emit_devices(bool force) {
@@ -666,6 +1084,15 @@ class Helper : public BackendListener {
     }
     // permission "suspect": a mic capture that delivered digital zero for 5 s. Not for system
     // sound: a silent machine's tap is digital zero too.
+    // camera: `camera` events of video send streams; an undetermined camera permission re-read every 2 s
+    for (auto& kv : streams_) {
+      Json cev;
+      if (kv.second.vsend && kv.second.vsend->take_camera_event(&cev)) ev_->emit(cev);
+    }
+    if (last_perm_cam_ == "undetermined" && now >= next_cam_perm_ns_) {
+      next_cam_perm_ns_ = now + 2'000'000'000LL;
+      emit_permission(false);
+    }
     for (auto& kv : streams_) {
       StreamBase& s = *kv.second.base;
       const bool mic = (kv.second.send && kv.second.send->kind() == "mic") || kv.second.loop;
@@ -718,6 +1145,7 @@ class Helper : public BackendListener {
   void drain_meters() {
     Acc a;
     for (auto& kv : streams_) {
+      if (kv.second.video()) continue;
       kv.second.base->meter.drain(&a.sumsq, &a.peak, &a.frames);
       kv.second.base->device_meter.drain(&a.sumsq, &a.peak, &a.frames);
       if (kv.second.loop) kv.second.loop->out_meter.drain(&a.sumsq, &a.peak, &a.frames);
@@ -729,6 +1157,7 @@ class Helper : public BackendListener {
     std::map<std::string, Acc> in, out;
     Json streams = Json::object();
     for (auto& kv : streams_) {
+      if (kv.second.video()) continue;
       StreamBase& s = *kv.second.base;
       Acc sa;
       s.meter.drain(&sa.sumsq, &sa.peak, &sa.frames);
@@ -831,7 +1260,15 @@ class Helper : public BackendListener {
   bool meter_on_ = false;
   int64_t meter_period_ns_ = 100'000'000, next_levels_ns_ = 0, last_stats_ns_ = 0;
   double last_cpu_s_ = 0;
-  std::string last_perm_mic_, last_perm_sys_;
+  std::string last_perm_mic_, last_perm_sys_, last_perm_cam_;
+  // video
+  VideoBackend* video_ = nullptr;
+  std::vector<std::string> video_features_;
+  std::map<std::string, Placeholder> vcam_texts_;
+  std::string vcam_idle_ = "waiting", last_vcam_;
+  double idr_pace_x_ = 4.0, playout_floor_ms_ = 50.0;
+  LipSyncHold lipsync_;
+  int64_t next_cam_perm_ns_ = 0;
 };
 
 // ------------------------------------------------------------------ command line
@@ -840,6 +1277,7 @@ void usage() {
   fprintf(stderr,
           "usage: beamer-audio --control --parent-pid <pid> --state-dir <dir> --exclude-pid <pid>\n"
           "                    [--dev] [--log-level debug|info|warn] [--backend null:<options>]\n"
+          "                    [--video null:<options> | --no-video]\n"
           "       beamer-audio list | restore | version   [--backend null:<options>]\n");
 }
 
@@ -874,7 +1312,9 @@ int run_control(Backend& backend, const HelperOptions& opt, const HelperIo& io) 
   return h.run(io);
 }
 
-int run_helper(Backend& given, int argc, char** argv) {
+int run_helper(Backend& given, int argc, char** argv) { return run_helper(given, nullptr, argc, argv); }
+
+int run_helper(Backend& given, VideoBackend* given_video, int argc, char** argv) {
 #if defined(_WIN32)
   _setmode(_fileno(stdin), _O_BINARY);
   _setmode(_fileno(stdout), _O_BINARY);
@@ -883,8 +1323,8 @@ int run_helper(Backend& given, int argc, char** argv) {
 #endif
   HelperOptions opt;
   bool control = false;
-  std::string mode, null_opts;
-  bool use_null = false;
+  std::string mode, null_opts, null_video_opts;
+  bool use_null = false, use_null_video = false, no_video = false;
   for (int i = 1; i < argc; ++i) {
     std::string a = argv[i];
     auto next = [&](const char* what) -> std::string {
@@ -910,6 +1350,16 @@ int run_helper(Backend& given, int argc, char** argv) {
       }
       use_null = true;
       null_opts = b.size() > 5 ? b.substr(5) : "";
+    } else if (a == "--video") {
+      std::string v = next("--video");
+      if (v.rfind("null", 0) != 0) {
+        fprintf(stderr, "warn: unknown video backend %s\n", v.c_str());
+        return 2;
+      }
+      use_null_video = true;
+      null_video_opts = v.size() > 5 ? v.substr(5) : "";
+    } else if (a == "--no-video") {
+      no_video = true;
     } else if (a == "list" || a == "restore" || a == "version") mode = a;
     else if (a == "--help" || a == "-h") {
       usage();
@@ -921,6 +1371,9 @@ int run_helper(Backend& given, int argc, char** argv) {
   std::unique_ptr<Backend> null_backend;
   if (use_null) null_backend = make_null_backend(null_opts);
   Backend& backend = use_null ? *null_backend : given;
+  std::unique_ptr<VideoBackend> null_video;
+  if (use_null_video && !no_video) null_video = make_null_video_backend(null_video_opts);
+  opt.video = no_video ? nullptr : (null_video ? null_video.get() : given_video);
 
   if (mode == "version") {
     write_stdout_line(Json{{"version", kEngineVersion}, {"proto", kControlProto}, {"platform", kPlatform},

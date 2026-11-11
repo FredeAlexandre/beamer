@@ -55,44 +55,13 @@ size_t Sealer::seal(Header h, const uint8_t* payload, size_t len, uint8_t* out) 
   return kHeaderLen + len + kTagLen;
 }
 
-bool ReplayWindow::fresh(uint64_t seq) const {
-  if (seq == 0) return false;
-  if (seq > hi_) return true;
-  uint64_t d = hi_ - seq;
-  if (d >= static_cast<uint64_t>(kReplayWindow)) return false;
-  return !((bits_[d >> 6] >> (d & 63)) & 1);
-}
-
-void ReplayWindow::mark(uint64_t seq) {
-  if (seq > hi_) {
-    uint64_t s = seq - hi_;
-    if (s >= 128) {
-      bits_[0] = bits_[1] = 0;
-    } else if (s >= 64) {
-      bits_[1] = bits_[0] << (s - 64);
-      bits_[0] = 0;
-    } else if (s > 0) {
-      bits_[1] = (bits_[1] << s) | (bits_[0] >> (64 - s));
-      bits_[0] <<= s;
-    }
-    bits_[0] |= 1;
-    hi_ = seq;
-  } else {
-    uint64_t d = hi_ - seq;
-    if (d < 128) bits_[d >> 6] |= uint64_t(1) << (d & 63);
-  }
-}
-
-OpenResult open_packet(const uint8_t key[kKeyLen], uint32_t dir_stream, ReplayWindow* window,
-                       const uint8_t* data, size_t len, Header* h, uint8_t* payload_out,
-                       size_t* payload_len) {
+OpenResult open_packet_auth(const uint8_t key[kKeyLen], uint32_t dir_stream, const uint8_t* data, size_t len,
+                            Header* h, uint8_t* payload_out, size_t* payload_len) {
   if (len < kMinPacket || len > kMaxPacket || !read_header(data, len, h)) return OpenResult::Rejected;
-  if (window && !window->fresh(h->seq)) return OpenResult::Replayed;
   uint8_t nonce[kNonceLen];
   make_nonce(dir_stream, h->seq, nonce);
   if (!aead_open(key, nonce, data, kHeaderLen, data + kHeaderLen, len - kHeaderLen, payload_out))
     return OpenResult::Rejected;
-  if (window) window->mark(h->seq);
   *payload_len = len - kMinPacket;
   return OpenResult::Ok;
 }

@@ -2,6 +2,9 @@
 // One UDP flow per directly linked peer (§4.2, §4.5): probing, ping/pong, receiver reports,
 // replay protection, link fallback. All packet reception and timers run on the network thread
 // (NetLoop); encoder threads send media through send_media().
+// Camera (camera PHASE2 §4.2-4.5, §4.10): video streams on the same flow; the network thread is the only
+// sealer of receiver-direction video packets (RR, NACK, PLI) and of the flow's time map; a flow-owned pacer
+// sends video media through send_video(); the clock offset is estimated continuously from the pongs.
 #pragma once
 
 #include <atomic>
@@ -11,6 +14,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <random>
 #include <string>
 #include <thread>
 #include <vector>
@@ -18,11 +22,31 @@
 #include "events.h"
 #include "net.h"
 #include "packet.h"
+#include "pacer.h"
+#include "sync.h"
+#include "video_packet.h"
 
 namespace beamer::audio {
 
 class RecvStream;
 class SendStream;
+class VideoRecvStream;
+class VideoSendStream;
+
+// Wakes NetLoop::run from any thread: a loopback UDP socket connected to itself, in the poll set (§4.2).
+class Waker {
+ public:
+  Waker() = default;
+  ~Waker();
+  bool open();
+  void wake();   // any thread; coalesced
+  void drain();  // network thread
+  net::Socket sock() const { return sock_; }
+
+ private:
+  net::Socket sock_ = net::kInvalid;
+  std::atomic<bool> pending_{false};
+};
 
 constexpr uint16_t kDefaultAnswerPort = 24823;
 
@@ -67,6 +91,8 @@ class Flow {
   void link_in(std::vector<std::vector<uint8_t>>&& packets);
   void attach_recv(const std::shared_ptr<RecvStream>& s);
   void attach_send(const std::shared_ptr<SendStream>& s);
+  void attach_video_recv(const std::shared_ptr<VideoRecvStream>& s);
+  void attach_video_send(const std::shared_ptr<VideoSendStream>& s);  // creates the pacer
   void detach(uint32_t stream_id);
   void start();  // emits the initial flow_state
 
@@ -79,6 +105,28 @@ class Flow {
   double rtt_ms() const { return rtt_ms_.load(std::memory_order_relaxed); }  // < 0: unknown
   std::atomic<bool> dev_drop_udp{false};
   std::atomic<double> dev_loss{0.0};  // fraction of media packets dropped at send (dev)
+  // ---- video (camera PHASE2)
+  // Feedback (video RR, NACK, PLI, time map): UDP always, plus the link outbox in link state (§4.2, §4.10).
+  void send_feedback(const uint8_t* pkt, size_t len) { send_media(pkt, len); }
+  // Pacer thread: one video media packet. UDP when up; in link state only frame-tagged link_out events
+  // ({"video":true,"frame":N,"end":bool}, <= 4 packets of one frame each). Applies the dev video drops.
+  void send_video(const PacedPacket& p);
+  Pacer* pacer();                   // created on first use
+  Pacer* pacer_if_any();
+  // Clock offset (§4.5.3): peer clock minus ours, min-RTT pong of the last 10; false before the first pong.
+  bool clock_offset(int64_t now, int64_t* offset_ns, int64_t* age_ns) const { return offset_.get(now, offset_ns, age_ns); }
+  void wake() {
+    Waker* w = waker_.load(std::memory_order_acquire);
+    if (w) w->wake();
+  }
+  void set_waker(Waker* w) { waker_.store(w, std::memory_order_release); }
+  std::atomic<double> dev_video_loss{0.0};      // fraction of video packets dropped at send
+  std::atomic<double> dev_video_burst{0.0};     // mean burst (packets); 0 = iid, else Gilbert
+  std::atomic<int64_t> dev_video_drop_until{0}; // drop all video until this now_ns()
+  std::atomic<int64_t> dev_video_drop_pk{0};    // drop the next n video media packets (kept in the history)
+  std::atomic<bool> dev_log_time_map{false};    // time_map events for every entry sent or received
+  std::atomic<uint64_t> n_video_tx{0}, n_video_dev_dropped{0}, n_video_link_events{0}, n_time_map_tx{0},
+      n_time_map_rx{0};
   std::atomic<uint64_t> n_rejected{0}, n_replayed{0}, n_unknown{0}, n_udp_rx{0}, n_link_rx{0},
       n_udp_tx{0}, n_link_tx{0}, n_link_dropped{0}, n_rr_tx{0};
 
@@ -102,6 +150,9 @@ class Flow {
   bool udp_send_raw(const uint8_t* pkt, size_t len);
   void send_rr(int64_t now);
   void flush_link_out();
+  void video_tick(int64_t now);
+  void send_time_map(int64_t now);
+  void emit_video_event(uint32_t stream, uint32_t frame, std::vector<std::string>&& p, bool end);
 
   const std::string id_, peer_;
   const bool offerer_;
@@ -131,9 +182,29 @@ class Flow {
   int n_rtts_ = 0;
   size_t rr_rr_ = 0;  // round-robin index for receiver reports
 
-  std::mutex streams_mu_;
+  mutable std::mutex streams_mu_;
   std::map<uint32_t, std::shared_ptr<RecvStream>> recv_;
   std::map<uint32_t, std::shared_ptr<SendStream>> send_;
+  std::map<uint32_t, std::shared_ptr<VideoRecvStream>> vrecv_;
+  std::map<uint32_t, std::shared_ptr<VideoSendStream>> vsend_;
+
+  // video: clock offset (written by the network thread), time map (network thread), link events (pacer thread)
+  OffsetEstimator offset_;
+  struct TmState {
+    bool first_sent = false;
+    int64_t second_at = 0;
+  };
+  std::map<uint32_t, TmState> tm_state_;
+  int64_t next_tm_ = 0;
+  std::atomic<Waker*> waker_{nullptr};
+  std::mutex vlink_mu_;
+  struct VEvent {
+    uint32_t frame = 0;
+    std::vector<std::string> p;
+  };
+  std::map<uint32_t, VEvent> vpending_;
+  bool gilbert_bad_ = false;  // pacer thread
+  std::mt19937 vrng_{12345};
 
   mutable std::mutex link_mu_;
   std::vector<std::vector<uint8_t>> inbox_;
@@ -143,9 +214,14 @@ class Flow {
   std::mutex closed_mu_;
   std::condition_variable closed_cv_;
   bool closed_ = false;
+
+  std::mutex pacer_mu_;
+  std::unique_ptr<Pacer> pacer_;  // last: destroyed first (its thread calls send_video)
 };
 
-// The network thread: poll over all flow sockets (2 ms), timers, link queues.
+// The network thread: poll over all flow sockets and the waker, timers, link queues. It sleeps until the
+// earliest Flow::next_deadline (2 ms in link mode or before the remote is set, up to 10 ms while a flow is up,
+// sooner for video timers); a packet, or a Waker::wake() from another thread, ends the wait at once.
 class NetLoop {
  public:
   NetLoop() = default;
@@ -164,6 +240,7 @@ class NetLoop {
   std::thread thread_;
   std::atomic<bool> stop_{false};
   bool running_ = false;
+  Waker waker_;
 };
 
 }  // namespace beamer::audio

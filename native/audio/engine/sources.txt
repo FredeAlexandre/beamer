@@ -14,11 +14,17 @@ howl.cpp
 jitter.cpp
 net.cpp
 null_backend.cpp
+null_video.cpp
+pacer.cpp
 packet.cpp
 resampler.cpp
 streams.cpp
+sync.cpp
 test_signal.cpp
 util.cpp
+video_packet.cpp
+video_recv.cpp
+video_send.cpp
 ../third_party/monocypher-4.0.2/src/monocypher.c
 ../third_party/speexdsp-1.2.1/libspeexdsp/mdf.c
 ../third_party/speexdsp-1.2.1/libspeexdsp/preprocess.c

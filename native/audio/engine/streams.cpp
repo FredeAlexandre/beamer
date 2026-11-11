@@ -259,12 +259,19 @@ void SendStream::encode_frame(const float* pcm_in, std::uniform_real_distributio
   h.channels = static_cast<uint8_t>(C);
   size_t len = sealer_.seal(h, payload, static_cast<size_t>(n), pkt);
   frames_.fetch_add(1, std::memory_order_relaxed);
+  if (cfg_.sr) {
+    // capture time of this frame's first sample: now minus what is still buffered behind it (camera §4.2;
+    // CW10 refines with the device latency)
+    const int64_t behind = static_cast<int64_t>(ring_.available()) + frame_;
+    tm_.publish(ts, now_ns() - behind * 1'000'000'000LL / kRate);
+  }
   double loss = flow_->dev_loss.load(std::memory_order_relaxed);
   if (loss > 0 && uni(rng_) < loss) {
     dev_dropped_.fetch_add(1, std::memory_order_relaxed);
     return;
   }
   flow_->send_media(pkt, len);
+  if (cfg_.sr && first_tx_ns_.load(std::memory_order_relaxed) == 0) first_tx_ns_.store(now_ns(), std::memory_order_relaxed);
   tx_.fetch_add(1, std::memory_order_relaxed);
   tx_bytes_.fetch_add(len + 28, std::memory_order_relaxed);
 }
@@ -431,6 +438,9 @@ void RecvStream::on_render(float* out, int frames, int channels, uint64_t) {
 void RecvStream::publish() {
   const JbCounters& c = jb_.counters();
   const auto R = std::memory_order_relaxed;
+  if (jb_.playing())  // camera §4.9: ts being rendered ~ newest ts - JB level
+    render_ts_.publish(jb_.newest_ts32() - static_cast<uint32_t>(std::max(0.0, jb_.last_level_ms()) * kRate / 1000.0),
+                       now_ns());
   level_ms_.store(jb_.last_level_ms(), R);
   target_ms_.store(jb_.target_ms(), R);
   ppm_.store(jb_.ppm(), R);

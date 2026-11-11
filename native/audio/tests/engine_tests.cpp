@@ -34,8 +34,10 @@
 #include "resampler.h"
 #include "spsc.h"
 #include "streams.h"
+#include "null_video.h"
 #include "test_signal.h"
 #include "util.h"
+#include "video_backend.h"
 
 using namespace beamer::audio;
 
@@ -53,7 +55,7 @@ static constexpr double M_PI_ = 3.14159265358979323846;
 #define SANITIZED 0
 #endif
 
-static int g_checks = 0, g_failures = 0;
+int g_checks = 0, g_failures = 0;  // shared with video_tests.cpp
 static std::string g_vectors = "native/audio/tests/vectors";
 static std::string g_golden = "native/audio/tests/golden_control.txt";
 
@@ -747,12 +749,15 @@ static void test_spsc_threads() {
 
 class InProc {
  public:
-  explicit InProc(const std::string& null_opts, FlowTiming timing = FlowTiming()) {
+  // video_opts: null = no video backend (the helper as before), else the null video backend's options
+  explicit InProc(const std::string& null_opts, FlowTiming timing = FlowTiming(), const char* video_opts = nullptr) {
     backend_ = make_null_backend(null_opts);
+    if (video_opts) video_ = make_null_video_backend(video_opts);
     HelperOptions opt;
     opt.dev = true;
     opt.timing = timing;
     opt.stats_period_ms = 500;
+    opt.video = video_.get();
     HelperIo io;
     io.read_line = [this](std::string* l) {
       std::unique_lock<std::mutex> lock(imu_);
@@ -825,6 +830,7 @@ class InProc {
 
  private:
   std::unique_ptr<Backend> backend_;
+  std::unique_ptr<VideoBackend> video_;
   std::thread thread_;
   std::mutex imu_, omu_;
   std::condition_variable icv_, ocv_;
@@ -1066,7 +1072,8 @@ static Json substitute(const Json& j, const std::map<std::string, Json>& vars) {
 static void test_golden_control() {
   std::ifstream f(g_golden);
   CHECKF(f.good(), "cannot open %s", g_golden.c_str());
-  InProc a("vmic=absent"), b("");
+  // both helpers with the null video backend (camera PHASE2 §3 additions)
+  InProc a("vmic=absent", FlowTiming(), "cam_start_ms=5"), b("", FlowTiming(), "");
   std::map<char, InProc*> h{{'A', &a}, {'B', &b}};
   std::map<char, size_t> cur{{'A', 0}, {'B', 0}};
   std::map<std::string, Json> vars{{"FK", b64key(9)}, {"SK1", b64key(1)}, {"SK2", b64key(2)}};
@@ -1110,7 +1117,8 @@ static void test_golden_control() {
     }
   }
   for (const char* c : {"devices", "flow_open", "flow_remote", "flow_close", "link_in", "send", "recv", "loop",
-                        "stop", "meter", "test_input", "ping", "quit"})
+                        "stop", "meter", "test_input", "ping", "quit", "video_config", "video_warm", "video_link",
+                        "cameras", "permission_request", "vcam"})
     CHECKF(covered.count(c), "golden session does not cover %s", c);
   std::printf("    %d commands, %zu kinds\n", cmds, covered.size());
 }
@@ -1935,6 +1943,8 @@ struct Case {
   const char* name;
   void (*fn)();
 };
+// camera PHASE2 §10.2: video cases live in video_tests.cpp
+const Case* video_test_cases(size_t* n);
 
 int main(int argc, char** argv) {
   std::vector<std::string> filters;
@@ -1982,8 +1992,12 @@ int main(int argc, char** argv) {
       {"howl_false_alarm_release", test_howl_false_alarm_release},
       {"howl_event", test_howl_event},
   };
+  std::vector<Case> all(std::begin(cases), std::end(cases));
+  size_t nv = 0;
+  const Case* vc = video_test_cases(&nv);
+  all.insert(all.end(), vc, vc + nv);
   int run = 0;
-  for (const Case& c : cases) {
+  for (const Case& c : all) {
     if (!filters.empty() &&
         std::none_of(filters.begin(), filters.end(), [&](const std::string& f) { return std::strstr(c.name, f.c_str()); }))
       continue;

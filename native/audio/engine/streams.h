@@ -19,6 +19,7 @@
 #include "packet.h"
 #include "resampler.h"
 #include "spsc.h"
+#include "sync.h"
 #include "test_signal.h"
 #include "util.h"
 
@@ -69,6 +70,7 @@ class SendStream : public StreamBase, public CaptureSink {
     bool mute_local = false;
     bool aec = false;          // mic only: echo cancellation against aec_opt.reference (§7)
     AecOptions aec_opt;
+    bool sr = false;           // camera §4.2: (ts, capture time) pairs go into the flow's time map
   };
   SendStream(const Config& cfg, std::shared_ptr<Flow> flow);
   ~SendStream() override;
@@ -84,6 +86,10 @@ class SendStream : public StreamBase, public CaptureSink {
   void on_capture(const float* interleaved, int frames, int channels, uint64_t host_ns) override;
   // network thread
   OpenResult ingest_rr(const uint8_t* data, size_t len, int64_t now);
+  // time map (camera §4.2, §4.9): the latest (ts, capture now_ns) pair, published when `sr` is set
+  bool sr() const { return cfg_.sr; }
+  bool time_map_pair(uint32_t* ts, int64_t* ns) const { return tm_.read(ts, ns); }
+  int64_t first_tx_ns() const { return first_tx_ns_.load(std::memory_order_relaxed); }
 
  private:
   void encoder_loop();
@@ -123,6 +129,8 @@ class SendStream : public StreamBase, public CaptureSink {
   std::atomic<int64_t> test_t0_ns_{0};  // dev test source: now_ns() of its sample 0 (E2E timeline)
   std::unique_ptr<HowlGuard> howl_;     // encoder thread: ducks system sound that feeds back
   uint64_t last_tx_ = 0, last_tx_bytes_ = 0;
+  PairPublisher tm_;                    // camera §4.2 time map (encoder thread -> network thread)
+  std::atomic<int64_t> first_tx_ns_{0};
 };
 
 // ------------------------------------------------------------------ recv
@@ -153,6 +161,13 @@ class RecvStream : public StreamBase, public RenderSource {
   bool media_recent(int64_t now) const;
   // network thread: seal a receiver report (stream key, receiver direction). Returns length.
   size_t make_rr(uint8_t* out);
+  // camera §4.9 lip-sync data (policy: CW10). The time map of this stream (network thread), and the ts of the
+  // sample being rendered (render thread, approximated as newest ts - JB level) + the render latency beyond the
+  // JB (0 until a backend reports it).
+  void on_time_map(uint32_t ts, uint64_t sender_ns) { tm_rx_.publish(ts, static_cast<int64_t>(sender_ns)); }
+  bool time_map_pair(uint32_t* ts, int64_t* ns) const { return tm_rx_.read(ts, ns); }
+  bool render_ts(uint32_t* ts, int64_t* at_ns) const { return render_ts_.read(ts, at_ns); }
+  std::atomic<double> render_latency_ms{0.0};
 
  private:
   void publish();  // IO thread: counters -> atomics
@@ -165,6 +180,7 @@ class RecvStream : public StreamBase, public RenderSource {
   // network thread
   ReplayWindow window_;
   Sealer rr_sealer_;
+  PairPublisher tm_rx_, render_ts_;
   uint64_t hi_seq_ = 0;
   std::atomic<int64_t> last_media_ns_{0};
   std::atomic<uint32_t> newest_ts_{0};

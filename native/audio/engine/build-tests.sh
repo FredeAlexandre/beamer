@@ -74,7 +74,7 @@ for s in $(grep -v '^\s*#' "$HERE/sources.txt" | grep -v '^\s*$'); do
   case "$s" in *speexdsp-*.c) kind=S ;; *.c) kind=E ;; esac
   if [ ! -f "$o" ] || [ "$HERE/$s" -nt "$o" ] || [ "$NEWEST_HDR" -nt "$o" ]; then echo "$kind|$HERE/$s|$o" >> "$JOBLIST"; fi
 done
-for s in engine_tests.cpp null_main.cpp; do
+for s in engine_tests.cpp video_tests.cpp null_main.cpp; do
   o="$OBJ/tests/${s%.cpp}.o"
   if [ ! -f "$o" ] || [ "$ROOT/tests/$s" -nt "$o" ] || [ "$NEWEST_HDR" -nt "$o" ]; then echo "X|$ROOT/tests/$s|$o" >> "$JOBLIST"; fi
 done
@@ -100,7 +100,7 @@ EOF
 fi
 
 LINK="$CXX $COMMON $SAN"
-$LINK -o "$OUT/engine_tests" "$OBJ/tests/engine_tests.o" "${ENGINE_OBJS[@]}" "${OBJS[@]}" -lpthread
+$LINK -o "$OUT/engine_tests" "$OBJ/tests/engine_tests.o" "$OBJ/tests/video_tests.o" "${ENGINE_OBJS[@]}" "${OBJS[@]}" -lpthread
 $LINK -o "$OUT/beamer-audio-null" "$OBJ/tests/null_main.o" "${ENGINE_OBJS[@]}" "${OBJS[@]}" -lpthread
 echo "built $OUT/engine_tests and $OUT/beamer-audio-null"
 
