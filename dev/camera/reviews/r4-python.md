@@ -250,7 +250,7 @@ not warn about that. `vcam-install` from account B likewise overwrites the `Owne
 - Otherwise only `vcam-remove` this user's camera.
 - Say in the uninstaller that cameras may pause for about a second.
 
-### 8. minor: a refusal of a peer's close is reported as a camera error on the source
+### 8. minor: a sink's normal close (route, demand, shutdown) is shown as a camera error on the source
 
 **Where**: `core/camera/part.py:452-463` together with `_compose_snapshot` (`part.py:966-972`).
 
@@ -268,7 +268,7 @@ instead of marking it failed. Keep the failure path for `error`, `helper` and `n
 
 - **Sharing switch cannot be set from outside the Mac.** `set_sharing` is reachable only from the local
   service queue (page row, menu, dev file). `_on_camera_devices` ignores a list that describes its own
-  machine, except to raise `own_rev` (`part.py:364-369`). `self._machines` never holds a peer's version of
+  machine, except to raise `own_rev` (`part.py:366-371`). `self._machines` never holds a peer's version of
   the own list, because the store load filters it out. The planner reads S's `sharing` from the list S
   composes itself (`_compose_own`), so a forged or forwarded list with `sharing: true` for the Mac changes
   only what other pages display, never what the Mac opens. Sharing off yields `sharing_off` before the
