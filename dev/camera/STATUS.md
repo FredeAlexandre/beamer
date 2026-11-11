@@ -57,6 +57,17 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
   the PC in wave 1; CW4 tests against a shm stand-in. Reports: `dev/camera/reports/cwN.md`.
 - Implementation does not start before C4's numbers are folded into PHASE2 and R1's blockers/majors are fixed.
 
+## Implementation wave 1
+
+| WP | State |
+|---|---|
+| CW1 Python control plane | running |
+| CW2 Engine video transport | running |
+| CW3 Mac camera backend | running |
+| CW4 Windows video sink | running |
+| CW5 Windows camera source DLL | running (`shm_protocol.h` landed) |
+| CW9 Packaging, install, permissions | **part 1 done** (`8e14cb8`, code `d6859c5`): camera entitlement on app + python + helper (checked on a private Beamer Dev build, deleted), Info.plist keys, `build_dmg.sh` guard, Inno script (not compiled: no ISCC on lebig), `Install-Beamer.ps1` camera step, portable build puts `camera\BeamerCameraSource.dll` beside `beamer-audio.exe` (stub binaries), `vcam_install.py` 30 tests Mac + lebig, `Install-Maintenance -Remove` on a fake install. Touched `win_app/build_portable.ps1` outside its list (needed; accepted). **Part 2 (CW9b) after CW4+CW5:** rebuild PC with the real DLL, `-Remove` on a real dev install, README section for vcam-win (text in cw9.md). Inno compile needs Inno Setup 6 on lebig (Alex's call, later) |
+
 ## How agents work here
 
 T3 delegates cannot get their own worktree from the operator's thread, so Phase 1 agents share the main
