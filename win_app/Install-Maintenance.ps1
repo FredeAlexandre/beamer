@@ -148,18 +148,70 @@ function Get-BeamerCameraPaths {
     }
 }
 
+# Attributes of a file-system entry, links included (a dangling junction too), or $null when there is none.
+function Get-BeamerFsAttributes([string]$Path) {
+    try { return [IO.File]::GetAttributes($Path) } catch { return $null }
+}
+
+function Test-BeamerReparsePoint([string]$Path) {
+    $attributes = Get-BeamerFsAttributes $Path
+    return $null -ne $attributes -and ($attributes -band [IO.FileAttributes]::ReparsePoint)
+}
+
+# Deletes a file-system tree without ever going through a link: a junction or symbolic link inside it (or the
+# path itself, when it is one) is removed as a link, so what it points to is never touched. Elevated
+# Remove-Item -Recurse in Windows PowerShell 5.1 follows junctions; a user can plant one under
+# %ProgramData%, which Users may write (F1, operator item 2).
+function Remove-BeamerTree([string]$Path) {
+    $attributes = Get-BeamerFsAttributes $Path
+    if ($null -eq $attributes) { return }
+    if ($attributes -band [IO.FileAttributes]::ReparsePoint) {
+        if ($attributes -band [IO.FileAttributes]::Directory) { [IO.Directory]::Delete($Path, $false) } else { [IO.File]::Delete($Path) }
+        return
+    }
+    if ($attributes -band [IO.FileAttributes]::Directory) {
+        foreach ($child in [IO.Directory]::GetFileSystemEntries($Path)) { Remove-BeamerTree $child }
+        [IO.Directory]::Delete($Path, $false)
+        return
+    }
+    if ($attributes -band [IO.FileAttributes]::ReadOnly) {
+        [IO.File]::SetAttributes($Path, ($attributes -band (-bnot [IO.FileAttributes]::ReadOnly)))
+    }
+    [IO.File]::Delete($Path)
+}
+
+function Test-BeamerRegistryPath([string]$Path) {
+    return $Path -match '^(HKLM|HKCU|HKCR|HKU|Registry)::?' -or $Path -match '^HK[A-Z_]*:'
+}
+
 # Deletes a folder or registry key, then its `Beamer` parent when that is left empty. Returns $false when
 # it could not be deleted (a file in use: Frame Server holds the DLL it loaded), $true when it is gone.
+# A folder whose `Beamer` parent is a link is not ours: it is left alone (never deleted through the link).
 function Remove-BeamerCameraItem([string]$Path) {
-    if (Test-Path -LiteralPath $Path) {
-        try { Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop } catch { }
-        if (Test-Path -LiteralPath $Path) { return $false }
-    }
     $parent = Split-Path -Parent $Path
-    if ((Split-Path -Leaf $parent) -eq 'Beamer' -and (Test-Path -LiteralPath $parent) -and
-        -not (Get-ChildItem -LiteralPath $parent -Force -ErrorAction SilentlyContinue) -and
-        -not (Get-Item -LiteralPath $parent -Force).Property) {
-        Remove-Item -LiteralPath $parent -Force -ErrorAction SilentlyContinue
+    if (Test-BeamerRegistryPath $Path) {
+        if (Test-Path -LiteralPath $Path) {
+            try { Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop } catch { }
+            if (Test-Path -LiteralPath $Path) { return $false }
+        }
+        if ((Split-Path -Leaf $parent) -eq 'Beamer' -and (Test-Path -LiteralPath $parent) -and
+            -not (Get-ChildItem -LiteralPath $parent -Force -ErrorAction SilentlyContinue) -and
+            -not (Get-Item -LiteralPath $parent -Force).Property) {
+            Remove-Item -LiteralPath $parent -Force -ErrorAction SilentlyContinue
+        }
+        return $true
+    }
+    if (Test-BeamerReparsePoint $parent) {
+        Write-Warning "Beamer Camera: $parent is a link; nothing is deleted through it."
+        return $true
+    }
+    if ($null -ne (Get-BeamerFsAttributes $Path)) {
+        try { Remove-BeamerTree $Path } catch { }
+        if ($null -ne (Get-BeamerFsAttributes $Path)) { return $false }
+    }
+    if ((Split-Path -Leaf $parent) -eq 'Beamer' -and [IO.Directory]::Exists($parent) -and
+        -not [IO.Directory]::EnumerateFileSystemEntries($parent).GetEnumerator().MoveNext()) {
+        try { [IO.Directory]::Delete($parent, $false) } catch { }
     }
     return $true
 }
@@ -211,11 +263,15 @@ function Remove-BeamerCameraStaleVersions([hashtable]$Paths = (Get-BeamerCameraP
     if (-not (Test-Path -LiteralPath $Paths.ProgramFolder) -or -not (Test-Path -LiteralPath $Paths.CameraKey)) { return }
     $current = (Get-ItemProperty -LiteralPath $Paths.CameraKey -ErrorAction SilentlyContinue).DllPath
     if (-not $current) { return }
+    if ((Test-BeamerReparsePoint $Paths.ProgramFolder) -or (Test-BeamerReparsePoint (Split-Path -Parent $Paths.ProgramFolder))) {
+        Write-Warning "Beamer Camera: $($Paths.ProgramFolder) is reached through a link; stale versions are left alone."
+        return
+    }
     $currentFolder = [IO.Path]::GetFullPath((Split-Path -Parent $current))
     foreach ($folder in @(Get-ChildItem -LiteralPath $Paths.ProgramFolder -Directory -Force)) {
         if ([string]::Equals([IO.Path]::GetFullPath($folder.FullName), $currentFolder, [StringComparison]::OrdinalIgnoreCase)) { continue }
         try {
-            Remove-Item -LiteralPath $folder.FullName -Recurse -Force -ErrorAction Stop
+            Remove-BeamerTree $folder.FullName
         } catch {
             Write-Warning "Beamer Camera: $($folder.FullName) is still in use; the next maintenance run deletes it."
         }

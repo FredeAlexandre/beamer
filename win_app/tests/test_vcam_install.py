@@ -352,7 +352,7 @@ foreach ($version in 1, 2) {{
     New-Item -ItemType Directory -Path (Join-Path $paths.ProgramFolder $version) -Force | Out-Null
     Set-Content -Path (Join-Path $paths.ProgramFolder "$version\\BeamerCameraSource.dll") -Value 'dll'
 }}
-New-ItemProperty -Path $paths.CameraKey -Name DllPath -Value (Join-Path $paths.ProgramFolder '2\\BeamerCameraSource.dll') | Out-Null
+New-ItemProperty -Path $paths.CameraKey -Name DllPath -Value (Join-Path $paths.ProgramFolder '2\BeamerCameraSource.dll') | Out-Null
 New-Item -ItemType Directory -Path $paths.DataFolder -Force | Out-Null
 Set-Content -Path (Join-Path $paths.DataFolder 'source.log') -Value 'log'
 """ + probe
@@ -395,6 +395,60 @@ if (-not (Test-Path -LiteralPath $other)) { throw 'deleted a sibling' }
 Remove-BeamerCamera -Paths $paths
 Remove-BeamerCamera -Paths $paths
 if ($script:stopped -ne 0) { throw 'stopped FrameServer' }
+""")
+
+    # Elevated Remove-Item -Recurse in Windows PowerShell 5.1 follows junctions; Users may create folders in
+    # %ProgramData%. Junctions need no privilege, so these run unelevated too.
+    VICTIM = r"""
+$victim = Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $paths.DataFolder))) 'Victim'
+New-Item -ItemType Directory -Path (Join-Path $victim 'sub') -Force | Out-Null
+Set-Content -Path (Join-Path $victim 'keep.txt') -Value 'victim'
+Set-Content -Path (Join-Path $victim 'sub\keep.txt') -Value 'victim'
+function Test-Entry([string]$Path) { try { [IO.File]::GetAttributes($Path) | Out-Null; $true } catch { $false } }
+function Assert-Victim {
+    foreach ($file in 'keep.txt', 'sub\keep.txt') {
+        if (-not (Test-Path -LiteralPath (Join-Path $victim $file))) { throw "deleted $file through a junction" }
+    }
+}
+"""
+
+    def test_remove_never_deletes_through_a_junction_inside_the_camera_folder(self):
+        self.run_probe(self.VICTIM + r"""
+New-Item -ItemType Junction -Path (Join-Path $paths.DataFolder 'link') -Target $victim | Out-Null
+New-Item -ItemType Junction -Path (Join-Path $paths.ProgramFolder '2\link') -Target $victim | Out-Null
+Remove-BeamerCamera -Paths $paths
+Assert-Victim
+foreach ($item in $paths.Values) { if (Test-Path -LiteralPath $item) { throw "left $item" } }
+""")
+
+    def test_remove_deletes_a_camera_folder_that_is_a_junction_as_a_link(self):
+        self.run_probe(self.VICTIM + r"""
+Remove-Item -LiteralPath $paths.DataFolder -Recurse -Force
+New-Item -ItemType Junction -Path $paths.DataFolder -Target $victim | Out-Null
+Remove-BeamerCamera -Paths $paths
+Assert-Victim
+if (Test-Entry $paths.DataFolder) { throw 'left the junction' }
+""")
+
+    def test_remove_leaves_a_camera_folder_whose_parent_is_a_junction(self):
+        self.run_probe(self.VICTIM + r"""
+New-Item -ItemType Directory -Path (Join-Path $victim 'Camera') -Force | Out-Null
+Set-Content -Path (Join-Path $victim 'Camera\keep.txt') -Value 'victim'
+$beamer = Split-Path -Parent $paths.DataFolder
+Remove-Item -LiteralPath $beamer -Recurse -Force
+New-Item -ItemType Junction -Path $beamer -Target $victim | Out-Null
+Remove-BeamerCamera -Paths $paths 3>$null
+Assert-Victim
+if (-not (Test-Path -LiteralPath (Join-Path $victim 'Camera\keep.txt'))) { throw 'deleted through the parent junction' }
+""")
+
+    def test_stale_versions_never_delete_through_a_junction(self):
+        self.run_probe(self.VICTIM + r"""
+New-Item -ItemType Junction -Path (Join-Path $paths.ProgramFolder '1\link') -Target $victim | Out-Null
+New-Item -ItemType Junction -Path (Join-Path $paths.ProgramFolder '0') -Target $victim | Out-Null
+Remove-BeamerCameraStaleVersions -Paths $paths
+Assert-Victim
+foreach ($stale in '0', '1') { if (Test-Entry (Join-Path $paths.ProgramFolder $stale)) { throw "kept $stale" } }
 """)
 
     def test_remove_keeps_a_camera_another_account_owns(self):
