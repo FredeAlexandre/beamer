@@ -2,6 +2,7 @@
 """vcam_install (camera PHASE2 §9.2) with its OS seams mocked, on any platform; the real seams, the
 installers' camera hunks and Install-Maintenance.ps1's camera step on Windows."""
 
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -21,12 +22,15 @@ from vcam_install import Result
 
 WIN_APP = Path(__file__).parents[1]
 SID = "S-1-5-21-1004336348-1177238915-682003330-1001"
+OTHER_SID = "S-1-5-21-1004336348-1177238915-682003330-1002"
+DLL_BYTES = b"MZ camera source"
+DLL_SHA256 = hashlib.sha256(DLL_BYTES).hexdigest()
 
 
 class _Run:
     """Runs one install/remove with the seams replaced, waits for on_done, records everything."""
 
-    def __init__(self, test, *, sid=SID, elevated=0, unelevated=0, windows=True, exe_exists=True):
+    def __init__(self, test, *, sid=SID, elevated=0, unelevated=0, windows=True, exe_exists=True, dll=DLL_BYTES):
         self.calls = []
         self.results = []
         self.threads = []
@@ -36,6 +40,9 @@ class _Run:
         self.exe = Path(directory) / "beamer-audio.exe"
         if exe_exists:
             self.exe.write_bytes(b"MZ")
+        if dll is not None:
+            (Path(directory) / "camera").mkdir()
+            (Path(directory) / "camera" / vcam_install.DLL_NAME).write_bytes(dll)
 
         def shell(exe, parameters):
             self.calls.append(("elevated", Path(exe), parameters))
@@ -98,7 +105,19 @@ class InstallTests(unittest.TestCase):
     def test_verb_line_runs_the_helper_elevated_with_this_users_sid(self):
         run = _Run(self)
         self.assertEqual(run.go(self, vcam_install.install), Result(True, "ok"))
-        self.assertEqual(run.calls, [("sid",), ("elevated", run.exe.resolve(), f"vcam-install --owner-sid {SID}")])
+        self.assertEqual(run.calls, [("sid",), ("elevated", run.exe.resolve(),
+                                                f"vcam-install --owner-sid {SID} --dll-sha256 {DLL_SHA256}")])
+
+    def test_the_dll_hash_is_the_one_the_helper_will_install(self):
+        """R4 #6: the hash of the DLL the helper's lookup rule picks (camera folder, then beside it),
+        read before the prompt; no DLL, no prompt."""
+        run = _Run(self, dll=None)
+        (run.exe.parent / vcam_install.DLL_NAME).write_bytes(b"beside")
+        run.go(self, vcam_install.install)
+        self.assertTrue(run.calls[-1][2].endswith("--dll-sha256 " + hashlib.sha256(b"beside").hexdigest()))
+        missing = _Run(self, dll=None)
+        self.assertEqual(missing.go(self, vcam_install.install), Result(False, "failed"))
+        self.assertEqual(missing.calls, [("sid",)])
 
     def test_install_update_and_repair_are_one_command_whatever_the_versions(self):
         # The helper picks the DLL by the §9.2 lookup rule and installs its own kDllVersion, so the page
@@ -108,8 +127,8 @@ class InstallTests(unittest.TestCase):
             run = _Run(self)
             run.go(self, vcam_install.install)
             lines.add(run.calls[-1][2])
-        self.assertEqual(lines, {f"vcam-install --owner-sid {SID}"})
-        self.assertNotIn("--dll", lines.pop())
+        self.assertEqual(lines, {f"vcam-install --owner-sid {SID} --dll-sha256 {DLL_SHA256}"})
+        self.assertNotIn("--dll ", lines.pop())
 
     def test_uac_refused_is_cancelled(self):
         refused = OSError(1223, "The operation was cancelled by the user.")
@@ -256,7 +275,7 @@ class PackagingContractTests(unittest.TestCase):
         source = self.read("Install-Maintenance.ps1")
         main = source[source.index("if ($MyInvocation.InvocationName -ne '.')"):]
         remove, other = main.split("} else {", 1)
-        self.assertIn("Remove-BeamerCamera\n", remove)
+        self.assertIn("Remove-BeamerCamera -UserSid $UserSid\n", remove)
         self.assertNotIn("StaleVersions", remove)
         self.assertIn("Remove-BeamerCameraStaleVersions", other.split("exit 0")[0])
         self.assertIn("{19FCB9D1-E91E-45D0-B865-75D8F6D98A91}", source)
@@ -376,6 +395,30 @@ if (-not (Test-Path -LiteralPath $other)) { throw 'deleted a sibling' }
 Remove-BeamerCamera -Paths $paths
 Remove-BeamerCamera -Paths $paths
 if ($script:stopped -ne 0) { throw 'stopped FrameServer' }
+""")
+
+    def test_remove_keeps_a_camera_another_account_owns(self):
+        """R4 #7: OwnerSid names another account: its camera stays, keys, folders and Frame Server."""
+        self.run_probe(rf"""
+New-ItemProperty -Path $paths.CameraKey -Name OwnerSid -Value '{OTHER_SID}' | Out-Null
+Remove-BeamerCamera -Paths $paths -UserSid '{SID}' 3>$null
+foreach ($item in $paths.Values) {{ if (-not (Test-Path -LiteralPath $item)) {{ throw "removed $item" }} }}
+if ($script:stopped -ne 0) {{ throw 'stopped FrameServer' }}
+Remove-BeamerCamera -Paths $paths 3>$null
+foreach ($item in $paths.Values) {{ if (-not (Test-Path -LiteralPath $item)) {{ throw "removed $item without a user" }} }}
+""")
+
+    def test_remove_by_the_owner_removes_everything(self):
+        self.run_probe(rf"""
+New-ItemProperty -Path $paths.CameraKey -Name OwnerSid -Value '{SID.lower()}' | Out-Null
+Remove-BeamerCamera -Paths $paths -UserSid '{SID}'
+foreach ($item in $paths.Values) {{ if (Test-Path -LiteralPath $item) {{ throw "left $item" }} }}
+""")
+
+    def test_remove_with_no_owner_recorded_removes_everything(self):
+        self.run_probe(rf"""
+Remove-BeamerCamera -Paths $paths -UserSid '{SID}'
+foreach ($item in $paths.Values) {{ if (Test-Path -LiteralPath $item) {{ throw "left $item" }} }}
 """)
 
     def test_stale_versions_go_the_registered_one_stays_and_a_locked_one_waits(self):

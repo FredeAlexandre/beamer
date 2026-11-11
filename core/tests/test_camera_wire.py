@@ -120,14 +120,43 @@ class RouteTests(unittest.TestCase):
     def test_malformed(self):
         for change in ({"camera": None}, {"quality": {"size": "4k", "set_at": 1, "by": MAC}},
                        {"camera": {"machine": "x", "set_at": 1, "by": MAC}},
-                       {"camera": {"machine": MAC, "set_at": int(NOW) + 2 * 86400, "by": MAC}},
                        {"camera": {"machine": MAC, "device": {"key": ""}, "set_at": 1, "by": MAC}}):
             msg = wire.route(self.route())
             msg["data"].update(change)
             self.assertIsNone(read(msg), change)
-        crowded = wire.route(self.route())
-        crowded["data"].update({f"x{i}": i for i in range(wire.MAX_EXTRA + 1)})
-        self.assertIsNone(read(crowded))
+
+    def test_bad_entries_are_dropped_one_by_one(self):
+        """R4 #1: an entry with a bad stamp (or too far ahead), or an unknown entry that is not a small
+        object, is dropped on its own; the held entry stands in for it, so the merge neither takes it
+        nor answers about it."""
+        held = self.route(kept={"v": 1, "set_at": 5, "by": MAC})
+        msg = wire.route(self.route())
+        msg["data"]["camera"]["set_at"] = int(NOW) + wire.ROUTE_FUTURE + 5
+        msg["data"].update({
+            "future": {"set_at": 2 ** 53, "by": ""}, "ahead": {"set_at": int(NOW) + 2 * 86400},
+            "blob": {"data": "x" * 17_000}, "number": 3, "kept": {"v": 2, "set_at": 2 ** 60},
+            "fine": {"v": 1, "set_at": int(NOW), "by": PC}, "plain": {"v": 1}})
+        route, dropped = wire.check_route(msg["data"], now=NOW, held=held)
+        self.assertEqual(set(dropped), {"camera", "future", "ahead", "blob", "number", "kept"})
+        self.assertEqual(route.camera, held.camera)
+        self.assertEqual(route.quality, self.route().quality)
+        self.assertEqual(route.extra, {"kept": held.extra["kept"], "fine": msg["data"]["fine"], "plain": {"v": 1}})
+        merged, changed, answer = model.merge_route(held, route)
+        self.assertEqual(merged.camera, held.camera)
+        # Without a held route (camera.json, the generic reader) a dropped camera entry is "never set".
+        self.assertEqual(read(msg)[1].camera, model.CAMERA_OFF)
+        self.assertEqual(model.max_stamp(route), max(route.camera.stamp.set_at, route.quality.stamp.set_at, int(NOW)))
+
+    def test_at_most_max_extra_unknown_entries(self):
+        held = self.route(**{f"h{i}": {"v": i} for i in range(wire.MAX_EXTRA - 2)})
+        msg = wire.route(self.route())
+        msg["data"].update({f"x{i}": {"v": i} for i in range(5)})
+        route, dropped = wire.check_route(msg["data"], now=NOW, held=held)
+        self.assertEqual(sorted(route.extra), ["x0", "x1"])
+        self.assertEqual(dropped, ("x2", "x3", "x4"))
+        merged, _changed, _answer = model.merge_route(held, route)
+        self.assertEqual(len(merged.extra), wire.MAX_EXTRA)
+        self.assertTrue(wire.size_ok(wire.route(merged)))
 
     def test_missing_quality_is_the_default(self):
         msg = wire.route(self.route())

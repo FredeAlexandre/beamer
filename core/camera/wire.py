@@ -38,7 +38,11 @@ MAX_KEY = 200
 MAX_NAME = 128
 MAX_APP = 128
 MAX_EFFECTS = 16
-MAX_EXTRA = 8
+MAX_EXTRA = 8                 # unknown top-level route entries held at most (§6.2)
+MAX_EXTRA_SIZE = 1024         # bytes of one unknown route entry, encoded
+# A route entry stamped further ahead of this machine's clock is dropped (R4 #1): accepted, it would make
+# every later local change here newer than any other machine accepts (`next_stamp` is one past it).
+ROUTE_FUTURE = 10 * 60
 MAX_STREAM = 2 ** 31 - 1
 KEY_SIZE = 32
 OPEN_ERRORS = ("not_installed", "outdated", "helper", "unsupported", "not_source")
@@ -131,11 +135,11 @@ def _camera_key(value):
     return _text(value, MAX_KEY, 1)
 
 
-def _stamp(data, now):
+def _stamp(data, now, ahead=settings_sync.DAY):
     if not isinstance(data, dict):
         return None
     set_at, by = data.get("set_at"), data.get("by", "")
-    if not _int(set_at, 0, settings_sync.MAX_STAMP) or set_at > now + settings_sync.DAY:
+    if not _int(set_at, 0, settings_sync.MAX_STAMP) or set_at > now + ahead:
         return None
     if by != "" and not _machine(by):
         return None
@@ -251,37 +255,91 @@ def read_devices(data, now=None):
     return model.sanitize(machine)
 
 
-def read_route(data, now=None):
-    """The CameraRoute a `camera_route` message carries, or None."""
+def read_route(data, now=None, held=None):
+    """The CameraRoute a `camera_route` message carries, or None (see `check_route`)."""
+    checked = check_route(data, now, held)
+    return None if checked is None else checked[0]
+
+
+def _extra_size(value):
+    try:
+        return len(json.dumps(value, separators=(",", ":")).encode("utf-8"))
+    except (TypeError, ValueError, RecursionError):
+        return None
+
+
+def _extra_ok(value, now):
+    """An unknown route entry this version keeps and forwards: an object of at most MAX_EXTRA_SIZE
+    bytes whose stamp, when it has one, is valid and not too far ahead (R4 #1)."""
+    if not isinstance(value, dict):
+        return False
+    size = _extra_size(value)
+    if size is None or size > MAX_EXTRA_SIZE:
+        return False
+    if "set_at" in value or "by" in value:
+        return _stamp(value, now, ROUTE_FUTURE) is not None
+    return True
+
+
+def check_route(data, now=None, held=None):
+    """(CameraRoute, dropped entry names) of a `camera_route` message, or None when it is malformed.
+
+    An entry whose stamp is invalid or more than ROUTE_FUTURE ahead of `now`, and an unknown entry that
+    is not a small object (`_extra_ok`) or beyond MAX_EXTRA, is dropped on its own; the rest of the
+    message still counts (R4 #1: one bad entry never blocks the others). A dropped entry is replaced by
+    the one `held` (this machine's route) has, so the merge neither takes it nor answers about it: a
+    sender that keeps a bad entry gets no reply for it, and no reply loop starts."""
     now = time.time() if now is None else now
     if not isinstance(data, dict):
         return None
+    dropped = []
     try:
         camera = data.get("camera")
         if not isinstance(camera, dict):
             return None
-        stamp = _stamp(camera, now)
         machine = camera.get("machine")
-        if stamp is None or (machine is not None and not _machine(machine)):
+        if machine is not None and not _machine(machine):
             return None
-        entry = model.CameraEntry(machine, _ref(camera.get("device")) if machine is not None else None, stamp)
+        device = _ref(camera.get("device")) if machine is not None else None
+        stamp = _stamp(camera, now, ROUTE_FUTURE)
+        if stamp is None:
+            dropped.append("camera")
+            entry = held.camera if held is not None else model.CAMERA_OFF
+        else:
+            entry = model.CameraEntry(machine, device, stamp)
         quality = data.get("quality")
         if quality is None:
             size = model.QUALITY_DEFAULT
         else:
             if not isinstance(quality, dict) or quality.get("size") not in model.QUALITIES:
                 return None
-            stamp = _stamp(quality, now)
+            stamp = _stamp(quality, now, ROUTE_FUTURE)
             if stamp is None:
-                return None
-            size = model.QualityEntry(quality["size"], stamp)
+                dropped.append("quality")
+                size = held.quality if held is not None else model.QUALITY_DEFAULT
+            else:
+                size = model.QualityEntry(quality["size"], stamp)
     except ValueError:
         return None
-    extra = {name: value for name, value in data.items()
-             if name not in ("camera", "quality") and isinstance(name, str) and _WORD.fullmatch(name)}
-    if len(extra) > MAX_EXTRA:
-        return None
-    return model.CameraRoute(entry, size, extra)
+    held_extra = dict(held.extra) if held is not None else {}
+    names = set(held_extra)
+    extra = {}
+    for name in sorted(name for name in data if isinstance(name, str) and name not in ("camera", "quality")):
+        value = data[name]
+        if not _WORD.fullmatch(name):
+            dropped.append(name[:32])
+            continue
+        if name not in names and len(names) >= MAX_EXTRA:
+            dropped.append(name)
+            continue
+        if _extra_ok(value, now):
+            extra[name] = value
+            names.add(name)
+        else:
+            dropped.append(name)
+            if name in held_extra:
+                extra[name] = held_extra[name]
+    return model.CameraRoute(entry, size, extra), tuple(dropped)
 
 
 def read_codec(value):

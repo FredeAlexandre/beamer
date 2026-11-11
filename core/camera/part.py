@@ -27,12 +27,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional, Protocol
 
+from core import protocol, settings_sync
 from core.audio import wire as audio_wire
 from core.audio.model import MachineAudio
 from core.camera import model, planner, store, texts, wire
 from core.camera.model import CameraRef, CameraSnapshot, CameraStatus, MachineCamera, VideoStreamView
 
 SAVE_DELAY = 0.5
+SAVE_RETRY = 5.0               # a failed save is tried again this much later (R4 #4)
+MAX_HELD = protocol.MAX_PEERS  # camera lists held for other machines (R4 #5)
+HELD_TTL = settings_sync.SNAPSHOT_TTL   # s: a machine offline this long has left the cluster: its list goes
+QUIET_CLOSES = ("route", "demand", "shutdown")   # a sink's normal close: not an error on the source (R4 #8)
 VIDEO_OUTBOX_LIMIT = 32        # §4.10: video link_out events are dropped while the link outbox holds more
 PAUSE_AFTER = 1.0              # outbox over the limit this long -> video_link paused
 RESUME_BELOW = 8               # outbox under this ...
@@ -81,6 +86,7 @@ class _Send:
     error: Optional[str] = None
     retry_token: Any = None
     accepted: bool = False     # camera_opened ok:true
+    quiet: bool = False        # failed by a sink's normal close (QUIET_CLOSES): not shown as an error
     helper_started: bool = True
     ran: bool = False
 
@@ -91,6 +97,7 @@ class _Recv:
     stream: int
     flow: str
     codec: dict
+    camera: Optional[CameraRef] = None   # the camera the sender named in its camera_open
     state: str = "starting"    # starting | running
     helper: bool = True        # False: `camera_refuse silent` accepted it without opening the recv
 
@@ -113,7 +120,8 @@ def snapshot_data(snap: CameraSnapshot) -> dict:
             "streams": [dataclasses.asdict(stream) for stream in snap.streams], "permission": snap.permission,
             "needs_permission": snap.needs_permission, "sharing": snap.sharing,
             "vcam_install_offer": snap.vcam_install_offer,
-            "vcam_local": None if snap.vcam_local is None else dataclasses.asdict(snap.vcam_local)}
+            "vcam_local": None if snap.vcam_local is None else dataclasses.asdict(snap.vcam_local),
+            "store_problem": snap.store_problem}
 
 
 def _number(value):
@@ -130,8 +138,13 @@ class CameraPart:
         stored = store.load(self._state_dir, now=self._wall())
         self._route = stored.route
         self._own_rev = stored.own_rev
-        self._sharing = stored.sharing                # applied before the first plan (§7.3)
-        self._machines = {ident: machine for ident, machine in stored.machines.items() if ident != self._own}
+        self._sharing = stored.sharing                # applied before the first plan (§7.3); off if unreadable
+        self._store_problem = stored.problem          # "unreadable" | "save_failed" | None (R4 #4)
+        # Held lists come back without demand (R4 #2): only a live path says an app uses the camera.
+        self._machines = {ident: model.without_demand(machine) for ident, machine in stored.machines.items()
+                          if ident != self._own}
+        loaded_at = self._wall()
+        self._seen = {ident: stored.seen.get(ident, loaded_at) for ident in self._machines}
         # Helper-side state of this machine.
         self._cameras = None          # last `cameras` event
         self._permission = None       # camera permission from `permission` / `cameras`
@@ -149,7 +162,9 @@ class CameraPart:
         self._in_use = {}
         self._greeted = set()
         self._force_republish = False
-        self._not_source = _UNSENT    # our route view's camera machine when this sink refused `not_source`
+        self._not_source = _UNSENT    # our route view's camera (machine, device) when this sink refused or
+                                      # closed a stream because the route no longer named its sender
+        self._route_warned = set()    # peers whose dropped route entries were logged (R4 #1 d)
         # What the helper was last told.
         self._sent_warm = _UNSENT
         self._sent_placeholders = _UNSENT
@@ -208,11 +223,19 @@ class CameraPart:
             self._save_at = self._now() + SAVE_DELAY
 
     def _save_now(self):
+        """Writes camera.json now. A failure is shown on the page (R4 #4) and tried again later."""
         self._save_at = None
         try:
-            store.save(self._state_dir, store.Stored(self._route, self._own_rev, self._sharing, dict(self._machines)))
+            store.save(self._state_dir, store.Stored(self._route, self._own_rev, self._sharing, dict(self._machines),
+                                                     dict(self._seen)))
         except OSError as error:
             self._log.warning("camera: could not save %s: %s", store.FILE_NAME, error)
+            self._store_problem = "save_failed"
+            self._save_at = self._now() + SAVE_RETRY
+            return False
+        if self._store_problem == "save_failed":
+            self._store_problem = None
+        return True
 
     # Helper events ------------------------------------------------------------------------------
 
@@ -291,6 +314,10 @@ class CameraPart:
         self._link.clear()
         self._sent_warm = _UNSENT
         self._sent_placeholders = _UNSENT
+        if isinstance(self._vcam, dict):
+            # The old helper's demand is gone with it (R4 #2): no `in_use` is published until the new
+            # helper's first `vcam` event says what apps do now.
+            self._vcam = dict(self._vcam, in_use=False, app=None, want=None)
 
     def _on_stream_state(self, event):
         stream, state = event.get("stream"), event.get("state")
@@ -317,8 +344,8 @@ class CameraPart:
             return True
         return False
 
-    def _send_failed(self, peer, send, error, helper_ended=False, notify=True):
-        send.state, send.error = "failed", error
+    def _send_failed(self, peer, send, error, helper_ended=False, notify=True, quiet=False):
+        send.state, send.error, send.quiet = "failed", error, quiet
         send.retry_token = self._retry_token(peer)
         if not helper_ended and send.helper_started:
             self._helper_send({"cmd": "stop", "stream": send.stream})
@@ -352,8 +379,21 @@ class CameraPart:
                 self._helper_send({"cmd": "stop", "stream": self._recv.stream})
             self._stats.pop(self._recv.stream, None)
             self._recv = None
+        self._forget_demand(peer)
+
+    def _forget_demand(self, ident):
+        """The demand learned from `ident` is no longer known (link loss): it is dropped, with no hold
+        (R4 #2). A fresh list over a live path says it again."""
+        machine = self._machines.get(ident)
+        if machine is not None:
+            self._machines[ident] = model.without_demand(machine)
+        self._in_use[ident] = False
+        self._demand_hold.pop(ident, None)
 
     def link_message(self, peer: str, message: dict) -> None:
+        if isinstance(message, dict) and message.get("type") == wire.ROUTE:
+            self._route_message(peer, message.get("data"))
+            return
         read = wire.read(message, now=self._wall())
         if read is None:
             if wire.is_camera(message):
@@ -362,17 +402,39 @@ class CameraPart:
         kind, data = read
         getattr(self, "_on_" + kind)(peer, data)
 
+    def _route_message(self, peer, data):
+        try:
+            checked = wire.check_route(data, now=self._wall(), held=self._route)
+        except (TypeError, ValueError, KeyError, AttributeError):
+            checked = None
+        if checked is None:
+            self._log.debug("camera: malformed camera_route ignored")
+            return
+        route, dropped = checked
+        if dropped and peer not in self._route_warned:
+            # Once per peer (R4 #1 d): a clock far ahead of ours, or an entry this version cannot hold.
+            self._route_warned.add(peer)
+            self._log.warning("camera: camera_route from %s: entries %s dropped (stamp more than %d s ahead of "
+                              "this clock, or malformed)", self._ctx.machine_name(peer), ", ".join(dropped),
+                              wire.ROUTE_FUTURE)
+        self._on_camera_route(peer, route)
+
     def _on_camera_devices(self, peer, machine):
         if machine.id == self._own:
-            if machine.rev > self._own_rev:
-                # A list of ours newer than the one we know: camera.json went back.
+            if machine.rev > self._own_rev and machine.rev <= (self._wall() + wire.ROUTE_FUTURE) * 1000:
+                # A list of ours newer than the one we know: camera.json went back. One far ahead of
+                # our clock is not taken: our own revs would then be refused everywhere (R4 #1).
                 self._own_rev = machine.rev
                 self._machines.pop(self._own, None)
             return
         held = self._machines.get(machine.id)
         if not model.accept_devices(held, machine, direct_from=machine.id == peer) or machine == held:
             return
+        if held is None and not self._make_room(machine.id):
+            self._log.debug("camera: no room for another machine's camera list")
+            return
         self._machines[machine.id] = machine
+        self._seen[machine.id] = self._wall()
         self._schedule_save()
         for other in sorted(self._camera_peers() - {peer, machine.id}):
             self._post(other, wire.devices(machine))
@@ -393,8 +455,8 @@ class CameraPart:
         if refuse in ("not_source", "helper"):
             self._post(peer, wire.opened(stream, False, refuse))
             return
-        if self._route.camera.machine != peer:
-            self._not_source = self._route.camera.machine
+        if not self._route_names(peer, data["camera"]):
+            self._not_source = self._route_key()
             self._post(peer, wire.opened(stream, False, "not_source"))
             return
         own = self._machines.get(self._own)
@@ -418,10 +480,10 @@ class CameraPart:
             if old.stream != stream:
                 self._post(old.peer, wire.close(old.stream, "route"))
         if refuse == "silent":
-            self._recv = _Recv(peer, stream, data["flow"], data["codec"], helper=False)
+            self._recv = _Recv(peer, stream, data["flow"], data["codec"], data["camera"], helper=False)
             self._post(peer, wire.opened(stream, True))
             return
-        recv = _Recv(peer, stream, data["flow"], data["codec"])
+        recv = _Recv(peer, stream, data["flow"], data["codec"], data["camera"])
         self._recv = recv
 
         def reply(event, recv=recv):
@@ -460,7 +522,12 @@ class CameraPart:
             return
         send = self._sends.get(peer)
         if send is not None and send.stream == stream and send.state != "failed":
-            self._send_failed(peer, send, data["reason"], notify=False)
+            reason = data["reason"]
+            # A sink's normal close (its route moved, its app closed, it quits) stops the camera at once
+            # like a refusal, but is no error here (R4 #8); the same re-open rule applies (§6.5).
+            self._send_failed(peer, send, reason, notify=False, quiet=reason in QUIET_CLOSES)
+            if reason == "demand":
+                self._demand_hold.pop(peer, None)
 
     # Video link_out (§4.10) ---------------------------------------------------------------------
 
@@ -559,9 +626,12 @@ class CameraPart:
     def set_sharing(self, on: bool) -> None:
         """This machine's kill switch (§6.1): off closes every video stream and never opens the camera."""
         on = bool(on)
+        if self._store_problem == "unreadable":
+            self._store_problem = None      # Alex chose: the notice has done its job
         if on != self._sharing:
             self._sharing = on
-            self._schedule_save()
+            # At once, not debounced (R4 #4): a quit right after "Stop Sharing" must not lose it.
+            self._save_now()
 
     def ask_permission(self) -> None:
         """"Allow Camera Access…" on the Mac: the only way, with `set_camera(own, …)`, to prompt."""
@@ -574,6 +644,20 @@ class CameraPart:
         """PC: after an install, update or repair, the helper re-reads the install state (§4.6.5)."""
         if "virtual_camera" in self._features():
             self._helper_send({"cmd": "vcam"})
+
+    def _route_key(self):
+        return (self._route.camera.machine, self._route.camera.device)
+
+    def _route_names(self, peer, camera):
+        """Whether this machine's own route view names `peer` as the camera machine and, when it names a
+        camera, `camera` is that one (same key, else same name): what a sink requires of every stream
+        it takes, at the open and at every route change (R4 #1, §6.4 rule 5)."""
+        if self._route.camera.machine != peer:
+            return False
+        device = self._route.camera.device
+        if device is None:
+            return True
+        return camera is not None and (camera.key == device.key or camera.name == device.name)
 
     def _broadcast_route(self):
         self._schedule_save()
@@ -661,6 +745,7 @@ class CameraPart:
     def apply(self, now: Optional[float] = None) -> None:
         """Plan and diff; called after every audio apply and when the part's wake time comes."""
         now = self._now() if now is None else now
+        self._track_presence()
         self._greet()
         self._republish_own()
         self._track_demand(now)
@@ -670,10 +755,10 @@ class CameraPart:
         self._warm(plan)
         self._check_recv(plan)
         poll = self._poll_outboxes(now)
+        if self._save_at is not None and now >= self._save_at:
+            self._save_now()                # before the snapshot: it shows a failed save (R4 #4)
         snap = self._compose_snapshot(plan)
         self._push_placeholders(snap, plan)
-        if self._save_at is not None and now >= self._save_at:
-            self._save_now()
         wakes = [moment for moment in (plan.wake_at, self._save_at, poll) if moment is not None]
         wakes += [at for peer, at in self._backoff_at.items()
                   if peer in self._sends and self._sends[peer].state == "failed" and at > now]
@@ -684,6 +769,44 @@ class CameraPart:
         if snap != self._snapshot:
             self._snapshot = snap
             self._ctx.changed()
+
+    def _online(self):
+        return frozenset(self._ctx.online()) | {self._own}
+
+    def _track_presence(self):
+        """When each machine was last online (saved at most hourly), and the lists of machines offline
+        for HELD_TTL dropped: they have left the cluster (R4 #5)."""
+        wall, online = self._wall(), self._online()
+        for ident in list(self._machines):
+            if ident == self._own:
+                continue
+            if ident in online:
+                if wall - self._seen.get(ident, 0.0) > 3600:
+                    self._seen[ident] = wall
+                    self._schedule_save()
+            elif wall - self._seen.setdefault(ident, wall) > HELD_TTL:
+                del self._machines[ident]
+                self._seen.pop(ident, None)
+                self._in_use.pop(ident, None)
+                self._demand_hold.pop(ident, None)
+                self._schedule_save()
+
+    def _make_room(self, ident):
+        """Room for the list of a machine not held yet: at most MAX_HELD, the offline machine seen
+        longest ago making way; none offline -> no room (R4 #5)."""
+        others = [held for held in self._machines if held != self._own]
+        if len(others) < MAX_HELD:
+            return True
+        online = self._online() | frozenset(self._ctx.direct())
+        offline = sorted((self._seen.get(held, 0.0), held) for held in others if held not in online)
+        if not offline:
+            return False
+        _at, evicted = offline[0]
+        del self._machines[evicted]
+        self._seen.pop(evicted, None)
+        self._in_use.pop(evicted, None)
+        self._demand_hold.pop(evicted, None)
+        return True
 
     def _greet(self):
         """A direct peer that now speaks `camera1` gets our list, every held list and the route (§5.3)."""
@@ -775,8 +898,9 @@ class CameraPart:
     def _republish_own(self):
         fresh = self._compose_own()
         held = self._machines.get(self._own)
-        if self._not_source is not _UNSENT and self._route.camera.machine != self._not_source:
-            # §5.3/§6.5: our route view lagged S's when we refused `not_source`; a new rev lets S retry.
+        if self._not_source is not _UNSENT and self._route_key() != self._not_source:
+            # §5.3/§6.5: our route view lagged S's when we refused `not_source` (or closed its stream
+            # because our route moved away from it); a new rev lets S retry.
             own_demand = held is not None and held.virtual_camera.in_use
             self._not_source = _UNSENT
             if own_demand:
@@ -793,10 +917,19 @@ class CameraPart:
             self._post(peer, wire.devices(own))
 
     def _track_demand(self, now):
+        """Demand per machine, and the DEMAND_HOLD after it ends (§6.3). Only a live end starts the hold
+        (R4 #2): the machine is online and its helper is up. A machine that went offline loses its
+        demand with no hold; a list from a restarting helper (no `ok`) ends it with no hold either."""
+        online = self._online()
+        for ident in list(self._machines):
+            if ident != self._own and ident not in online and (self._in_use.get(ident)
+                                                               or self._machines[ident].virtual_camera.in_use):
+                self._forget_demand(ident)
         for ident, machine in self._machines.items():
             in_use = machine.virtual_camera.in_use
             if self._in_use.get(ident) and not in_use:
-                self._demand_hold[ident] = now + planner.DEMAND_HOLD
+                if ident in online and machine.status == "ok":
+                    self._demand_hold[ident] = now + planner.DEMAND_HOLD
             elif in_use:
                 self._demand_hold.pop(ident, None)
             self._in_use[ident] = in_use
@@ -922,17 +1055,29 @@ class CameraPart:
             self._sent_warm = plan.warm
 
     def _check_recv(self, plan):
-        """A sink whose Beamer Camera is no longer installed (or whose helper lost the camera) stops
-        taking the stream; route changes are the sender's to close (§6.4 rule 4)."""
+        """A sink stops taking the stream when its Beamer Camera is no longer installed (or its helper
+        lost the camera), and when its own route view no longer names the sender and its camera (R4 #1):
+        the sender closes on route changes too (§6.4 rule 4), but a change that did not reach it (a
+        dropped stamp, a clock far apart) must still turn its camera off. The `route` close stops the
+        sender's camera at once; it re-opens only on a new retry token (§6.5), and this sink publishes
+        one when its route view changes again while it has demand."""
         recv = self._recv
         if recv is None:
             return
         own = self._machines.get(self._own)
+        reason = None
         if own is None or own.virtual_camera.install != "ok":
-            self._recv = None
-            if recv.helper:
-                self._helper_send({"cmd": "stop", "stream": recv.stream})
-            self._post(recv.peer, wire.close(recv.stream, "error"))
+            reason = "error"
+        elif not self._route_names(recv.peer, recv.camera):
+            reason = "route"
+            self._not_source = self._route_key()
+        if reason is None:
+            return
+        self._recv = None
+        if recv.helper:
+            self._helper_send({"cmd": "stop", "stream": recv.stream})
+        self._stats.pop(recv.stream, None)
+        self._post(recv.peer, wire.close(recv.stream, reason))
 
     def _push_placeholders(self, snap, plan):
         """On a machine with a virtual camera: the placeholder texts and idle state, whenever either
@@ -966,7 +1111,9 @@ class CameraPart:
         source = self._route.camera.machine
         for peer, send in self._sends.items():
             params = {"machine": self._own, "to": peer}
-            if send.state == "failed":
+            if send.state == "failed" and send.quiet:
+                sinks[peer] = CameraStatus("idle", None, params)
+            elif send.state == "failed":
                 sinks[peer] = CameraStatus("error", send.error, params)
             elif send.state == "running":
                 sinks[peer] = CameraStatus("reduced" if self._reduced(send.stream) else "streaming", None, params)
@@ -995,7 +1142,7 @@ class CameraPart:
                               permission=own.permission if own is not None else None,
                               needs_permission=plan.needs_permission,
                               sharing=own.sharing if own is not None else None,
-                              vcam_install_offer=offer, vcam_local=local)
+                              vcam_install_offer=offer, vcam_local=local, store_problem=self._store_problem)
 
     def _reduced(self, stream):
         stats = self._stats.get(stream) or {}

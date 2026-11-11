@@ -137,6 +137,51 @@ class CameraMenu:
     allow_title: str = ""
 
 
+def sharing_title(on: bool) -> str:
+    """The menu's sharing item's words while sharing is `on` (or off)."""
+    return tr("Stop Sharing the Camera") if on else tr("Share the Camera")
+
+
+class SharingItem:
+    """The Mac menu's sharing item acts on its label (R4 #3): a click sends the action the shown title
+    promised, never the opposite of state read at click time, and the title turns at once to the
+    other action. Until the snapshot agrees (or HOLD seconds pass), the menu keeps showing what the
+    click asked for, so a status tick that still carries the old state does not bring the old title
+    back. Used on the AppKit main thread only."""
+
+    HOLD = 2.0
+
+    def __init__(self):
+        self.action: Optional[str] = None      # ACTION_STOP_SHARING / ACTION_SHARE of the shown title
+        self._pending = None                   # (sharing on asked for, until)
+
+    def title(self) -> str:
+        return sharing_title(self.action == ACTION_STOP_SHARING)
+
+    def show(self, menu: CameraMenu, now: float) -> str:
+        """The title for `menu` (a status tick); remembers its action."""
+        on = menu.sharing_on
+        if self._pending is not None:
+            wanted, until = self._pending
+            if wanted == on or now >= until:
+                self._pending = None
+            else:
+                on = wanted
+        self.action = ACTION_STOP_SHARING if on else ACTION_SHARE
+        return sharing_title(on)
+
+    def click(self, now: float) -> Optional[str]:
+        """The action the clicked title promised (None before any title was shown); the title then
+        shows the other action."""
+        action = self.action
+        if action is None:
+            return None
+        on = action == ACTION_SHARE
+        self._pending = (on, now + self.HOLD)
+        self.action = ACTION_STOP_SHARING if on else ACTION_SHARE
+        return action
+
+
 # Words.
 
 def _reason(code: Optional[str]) -> str:
@@ -447,6 +492,16 @@ def _notices(snap: CameraSnapshot, audio, names, platform: str) -> tuple:
     notices = []
     own = _machine(snap, snap.own)
     source = snap.route.camera.machine
+    if snap.store_problem == "unreadable" and own is not None and "camera_capture" in own.features:
+        # R4 #4: camera.json could not be read, so sharing started off (fail closed).
+        # The sharing row below carries "Share the Camera": one button for it on the page.
+        notices.append(Notice("camera_store_unreadable",
+                              tr("Camera sharing is off because Beamer could not read its saved camera settings."),
+                              WAIT, machine=snap.own))
+    elif snap.store_problem == "save_failed":
+        notices.append(Notice("camera_store_save_failed",
+                              tr("Beamer could not save the camera settings. After a restart, they may not be as you set them."),
+                              FAULT, machine=snap.own))
     if snap.needs_permission:
         notices.append(Notice("camera_permission", tr("Beamer needs camera access to share this Mac's camera."), WAIT,
                               ACTION_ALLOW, tr("Allow Camera Access…"), machine=snap.own))
@@ -556,8 +611,7 @@ def menu_model(snap: CameraSnapshot, audio, own_label: str = "") -> CameraMenu:
                            else tr("in use on {machine}").format(machine=names(target)))
         if phrases:
             line = tr("Camera: {users}").format(users=joined(phrases))
-    return CameraMenu(True, line, tr("Stop Sharing the Camera") if sharing else tr("Share the Camera"), sharing,
-                      snap.needs_permission, tr("Allow Camera Access…"))
+    return CameraMenu(True, line, sharing_title(sharing), sharing, snap.needs_permission, tr("Allow Camera Access…"))
 
 
 # Actions: what a page calls when a person changes something.

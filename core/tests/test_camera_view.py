@@ -380,6 +380,43 @@ class MacMenu(unittest.TestCase):
         fixture = cf.seen_from_pc(cf.streaming())
         self.assertFalse(view.menu_model(fixture.camera, fixture.audio.snapshot, "This PC").shown)
 
+    def test_sharing_item_acts_on_its_label(self):
+        """R4 #3: the click sends what the shown title promised; the title turns at once and does not
+        come back while a stale snapshot still says the old state."""
+        on, off = self.menu(cf.idle()), self.menu(cf.sharing_off())
+        item = view.SharingItem()
+        self.assertIsNone(item.click(0.0))                          # nothing shown yet: nothing sent
+        self.assertEqual(item.show(on, 0.0), "Stop Sharing the Camera")
+        # Two quick clicks while the worker has not answered (every snapshot still says "on").
+        self.assertEqual(item.click(0.1), view.ACTION_STOP_SHARING)
+        self.assertEqual(item.title(), "Share the Camera")
+        self.assertEqual(item.show(on, 0.4), "Share the Camera")    # a status tick with the old snapshot
+        self.assertEqual(item.click(0.5), view.ACTION_SHARE)        # what that label said
+        self.assertEqual(item.title(), "Stop Sharing the Camera")
+        # Once the snapshot agrees, or after the hold, the snapshot decides again.
+        self.assertEqual(item.show(on, 0.6), "Stop Sharing the Camera")
+        self.assertEqual(item.show(off, 0.7), "Share the Camera")
+        # The state changed elsewhere (the page) while the menu showed "Stop Sharing": a click stops.
+        item = view.SharingItem()
+        item.show(on, 0.0)
+        self.assertEqual(item.click(0.1), view.ACTION_STOP_SHARING)
+        item = view.SharingItem()
+        item.show(on, 0.0)
+        item.click(0.1)
+        self.assertEqual(item.show(on, 0.1 + view.SharingItem.HOLD), "Stop Sharing the Camera")
+
+    def test_store_notices(self):
+        fixture = cf.idle()
+        unreadable = replace(fixture, camera=replace(fixture.camera, store_problem="unreadable",
+                                                     machines={**fixture.camera.machines,
+                                                               MAC: cf.mac_camera(sharing=False)}))
+        codes = [notice.code for notice in mac_section(unreadable).notices]
+        self.assertIn("camera_store_unreadable", codes)
+        failed = replace(fixture, camera=replace(fixture.camera, store_problem="save_failed"))
+        notice = [n for n in mac_section(failed).notices if n.code == "camera_store_save_failed"][0]
+        self.assertEqual(notice.tone, view.FAULT)
+        self.assertNotIn("camera_store_unreadable", [n.code for n in pc_section(cf.seen_from_pc(unreadable)).notices])
+
 
 class Actions(unittest.TestCase):
     def setUp(self):

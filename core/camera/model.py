@@ -155,6 +155,9 @@ class CameraSnapshot:
     sharing: Optional[bool]             # own machine
     vcam_install_offer: Optional[str]   # "install" | "update" | "repair" | None (this PC only)
     vcam_local: Optional[LocalVcam]     # this PC only: versions for "Restart to finish the update" (§9.2)
+    # camera.json (R4 #4): "unreadable" (it could not be read, so sharing starts off), "save_failed"
+    # (the last save failed: a restart may not keep what was set), else None.
+    store_problem: Optional[str] = None
 
 
 ZERO = Stamp(0, "")
@@ -188,7 +191,7 @@ def newer(one: Stamp, other: Stamp) -> bool:
 def max_stamp(route: CameraRoute) -> int:
     stamps = [route.camera.stamp.set_at, route.quality.stamp.set_at]
     for value in route.extra.values():
-        if isinstance(value, dict) and type(value.get("set_at")) is int:
+        if isinstance(value, dict) and type(value.get("set_at")) is int and 0 <= value["set_at"] <= settings_sync.MAX_STAMP:
             stamps.append(value["set_at"])
     return max(stamps)
 
@@ -261,6 +264,15 @@ def accept_devices(held: Optional[MachineCamera], incoming: MachineCamera, direc
     if incoming.rev > held.rev:
         return True
     return direct_from and incoming != held
+
+
+def without_demand(machine: MachineCamera) -> MachineCamera:
+    """The list with its demand (`in_use`, `app`, `want`) cleared: what a list held from before a link
+    loss or a restart says until a live path brings a fresh one (R4 #2)."""
+    vcam = machine.virtual_camera
+    if not vcam.in_use and vcam.app is None and vcam.want is None:
+        return machine
+    return replace(machine, virtual_camera=replace(vcam, in_use=False, app=None, want=None))
 
 
 def sanitize(machine: MachineCamera) -> MachineCamera:

@@ -164,7 +164,28 @@ function Remove-BeamerCameraItem([string]$Path) {
     return $true
 }
 
-function Remove-BeamerCamera([hashtable]$Paths = (Get-BeamerCameraPaths)) {
+# The camera is machine-wide but Beamer installs per user: HKLM\SOFTWARE\Beamer\Camera's OwnerSid names the
+# account whose Beamer installed it. Uninstalling Beamer for another account leaves it in place (R4 #7).
+# Returns $true when this account may remove it: it owns it, or no owner is recorded.
+function Test-BeamerCameraOwner([hashtable]$Paths, [string]$UserSid) {
+    if (-not (Test-Path -LiteralPath $Paths.CameraKey)) { return $true }
+    $owner = (Get-ItemProperty -LiteralPath $Paths.CameraKey -Name OwnerSid -ErrorAction SilentlyContinue).OwnerSid
+    if (-not $owner) { return $true }
+    if (-not $UserSid) { return $false }
+    try {
+        $owner = ([Security.Principal.SecurityIdentifier][string]$owner).Value
+        $UserSid = ([Security.Principal.SecurityIdentifier]$UserSid).Value
+    } catch {
+        return $false
+    }
+    return [string]::Equals($owner, $UserSid, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Remove-BeamerCamera([hashtable]$Paths = (Get-BeamerCameraPaths), [string]$UserSid = '') {
+    if (-not (Test-BeamerCameraOwner -Paths $Paths -UserSid $UserSid)) {
+        Write-Warning 'Beamer Camera was installed by another Windows account; it stays installed for that account.'
+        return
+    }
     foreach ($key in @($Paths.ClsidKey, $Paths.CameraKey)) {
         if (-not (Remove-BeamerCameraItem $key)) { throw "Could not delete $key" }
     }
@@ -217,7 +238,7 @@ if ($MyInvocation.InvocationName -ne '.') {
         if ($Remove) {
             Update-BeamerGameInputRecovery -Remove
             Remove-BeamerFirewall -ExePath $ExePath
-            Remove-BeamerCamera
+            Remove-BeamerCamera -UserSid $UserSid
         } else {
             Repair-BeamerFirewall -ExePath $ExePath
             Update-BeamerGameInputRecovery

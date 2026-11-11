@@ -5093,6 +5093,16 @@ objc.classAddMethods(rumps.rumps.NSApp, [objc.selector(
     signature=b"Z@:@Z")])
 
 
+def _camera_sharing_item(app):
+    """The menu's camera sharing item state (core.camera.view.SharingItem), made on first use."""
+    item = getattr(app, "_camera_sharing", None)
+    if item is None:
+        from core.camera import view as camera_view
+        item = camera_view.SharingItem()
+        app._camera_sharing = item
+    return item
+
+
 class TrayApp(rumps.App):
     def __init__(self, controller, settings_store, logger, hidden=False):
         self.hidden = hidden
@@ -5187,6 +5197,7 @@ class TrayApp(rumps.App):
         self._camera_line = ""
         self.camera_line_item = _tray_item("beamer-camera-line", callback=None)
         self.camera_sharing_item = _tray_item("beamer-camera-sharing", callback=self.toggle_camera_sharing)
+        self._camera_sharing = None     # core.camera.view.SharingItem, made with the first camera menu
         self.camera_allow_item = _tray_item("beamer-camera-allow", callback=self.allow_camera_access)
         self._symbol = None
         super().__init__(
@@ -5754,21 +5765,25 @@ class TrayApp(rumps.App):
             _set_tray_title(self.camera_line_item, self._camera_line)
         self.camera_sharing_item.hidden = not shown
         if shown:
-            _set_tray_title(self.camera_sharing_item, menu.sharing_title)
+            _set_tray_title(self.camera_sharing_item, _camera_sharing_item(self).show(menu, time.monotonic()))
         self.camera_allow_item.hidden = not (shown and menu.allow_shown)
         if shown and menu.allow_shown:
             _set_tray_title(self.camera_allow_item, menu.allow_title)
 
     def toggle_camera_sharing(self, _sender):
-        """"Stop Sharing the Camera" / "Share the Camera": this Mac's own switch, whatever the route."""
-        menu = self._camera_menu()
+        """"Stop Sharing the Camera" / "Share the Camera": this Mac's own switch, whatever the route.
+        Does what the clicked title said (R4 #3), never the opposite of a state read now; the title
+        turns to the other action at once."""
         service = getattr(self.controller, "audio", None)
-        if menu is None or not menu.shown or service is None:
+        if service is None:
+            return
+        item = _camera_sharing_item(self)
+        action = item.click(time.monotonic())
+        if action is None:
             return
         from core.camera import view as camera_view
-        camera_view.apply_camera_action(service, camera_view.ACTION_STOP_SHARING if menu.sharing_on
-                                        else camera_view.ACTION_SHARE)
-        self._camera_items()
+        camera_view.apply_camera_action(service, action)
+        _set_tray_title(self.camera_sharing_item, item.title())
 
     def allow_camera_access(self, _sender):
         """"Allow Camera Access…": the macOS prompt appears because of this click (§9.1)."""

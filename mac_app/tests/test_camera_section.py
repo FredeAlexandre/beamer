@@ -341,12 +341,38 @@ class MenuTests(CameraFlag):
     def test_items_call_the_service(self):
         import kvm_bridge_app
         tray = self.tray(cf.idle())
+        kvm_bridge_app.TrayApp.toggle_camera_sharing(tray, None)         # never shown: nothing to act on
+        self.items(tray)
         kvm_bridge_app.TrayApp.toggle_camera_sharing(tray, None)
         tray.controller.audio._camera = cf.sharing_off().camera
+        self.items(tray)
         kvm_bridge_app.TrayApp.toggle_camera_sharing(tray, None)
         kvm_bridge_app.TrayApp.allow_camera_access(tray, None)
         self.assertEqual(tray.controller.audio.calls, [("set_camera_sharing", (False,)), ("set_camera_sharing", (True,)),
                                                        ("ask_camera_permission", ())])
+
+    def test_sharing_item_acts_on_its_label_with_two_quick_clicks(self):
+        """R4 #3: the service has not answered yet (its snapshot still says sharing on) when Alex clicks
+        twice; each click does what the title then showed, and the title turns at once."""
+        import kvm_bridge_app
+        tray = self.tray(cf.idle())
+        self.assertEqual(self.items(tray)["sharing"][0], "Stop Sharing the Camera")
+        kvm_bridge_app.TrayApp.toggle_camera_sharing(tray, None)
+        self.assertEqual(tray.camera_sharing_item.title, "Share the Camera")       # at once, no tick
+        self.assertEqual(self.items(tray)["sharing"][0], "Share the Camera")       # a tick, stale snapshot
+        kvm_bridge_app.TrayApp.toggle_camera_sharing(tray, None)
+        self.assertEqual(tray.camera_sharing_item.title, "Stop Sharing the Camera")
+        self.assertEqual(tray.controller.audio.calls, [("set_camera_sharing", (False,)), ("set_camera_sharing", (True,))])
+
+    def test_stop_sharing_never_turns_sharing_on(self):
+        """R4 #3: the menu showed "Stop Sharing the Camera"; sharing was turned off on the page before the
+        click. The click still stops (it never inverts the state read at click time)."""
+        import kvm_bridge_app
+        tray = self.tray(cf.idle())
+        self.items(tray)
+        tray.controller.audio._camera = cf.sharing_off().camera
+        kvm_bridge_app.TrayApp.toggle_camera_sharing(tray, None)
+        self.assertEqual(tray.controller.audio.calls, [("set_camera_sharing", (False,))])
 
     def test_hidden_without_the_flag_a_service_or_a_camera(self):
         with mock.patch.object(feature_flags, "CAMERA", False):

@@ -8,6 +8,11 @@ and `on_done` is called exactly once there with a `Result` (the caller marshals 
   (the UAC prompt). Install, update and repair are the same command: the helper copies the DLL it finds by
   the §9.2 lookup rule (its own `camera\\BeamerCameraSource.dll`, built with it, so its version is the
   helper's `kDllVersion`) to `%ProgramFiles%\\Beamer\\Camera\\<version>\\` and re-points the COM class.
+  The line also carries `--dll-sha256 <hex>`: the hash of that DLL as this (unelevated) Beamer read it
+  before the prompt. The helper hashes its copy in the protected folder and refuses to register on a
+  mismatch, so a DLL swapped in the user-writable install folder while the prompt is up is never
+  registered (R4 #6). The elevated helper itself still runs from that folder: an accepted risk
+  (dev/camera/reviews/r4-resolution.md).
 - `remove`: `vcam-remove` unelevated (Remove() of this user's camera, best effort), then the elevated
   `vcam-uninstall` (COM class, HKLM key, Camera folders).
 
@@ -18,6 +23,7 @@ process Beamer runs.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import logging
 from pathlib import Path
 import re
@@ -38,6 +44,9 @@ _CODES = {EXIT_OK: "ok", EXIT_BAD_ARGS: "bad_args", EXIT_NOT_ELEVATED: "not_elev
 ELEVATED_TIMEOUT_S = 120.0
 REMOVE_TIMEOUT_S = 30.0
 SEE_MASK_NOCLOSEPROCESS, SEE_MASK_NOASYNC = 0x40, 0x100
+DLL_NAME = "BeamerCameraSource.dll"
+# The helper's §9.2 lookup rule (native/audio/win/vcam_install_win.cpp): its camera folder, then beside it.
+DLL_LOOKUP = (Path("camera") / DLL_NAME, Path(DLL_NAME))
 _SID = re.compile(r"S-1-\d+(?:-\d+)+")
 
 
@@ -62,7 +71,33 @@ def _install_steps(exe: Path) -> Result:
     if not _SID.fullmatch(sid or ""):
         LOGGER.warning("vcam-install: this account's SID could not be read (%r)", sid)
         return Result(False, "failed")
-    return _elevated(exe, ["vcam-install", "--owner-sid", sid])
+    dll = _bundled_dll(exe)
+    if dll is None:
+        LOGGER.warning("vcam-install: no %s beside %s", DLL_NAME, exe)
+        return Result(False, "failed")
+    try:
+        digest = _sha256(dll)
+    except OSError as exc:
+        LOGGER.warning("vcam-install: %s could not be read: %s", dll, exc)
+        return Result(False, "failed")
+    return _elevated(exe, ["vcam-install", "--owner-sid", sid, "--dll-sha256", digest])
+
+
+def _bundled_dll(exe: Path) -> Optional[Path]:
+    """The DLL the helper will install, by its own lookup rule; None when there is none."""
+    for relative in DLL_LOOKUP:
+        candidate = exe.parent / relative
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 16), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _remove_steps(exe: Path) -> Result:
