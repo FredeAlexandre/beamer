@@ -28,8 +28,10 @@ void Pacer::add_client(uint32_t stream, std::weak_ptr<PacerClient> c) {
 }
 
 void Pacer::remove_stream(uint32_t stream) {
-  std::lock_guard<std::mutex> lock(mu_);
+  std::unique_lock<std::mutex> lock(mu_);
   clients_.erase(stream);
+  if (std::this_thread::get_id() != thread_.get_id())  // never from on_paced itself (it would wait for itself)
+    idle_cv_.wait(lock, [&] { return !in_flight_ || in_flight_stream_ != stream; });
   auto drop = [stream](std::deque<PacedPacket>& q) {
     q.erase(std::remove_if(q.begin(), q.end(), [stream](const PacedPacket& p) { return p.stream == stream; }), q.end());
   };
@@ -139,13 +141,23 @@ void Pacer::run() {
     std::shared_ptr<PacerClient> client;
     auto c = clients_.find(out.stream);
     if (c != clients_.end()) client = c->second.lock();
+    if (client) {
+      in_flight_ = true;
+      in_flight_stream_ = out.stream;
+    }
     lock.unlock();
     send_(out);
     n_sent.fetch_add(1, std::memory_order_relaxed);
     if (out.retx) n_retx.fetch_add(1, std::memory_order_relaxed);
     wait_ns_sum.fetch_add(static_cast<uint64_t>(std::max<int64_t>(0, now - out.enqueued_ns)), std::memory_order_relaxed);
     if (client) client->on_paced(out, now);
+    const bool had = client != nullptr;
+    client.reset();  // outside the lock; never the last reference once remove_stream ran (it waits for this)
     lock.lock();
+    if (had) {
+      in_flight_ = false;
+      idle_cv_.notify_all();
+    }
   }
 }
 

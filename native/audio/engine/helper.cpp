@@ -230,6 +230,21 @@ class Helper : public BackendListener, public VideoBackendListener {
     });
   }
   void camera_lost(CameraHandle* h, const std::string& why) override {
+    // Resolved now, while `h` is alive (backend contract): by the time the helper thread runs, the handle may be
+    // freed and its address reused by another stream's handle (R3 #13). The serial tells a reused stream id apart.
+    uint32_t id = 0;
+    uint64_t serial = 0;
+    if (VideoSendStream::camera_owner(h, &id, &serial)) {
+      post([this, id, serial, why] {
+        auto it = streams_.find(id);
+        if (it == streams_.end() || !it->second.vsend || it->second.vsend->serial() != serial) return;  // gone already
+        BA_WARN("video stream %u lost its camera: %s", id, why.c_str());
+        stop_stream(id, "no_camera");
+      });
+      return;
+    }
+    // Not registered yet: lost while open_camera() was still returning it. The stream registers the handle right
+    // after, before the helper thread can run this, so the pointer match is still the same handle there.
     post([this, h, why] {
       for (auto& kv : streams_)
         if (kv.second.vsend && kv.second.vsend->owns_camera(h)) {

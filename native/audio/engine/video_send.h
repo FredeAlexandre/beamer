@@ -116,6 +116,11 @@ class VideoSendStream : public StreamBase, public EncoderSink, public PacerClien
     std::lock_guard<std::mutex> lock(cam_mu_);
     return h && cam_.get() == h;
   }
+  uint64_t serial() const { return serial_; }  // unique per stream object in this process (never reused)
+  // R3 #13: the stream that owns the camera handle `h` right now (stream id and serial), from a registry kept while
+  // the stream holds the handle. For VideoBackendListener::camera_lost, which runs while `h` is alive: looked up
+  // there, not later on the helper thread, where `h` may already be freed and its address reused by a new stream.
+  static bool camera_owner(const CameraHandle* h, uint32_t* stream, uint64_t* serial);
 
   // EncoderSink (backend's encoder thread)
   uint32_t on_frame(const EncodedFrame& f) override;
@@ -162,6 +167,8 @@ class VideoSendStream : public StreamBase, public EncoderSink, public PacerClien
   FailFn on_fail_;
   std::unique_ptr<CameraHandle> cam_;
   std::mutex cam_mu_;  // cam_ lifetime vs. sender-thread calls
+  const uint64_t serial_;
+  void set_camera_locked(std::unique_ptr<CameraHandle> cam);  // cam_mu_ held; keeps the owner registry in step
 
   // queue (encoder thread -> sender thread)
   std::mutex mu_;

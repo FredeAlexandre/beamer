@@ -227,7 +227,14 @@ class VideoRecvStream : public StreamBase, public VideoSinkListener {
   // network thread
   OpenResult ingest(const uint8_t* data, size_t len, int64_t now, bool via_link, std::vector<std::vector<uint8_t>>* out) {
     OpenResult r = core_.ingest(data, len, now, via_link, out);
-    if (r == OpenResult::Ok) cv_.notify_all();
+    if (r == OpenResult::Ok) {
+      {
+        // a state change under mu_, so the video thread cannot miss it between pump() and its wait (R3 #10)
+        std::lock_guard<std::mutex> lock(mu_);
+        pkts_++;
+      }
+      cv_.notify_all();
+    }
     return r;
   }
   void on_time_map(uint32_t ts, uint64_t ns) { core_.on_time_map(ts, ns); }
@@ -240,6 +247,8 @@ class VideoRecvStream : public StreamBase, public VideoSinkListener {
   void on_sink_event(const std::string& what, const std::string& detail) override;
 
   VideoRecvCore& core() { return core_; }
+  // tests: called on the video thread after each round (pump + sink calls), just before it waits again
+  std::function<void(bool display_tick)> test_before_wait;
 
  private:
   void video_loop();
@@ -251,6 +260,7 @@ class VideoRecvStream : public StreamBase, public VideoSinkListener {
   std::unique_ptr<VideoSinkHandle> sink_;
   std::mutex mu_;
   std::condition_variable cv_;
+  uint64_t pkts_ = 0;  // under mu_: media packets accepted (wakes the video thread)
   struct Mail {
     bool decoded;
     uint32_t frame;

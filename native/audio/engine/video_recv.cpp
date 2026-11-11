@@ -459,9 +459,23 @@ void VideoRecvCore::on_sink_event(const std::string& what, const std::string& de
   std::lock_guard<std::mutex> lock(mu_);
   if (what == "decoder_sw" || what == "decoder_hw") {
     decoder_ = what == "decoder_sw" ? "sw" : "hw";
-    // a new decoder is ready (§4.6.1): the AUs handed to the old one while it was re-created were discarded, so
-    // ask for an IDR (PLI start). Nothing handed since the last (re)start: the coming IDR reaches the new one.
-    if (started_) {
+    // A new decoder is ready (§4.6.1). It needs an IDR, so ask for one (PLI start) only when it has none to start
+    // from (R3 #2):
+    // - nothing handed since the last (re)start: the coming IDR reaches the new decoder;
+    // - an IDR was handed and its result has not come back: the sink still holds it (backlog kept while the
+    //   decoder was being made, or queued) and the new decoder decodes it. The sink reports every AU it
+    //   discards (on_decoded ok=false) before this event, through the same mailbox, so an IDR without a result
+    //   here has not been discarded. Asking anyway revoked that IDR's picture and made a second IDR (~1 s later:
+    //   the sender drops start PLIs inside its coalescing and 1 s windows).
+    // Otherwise the AUs handed meanwhile went to no decoder: revoke what is pending and ask (coalesced with a
+    // pending start/size request by need_idr).
+    bool idr_in_sink = false;
+    for (auto& kv : frames_)
+      if (kv.second.handed && !kv.second.decoded && (kv.second.vflags & kVIdr)) {
+        idr_in_sink = true;
+        break;
+      }
+    if (started_ && !idr_in_sink) {
       std::vector<SinkAction> drops;
       revoke_from(0, &drops);
       pending_.insert(pending_.end(), drops.begin(), drops.end());
@@ -836,15 +850,17 @@ void VideoRecvStream::video_loop() {
   flow_->wake();
   int64_t next_tick = now + kDisplayTickNs;
   bool fail_sent = false;
+  uint64_t seen_pkts = 0;
   for (;;) {
     std::deque<Mail> mail;
     {
       std::unique_lock<std::mutex> lock(mu_);
       const int64_t d = std::min(core_.next_video_deadline(now_ns()), next_tick);
-      if (mail_.empty() && !stop_)
+      if (mail_.empty() && !stop_ && pkts_ == seen_pkts)
         cv_.wait_until(lock, std::chrono::steady_clock::time_point(std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                                  std::chrono::nanoseconds(d))));
       if (stop_) return;
+      seen_pkts = pkts_;
       mail.swap(mail_);
     }
     now = now_ns();
@@ -866,6 +882,7 @@ void VideoRecvStream::video_loop() {
       fail_sent = true;
       if (on_fail_) on_fail_(cfg_.id, "decoder", detail);
     }
+    if (test_before_wait) test_before_wait(tick);
   }
 }
 

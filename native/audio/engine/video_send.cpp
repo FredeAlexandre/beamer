@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <map>
+#include <mutex>
 
 #include "flow.h"
 #include "util.h"
@@ -155,8 +157,36 @@ std::vector<uint32_t> SenderRecovery::on_rr(uint32_t clean_since, uint32_t acked
 
 // ================================================================== VideoSendStream
 
+namespace {
+std::atomic<uint64_t> g_stream_serial{0};
+std::mutex g_cam_owner_mu;  // leaf lock (taken under cam_mu_, and alone from camera_owner)
+std::map<const CameraHandle*, std::pair<uint32_t, uint64_t>> g_cam_owner;
+}  // namespace
+
+bool VideoSendStream::camera_owner(const CameraHandle* h, uint32_t* stream, uint64_t* serial) {
+  std::lock_guard<std::mutex> lock(g_cam_owner_mu);
+  auto it = g_cam_owner.find(h);
+  if (it == g_cam_owner.end()) return false;
+  *stream = it->second.first;
+  *serial = it->second.second;
+  return true;
+}
+
+void VideoSendStream::set_camera_locked(std::unique_ptr<CameraHandle> cam) {
+  {
+    std::lock_guard<std::mutex> lock(g_cam_owner_mu);
+    if (cam_) {
+      auto it = g_cam_owner.find(cam_.get());
+      if (it != g_cam_owner.end() && it->second.second == serial_) g_cam_owner.erase(it);
+    }
+    if (cam) g_cam_owner[cam.get()] = {cfg_.id, serial_};
+  }
+  cam_ = std::move(cam);  // the old handle (if any) is destroyed here, after it left the registry
+}
+
 VideoSendStream::VideoSendStream(const Config& cfg, std::shared_ptr<Flow> flow, EventSink* events, FailFn on_fail)
-    : StreamBase(cfg.id, "video"), cfg_(cfg), flow_(std::move(flow)), events_(events), on_fail_(std::move(on_fail)) {
+    : StreamBase(cfg.id, "video"), cfg_(cfg), flow_(std::move(flow)), events_(events), on_fail_(std::move(on_fail)),
+      serial_(++g_stream_serial) {
   sealer_.init(cfg_.key, cfg_.id & ~kDirBit);
   base_bitrate_ = cfg_.spec.bitrate;
   base_fps_ = cfg_.fps;
@@ -187,7 +217,7 @@ bool VideoSendStream::start(VideoBackend& backend, std::string* code, std::strin
   }
   {
     std::lock_guard<std::mutex> lock(cam_mu_);
-    cam_ = std::move(cam);
+    set_camera_locked(std::move(cam));
     device_label_ = cam_->device_in_use();
   }
   last_fb_ns_.store(start_ns_);
@@ -206,7 +236,7 @@ void VideoSendStream::stop() {
   if (thread_.joinable()) thread_.join();
   {
     std::lock_guard<std::mutex> lock(cam_mu_);
-    cam_.reset();  // the encoder stops now; the backend stops the capture when no other stream uses it
+    set_camera_locked(nullptr);  // the encoder stops now; the backend stops the capture when no other stream uses it
   }
   if (flow_) {
     if (Pacer* p = flow_->pacer_if_any()) p->remove_stream(cfg_.id);
@@ -224,7 +254,7 @@ void VideoSendStream::fail(const std::string& code) {
   {
     // close the camera at once (the helper then ends the stream)
     std::lock_guard<std::mutex> lock(cam_mu_);
-    cam_.reset();
+    set_camera_locked(nullptr);
   }
   BA_INFO("video stream %u: %s", cfg_.id, code.c_str());
   if (on_fail_) on_fail_(cfg_.id, code);

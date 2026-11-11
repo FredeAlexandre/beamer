@@ -813,6 +813,221 @@ void test_video_presenter() {
     if (!kv.second) VCHECK(!r.was_presented(kv.first));
 }
 
+// R3 #2: a decoder made (or re-made) while the IDR waits in the sink. The Windows sink keeps an IDR that arrives
+// while its decoder is being created (with the AUs behind it) and decodes it once the decoder is ready, reporting
+// decoder_hw/decoder_sw just before. Simulated on synthetic time: SenderRecovery answers the receiver's PLIs
+// (start PLI -> camera's first frame 20 ms later, IDR paced over 100 ms; class-1 IDR requests by its own rules), a
+// frame every 33.3 ms, and a sink model with the Windows sink's ordering (discards reported first, then the
+// decoder event, then the backlog's results).
+struct DecoderSim {
+  Rig r;
+  SenderRecovery s;
+  int64_t t0 = 0;
+  int64_t dec_ready = 0;          // when the sink's (next) decoder is ready
+  bool ready = false, awaiting_idr = true;
+  const char* ready_event = "decoder_hw";
+  std::vector<std::pair<uint32_t, bool>> backlog;
+  std::set<uint32_t> seen;        // AUs handed to the sink and answered or held
+  bool started = false, want_idr = false;
+  uint32_t next_frame = 0;
+  int64_t next_cap = 0, idr_done = 0;
+  int idrs = 0, plis = 0, plis_after_ready = 0;
+  std::vector<int64_t> idr_at;
+  struct Wire {
+    int64_t at;
+    uint32_t frame;
+    bool idr;
+  };
+  std::deque<Wire> wire;
+
+  explicit DecoderSim(int64_t ready_after_ms) {
+    r.auto_decode = false;
+    s.set_rtt_ns(3 * kMs);
+    t0 = r.t;
+    r.map(0, t0 + 20 * kMs);  // ts 0 = the first frame's capture
+    dec_ready = t0 + ready_after_ms * kMs;
+  }
+  void sink_answers() {
+    for (auto& kv : r.decoded) {
+      const uint32_t f = kv.first;
+      if (seen.count(f)) continue;
+      seen.insert(f);
+      const bool idr = au_is_idr(f);
+      if (!ready) {
+        if (idr || !backlog.empty()) backlog.emplace_back(f, idr);  // kept until the decoder is ready
+        else r.core.on_decoded(f, false, 0, r.t);                   // no decoder, nothing to start from
+      } else if (awaiting_idr && !idr) {
+        r.core.on_decoded(f, false, 0, r.t);
+      } else {
+        awaiting_idr = false;
+        r.core.on_decoded(f, true, 1.5, r.t);
+      }
+    }
+  }
+  std::set<uint32_t> idr_frames;
+  bool au_is_idr(uint32_t f) const { return idr_frames.count(f) > 0; }
+  void lose_device() {  // the decoder is gone; a new one is being made
+    ready = false;
+    awaiting_idr = true;
+    r.core.on_sink_event("device_lost", "DXGI_ERROR_DEVICE_REMOVED", r.t);
+  }
+  void step() {
+    r.t += kMs;
+    const int64_t t = r.t;
+    // receiver -> sender
+    r.net();
+    const int n = r.count_fb(kPli);
+    for (int i = 0; i < n; ++i) {
+      plis++;
+      if (ready && t >= dec_ready) plis_after_ready++;
+      const auto a = s.on_pli(Pli{kNoFrame, kPliStart}, t);
+      if (a == SenderRecovery::kStart) {
+        started = true;
+        want_idr = true;
+        next_cap = t + 20 * kMs;  // the camera's first frame
+      } else if (a == SenderRecovery::kIdr) {
+        want_idr = true;
+      }
+    }
+    if (s.on_timer(t) == SenderRecovery::kIdr) want_idr = true;
+    // sender: one frame per 33.3 ms; an IDR is paced over 100 ms, the frames behind it wait for it
+    if (started && t >= next_cap) {
+      const uint32_t f = next_frame++;
+      const bool idr = want_idr;
+      want_idr = false;
+      int64_t at = t + 5 * kMs;
+      if (idr) {
+        s.on_idr_numbered(f, t);
+        s.on_idr_first_packet(t + kMs, 100 * kMs);
+        idr_done = t + 100 * kMs;
+        at = idr_done;
+        idrs++;
+        idr_at.push_back(t - t0);
+        idr_frames.insert(f);
+      }
+      at = std::max(at, idr_done);
+      wire.push_back(Wire{at, f, idr});
+      next_cap += 33'333'333;
+    }
+    while (!wire.empty() && wire.front().at <= t) {
+      const Wire w = wire.front();
+      wire.pop_front();
+      for (auto& p : r.make_au(w.frame, w.idr ? 30000 : 3000, w.idr ? kVIdr : (t < idr_done + 40 * kMs ? kVBehindIdr : 0),
+                               w.frame * 3000, 50))
+        r.deliver(p);
+    }
+    // sink: the decoder becomes ready -> event, then the backlog in order
+    if (!ready && t >= dec_ready) {
+      ready = true;
+      r.core.on_sink_event(ready_event, "", t);
+      auto b = std::move(backlog);
+      backlog.clear();
+      for (auto& x : b) {
+        if (awaiting_idr && !x.second) {
+          r.core.on_decoded(x.first, false, 0, t);
+        } else {
+          awaiting_idr = false;
+          r.core.on_decoded(x.first, true, 1.5, t);
+        }
+      }
+    }
+    const bool tick = (t / kMs) % 33 == 0;
+    for (int round = 0; round < 4; ++round) {
+      r.run(tick && round == 0);
+      const size_t before = seen.size();
+      sink_answers();
+      if (seen.size() == before) break;
+    }
+  }
+  void run_until(int64_t ms) {
+    while (r.t < t0 + ms * kMs) step();
+  }
+  double first_ms() const { return r.presented.empty() ? -1 : double(r.presented.front().second - t0) * 1e-6; }
+  int64_t last_presented() const { return r.presented.empty() ? 0 : r.presented.back().second - t0; }
+  size_t presented_between(int64_t a_ms, int64_t b_ms) const {
+    size_t n = 0;
+    for (auto& p : r.presented)
+      if (p.second - t0 >= a_ms * kMs && p.second - t0 < b_ms * kMs) n++;
+    return n;
+  }
+  size_t presented_after(int64_t ms) const { return presented_between(ms, INT64_MAX / kMs); }
+};
+
+void test_video_new_decoder_backlog() {
+  // 1. The reviewer's case: the IDR is handed at ~+120 ms and kept by the sink; the hardware decoder is ready at
+  //    +170 ms. Exactly one IDR, shown when the decoder decodes it; no new PLI.
+  {
+    DecoderSim d(170);
+    d.run_until(2500);
+    std::fprintf(stderr, "  new decoder after the IDR (ready +170 ms): first frame %.1f ms, IDRs %d, PLIs after ready %d\n",
+                 d.first_ms(), d.idrs, d.plis_after_ready);
+    VCHECKF(d.idrs == 1, "IDRs %d (at %lld ms ...)", d.idrs, d.idr_at.size() > 1 ? (long long)(d.idr_at[1] / kMs) : -1LL);
+    VCHECKF(d.first_ms() > 160 && d.first_ms() <= 200, "first frame %.1f ms", d.first_ms());
+    VCHECK(d.plis_after_ready == 0);
+    VCHECK(!d.r.presented.empty() && d.r.presented.front().first <= 4);  // from the first IDR's run (a burst shows its newest)
+    VCHECK(d.presented_after(2000) >= 10);  // live: frames keep coming
+  }
+  // 2. A slow decoder under GPU load (CW4 saw 0.4-1.7 s): still one IDR, shown when the decoder is ready
+  {
+    DecoderSim d(900);
+    d.run_until(2500);
+    std::fprintf(stderr, "  new decoder after the IDR (ready +900 ms): first frame %.1f ms, IDRs %d\n", d.first_ms(), d.idrs);
+    VCHECKF(d.idrs == 1, "IDRs %d", d.idrs);
+    VCHECKF(d.first_ms() > 890 && d.first_ms() <= 930, "first frame %.1f ms", d.first_ms());
+  }
+  // 3. Decoder ready before the IDR: nothing changes (one IDR, shown on arrival)
+  {
+    DecoderSim d(60);
+    d.run_until(1500);
+    VCHECKF(d.idrs == 1 && d.first_ms() > 110 && d.first_ms() <= 130, "IDRs %d, first frame %.1f ms", d.idrs, d.first_ms());
+  }
+  // 4. Device lost mid-stream: one IDR is asked for; it arrives while the software decoder is being made and is
+  //    kept; decoder_sw then must not ask for a second one.
+  {
+    DecoderSim d(60);
+    d.run_until(3000);
+    const int before = d.idrs;
+    d.ready_event = "decoder_sw";
+    d.dec_ready = d.r.t + 250 * kMs;  // the requested IDR (class 1, outside the 1 s window) arrives ~+140 ms
+    d.lose_device();
+    d.run_until(6000);
+    std::fprintf(stderr, "  device lost at 3000 ms, software decoder at 3250 ms: IDRs %d (+%d), first picture after %.1f ms\n",
+                 d.idrs, d.idrs - before, [&] {
+                   for (auto& p : d.r.presented)
+                     if (p.second - d.t0 > 3000 * kMs) return double(p.second - d.t0) * 1e-6 - 3000;
+                   return -1.0;
+                 }());
+    VCHECKF(d.idrs == before + 1, "IDRs %d -> %d", before, d.idrs);
+    VCHECK(d.presented_between(3240, 3300) > 0);  // the kept IDR, decoded by the new decoder
+    VCHECK(d.presented_after(5500) >= 10);
+  }
+  // 5. The hardware retry after a device loss (sink: decoder_hw at the IDR where it takes over): the IDR is handed
+  //    and not yet decoded when the event comes -> no PLI, nothing revoked.
+  {
+    Rig d;
+    d.map(0, d.t);
+    for (auto& p : d.make_au(0, 30000, kVIdr, 0, 50)) d.deliver(p);
+    d.run();
+    for (uint32_t f = 1; f < 40; ++f) {
+      d.t += 33 * kMs;
+      for (auto& p : d.make_au(f, 3000, 0, f * 3000, 50)) d.deliver(p);
+      d.run();
+    }
+    d.auto_decode = false;
+    d.t += 33 * kMs;
+    for (auto& p : d.make_au(40, 30000, kVIdr, 40 * 3000, 50)) d.deliver(p);  // an IDR (e.g. a size change)
+    d.run();
+    VCHECK(d.decoded.count(40));
+    d.core.on_sink_event("decoder_hw", "", d.t);  // the standby takes over at this IDR
+    d.core.on_decoded(40, true, 2, d.t);
+    d.auto_decode = true;
+    d.net();
+    VCHECK(d.count_fb(kPli) == 0);
+    d.advance(200 * kMs);
+    VCHECK(d.was_presented(40));
+  }
+}
+
 // ===================================================================== pacer (§4.4)
 
 void test_video_pacer_timing() {
@@ -898,6 +1113,139 @@ void test_video_pacer_timing() {
     const double rest = double(sent[63].t - sent[31].t) * 1e-9, want = 32 * 1200 * 8 / 25e6;
     VCHECKF(rest > 0.8 * want && rest < 1.6 * want, "bucket rest %.2f ms (%.2f)", rest * 1e3, want * 1e3);
   }
+}
+
+// R3 #10: a packet that completes a frame while the video thread is between pump() and its wait must still wake
+// it (before: the notification was lost and the frame waited for the next display tick, up to 33 ms).
+void test_video_wakeup_not_lost() {
+  uint8_t fkey[kKeyLen];
+  for (size_t i = 0; i < kKeyLen; ++i) fkey[i] = uint8_t(i + 9);
+  EventSink ev([](const std::string&) {});
+  auto flow = std::make_shared<Flow>("0000dddd", "peer", true, fkey, 10, &ev);
+  auto vb = make_null_video_backend("dec_ms=0");
+  Rig maker;  // seals media packets for stream 77 with Rig's key
+  auto packets = maker.make_au(0, 1000, kVIdr, 0, 50);
+  VideoRecvStream::Config cfg;
+  cfg.id = 77;
+  std::memcpy(cfg.key, Rig::k(), kKeyLen);
+  LipSyncHold hold;
+  auto vs = std::make_shared<VideoRecvStream>(cfg, flow, &ev, nullptr, &hold);
+  std::atomic<int64_t> injected{0};
+  int ticks = 0;
+  VideoRecvStream* raw = vs.get();
+  vs->test_before_wait = [&, raw](bool tick) {
+    // right after a display tick: the next deadline is a whole tick away
+    if (injected.load() || !tick || ++ticks < 3) return;
+    std::vector<std::vector<uint8_t>> out;
+    for (auto& p : packets) raw->ingest(p.data(), p.size(), now_ns(), false, &out);
+    injected = now_ns();
+  };
+  std::string code, msg;
+  VCHECK(vs->start(*vb, &code, &msg));
+  for (int i = 0; i < 400 && !injected.load(); ++i) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  VCHECK(injected.load() != 0);
+  int64_t handed = 0;
+  for (int i = 0; i < 2000 && !handed; ++i) {
+    if (vs->core().probe().started) handed = now_ns();
+    else std::this_thread::sleep_for(std::chrono::microseconds(100));
+  }
+  const double ms = handed ? double(handed - injected.load()) * 1e-6 : -1;
+  std::fprintf(stderr, "  IDR completed between pump and wait: handed after %.2f ms\n", ms);
+  VCHECKF(handed && ms < 8, "handed after %.2f ms", ms);
+  vs->stop();
+}
+
+// R3 #9: the pacer thread must never be the last owner of a stream (its destruction can end the flow, whose
+// pacer would then join its own thread: std::terminate). remove_stream() waits for a release in progress.
+void test_video_pacer_never_last_owner() {
+  struct Client : PacerClient {
+    std::atomic<bool> in{false}, out{false};
+    std::thread::id* died_on;
+    explicit Client(std::thread::id* d) : died_on(d) {}
+    ~Client() override { *died_on = std::this_thread::get_id(); }
+    void on_paced(const PacedPacket&, int64_t) override {
+      in = true;
+      std::this_thread::sleep_for(std::chrono::milliseconds(60));
+      out = true;
+    }
+  };
+  std::thread::id died_on;
+  Pacer pacer([](const PacedPacket&) {});
+  auto c = std::make_shared<Client>(&died_on);
+  pacer.add_client(5, std::weak_ptr<PacerClient>(std::static_pointer_cast<PacerClient>(c)));
+  PacedPacket p;
+  p.bytes = std::make_shared<const std::vector<uint8_t>>(std::vector<uint8_t>(1000, 1));
+  p.stream = 5;
+  p.end = true;
+  std::vector<PacedPacket> v{p};
+  pacer.enqueue(std::move(v));
+  for (int i = 0; i < 1000 && !c->in.load(); ++i) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  VCHECK(c->in.load());
+  pacer.remove_stream(5);  // the owner's stop(): returns only once the pacer let go of the client
+  VCHECK(c->out.load());
+  c.reset();               // the owner's last reference: the client dies here, on this thread
+  VCHECK(died_on == std::this_thread::get_id());
+}
+
+// R3 #13: camera_lost(h) names a handle by address. It is resolved to (stream id, serial) while `h` is alive; a later
+// stream whose handle reuses the address is a different owner (before: the helper matched the pointer later, on its
+// own thread, and could stop the wrong stream with no_camera).
+void test_video_camera_lost_owner() {
+  struct SameAddressHandle : CameraHandle {  // every instance at the same address
+    static void* operator new(size_t n) {
+      alignas(64) static unsigned char slot[512];
+      return n <= sizeof slot ? slot : throw std::bad_alloc();
+    }
+    static void operator delete(void*) {}
+    void start_encoding() override {}
+    void request_idr() override {}
+    void request_ltr_refresh() override {}
+    void acknowledge_ltr(uint32_t) override {}
+    void set_bitrate(int) override {}
+    void set_fps(int) override {}
+    void set_format(const VideoFormat&) override {}
+    void set_input_paused(bool) override {}
+    std::string device_in_use() const override { return "fake"; }
+  };
+  struct FakeBackend : VideoBackend {
+    void set_listener(VideoBackendListener*) override {}
+    std::vector<std::string> features() override { return {"camera_capture"}; }
+    CameraSnapshot cameras() override { return {}; }
+    void request_permission() override {}
+    std::unique_ptr<CameraHandle> open_camera(const CameraSpec&, EncoderSink*, std::string*) override {
+      return std::unique_ptr<CameraHandle>(new SameAddressHandle());
+    }
+    void set_encoder_standby(const EncoderStandby&) override {}
+    VcamState vcam() override { return {}; }
+    bool vcam_enable(bool, std::string*) override { return false; }
+    void vcam_placeholders(const std::map<std::string, Placeholder>&, const std::string&) override {}
+    std::unique_ptr<VideoSinkHandle> open_sink(VideoSinkListener*, std::string*) override { return nullptr; }
+  } be;
+  uint8_t fkey[kKeyLen] = {7};
+  EventSink ev([](const std::string&) {});
+  auto flow = std::make_shared<Flow>("0000eeee", "peer", true, fkey, 10, &ev);
+  VideoSendStream::Config cfg;
+  cfg.id = 41;
+  cfg.spec.fmt = VideoFormat{1280, 720, 30};
+  auto a = std::make_shared<VideoSendStream>(cfg, flow, &ev, nullptr);
+  std::string code, msg;
+  VCHECK(a->start(be, &code, &msg));
+  // the one address every SameAddressHandle gets (operator new only returns the slot; nothing is constructed)
+  const CameraHandle* h = static_cast<const CameraHandle*>(static_cast<SameAddressHandle*>(SameAddressHandle::operator new(sizeof(SameAddressHandle))));
+  uint32_t id = 0;
+  uint64_t serial = 0;
+  VCHECK(VideoSendStream::camera_owner(h, &id, &serial) && id == 41 && serial == a->serial());
+  const uint64_t serial_a = serial;
+  a->stop();  // its handle is gone: no owner
+  VCHECK(!VideoSendStream::camera_owner(h, &id, &serial));
+  cfg.id = 42;
+  auto b = std::make_shared<VideoSendStream>(cfg, flow, &ev, nullptr);
+  VCHECK(b->start(be, &code, &msg));
+  VCHECK(b->owns_camera(h));  // same address as a's handle
+  VCHECK(VideoSendStream::camera_owner(h, &id, &serial) && id == 42 && serial == b->serial() && serial != serial_a);
+  // a lost event resolved while a's handle was alive carries (41, serial_a): it can never match b
+  b->stop();
+  VCHECK(!VideoSendStream::camera_owner(h, &id, &serial));
 }
 
 // ===================================================================== tick latency (wake, §4.2)
@@ -1509,8 +1857,12 @@ const struct {
     {"video_bootstrap_and_unseen", test_video_bootstrap_and_unseen},
     {"video_lost_vs_late", test_video_lost_vs_late},
     {"video_presenter", test_video_presenter},
+    {"video_new_decoder_backlog", test_video_new_decoder_backlog},
     {"video_pacer_timing", test_video_pacer_timing},
+    {"video_pacer_never_last_owner", test_video_pacer_never_last_owner},
     {"video_tick_latency", test_video_tick_latency},
+    {"video_wakeup_not_lost", test_video_wakeup_not_lost},
+    {"video_camera_lost_owner", test_video_camera_lost_owner},
     {"video_e2e_start", test_video_e2e_start},
     {"video_e2e_no_receiver", test_video_e2e_no_receiver},
     {"video_e2e_recovery", test_video_e2e_recovery},

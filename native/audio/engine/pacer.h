@@ -50,7 +50,10 @@ class Pacer {
   Pacer& operator=(const Pacer&) = delete;
 
   void add_client(uint32_t stream, std::weak_ptr<PacerClient> c);
-  void remove_stream(uint32_t stream);  // drops its queued packets
+  // Drops its queued packets and returns once the pacer thread holds no reference to that stream's client (R3 #9):
+  // after it, the pacer can never be the last owner of the stream (whose destruction can end the flow and with it
+  // this pacer, which would then join its own thread). The owner calls it before it drops its references.
+  void remove_stream(uint32_t stream);
   void enqueue(std::vector<PacedPacket>&& pkts);       // one AU, FIFO behind earlier AUs
   void enqueue_retx(std::vector<PacedPacket>&& pkts);  // ahead of new data
   bool idr_queued(uint32_t stream) const;              // packets of an IDR of this stream still waiting
@@ -76,6 +79,9 @@ class Pacer {
   int64_t idr_t0_ = 0;
   double idr_bytes_before_ = 0;
   bool stop_ = false;
+  bool in_flight_ = false;        // the pacer thread holds a client reference (on_paced) of in_flight_stream_
+  uint32_t in_flight_stream_ = 0;
+  std::condition_variable idle_cv_;
   std::thread thread_;
 };
 
