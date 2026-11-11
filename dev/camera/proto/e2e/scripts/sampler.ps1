@@ -6,11 +6,11 @@ $end = (Get-Date).AddSeconds($Seconds)
 while ((Get-Date) -lt $end) {
   $t = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   $fs = (Get-CimInstance Win32_Service -Filter "Name='FrameServer'").ProcessId
-  $procs = @()
-  $procs += Get-Process camrecv -ErrorAction SilentlyContinue | % { ,@("camrecv", $_) }
-  if ($fs) { $procs += Get-Process -Id $fs -ErrorAction SilentlyContinue | % { ,@("frameserver", $_) } }
+  $procs = New-Object System.Collections.ArrayList
+  foreach ($p in @(Get-Process camrecv -ErrorAction SilentlyContinue)) { [void]$procs.Add([pscustomobject]@{ n = "camrecv"; p = $p }) }
+  if ($fs) { foreach ($p in @(Get-Process -Id $fs -ErrorAction SilentlyContinue)) { [void]$procs.Add([pscustomobject]@{ n = "frameserver"; p = $p }) } }
   $cids = Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" | ? { $_.CommandLine -like "*camera-c4*" } | % ProcessId
-  foreach ($id in $cids) { $procs += Get-Process -Id $id -ErrorAction SilentlyContinue | % { ,@("chrome", $_) } }
-  foreach ($x in $procs) { "$t,$($x[0]),$($x[1].Id),$([math]::Round($x[1].CPU,3)),$([math]::Round($x[1].WorkingSet64/1MB,1)),$([math]::Round($x[1].PrivateMemorySize64/1MB,1))" | Add-Content $Out }
+  foreach ($id in $cids) { foreach ($p in @(Get-Process -Id $id -ErrorAction SilentlyContinue)) { [void]$procs.Add([pscustomobject]@{ n = "chrome"; p = $p }) } }
+  foreach ($x in $procs) { "$t,$($x.n),$($x.p.Id),$([math]::Round($x.p.CPU,3)),$([math]::Round($x.p.WorkingSet64/1MB,1)),$([math]::Round($x.p.PrivateMemorySize64/1MB,1))" | Add-Content $Out }
   Start-Sleep $Every
 }

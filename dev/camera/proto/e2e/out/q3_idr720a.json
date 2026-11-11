@@ -1,0 +1,112 @@
+{
+ "idr_frames": 90,
+ "idr_packets": 9462,
+ "idr_packets_lost": 0,
+ "idr_frames_with_loss": 0,
+ "idr_bytes": {
+  "p50": 120110.5,
+  "n": 90,
+  "mean": 120113.1,
+  "max": 121105.0,
+  "min": 118871.0
+ },
+ "idr_send_ms": {
+  "p50": 100.17,
+  "p95": 101.13,
+  "n": 90,
+  "mean": 100.27,
+  "max": 101.16,
+  "min": 99.06
+ },
+ "idr_arrival_ms": {
+  "p50": 103.78,
+  "p95": 105.98,
+  "p99": 119.26,
+  "n": 90,
+  "mean": 104.19,
+  "max": 130.05,
+  "min": 101.49
+ },
+ "behind_idr_arrival_ms": {
+  "p50": 43.71,
+  "p95": 83.92,
+  "p99": 89.36,
+  "n": 263,
+  "mean": 45.72,
+  "max": 99.28,
+  "min": 4.67
+ },
+ "p_arrival_ms": {
+  "p50": 3.45,
+  "p95": 9.39,
+  "p99": 28.83,
+  "n": 5046,
+  "mean": 4.7,
+  "max": 37.58,
+  "min": 1.21
+ },
+ "p_packets": 42082,
+ "p_packets_lost": 0,
+ "holes": {},
+ "browser": {
+  "kinds": {
+   "pattern": 9,
+   "mac": 5213
+  },
+  "out_of_order": 0,
+  "repeated": 0,
+  "skipped_frames": 180,
+  "strip_time_mismatch": 0,
+  "oracle_checked": 0,
+  "oracle_below_30db": 0,
+  "oracle_psnr": {}
+ },
+ "delivery": {
+  "seconds": 179.7,
+  "fps": 29.01,
+  "freezes_over_100ms": 24,
+  "frozen_ms": 1683,
+  "frozen_ms_per_min": 561.7,
+  "longest_gap_ms": 114
+ },
+ "stages": {
+  "p50": 56.92,
+  "p95": 57.81,
+  "p99": 58.62,
+  "n": 5124,
+  "mean": 57.08,
+  "max": 79.87,
+  "min": 53.49
+ },
+ "audio": {
+  "received": 17997,
+  "lost": 0,
+  "delay_ms": {
+   "p50": 3.08,
+   "p95": 9.16,
+   "p99": 28.32,
+   "n": 17997,
+   "mean": 4.1,
+   "max": 42.25,
+   "min": 0.83
+  },
+  "delay_during_idr_ms": {
+   "p50": 3.26,
+   "p95": 7.12,
+   "p99": 26.7,
+   "n": 1082,
+   "mean": 4.08,
+   "max": 33.14,
+   "min": 1.04
+  },
+  "delay_else_ms": {
+   "p50": 3.08,
+   "p95": 9.29,
+   "p99": 28.37,
+   "n": 16915,
+   "mean": 4.1,
+   "max": 42.25,
+   "min": 0.83
+  }
+ }
+}

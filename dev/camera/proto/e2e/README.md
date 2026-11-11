@@ -28,7 +28,9 @@ PC   camrecv (Alex's session, scheduled task) ─ demand from the virtual camera
 | `scripts/*.ps1` | PC side: `setup.ps1` / `cleanup.ps1` (elevated: C2's camera from `camera-c4\bin`), `insession.ps1` (session-1 task), `browser.ps1`, `sampler.ps1` |
 | `analyze.py NAME` | clock fit, per-frame join Mac -> PC -> browser, stage breakdown, freezes, integrity, CPU/memory |
 | `analyze_q23.py cycles|loss|idr NAME` | on-demand cycles, loss-injection episodes, IDR pacing |
-| `out/*.json` | the summaries the report quotes |
+| `dfloor.py NAME` | what-if: late frames per minute for a fixed playout delay, from a measured run |
+| `samplers.py NAME` | CPU / memory of `camrecv`, Frame Server, Chrome (PC sampler) and `camsend`, `VTEncoderXPCService` (Mac) |
+| `out/*.json` | the summaries the report quotes (`q2_cycles_v1.json`: first Q2 run, IDR effectively paced at 2.0x by a since-fixed pacer bug) |
 
 PC work folder `C:\Users\Alex\camera-c4\` (`src\`, `bin\`, `web\`, `run\`, the scripts). `bin\` also holds C2's
 `BeamerCamC2.dll`, `vcamctl.exe`, `camprobe.exe` (copied from `camera-c2\bin`).
@@ -41,7 +43,8 @@ ssh lebig 'powershell -ExecutionPolicy Bypass -File C:\Users\Alex\camera-c4\setu
 scripts/run.sh q1_720 600 "" "mode=latency&w=1280&h=720&secs=600"
 scripts/run.sh q2_cycles 200 "" "mode=cycles&w=1280&h=720&n=20&hold=4&gap=3"
 scripts/run.sh q3_loss 260 "--loss 8:drop1,16:burst5,24:burst30,32:burst80,40:blackout1500@48" "mode=latency&secs=250"
-scripts/run.sh q3_idr720 300 "--key-every 60 --idr-pace 4 --audio" "mode=latency&secs=300"
+scripts/run.sh q3_idr720 300 "--key-every 60 --idr-pace 4 --audio --no-oracle" "mode=latency&secs=300"
+scripts/run.sh q4_soak 1800 "--audio" "mode=latency&w=1280&h=720&secs=1800"
 uv run -q --python 3.13 --with numpy analyze.py q1_720
 ssh lebig 'powershell -ExecutionPolicy Bypass -File C:\Users\Alex\camera-c4\cleanup.ps1'    # at the end
 ```

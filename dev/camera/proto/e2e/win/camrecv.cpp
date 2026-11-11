@@ -658,8 +658,7 @@ static bool inject(int64_t now, bool video) {
 }
 
 // ------------------------------------------------------------------------------------------- net
-struct AudioRec { uint32_t seq; uint64_t send_ns; int64_t arr; };
-static std::vector<AudioRec> g_audio;
+static FILE* g_audio_f = nullptr;  // streamed (the run scripts kill the receiver)
 
 static void on_data(const uint8_t* b, int n, int64_t now) {
   const DataHdr* h = (const DataHdr*)b;
@@ -863,6 +862,7 @@ static void net_loop() {
       wall0 = now;
       rx_bytes = 0;
       next_stats = now + 10000000;
+      if (g_audio_f) fflush(g_audio_f);
     }
     // receive everything pending
     for (;;) {
@@ -902,7 +902,7 @@ static void net_loop() {
           }
           break;
         case kAudio:
-          if (n >= (int)sizeof(Audio)) g_audio.push_back({((const Audio*)b)->seq, ((const Audio*)b)->send_ns, t});
+          if (n >= (int)sizeof(Audio) && g_audio_f) fprintf(g_audio_f, "%u,%llu,%lld\n", ((const Audio*)b)->seq, ((const Audio*)b)->send_ns, (long long)t);
           break;
       }
     }
@@ -929,6 +929,10 @@ int main(int argc, char** argv) {
   }
   if (!cfg.log.empty()) g_log = fopen(cfg.log.c_str(), "w");
   if (!cfg.loss.empty()) parse_loss(cfg.loss);
+  if (cfg.audio && !cfg.log.empty()) {
+    g_audio_f = fopen((cfg.log + ".audio.csv").c_str(), "w");
+    fprintf(g_audio_f, "seq,send_ns,arr_us\n");
+  }
   init_noise();
   timeBeginPeriod(1);
   CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -962,12 +966,7 @@ int main(int argc, char** argv) {
   td.join();
   tdisp.join();
   tor.join();
-  if (!g_audio.empty() && !cfg.log.empty()) {
-    FILE* f = fopen((cfg.log + ".audio.csv").c_str(), "w");
-    fprintf(f, "seq,send_ns,arr_us\n");
-    for (auto& a : g_audio) fprintf(f, "%u,%llu,%lld\n", a.seq, a.send_ns, (long long)a.arr);
-    fclose(f);
-  }
+  if (g_audio_f) fclose(g_audio_f);
   logj("{\"ev\":\"exit\",\"t\":%lld}", (long long)unix_us());
   return 0;
 }
