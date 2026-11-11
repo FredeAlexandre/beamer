@@ -272,7 +272,7 @@ class ThisMachine(unittest.TestCase):
         self.assertEqual(rows["outdated"],
                          [("Beamer Camera", "Needs an update", view.WAIT, view.ACTION_UPDATE, "Update Beamer Camera…")])
         self.assertEqual(rows["restart_needed"],
-                         [("Beamer Camera", "Restart Windows to finish updating Beamer Camera.", view.WAIT, None, "")])
+                         [("Beamer Camera", "Close apps that use the camera to finish updating Beamer Camera.", view.WAIT, None, "")])
         broken = cf.seen_from_pc(cf.pc_not_installed())
         machines = {**broken.camera.machines, PC: cf.pc_camera(install="broken")}
         broken = replace(broken, camera=replace(broken.camera, machines=machines, vcam_install_offer="repair"))

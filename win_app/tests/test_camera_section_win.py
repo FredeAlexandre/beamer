@@ -204,9 +204,9 @@ class Module(unittest.TestCase):
         self.assertIsNone(rows["streaming"].action)          # a stream runs on this PC: no Remove
         self.assertEqual(rows["pc_not_installed"].action, camera_view.ACTION_INSTALL)
         self.assertEqual(rows["outdated"].action, camera_view.ACTION_UPDATE)
-        self.assertEqual(rows["restart_needed"].value, "Restart Windows to finish updating Beamer Camera.")
+        self.assertEqual(rows["restart_needed"].value, "Close apps that use the camera to finish updating Beamer Camera.")
         page, _service = make_page(pc("restart_needed"))
-        self.assertEqual(page.camera.row_views[0].value.text(), "Restart Windows to finish updating Beamer Camera.")
+        self.assertEqual(page.camera.row_views[0].value.text(), "Close apps that use the camera to finish updating Beamer Camera.")
         self.assertTrue(page.camera.row_views[0].button.isHidden())
 
     def test_the_module_sits_under_the_notices_and_above_the_map(self):

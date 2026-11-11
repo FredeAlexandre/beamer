@@ -425,7 +425,7 @@ def _pc_rows(snap: CameraSnapshot, held: MachineCamera) -> list:
         restart = (local is not None and local.loaded_version and local.dll_version
                    and local.loaded_version != local.dll_version)
         if restart:
-            return [Row(tr("Beamer Camera"), tr("Restart Windows to finish updating Beamer Camera."), WAIT)]
+            return [Row(tr("Beamer Camera"), tr("Close apps that use the camera to finish updating Beamer Camera."), WAIT)]
         return [Row(tr("Beamer Camera"), tr("Installed"), PLAIN, None if busy else ACTION_REMOVE,
                     "" if busy else tr("Remove…"))]
     if install == "unsupported":
