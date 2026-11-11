@@ -1,0 +1,75 @@
+# Beamer Camera source (`BeamerCameraSource.dll`)
+
+The Windows half of "Beamer Camera": a Media Foundation media source that the Windows Camera Frame Server
+(`svchost -k Camera`, LocalService) loads for the virtual camera the helper creates with
+`MFCreateVirtualCamera` (System lifetime, CurrentUser access). The helper (`beamer-audio.exe`, Alex's session)
+decodes the Mac's stream and writes pictures into the shared memory this DLL owns. Design: `dev/camera/PHASE2.md`
+§4.6.2-4.6.4 and §9.2; measurements: `dev/camera/reports/cw5.md`.
+
+| File | What |
+|---|---|
+| `shm_protocol.h` | The contract with the helper (CW4): section layout, names, CLSID, offered media types. Frozen; change only with the operator. |
+| `source.cpp`, `source.def` | The DLL: activate -> source -> one shared NV12 stream at `kOffered`; owns the section and the frame event; validates everything the helper writes; built-in image when nobody feeds it. |
+| `builtin_image.h`, `placeholder_builtin.inc` | The built-in image ("Beamer Camera / Waiting for Beamer", PNG decoded with WIC) and the moving dot. The `.inc` is generated: `mac_app/.venv/bin/python native/audio/vcam-win/tools/make_builtin.py` on the Mac. |
+| `build.ps1` | Builds `<out>\camera\BeamerCameraSource.dll` and `<out>\camprobe.exe`, `feeder.exe`, `shmfuzz.exe` (out = `native\audio\build\win`). Called by `native\audio\win\build.ps1`; runs alone too (finds MSVC). |
+| `tools/camprobe.cpp` | A consumer: `list` (MF + DirectShow), `read` (IMFSourceReader; classifies every frame: live picture with the C2 stamp, slot 3, C1 code strip `--strip c1`, built-in image, uniform, other; latency from the stamp), `yuvcheck` (raw NV12 from ffmpeg dshow). |
+| `tools/feeder.cpp` | The helper stand-in: `run` (demand, beat, live or waiting pictures, wedge simulation), `vcam create/remove`, `inspect` (owners, DACLs, header), `squat`, `loadtest`, `cpu`. |
+| `tools/shmfuzz.cpp` | The hostile writer: random and boundary values in every helper-written field at 1 kHz. |
+| `tools/devinstall.ps1`, `devuninstall.ps1` | Elevated dev stand-ins for `vcam-install` / `vcam-uninstall` (same paths, keys and ACLs as §9.2). |
+| `tools/insession.ps1` | Runs a command in the signed-in user's session from ssh (scheduled task), as the helper runs. |
+
+## How the DLL behaves
+
+- **Only inside Frame Server.** Any process whose token is not LocalService (the helper, when
+  `MFCreateVirtualCamera` validates the DLL) gets an inert source: the three media types, built-in image if
+  started, no kernel object, no log, no registry access.
+- **Objects.** `Global\BeamerCamera.<InstallGuid>.Shm` (`kSectionBytes`) and `.Frame` (auto-reset) are created by
+  the first source object in Frame Server and kept while any source object lives (Frame Server re-creates the
+  source 2-3 times on every close, so between app sessions they usually do not exist; the helper polls every
+  1 s and opens them on the `.Demand` event). DACL `D:P(A;;GA;;;SY)(A;;GA;;;LS)(A;;GA;;;<OwnerSid>)`. An object
+  that already exists must be owned by LocalService or SYSTEM, else it is refused (`squatted` in the log) and
+  the camera shows the built-in image. `InstallGuid` is used verbatim as stored in the registry (the dev
+  install writes `{UPPERCASE-GUID}`); `OwnerSid` must be a valid SID that is not a broad group.
+- **Demand.** Start/Stop/Shutdown publish `streaming`, `want_*`, `state_qpc`, `state_seq + 1` and set
+  `.Demand` (opened with `EVENT_MODIFY_STATE` each time). Every Stop and Shutdown publishes, so repeated stops
+  are visible and harmless.
+- **What it shows** (checked on every delivery, §4.6.4): `beat_qpc` older than 500 ms, zero or invalid ->
+  built-in image + dot; `mode` waiting -> slot 3 + dot; live/hold -> the `latest` slot, repeated (counted in
+  `repeats`) when no newer picture arrives within 1.5 frame periods. A fresh picture is delivered as soon as a
+  request is pending (frame event), placeholders and repeats on a 30 fps high-resolution timer.
+- **Hostile input** (§4.6.3): geometry from constants only; `beat_qpc`, `mode`, `latest` and each slot's
+  `w`/`h`/`stride` read once and validated; the slot copied under its seqlock into a private buffer (two
+  attempts, then the previous picture); scaling reads only that buffer. Every failed check adds 1 to
+  `rejected` and logs at most once per second. The frame event is listened to at most once per 2 ms, so a
+  writer setting it in a loop cannot spin the delivery thread. An unchanged slot (same index, `seq` and
+  `written_qpc`) is not copied again: **the helper must keep incrementing `seq` (never reset it) and set
+  `written_qpc` on every write.**
+- **Log**: `%ProgramData%\Beamer\Camera\source.log` (folder made by `vcam-install`), token bucket of 3 lines
+  refilled at 1 line/s, rotated to `source.log.1` at 1 MB.
+
+## Updating the DLL
+
+A new `kDllVersion` installs into a new `%ProgramFiles%\Beamer\Camera\<version>\` folder and re-points the
+CLSID; Frame Server keeps the old DLL until it unloads it. What unloads it on this PC is measured in
+`dev/camera/reports/cw5.md` ("DLL update").
+
+## Test recipes (PC, from ssh; elevated)
+
+```powershell
+# build into a plain folder
+powershell -ExecutionPolicy Bypass -File native\audio\vcam-win\build.ps1 -OutDir C:\Users\Alex\camera-cw5\bin
+# install (dev stand-in for vcam-install), then create the camera in the user's session
+powershell -ExecutionPolicy Bypass -File native\audio\vcam-win\tools\devinstall.ps1 -Dll C:\Users\Alex\camera-cw5\bin\camera\BeamerCameraSource.dll
+powershell -ExecutionPolicy Bypass -File native\audio\vcam-win\tools\insession.ps1 -Command "C:\Users\Alex\camera-cw5\bin\feeder.exe vcam create"
+# feed it and read it
+insession.ps1 -Name CW5-feeder -NoWait -Command "...\feeder.exe run --follow --seconds 80"
+insession.ps1 -Name CW5-probe -Command "...\camprobe.exe read --seconds 60 --size 1920x1080"
+# fuzz it (while a camprobe read runs in the session)
+insession.ps1 -Name CW5-fuzz -Command "...\shmfuzz.exe --seconds 600 --hz 1000"
+# remove everything
+powershell -ExecutionPolicy Bypass -File native\audio\vcam-win\tools\devuninstall.ps1 -Feeder C:\Users\Alex\camera-cw5\bin\feeder.exe
+```
+
+## Dev install and removal with the helper's verbs
+
+(CW9 writes this section: the `beamer-audio.exe vcam-install` / `vcam-remove` / `vcam-uninstall` one-liners.)

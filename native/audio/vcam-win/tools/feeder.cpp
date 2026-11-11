@@ -11,7 +11,7 @@
 //        no writes, process alive).
 //   feeder vcam create|remove        MFCreateVirtualCamera(System, CurrentUser, "Beamer Camera") + Start / Remove
 //   feeder inspect                   object names, owners, DACLs, header fields and counters
-//   feeder squat [--seconds N]       pre-creates the .Frame event with a default DACL (refusal test)
+//   feeder squat [--seconds N] [--open]  pre-creates the .Frame event (default DACL, or everyone-full with --open)
 //   feeder loadtest DLL              loads the DLL in this process (as MFCreateVirtualCamera's validation does):
 //                                    media types offered, and no kernel object / no log created
 //   feeder cpu PID SECONDS           CPU of another process (% of one core: cycles and times)
@@ -77,7 +77,7 @@ int run(const RunOpts& o) {
   int64_t t_end = unix_us() + (int64_t)(o.seconds * 1e6), t_start = 0, next_poll = 0;
   uint32_t seen_seq = UINT32_MAX, cw = o.w, ch = o.h, latest = 0, picture = 0;
   bool streaming = false, waiting = o.waiting, beat_stopped = false, did_wait = false, did_live = false;
-  int64_t produced = 0, t_switch = 0;
+  int64_t produced = 0, t_switch = 0, last_beat_t = 0;
   double write_ms = 0;
   int64_t due = qpc_now();
   const int64_t period = (int64_t)(qpc_freq() / o.fps);
@@ -114,7 +114,7 @@ int run(const RunOpts& o) {
     double since = t_start ? (now_u - t_start) / 1e6 : -1;
     if (o.beat_stop_at >= 0 && since >= o.beat_stop_at && !beat_stopped) {
       beat_stopped = true;
-      printf("{\"event\":\"beat_stop\",\"t\":%lld}\n", (long long)now_u);
+      printf("{\"event\":\"beat_stop\",\"t\":%lld,\"last_beat_t\":%lld}\n", (long long)now_u, (long long)last_beat_t);
     }
     if (o.waiting_at >= 0 && since >= o.waiting_at && !did_wait) {
       did_wait = true;
@@ -156,11 +156,13 @@ int run(const RunOpts& o) {
           sec.hdr->mode.store(vc::kModeLive, std::memory_order_release);
         }
         sec.hdr->beat_qpc.store((uint64_t)qpc_now(), std::memory_order_release);
+        last_beat_t = unix_us();
         if (sec.frame) SetEvent(sec.frame);
         write_ms += qpc_to_ms(qpc_now() - w0);
         produced++;
       } else {
         sec.hdr->beat_qpc.store((uint64_t)qpc_now(), std::memory_order_release);   // idle loop beats too
+        last_beat_t = unix_us();
       }
     }
     // next iteration: the frame clock, or a demand change
@@ -172,7 +174,7 @@ int run(const RunOpts& o) {
       li.QuadPart = -(int64_t)((double)(due - now) * 1e7 / qpc_freq());
       SetWaitableTimer(timer, &li, 0, nullptr, nullptr, FALSE);
       HANDLE hs[2] = {timer, demand};
-      WaitForMultipleObjects(demand ? 2 : 1, hs, FALSE, INFINITE);
+      if (WaitForMultipleObjects(demand ? 2 : 1, hs, FALSE, INFINITE) == WAIT_OBJECT_0 + 1) next_poll = 0;   // demand: open now
     }
   }
   printf("{\"event\":\"exit\",\"t\":%lld,\"produced\":%lld}\n", (long long)unix_us(), produced);
@@ -247,10 +249,15 @@ int inspect() {
   return 0;
 }
 
-int squat(double seconds) {
+int squat(double seconds, bool open_dacl) {
   Names n = names();
   if (!n.ok) return 1;
-  HANDLE ev = CreateEventW(nullptr, FALSE, FALSE, n.frame.c_str());   // default DACL, owner = this user
+  // default DACL (LocalService cannot open it), or --open: everyone full access (the source then sees
+  // ERROR_ALREADY_EXISTS and must refuse it by its owner)
+  PSECURITY_DESCRIPTOR sd = nullptr;
+  if (open_dacl) ConvertStringSecurityDescriptorToSecurityDescriptorW(L"D:(A;;GA;;;WD)", SDDL_REVISION_1, &sd, nullptr);
+  SECURITY_ATTRIBUTES sa = {sizeof sa, sd, FALSE};
+  HANDLE ev = CreateEventW(open_dacl ? &sa : nullptr, FALSE, FALSE, n.frame.c_str());   // owner = this user
   DWORD err = GetLastError();
   std::string owner, sddl = ev ? object_sddl(ev, &owner) : "";
   printf("{\"event\":\"squat\",\"t\":%lld,\"created\":%s,\"existed\":%s,\"err\":%lu,\"owner\":\"%s\"}\n", (long long)unix_us(), ev ? "true" : "false",
@@ -320,16 +327,27 @@ int loadtest(const std::wstring& dll) {
     }
   }
   bool during_shm = n.ok && exists(true, n.shm), during_frame = n.ok && exists(false, n.frame);
-  if (src) src->Shutdown();
+  // repeated Stop / Shutdown on the inert source: must return, not crash
+  HRESULT h_start = E_FAIL, h_stop1 = E_FAIL, h_stop2 = E_FAIL, h_sd1 = E_FAIL, h_sd2 = E_FAIL;
+  if (src && pdsc) {
+    PROPVARIANT pos;
+    PropVariantInit(&pos);
+    h_start = src->Start(pdsc.Get(), nullptr, &pos);
+    h_stop1 = src->Stop();
+    h_stop2 = src->Stop();
+    h_sd1 = src->Shutdown();
+    h_sd2 = src->Shutdown();
+  }
   if (act) act->ShutdownObject();
   src.Reset();
   act.Reset();
   cf.Reset();
   long long log1 = log_size();
   printf("{\"ok\":%s,\"hr\":\"0x%08lx\",\"types\":[%s],\"types_exactly_kOffered\":%s,\"objects_before\":%s,\"objects_while_loaded\":%s,"
-         "\"log_bytes_before\":%lld,\"log_bytes_after\":%lld}\n",
+         "\"log_bytes_before\":%lld,\"log_bytes_after\":%lld,\"start_stop_stop_shutdown_shutdown\":[\"0x%08lx\",\"0x%08lx\",\"0x%08lx\",\"0x%08lx\",\"0x%08lx\"]}\n",
          SUCCEEDED(hr) ? "true" : "false", (unsigned long)hr, types.c_str(), exact ? "true" : "false", before_shm || before_frame ? "true" : "false",
-         during_shm || during_frame ? "true" : "false", log0, log1);
+         during_shm || during_frame ? "true" : "false", log0, log1, (unsigned long)h_start, (unsigned long)h_stop1, (unsigned long)h_stop2,
+         (unsigned long)h_sd1, (unsigned long)h_sd2);
   return SUCCEEDED(hr) ? 0 : 1;
 }
 
@@ -391,7 +409,11 @@ int wmain(int argc, wchar_t** argv) {
     else if (a == L"--beat-stop-at") o.beat_stop_at = num();
     else if (a == L"--switch-every") o.switch_every = num();
   }
-  if (cmd == L"squat") return squat(o.seconds);
+  if (cmd == L"squat") {
+    bool open_dacl = false;
+    for (int i = 2; i < argc; i++) open_dacl = open_dacl || !wcscmp(argv[i], L"--open");
+    return squat(o.seconds, open_dacl);
+  }
   if (cmd == L"run") {
     if (o.w > vc::kMaxW || o.h > vc::kMaxH || o.w < vc::kMinW || o.h < vc::kMinH) return 2;
     return run(o);
