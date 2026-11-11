@@ -48,7 +48,13 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
   regenerated only at merge time.
 - D3 accepted (operator): playout from encoder output; warm VT session with the measured fallback; floor 50 ms and
   the 10 s playout memory kept, revisit with the real camera in E2E.
-- Next: R2's blockers/majors fixed, then implementation.
+- D4 decisions accepted (operator), all seven.
+- **Implementation (Alex did not choose A/B; operator proceeds in this thread):** all WPs commit directly on
+  `feat/camera` in the shared checkout, only their own paths (PHASE2 §2.1/§2.2 ownership). To build without
+  seeing other WPs' uncommitted edits, every native build runs in a private export: `git archive HEAD` of the
+  repo into a private dir under `$TMPDIR`, overlay the WP's own files, build there (Mac: `build-mac.sh --no-driver`);
+  PC builds the same way in `C:\Users\Alex\camera-cwN\` (plain folder). Only CW5 registers a virtual camera on
+  the PC in wave 1; CW4 tests against a shm stand-in. Reports: `dev/camera/reports/cwN.md`.
 - Implementation does not start before C4's numbers are folded into PHASE2 and R1's blockers/majors are fixed.
 
 ## How agents work here
@@ -59,7 +65,7 @@ folders `C:\Users\Alex\camera-<wp>\`, never in the PC clone. Reports land in `de
 
 ## Phase
 
-**Phase 1 done 2026-11-11 (C1-C4). Phase 2 design: D1 -> R1 review -> D2 fixes -> D3 (C4 fold) running -> R2 re-check -> implementation.**
+**Phase 2 implementation, wave 1 (CW1, CW2, CW3, CW4, CW5, CW9) started 2026-11-11.** Design final at `84e4ec2` after D1 -> R1 -> D2 -> D3 (C4) -> R2 -> D4.
 
 | WP | What | Who / where | State |
 |---|---|---|---|
@@ -71,5 +77,5 @@ folders `C:\Users\Alex\camera-<wp>\`, never in the PC clone. Reports land in `de
 | R1 | Independent adversarial review of `PHASE2.md` against the code and reports | review agent, `reviews/r1-phase2.md` | **done** (`3d336c2`): 1 blocker (frame numbering vs dropped AUs -> corrupt frames marked good), 10 majors (sr vs pacer/seq space, sealer nonce reuse across threads, DLL trusts shm fields, no Reconnecting path, double IDR at start, busy undetectable, kill switch overridable from the PC + TCC prompt from a PC action, dev commands without owner WP, non-16:9 cameras, no acks over TCP fallback), 14 minors |
 | D3 | Fold C4 into PHASE1/PHASE2 (late frames shown on arrival, placeholder 500 ms when nothing feeds, warm encoder, IDR 4x fixed schedule, clock offset, lip sync) | design agent | **done** (`1889717`): no [C4] left; IDR 4x fixed schedule; late frames shown on arrival, loss only on proof; nothing before first keyframe; warm VT session while this Mac is the chosen camera (camera itself on demand), falls back to pre-warm if idle cost > 0.2 % core or 30 MB (CW3 measures); continuous clock offset; playout measured from encoder output (`enc_delay` header field); targets p50 <= 70 / p95 <= 90 / p99 <= 140 ms, first picture <= 450/600 ms synthetic, <= 1.0/1.5 s real camera. Kept D2's immediate PLI-as-start over C4's 300 ms delay |
 | R2 | Final independent review of PHASE2 (R1 resolutions, contradictions from the revisions, WPs) | review agent, `reviews/r2-phase2.md` | **done** (`e2a431e`): 0 blocker, 6 majors (double IDR at real-camera start, Mac camera can stay on with no receiver, placeholder texts owned by a later WP, synthetic dev source blocked by camera permission, sign error in provisional clock offset, 1080p coded 1920x1088 vs display size), 15 minors (3 false code claims); R1: 20 hold, 5 partial, 0 regressed |
-| D4 | Fix R2 majors + minors with operator rulings | design agent | started |
+| D4 | Fix R2 majors + minors with operator rulings | design agent | **done** (`84e4ec2`): 20 fixed, #18 already fixed by operator; Mac engine guards (no start PLI in 3 s or no feedback 5 s -> camera off `no_receiver`), retries only on change / backoff 10-30-60 s (worst ~3.5 s camera-on per minute), same loss rules UDP and link, refused size 3x in 10 s -> error screen, dev keys `camera_refuse` `log_time_map` `start_ms` `camera_synth` |
 | D2 | Revise PHASE2 per R1 with operator rulings (#1, #4, #7, #8, #10, #11) | design agent, `PHASE2.md` + `reviews/r1-resolution.md` | **done** (`3310a6b`): 24/25 fixed, #21 partly wrong (uninstaller already elevates; `vcam-remove` verb added); new: `time_map` flow-level packet replaces `sr`, RR 28 B with `clean_since`, encoder input pause instead of dropping AUs, DLL copies + validates shm, `shmfuzz` acceptance test, locale extraction must include `core/camera` |
