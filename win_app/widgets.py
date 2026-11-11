@@ -1495,7 +1495,8 @@ class PageButton(QPushButton):
     needs attention."""
 
     def __init__(self, text: str, parent: QWidget | None = None) -> None:
-        super().__init__(text, parent)
+        # "&" would be read as a mnemonic ("Audio & Camera" showed as "Audio_Camera").
+        super().__init__(text.replace("&", "&&"), parent)
         self.setProperty("vernier", "page")
         self.setCheckable(True)
         self.setAutoExclusive(True)
