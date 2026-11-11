@@ -72,4 +72,37 @@ powershell -ExecutionPolicy Bypass -File native\audio\vcam-win\tools\devuninstal
 
 ## Dev install and removal with the helper's verbs
 
-(CW9 writes this section: the `beamer-audio.exe vcam-install` / `vcam-remove` / `vcam-uninstall` one-liners.)
+This is what the page's "Install Beamer Camera…" and "Remove…" do (`win_app/vcam_install.py`), by hand.
+`ssh lebig` sessions are elevated, so there is no UAC prompt. The owner is the account that runs Beamer (Alex):
+
+```powershell
+$sid = (New-Object Security.Principal.NTAccount 'lebig\alex').Translate([Security.Principal.SecurityIdentifier]).Value
+$h = "$env:LOCALAPPDATA\Beamer\beamer-audio.exe"     # or a build: native\audio\build\win\beamer-audio.exe
+& $h vcam-install --owner-sid $sid                    # elevated; one JSON line, exit 0
+& $h vcam-status                                      # install ok, dll_version, loaded_version, bundled_version, present
+```
+
+Without `--dll` the helper installs `<its folder>\camera\BeamerCameraSource.dll` (the build and every package
+put it there) into `%ProgramFiles%\Beamer\Camera\<kDllVersion>\`. The install creates no camera: a helper
+running in the user's session creates it at its start or at its next `vcam` command (the running Beamer, or
+`refresh_camera_install()` after the page's install). From ssh, start one in the session with
+`tools\insession.ps1` and check with `camprobe list` (also in the session; the camera is CurrentUser).
+
+Remove (script-installed or dev machines; the Inno uninstaller does this itself):
+
+```powershell
+& $h vcam-remove        # Remove() the account's camera: works unelevated in the session and from ssh
+& $h vcam-uninstall     # elevated: COM class, HKLM\SOFTWARE\Beamer\Camera, the two Camera folders
+```
+
+`vcam-uninstall` leaves the empty `Beamer` parents (`HKLM\SOFTWARE\Beamer`, `%ProgramFiles%\Beamer`,
+`%ProgramData%\Beamer`); `Remove-BeamerCamera` from `win_app\Install-Maintenance.ps1` (dot-source the script
+elevated, then call the function) removes the same items and those parents. Both stop `FrameServer` only when
+the DLL is still loaded (an app has a camera open, or less than ~30 s since one closed). Exit codes: 0 ok,
+2 bad arguments, 3 not elevated, 4 failed.
+
+Updating: a helper built with a higher `kDllVersion` reports `install: outdated` until its `vcam-install` runs;
+then `dll_version` is the new one and `loaded_version` the one Frame Server runs. The old version folder stays
+while Frame Server holds it (`stale_left` in the install's JSON line) and goes at the next elevated action
+(install, repair, uninstall, `Install-Maintenance.ps1`) once Frame Server has stopped, ~30 s after the last
+app closed the camera. To load the new DLL at once on a dev machine: `Restart-Service FrameServer -Force`.

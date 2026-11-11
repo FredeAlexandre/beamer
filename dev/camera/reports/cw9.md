@@ -136,3 +136,64 @@ Teams/Chrome) no longer list "Beamer Camera"; the agent checks over ssh that the
    while an app there uses Beamer Camera, after you choose it on the Audio & Camera page." Click **Allow**.
 3. System Settings > Privacy & Security > Camera lists Beamer, on. If you clicked Don't Allow by mistake:
    `tccutil reset Camera uk.co.kalkman.beamer`, then repeat step 2.
+
+## Part 2 (CW9b): real build, real install round trips, update
+
+Date 2026-11-11. Mac agent, PC over `ssh lebig` (elevated), all work in `C:\Users\Alex\camera-cw9\` (plain folder
+from `git archive` of `6180ae8` + the `vcam_install.py` fix below; the N+1 build in `camera-cw9\v2\`). Nothing
+deployed; the installed Beamer, its tasks and the PC clone were not touched. Every "in session" step ran in Alex's
+signed-in session, unelevated, through a temporary scheduled task (CW5's `tools/insession.ps1`, tasks `CW9-*`,
+removed after each run). Drivers (not committed): `run\state.ps1` (every trace: devnode, CLSID, keys, folders,
+Frame Server and the DLL it has loaded, tasks, firewall rules, processes), `run\helper_session.ps1` (the built
+`beamer-audio.exe --control` in the session: `vcam`, wait, `vcam`, `quit`), `run\remove_maint.ps1` /
+`run\stale_maint.ps1` (dot-source `win_app\Install-Maintenance.ps1`, call `Remove-BeamerCamera` /
+`Remove-BeamerCameraStaleVersions` on the real paths, `Stop-Service` wrapped to count calls), `run\py_vcam.py`
+(the real `vcam_install.install()` / `remove()`).
+
+| Remaining item (part 1) | Result | Evidence |
+|---|---|---|
+| Windows build with CW5's DLL and CW4 + CW2's helper, signing step | **Pass** (unsigned: no Certum certificate on lebig) | `build_win_app.ps1` (`BEAMER_SKIP_TESTS=1`) exit 0: `dist\Beamer.exe`, `native\audio\build\win\beamer-audio.exe` (1,666,048 B, imports incl. MFPlat delay-load), `camera\BeamerCameraSource.dll` (276,992 B; MFPlat, ole32, ADVAPI32, KERNEL32), "Built …BeamerCameraSource.dll" from the camera hunk. `Get-BeamerSignTool`: "Windows signing: unsigned (Certum certificate absent from CurrentUser\My)", so `Sign-BeamerArtifact` returns for all three, as for the helper today; DLL `Get-AuthenticodeSignature` = NotSigned |
+| Portable build with the real DLL: `camera\BeamerCameraSource.dll` beside `beamer-audio.exe`, not under `_internal` | **Pass** | `build_portable.ps1 -OutputDirectory ..\out` exit 0. `Beamer-portable\` = `camera, licences, _internal, beamer-audio.exe, Beamer.exe, Beamer.portable, LICENSE, THIRD-PARTY-NOTICES.txt`; `camera\BeamerCameraSource.dll` and `beamer-audio.exe` byte-identical (SHA-256) to the build outputs; `_internal\camera` and `_internal\BeamerCameraSource.dll` absent; zip holds `Beamer-portable\camera\BeamerCameraSource.dll` (276,992) and `Beamer-portable\beamer-audio.exe` |
+| Real `vcam-install` (dev install) | **Pass** | Before: `vcam-status` `install:"missing"`, no trace (state.ps1). `beamer-audio.exe vcam-install --owner-sid S-1-5-21-…-1001` rc 0: `{"ok":true,"dll":"C:\\Program Files\\Beamer\\Camera\\1\\BeamerCameraSource.dll",…,"dll_version":1,"stale_left":0}`. HKLM CLSID `InprocServer32` = that path, `ThreadingModel=Both` (no HKCU / WOW6432 copy); `HKLM\SOFTWARE\Beamer\Camera` InstallGuid / OwnerSid (Alex) / DllVersion 1 / DllPath; `C:\ProgramData\Beamer\Camera` ACL `D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;LS)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;BU)` (protected); the DLL inherits Program Files' ACL (Users RX). `vcam-status` -> `install:"ok"` |
+| Camera present (MF enumeration) | **Pass** | The built helper started in the session (`--control`, then `vcam`): `creating:true` -> `present:true, loaded_version:1`, log "vcam: camera create ok (175 ms)" (143-146 ms on later runs). `camprobe list` in the session: MF `Beamer Camera (Caméra virtuelle Windows)` (`swd#vcamdevapi#…`), DirectShow the same + the pre-existing OBS Virtual Camera; devnode `SWD\VCAMDEVAPI\3C8B…` OK; Frame Server loaded `C:\Program Files\Beamer\Camera\1\BeamerCameraSource.dll`. `camprobe read` 3 s: 90 frames 29.9 fps, 0 gaps, `kOffered` types |
+| `Install-Maintenance.ps1 -Remove` camera step against the dev install, DLL loaded | **Pass** | Inno order: `vcam-remove` in the session rc 0 `{"removed":true}` (devnode gone, MF none); then `Remove-BeamerCamera` with Frame Server still running the DLL: **1** `Stop-Service FrameServer`, 842 ms, then nothing left (no device in any state, no CLSID, no `HKLM\SOFTWARE\Beamer`, no `Program Files\Beamer`, no `ProgramData\Beamer`), Frame Server Stopped |
+| Same, DLL not loaded | **Pass** | After the update run: Frame Server stopped by itself, `vcam-remove` (it starts Frame Server, which does not load our DLL), `Remove-BeamerCamera`: **0** `Stop-Service`, 550 ms, everything gone, Frame Server back to Stopped 28 s later |
+| Page path: `vcam_install.install()` / `remove()` for real | **Pass** | `py_vcam.py` over ssh (elevated, so `runas` shows no prompt): `install` returned at once, `Result(ok=True, code='ok')` on thread `beamer-vcam-install` after 0.1 s, keys and folder as above; camera created by the helper in the session; after Frame Server idled, `remove`: `Result(ok=True, code='ok')` on `beamer-vcam-remove` after 0.2 s, no warning logged, so **`vcam-remove` run from an ssh session (session 0, same account) does Remove() the camera** (part 1's open question): no devnode, no CLSID, no keys, no Camera folders. `vcam-uninstall` left the empty `Beamer` parents (contract issue 9); `Remove-BeamerCamera` then removed them with 0 `Stop-Service` |
+| Update N -> N+1 | **Pass** | v1 installed and created (above). N+1 = the same export with `kDllVersion = 2` in `shm_protocol.h` (private, `camera-cw9\v2`, never committed), helper and DLL rebuilt. (1) v2 helper `vcam-status` before its install: `install:"outdated","dll_version":1,"bundled_version":2`; v1 helper: `ok`. (2) An app (`camprobe read` 40 s) has the camera open on v1; v2 `vcam-install` rc 0: `dll_version 2, stale_left 1`; CLSID and `DllPath` -> `…\Camera\2\`, `DllVersion` 2, `InstallGuid` kept, folders `1` and `2`; Frame Server still runs `…\1\`. (3) v2 helper in the session: `install:"ok","dll_version":2,"loaded_version":1,"in_use":true`. (4) `Remove-BeamerCameraStaleVersions` while the app reads: warning "…\Camera\1 is still in use; the next maintenance run deletes it.", folder kept, 0 `Stop-Service`. The app ran through the whole update: 1193 frames, 29.8 fps, **0 gaps**. (5) App closed; Frame Server stopped by itself **30 s** later; `Remove-BeamerCameraStaleVersions` again: folder `1` deleted, only `2` left, 0 `Stop-Service`. (6) Reopen with the v2 helper running: Frame Server loads `…\Camera\2\BeamerCameraSource.dll`, helper `loaded_version:2`, 117 frames all the helper's pictures (0 built-in) |
+| Page "outdated" / "restart needed" logic sees the right versions | **Pass** | The captured `vcam` events run through `CameraPart._compose_vcam`, the part's version extraction and `core/camera/view._pc_rows` (Mac, fixtures for the rest): v1+v1 helper -> "Installed" / "Remove…"; v1 installed + v2 helper -> "Needs an update" / "Update Beamer Camera…"; v2 installed, app on v1 -> "Close apps that use the camera to finish updating Beamer Camera." (no action); reopened on v2 -> "Installed"; removed -> "Not installed" / "Install Beamer Camera…" |
+| i18n failure `win_app/vcam_install.py:91` | **Fixed** | Log strings are exempt only when called on a logger name (`test_i18n_coverage.LOGGERS` matches the receiver: `LOGGER.info(...)`), not through a local alias `log = LOGGER.info`; now `LOGGER.log(logging.INFO if result.ok else logging.WARNING, "%s exited %s (%s)", …)`. `test_no_hard_coded_user_visible_strings` OK on both machines; `test_vcam_install` 30 OK on lebig (nothing skipped), 30 OK (10 skipped) on the Mac. The other failure of that module (`beamer.pot` stale, `it.po` missing camera strings) is the merge step's (§12) |
+| README dev-install section | **Done** | `native/audio/vcam-win/README.md` "Dev install and removal with the helper's verbs", with what was measured here |
+| No firewall prompt / rule | **Pass** | Firewall rules 632 before and after, none for a `camera-cw9` path (the helper bound no socket: no `flow_open`) |
+| `dev/deploy.sh both`, Inno compile | **Not run** (unchanged from part 1): deploy forbidden; Inno Setup not installed on lebig | |
+
+### Contract issues (part 2)
+
+9. **`vcam-uninstall` (CW4) leaves empty parents**: `HKLM\SOFTWARE\Beamer`, `%ProgramFiles%\Beamer`,
+   `%ProgramData%\Beamer` stay (empty) after the page's "Remove…". Harmless; the uninstaller's
+   `Remove-BeamerCamera` removes them. Suggest CW4 deletes a `Beamer` parent it leaves empty, as the PowerShell does.
+10. **Full `Install-Maintenance.ps1 -Remove` not run**: besides the camera it unregisters the `Beamer-*`
+    autostart task for the given exe, the `Beamer-GameInputRecovery` task (unconditionally) and the `Beamer.exe`
+    firewall rules, i.e. the installed Beamer's. Its camera step was run as the real function on the real paths;
+    the whole script runs in H7 (Inno uninstall).
+11. **`vcam-remove` starts Frame Server** (MFCreateVirtualCamera + Remove() go through it) without loading our
+    DLL; it stops again ~30 s later. So `Remove-BeamerCamera` right after it normally finds nothing locked.
+12. **"Restart Windows" wording is gone** (STATUS decision after CW5): the page says "Close apps…", which
+    matches what was measured here (new DLL at the first open > 30 s after the last app closed).
+
+### PC cleanup (verified at the end, `run\state.ps1`)
+
+- No `SWD\VCAMDEVAPI*` devnode in any state, nothing named Beamer in `Win32_PnPEntity`; `camprobe list`: MF none,
+  DirectShow only "OBS Virtual Camera" (pre-existing).
+- No CLSID `{19FCB9D1-…}` (HKLM, HKCU, WOW6432Node); no `HKLM\SOFTWARE\Beamer`.
+- No `C:\Program Files\Beamer`, no `C:\ProgramData\Beamer`.
+- Frame Server Stopped, start type Manual (as before).
+- No `CW9*` scheduled task; Beamer's `Beamer-lebig-Alex` (Running) and `Beamer-GameInputRecovery` (Ready) as
+  before; no process from `camera-cw9`; firewall rules 632 as before.
+
+What stays: the work folder `C:\Users\Alex\camera-cw9\` (export, its venv, builds, portable zip, `run\` drivers;
+the N+1 build `v2\` was deleted). Remove with `Remove-Item -Recurse C:\Users\Alex\camera-cw9` when Phase 2 closes.
+
+### Needs Alex (unchanged)
+
+H6 (first install through the page's UAC prompt, any Windows Firewall prompt) and H7 (Inno uninstall removes the
+camera) as in part 1; both need a deploy first.

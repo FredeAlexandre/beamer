@@ -87,8 +87,7 @@ def _elevated(exe: Path, arguments: list) -> Result:
         LOGGER.warning("%s could not start elevated: %s", arguments[0], exc)
         return Result(False, "failed")
     result = Result(code == EXIT_OK, _CODES.get(code, "failed"))
-    log = LOGGER.info if result.ok else LOGGER.warning
-    log("%s exited %s (%s)", arguments[0], code, result.code)
+    LOGGER.log(logging.INFO if result.ok else logging.WARNING, "%s exited %s (%s)", arguments[0], code, result.code)
     return result
 
 
