@@ -61,12 +61,13 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 
 | WP | State |
 |---|---|
-| CW1 Python control plane | running; wire/planner/store `6887b20`, CameraPart + harness + invariant checker `5b9f98f`; resumed after stopping while waiting for its suite |
+| CW1 Python control plane | **done** (`3e7991a`): 100 tests Mac + PC; convergence 200 seeds worst 6 rounds; 0 `camera_*` to peers without `camera1`; Mac with sharing off never sends; invariant checker never fired (and caught an injected bug: camera on 5.6 s without receiver); start-PLI hold 3.03 s; 5 refusal codes stop at once; `no_receiver` backoff ~10/43/106 s, 3.0-3.1 s on per try; 0 TCC prompts from PC actions; synthetic source needs no permission. Contract additions accepted (helpers in model.py, `CameraPart.shutdown()`, helper_event routing, schedule rule, chosen states). i18n: hard-coded string `win_app/vcam_install.py:91` (CW9) -> fix in CW9b |
 | CW2 Engine video transport | running (`video_backend.h` landed `e0a4ef5`) |
 | CW3 Mac camera backend | running |
 | CW4 Windows video sink | running |
 | CW5 Windows camera source DLL | running (`shm_protocol.h` `5adb0d8`, DLL `dffd9a0`); resumed after stopping while its PC test ran (camera registered, tasks CW5-* running) |
 | CW7 Page model, Mac UI, menu (wave 2, started early: CW1 milestones 1+2 landed `b9116dd`, `bf21597`) | running; milestone 1 `view.py` landed `cde2cad`; resumed after stopping with work uncommitted |
+| CW6 Link and service integration | running (started on CW1 done) |
 | CW8 Qt Camera module (PC) | running (started on CW7 milestone 1 + CW9's `vcam_install`) |
 | CW9 Packaging, install, permissions | **part 1 done** (`8e14cb8`, code `d6859c5`): camera entitlement on app + python + helper (checked on a private Beamer Dev build, deleted), Info.plist keys, `build_dmg.sh` guard, Inno script (not compiled: no ISCC on lebig), `Install-Beamer.ps1` camera step, portable build puts `camera\BeamerCameraSource.dll` beside `beamer-audio.exe` (stub binaries), `vcam_install.py` 30 tests Mac + lebig, `Install-Maintenance -Remove` on a fake install. Touched `win_app/build_portable.ps1` outside its list (needed; accepted). **Part 2 (CW9b) after CW4+CW5:** rebuild PC with the real DLL, `-Remove` on a real dev install, README section for vcam-win (text in cw9.md). Inno compile needs Inno Setup 6 on lebig (Alex's call, later) |
 
