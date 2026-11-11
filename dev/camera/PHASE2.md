@@ -700,8 +700,10 @@ refused (`size_rejected`, nothing written to a slot; loop guard in §4.5.6).
 **Decoder (re)creation never blocks the presenter (R2 #14).** Creating or re-creating the MFT and its D3D11
 device (first open, after 3 errors, on `DXGI_ERROR_DEVICE_REMOVED`, the 30 s hardware retry) runs on a separate
 worker thread. Meanwhile the video thread keeps presenting/holding and beating (§4.6.4), so the DLL never shows
-its built-in image during a healthy stream; AUs that arrive meanwhile are discarded until the new decoder is
-ready, and the stream then sends PLI `start` (a new decoder always gets an IDR, §4.5.6). Kept pictures go to a pool of
+its built-in image during a healthy stream; the sink holds the first IDR that arrives while the decoder is being
+made and feeds it to the new decoder, and the stream sends PLI `start` only if the new decoder has no IDR to start
+from (as built after review R3 #2, `ef944c6`: otherwise every slow start cost a second IDR and ~1 s). After a GPU loss
+the software decoder keeps the stream until the next natural IDR; the 30 s hardware retry never forces one. Kept pictures go to a pool of
 **12 NV12 buffers** at the stream size: (D 150 + hold 150 ms) / 33 ms + 2 = 12, enough for the worst present
 delay; when the pool is exhausted the oldest unpresented kept picture is dropped, never shown (counted
 `skipped`). `present`
