@@ -6,10 +6,12 @@ Pure, so the rules are tested without Qt.
 from __future__ import annotations
 
 import re
+import sys
 import threading
 import time
 
 from core import effects
+from core import feature_flags
 from core import peerlist
 from core.i18n import N_, joined, tr, trc
 from core.ways import CORNER_NAMES_LOWER, EDGE_NAMES, part_names, parts_phrase, toggle_part
@@ -22,6 +24,12 @@ PAGES = (
     ("crossing", N_("Crossing"),
      N_("Choose how the pointer or a key moves input to each machine, and how hard the edge "
      "pushes back first.")),
+    # With the camera on Windows (dev/camera/PHASE2.md §8.1): the same page, key, place and shortcut,
+    # renamed for its Camera module. Linux shows no camera, so it keeps "Audio".
+    ("audio", N_("Audio & Camera"),
+     N_("Every machine's microphones, speakers and camera. Choose the microphone your apps hear, the camera "
+        "they see, and where each machine's sound plays."))
+    if getattr(feature_flags, "CAMERA", False) and sys.platform == "win32" else
     ("audio", N_("Audio"),
      N_("Every machine's microphones and speakers. Choose the microphone your apps hear and where each "
      "machine's sound plays.")),

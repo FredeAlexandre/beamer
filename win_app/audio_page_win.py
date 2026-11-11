@@ -8,8 +8,9 @@ only lays it out and draws it in the Crossing page's style:
 - `AudioMap`: the machines on the Crossing layout's tiles, read only, with the mic and sound routes as
   arrows (sound solid, mic dashed, grey while waiting); click or arrow keys select a machine;
 - `MenuSelect`: a button that opens a menu of `view.Choice`s, grouped under machine headers;
-- `AudioPageWidget`: the Microphone module, the notices right under it (both apps), Machines and
-  the selected machine.
+- `AudioPageWidget`: the Microphone module, the notices right under it (both apps), the Camera module
+  (camera_section_win.py, Windows with the camera feature: dev/camera/PHASE2.md §8), Machines and the
+  selected machine.
 
 Threads (§9.3): the service calls `subscribe`/`subscribe_levels` callbacks on its worker thread. They
 only store what arrived and post one queued signal (coalesced); the page reads the snapshot, builds the
@@ -29,6 +30,7 @@ from PySide6.QtGui import (QAccessible, QAccessibleAnnouncementEvent, QColor, QD
 from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QMenu, QPushButton, QSizePolicy,
                                QVBoxLayout, QWidget)
 
+import camera_section_win
 import theme
 import tokens
 import widgets
@@ -143,7 +145,7 @@ def arrow_offsets(arrows) -> list:
         pairs.setdefault(frozenset((arrow.source, arrow.target)), []).append(index)
     offsets = [0.0] * len(arrows)
     for indexes in pairs.values():
-        for rank, index in enumerate(indexes):
+        for rank, index in enumerate(camera_section_win.lane_order(arrows, indexes)):
             offsets[index] = (rank - (len(indexes) - 1) / 2) * ARROW_SPREAD
     return offsets
 
@@ -190,10 +192,12 @@ def paint_mic_glyph(painter: QPainter, x: float, y: float, colour: QColor, size:
     painter.restore()
 
 
-def paint_arrow(painter: QPainter, start, end, colour: QColor, dashed: bool) -> None:
+def paint_arrow(painter: QPainter, start, end, colour: QColor, dashed: bool, dotted: bool = False) -> None:
     pen = QPen(colour, 2.0)
     pen.setCapStyle(Qt.PenCapStyle.FlatCap)
-    if dashed:
+    if dotted:
+        pen = camera_section_win.camera_pen(pen)
+    elif dashed:
         pen.setDashPattern([2.2, 1.8])
     head = 8.0
     length = math.hypot(end[0] - start[0], end[1] - start[1])
@@ -467,12 +471,28 @@ class AudioMap(QWidget):
                 continue
             start, end = arrow_line(source, target, offset)
             colour = _colour("signal") if arrow.state == "active" else _colour("ink_3")
-            paint_arrow(painter, start, end, colour, dashed=arrow.kind == "mic")
+            paint_arrow(painter, start, end, colour, dashed=arrow.kind == "mic", dotted=arrow.kind == "camera")
         if self.hasFocus() and self._keyboard_focus and self.selected in self._rects:
             painter.setPen(QPen(_colour("ink_2"), 2.0))
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRoundedRect(self.tile_rect(self.selected).adjusted(-3, -3, 3, 3), 3, 3)
         painter.end()
+
+    def _watched(self, machine: str) -> bool:
+        """A live camera arrow ends at `machine`: an app there sees the camera now."""
+        return any(arrow.kind == "camera" and arrow.target == machine and arrow.state == "active"
+                   for arrow in self.arrows)
+
+    def _paint_camera_line(self, painter: QPainter, tile: view.TileView, rect: QRectF, y: float, room: int) -> None:
+        text = tile.camera_line or tile.watching_line
+        lit = tile.camera_live or (bool(tile.watching_line) and self._watched(tile.machine))
+        glyph = view.LIVE if lit and tile.online else view.QUIET
+        camera_section_win.paint_camera_glyph(painter, rect.left() + 9, y + 3, _colour(glyph), 11.0)
+        ink = "ink" if tile.has_active_camera else view.LIVE if lit else view.QUIET
+        painter.setPen(_colour(ink if tile.online else view.QUIET))
+        painter.setFont(theme.font(tokens.TYPE["note"], 600 if tile.has_active_camera else 400))
+        painter.drawText(QRectF(rect.left() + 28, y, room, 16), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+                         painter.fontMetrics().elidedText(text, Qt.TextElideMode.ElideRight, room))
 
     def _paint_tile(self, painter: QPainter, tile: view.TileView, rect: QRectF) -> None:
         radius = tokens.RADIUS["button"]
@@ -505,11 +525,15 @@ class AudioMap(QWidget):
             painter.drawEllipse(centre, 3, 3)
         # The microphone and the output in two lines over the level bar, as on the Mac page; short of
         # room the shared mic (or who hears it) beats the platform line, which beats the own default mic.
+        # The camera's line (its name on the camera machine, an app using it elsewhere) sits above the
+        # microphone's and counts as the shared mic does (camera_section_win.tile_lines).
         mic_text, mic_ink, important = tile_mic_text(tile)
         out_y = rect.bottom() - 33
-        mic_y = out_y - 19
-        show_mic = bool(mic_text) and (mic_y >= rect.top() + 48 or (important and mic_y >= rect.top() + 30))
-        if tall >= 56 and not (show_mic and mic_y < rect.top() + 48):
+        placed = camera_section_win.tile_lines(tile, self._watched(tile.machine), mic_text, important,
+                                               rect.top(), out_y - 19)
+        show_mic = "mic" in placed
+        mic_y = placed.get("mic", out_y - 19)
+        if tall >= 56 and not any(line_y < rect.top() + 48 for line_y in placed.values()):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(_colour("signal" if tile.online else "ink_3"))
             painter.drawEllipse(QPointF(rect.left() + 15, rect.top() + 39), 3, 3)
@@ -520,6 +544,8 @@ class AudioMap(QWidget):
                              painter.fontMetrics().elidedText(tile.subtitle, Qt.TextElideMode.ElideRight,
                                                               max(1, round(detail.width()))))
         room = max(1, round(rect.width() - 28 - 10))
+        if "camera" in placed:
+            self._paint_camera_line(painter, tile, rect, placed["camera"], room)
         if show_mic:
             glyph = view.LIVE if tile.has_active_mic or tile.listen_line else view.QUIET
             if not tile.online:
@@ -797,6 +823,12 @@ class AudioPageWidget(QWidget):
         self.notices_box.setSpacing(8)
         outer.addLayout(self.notices_box)
 
+        # The camera (dev/camera/PHASE2.md §8.3), under the notices; hidden until the camera feature
+        # and a machine with a camera side are there.
+        self.camera = camera_section_win.CameraModule(lambda: self.service, lambda: self.camera_state.snapshot)
+        self.camera_state = camera_section_win.NO_CAMERA
+        outer.addWidget(self.camera)
+
         self.map_module = widgets.Module(tr("Machines"))
         self.map = AudioMap(self._machine_chosen)
         self.map_module.body.addWidget(self.map)
@@ -809,6 +841,17 @@ class AudioPageWidget(QWidget):
             line.addWidget(_LegendMark(kind))
             line.addWidget(widgets.label(tr(text), "note"))
             line.addSpacing(10)
+            if kind == "mic":
+                # The camera's arrow, between the mic and Waiting, while the Camera module shows.
+                self.camera_legend = QWidget()
+                self.camera_legend.setProperty("vernier", "plain")
+                mark = QHBoxLayout(self.camera_legend)
+                mark.setContentsMargins(0, 0, 10, 0)
+                mark.setSpacing(6)
+                mark.addWidget(_LegendMark("camera"))
+                mark.addWidget(widgets.label(tr(camera_section_win.LEGEND_CAMERA), "note"))
+                self.camera_legend.hide()
+                line.addWidget(self.camera_legend)
         line.addStretch(1)
         self.map_module.body.addWidget(legend)
         self.map_module.body.addWidget(widgets.label(tr(MAP_HINT), "note-quiet", wrap=True))
@@ -943,6 +986,8 @@ class AudioPageWidget(QWidget):
         self.unavailable.show()
         for module in (self.mic_module, self.map_module, self.panel_module):
             module.hide()
+        self.camera_state = camera_section_win.NO_CAMERA
+        self.camera.show_section(None)
         _clear(self.notices_box)
         self.notices, self._notice_keys = [], None
 
@@ -951,10 +996,10 @@ class AudioPageWidget(QWidget):
         selector's menu is open it waits for the menu to close."""
         if self.service is None:
             return
-        if self.mic_select.menu_open() or self.output_select.menu_open():
+        if self.mic_select.menu_open() or self.output_select.menu_open() or self.camera.select.menu_open():
             if not self._dirty:
                 self._dirty = True
-                for select in (self.mic_select, self.output_select):
+                for select in (self.mic_select, self.output_select, self.camera.select):
                     select.menu().aboutToHide.connect(self._menu_closed, Qt.ConnectionType.QueuedConnection)
             return
         try:
@@ -965,12 +1010,16 @@ class AudioPageWidget(QWidget):
             without_audio = tuple(self._peers_without_audio() or ())
         except Exception:  # noqa: BLE001 - links changing under us; the next refresh has them
             without_audio = ()
-        page = view.page_model(self.service.snapshot(), tiles, self.selected, self.own_label,
-                               without_audio, self._driver())
+        audio = self.service.snapshot()
+        self.camera_state = camera_section_win.section_for(self.service, audio, self.own_label)
+        page = view.page_model(audio, tiles, self.selected, self.own_label, without_audio, self._driver(),
+                               camera=self.camera_state.extras)
         self.show_page(page)
+        self.camera.show_section(self.camera_state.section)
+        self.camera_legend.setVisible(self.camera_state.extras is not None)
 
     def _menu_closed(self) -> None:
-        for select in (self.mic_select, self.output_select):
+        for select in (self.mic_select, self.output_select, self.camera.select):
             try:
                 select.menu().aboutToHide.disconnect(self._menu_closed)
             except (RuntimeError, TypeError):
@@ -1127,4 +1176,4 @@ class _LegendMark(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         colour = _colour("ink_3" if self.kind == "waiting" else "signal")
-        paint_arrow(painter, (1, 6), (25, 6), colour, dashed=self.kind == "mic")
+        paint_arrow(painter, (1, 6), (25, 6), colour, dashed=self.kind == "mic", dotted=self.kind == "camera")
