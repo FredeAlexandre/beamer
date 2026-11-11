@@ -975,11 +975,11 @@ msgstr ""
 msgid "bottom"
 msgstr ""
 
-#: core/ways.py
+#: core/ways.py core/camera/view.py
 msgid "this PC"
 msgstr ""
 
-#: core/ways.py
+#: core/ways.py core/camera/view.py
 msgid "this Mac"
 msgstr ""
 
@@ -1120,7 +1120,7 @@ msgstr ""
 msgid "{name} has no way in: {other} already leads from the {side} edge of {here}. Give each its own thirds of that edge by moving the machines on the map, or move one to another side."
 msgstr ""
 
-#: core/ways.py mac_app/kvm_bridge_app.py win_app/pages_win.py
+#: core/ways.py core/camera/texts.py core/camera/view.py mac_app/kvm_bridge_app.py win_app/pages_win.py
 msgid "another machine"
 msgstr ""
 
@@ -1251,6 +1251,11 @@ msgstr ""
 msgid "the {edge} edge"
 msgstr ""
 
+#: core/audio/service.py core/audio/view.py mac_app/diagram.py
+#, python-brace-format
+msgid "Machine · {id}"
+msgstr ""
+
 #: core/audio/view.py mac_app/ledger.py win_app/crossing_ledger.py
 msgid "macOS"
 msgstr ""
@@ -1354,7 +1359,7 @@ msgstr ""
 msgid "{machine} · {device}"
 msgstr ""
 
-#: core/audio/view.py mac_app/kvm_bridge_app.py win_app/kvm_bridge_win.py
+#: core/audio/view.py core/camera/view.py mac_app/kvm_bridge_app.py win_app/kvm_bridge_win.py
 msgid "Off"
 msgstr ""
 
@@ -1417,11 +1422,6 @@ msgstr ""
 
 #: core/audio/view.py
 msgid "Apps use 'Beamer Microphone' on a Mac and 'CABLE Output' on a PC."
-msgstr ""
-
-#: core/audio/view.py mac_app/diagram.py
-#, python-brace-format
-msgid "Machine · {id}"
 msgstr ""
 
 #: core/audio/view.py
@@ -1517,7 +1517,7 @@ msgstr ""
 msgid "Beamer's audio helper stopped and did not start again."
 msgstr ""
 
-#: core/audio/view.py
+#: core/audio/view.py core/camera/view.py mac_app/camera_section.py
 msgid "Retry"
 msgstr ""
 
@@ -1538,7 +1538,7 @@ msgstr ""
 msgid "Default ({name})"
 msgstr ""
 
-#: core/audio/view.py
+#: core/audio/view.py core/camera/view.py
 #, python-brace-format
 msgid "{device} (not connected)"
 msgstr ""
@@ -1612,7 +1612,7 @@ msgstr ""
 msgid "Plays {machines}"
 msgstr ""
 
-#: core/audio/view.py
+#: core/audio/view.py core/camera/view.py
 #, python-brace-format
 msgid "{machine} is offline."
 msgstr ""
@@ -1675,6 +1675,11 @@ msgstr ""
 
 #: core/audio/view.py
 #, python-brace-format
+msgid "Its {camera} is the shared camera."
+msgstr ""
+
+#: core/audio/view.py
+#, python-brace-format
 msgid "Plays on {device}."
 msgstr ""
 
@@ -1703,6 +1708,11 @@ msgid "{names} runs a Beamer without audio. Update Beamer there to use its micro
 msgid_plural "{names} run a Beamer without audio. Update Beamer there to use their microphones and speakers."
 msgstr[0] ""
 msgstr[1] ""
+
+#: core/audio/view.py
+#, python-brace-format
+msgid "{target} sees the camera of {source}."
+msgstr ""
 
 #: core/audio/view.py
 #, python-brace-format
@@ -1753,6 +1763,472 @@ msgstr ""
 msgid "If {target}'s speakers can be heard by {mic}, people in a call on {target} hear themselves. Use a headset on {target}."
 msgstr ""
 
+#: core/camera/texts.py
+msgid "Open Beamer for details"
+msgstr ""
+
+#: core/camera/texts.py
+msgid "The camera is not available"
+msgstr ""
+
+#: core/camera/texts.py
+msgid "Camera access is not allowed"
+msgstr ""
+
+#: core/camera/texts.py core/camera/view.py
+msgid "Beamer Camera is not installed"
+msgstr ""
+
+#: core/camera/texts.py core/camera/view.py
+msgid "Beamer Camera needs an update"
+msgstr ""
+
+#: core/camera/texts.py
+msgid "That machine cannot send its camera"
+msgstr ""
+
+#: core/camera/texts.py
+msgid "This PC could not show the picture"
+msgstr ""
+
+#: core/camera/texts.py
+msgid "The picture did not reach this PC"
+msgstr ""
+
+#: core/camera/texts.py core/camera/view.py
+msgid "Beamer's media helper stopped"
+msgstr ""
+
+#: core/camera/texts.py
+msgid "The camera choice changed"
+msgstr ""
+
+#: core/camera/texts.py
+msgid "Something went wrong in Beamer"
+msgstr ""
+
+#: core/camera/texts.py core/camera/view.py
+msgid "Test source"
+msgstr ""
+
+#: core/camera/texts.py core/camera/view.py
+msgid "Default camera"
+msgstr ""
+
+#: core/camera/texts.py
+msgid "Beamer Camera is off"
+msgstr ""
+
+#: core/camera/texts.py
+msgid "Choose a camera in Beamer"
+msgstr ""
+
+#: core/camera/texts.py
+msgid "Waiting for camera access"
+msgstr ""
+
+#: core/camera/texts.py
+msgid "Beamer Camera stopped"
+msgstr ""
+
+#: core/camera/texts.py
+#, python-brace-format
+msgid "Waiting for {machine}"
+msgstr ""
+
+#: core/camera/texts.py
+#, python-brace-format
+msgid "Allow it in Beamer on {machine}"
+msgstr ""
+
+#: core/camera/texts.py
+#, python-brace-format
+msgid "Camera turned off on {machine}"
+msgstr ""
+
+#: core/camera/texts.py
+#, python-brace-format
+msgid "Turn it on in Beamer on {machine}"
+msgstr ""
+
+#: core/camera/texts.py
+#, python-brace-format
+msgid "{machine} has not allowed the camera"
+msgstr ""
+
+#: core/camera/texts.py
+#, python-brace-format
+msgid "Starting {camera}"
+msgstr ""
+
+#: core/camera/texts.py
+#, python-brace-format
+msgid "on {machine}"
+msgstr ""
+
+#: core/camera/texts.py
+#, python-brace-format
+msgid "Reconnecting to {machine}"
+msgstr ""
+
+#: core/camera/view.py
+msgid "the camera is not available"
+msgstr ""
+
+#: core/camera/view.py
+msgid "camera access is not allowed"
+msgstr ""
+
+#: core/camera/view.py
+msgid "that machine cannot send its camera"
+msgstr ""
+
+#: core/camera/view.py
+msgid "the picture could not be shown"
+msgstr ""
+
+#: core/camera/view.py
+msgid "the picture did not arrive"
+msgstr ""
+
+#: core/camera/view.py
+msgid "the camera choice changed"
+msgstr ""
+
+#: core/camera/view.py
+msgid "another app holds the camera"
+msgstr ""
+
+#: core/camera/view.py
+msgid "something went wrong in Beamer"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Apps on a PC choose 'Beamer Camera'. Macs cannot show another machine's camera yet."
+msgstr ""
+
+#: core/camera/view.py
+msgid "Stop Sharing the Camera"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Share the Camera"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Damaged"
+msgstr ""
+
+#: core/camera/view.py
+msgid "One app at a time can use Beamer Camera unless Windows allows several: Settings > Bluetooth & devices > Cameras > Beamer Camera."
+msgstr ""
+
+#: core/camera/view.py
+msgid "Allow Camera Access…"
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "an app on {machine}"
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "{apps} is using it."
+msgid_plural "{apps} are using it."
+msgstr[0] ""
+msgstr[1] ""
+
+#: core/camera/view.py
+msgid "Off. Apps that open Beamer Camera see a 'camera off' picture."
+msgstr ""
+
+#: core/camera/view.py
+msgid "An app is using it."
+msgstr ""
+
+#: core/camera/view.py
+msgid "No linked PC can show it: apps on a PC use Beamer Camera."
+msgstr ""
+
+#: core/camera/view.py
+msgid "through the Beamer link"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Install Beamer Camera…"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Update Beamer Camera…"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Repair Beamer Camera…"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Beamer Camera"
+msgstr ""
+
+#: core/camera/view.py mac_app/camera_section.py win_app/camera_section_win.py
+msgid "Camera settings"
+msgstr ""
+
+#: core/camera/view.py mac_app/camera_section.py
+msgid "Camera your apps see"
+msgstr ""
+
+#: core/camera/view.py mac_app/camera_section.py
+msgid "Quality"
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "{app} on {machine}"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Ready. No app is using Beamer Camera."
+msgstr ""
+
+#: core/camera/view.py
+msgid "Camera sharing is off on this Mac."
+msgstr ""
+
+#: core/camera/view.py
+msgid "Allow camera access on this Mac."
+msgstr ""
+
+#: core/camera/view.py
+msgid "This Mac does not allow Beamer to use its camera."
+msgstr ""
+
+#: core/camera/view.py
+msgid "This Mac has no camera."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "Beamer Camera is not installed on {machines}."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "Beamer Camera needs an update on {machines}."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "Beamer Camera is damaged on {machines}."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "The camera stopped on {machine}: {reason}."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "The camera stopped on {machine}."
+msgstr ""
+
+#: core/camera/view.py
+msgid "Camera sharing"
+msgstr ""
+
+#: core/camera/view.py mac_app/kvm_bridge_app.py win_app/kvm_bridge_win.py
+msgid "On"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Stop Sharing"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Camera access"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Allowed"
+msgstr ""
+
+#: core/camera/view.py
+msgid "On, sent instead of the camera"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Installed"
+msgstr ""
+
+#: core/camera/view.py
+msgid "This version of Windows cannot show it."
+msgstr ""
+
+#: core/camera/view.py
+msgid "Not installed"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Needs an update"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Camera sharing is off because Beamer could not read its saved camera settings."
+msgstr ""
+
+#: core/camera/view.py
+msgid "Beamer needs camera access to share this Mac's camera."
+msgstr ""
+
+#: core/camera/view.py
+msgid "Another app on this Mac uses the camera at the same time."
+msgstr ""
+
+#: core/camera/view.py
+msgid "An app uses the camera"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Camera ready"
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "Ready. No app on {machines} is using Beamer Camera."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "Starting for {apps}…"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Reduced quality: the network is slow."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "Turned off on {machine}."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "Allow camera access on {machine}."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "{machine} does not allow Beamer to use its camera."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "{camera} is not connected to {machine}."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "{machine} has no camera."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "Video needs a direct network path between {source} and {targets}."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "{width}x{height}"
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "{fps} fps"
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "{ms} ms"
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "Default camera ({name})"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Not allowed"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Open Privacy Settings"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Close apps that use the camera to finish updating Beamer Camera."
+msgstr ""
+
+#: core/camera/view.py
+msgid "Remove…"
+msgstr ""
+
+#: core/camera/view.py
+msgid "Beamer could not save the camera settings. After a restart, they may not be as you set them."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "Camera: {users}"
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "{source} and {targets} are not linked directly."
+msgstr ""
+
+#: core/camera/view.py
+msgid "the machine using it"
+msgstr ""
+
+#: core/camera/view.py mac_app/login_item.py win_app/kvm_bridge_win.py
+msgid "Unknown"
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "{machine}: Beamer Camera is not installed there. Install it in Beamer on {machine}."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "{machine}: Beamer Camera needs an update there. Update it in Beamer on {machine}."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "{machine}: Beamer Camera is damaged there. Repair it in Beamer on {machine}."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "{app} uses the camera"
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "{machine} is starting its camera side."
+msgstr ""
+
+#: core/camera/view.py
+msgid "Not asked yet"
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "in use on {machine}"
+msgstr ""
+
 #: mac_app/audio_page.py
 msgid "Beamer wants to install Beamer Microphone, the microphone your apps hear from your other machines."
 msgstr ""
@@ -1775,6 +2251,10 @@ msgstr ""
 
 #: mac_app/audio_page.py mac_app/kvm_bridge_app.py mac_app/machines_panel.py win_app/audio_page_win.py win_app/machines_win.py
 msgid "Machines"
+msgstr ""
+
+#: mac_app/audio_page.py mac_app/camera_section.py win_app/camera_section_win.py
+msgid "Camera"
 msgstr ""
 
 #: mac_app/audio_page.py
@@ -2674,7 +3154,7 @@ msgstr ""
 msgid "Stays on this Mac"
 msgstr ""
 
-#: mac_app/kvm_bridge_app.py mac_app/machines_panel.py win_app/kvm_bridge_win.py win_app/machines_win.py
+#: mac_app/kvm_bridge_app.py mac_app/machines_panel.py win_app/camera_section_win.py win_app/kvm_bridge_win.py win_app/machines_win.py
 msgid "Remove"
 msgstr ""
 
@@ -3062,10 +3542,6 @@ msgstr ""
 
 #: mac_app/kvm_bridge_app.py
 msgid "On a PC, each key arrives as the key in its place, so Command arrives as the Windows key. Between two Macs every key arrives as itself."
-msgstr ""
-
-#: mac_app/kvm_bridge_app.py win_app/kvm_bridge_win.py
-msgid "On"
 msgstr ""
 
 #: mac_app/kvm_bridge_app.py win_app/kvm_bridge_win.py
@@ -3782,10 +4258,6 @@ msgstr ""
 msgid "Not found"
 msgstr ""
 
-#: mac_app/login_item.py win_app/kvm_bridge_win.py
-msgid "Unknown"
-msgstr ""
-
 #: mac_app/machines.py win_app/peers_view.py
 msgid "iPhone"
 msgstr ""
@@ -4337,22 +4809,6 @@ msgstr ""
 msgid "At the notch, Glow and Beam do not draw: the notch style you choose here plays instead, and their tiles show it."
 msgstr ""
 
-#: mac_app/pages.py win_app/pages_win.py
-msgid "Overview"
-msgstr ""
-
-#: mac_app/pages.py
-msgid "Where input is, whether each link is up, and the controls you reach for every day. Pair your machines here first."
-msgstr ""
-
-#: mac_app/pages.py
-msgid "Permissions"
-msgstr ""
-
-#: mac_app/pages.py
-msgid "macOS must allow Beamer to read this Mac's input and to move its pointer and type when another machine drives it."
-msgstr ""
-
 #: mac_app/pages.py
 msgid "Plays Glow"
 msgstr ""
@@ -4391,12 +4847,28 @@ msgstr ""
 msgid "With only the notch or a corner on, input arrives by the notch's or corner's own side, so this choice does nothing on this Mac; {name}'s own push still follows it."
 msgstr ""
 
-#: mac_app/pages.py win_app/audio_page_win.py win_app/pages_win.py
-msgid "Audio"
+#: mac_app/pages.py win_app/pages_win.py
+msgid "Overview"
+msgstr ""
+
+#: mac_app/pages.py
+msgid "Where input is, whether each link is up, and the controls you reach for every day. Pair your machines here first."
+msgstr ""
+
+#: mac_app/pages.py
+msgid "Permissions"
+msgstr ""
+
+#: mac_app/pages.py
+msgid "macOS must allow Beamer to read this Mac's input and to move its pointer and type when another machine drives it."
 msgstr ""
 
 #: mac_app/pages.py win_app/pages_win.py
-msgid "Every machine's microphones and speakers. Choose the microphone your apps hear and where each machine's sound plays."
+msgid "Audio & Camera"
+msgstr ""
+
+#: mac_app/pages.py win_app/pages_win.py
+msgid "Every machine's microphones, speakers and camera. Choose the microphone your apps hear, the camera they see, and where each machine's sound plays."
 msgstr ""
 
 #: mac_app/pages.py
@@ -4425,6 +4897,14 @@ msgstr ""
 #: mac_app/pages.py
 #, python-brace-format
 msgid "{place} is not one of your ways in, so this only shows how it would look. Turn it on under Crossing. At the notch, Glow and Beam do not draw: the notch style you choose here plays instead, and their tiles show it."
+msgstr ""
+
+#: mac_app/pages.py win_app/audio_page_win.py win_app/pages_win.py
+msgid "Audio"
+msgstr ""
+
+#: mac_app/pages.py win_app/pages_win.py
+msgid "Every machine's microphones and speakers. Choose the microphone your apps hear and where each machine's sound plays."
 msgstr ""
 
 #: mac_app/pages.py
@@ -4583,6 +5063,46 @@ msgstr ""
 #: win_app/audio_page_win.py
 #, python-brace-format
 msgid "{device} is a headset"
+msgstr ""
+
+#: win_app/camera_section_win.py
+msgid "Remove Beamer Camera?"
+msgstr ""
+
+#: win_app/camera_section_win.py
+msgid "Apps on this PC will no longer list Beamer Camera. Windows asks for administrator permission, and every camera on this PC may pause for about a second."
+msgstr ""
+
+#: win_app/camera_section_win.py
+msgid "Waiting for Windows to install Beamer Camera…"
+msgstr ""
+
+#: win_app/camera_section_win.py
+msgid "Waiting for Windows to remove Beamer Camera…"
+msgstr ""
+
+#: win_app/camera_section_win.py
+msgid "Installation was cancelled."
+msgstr ""
+
+#: win_app/camera_section_win.py
+msgid "Removal was cancelled."
+msgstr ""
+
+#: win_app/camera_section_win.py
+msgid "Beamer Camera could not be installed. Try again, or see Beamer's log."
+msgstr ""
+
+#: win_app/camera_section_win.py
+msgid "Beamer Camera could not be removed. Try again, or see Beamer's log."
+msgstr ""
+
+#: win_app/camera_section_win.py
+msgid "Beamer's media helper is missing, so Beamer Camera cannot be installed."
+msgstr ""
+
+#: win_app/camera_section_win.py
+msgid "Beamer's media helper is missing, so Beamer Camera cannot be removed."
 msgstr ""
 
 #: win_app/crossing_ledger.py
