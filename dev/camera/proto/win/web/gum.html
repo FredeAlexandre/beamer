@@ -1,0 +1,59 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- C2: getUserMedia consumer. Opens "Beamer Camera", decodes the frame stamp (common.h) on every frame
+     (requestVideoFrameCallback), logs one JSON line with C2RESULT to the console. Query: ?w=1280&h=720&secs=10 -->
+<meta charset="utf-8"><title>C2 gum</title>
+<video id="v" muted playsinline></video><canvas id="c"></canvas>
+<script>
+const q = new URLSearchParams(location.search);
+const W = +(q.get("w") || 1280), H = +(q.get("h") || 720), SECS = +(q.get("secs") || 10);
+const out = (o) => console.log("C2RESULT " + JSON.stringify(o));
+const nowUs = () => Math.round((performance.timeOrigin + performance.now()) * 1000);
+function pct(a, p) { if (!a.length) return -1; const s = [...a].sort((x, y) => x - y); return +s[Math.min(s.length - 1, Math.round(p * (s.length - 1)))].toFixed(2); }
+(async () => {
+  try {
+    await (await navigator.mediaDevices.getUserMedia({ video: true })).getTracks().forEach(t => t.stop());
+  } catch (e) { /* permission probe; may fail if the default camera is not ours */ }
+  const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+  const dev = devs.find(d => d.label.includes("Beamer Camera"));
+  if (!dev) { out({ ok: false, error: "not found", devices: devs.map(d => d.label) }); return; }
+  const t0 = performance.now();
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: dev.deviceId }, width: { exact: W }, height: { exact: H }, frameRate: 30 } });
+  const tOpen = performance.now() - t0;
+  const track = stream.getVideoTracks()[0];
+  const v = document.getElementById("v"); v.srcObject = stream; await v.play();
+  const c = document.getElementById("c"); c.width = W; c.height = H;
+  const g = c.getContext("2d", { willReadFrequently: true });
+  const lat = [], capLat = []; let frames = 0, bad = 0, gaps = 0, last = -1, origins = {}, tFirst = 0;
+  const bw = Math.floor(W / 40), bh = Math.floor(H / 22);
+  const step = (now, meta) => {
+    const t = nowUs();
+    if (!tFirst) tFirst = performance.now();
+    frames++;
+    g.drawImage(v, 0, 0, W, H);
+    const px = g.getImageData(0, 0, 40 * bw, 3 * bh).data;
+    const rows = [0n, 0n, 0n];
+    for (let r = 0; r < 3; r++) for (let k = 0; k < 40; k++) {
+      const x = k * bw + (bw >> 1), y = r * bh + (bh >> 1), i = (y * 40 * bw + x) * 4;
+      rows[r] = (rows[r] << 1n) | ((px[i] + px[i + 1] + px[i + 2]) / 3 >= 128 ? 1n : 0n);
+    }
+    if ((rows[0] >> 32n) === 0xA5n && (rows[1] >> 32n) === 0x5An && (rows[2] >> 32n) === 0xC3n) {
+      const cnt = Number(rows[0] & 0xFFFFFFFFn), tlo = Number(rows[1] & 0xFFFFFFFFn), org = Number((rows[2] >> 24n) & 0xFFn);
+      const l = (((t % 4294967296) - tlo) % 4294967296 + 4294967296) % 4294967296 / 1000;
+      lat.push(l);
+      if (meta && meta.captureTime) capLat.push(meta.presentationTime - meta.captureTime);
+      if (last >= 0 && cnt !== last + 1) gaps++;
+      last = cnt; origins[org] = (origins[org] || 0) + 1;
+    } else bad++;
+    if (performance.now() - tFirst < SECS * 1000) v.requestVideoFrameCallback(step);
+    else {
+      const s = track.getSettings();
+      out({ ok: true, ua: navigator.userAgent.match(/(Edg|Chrome)\/[\d.]+/g), label: dev.label, settings: { w: s.width, h: s.height, fps: s.frameRate },
+            openMs: +tOpen.toFixed(1), frames, fps: +((frames - 1) / SECS).toFixed(2), unstamped: bad, gaps, origins,
+            lat_ms_p50: pct(lat, .5), lat_ms_p95: pct(lat, .95), lat_ms_max: pct(lat, 1), capture_to_present_ms_p50: pct(capLat, .5) });
+      track.stop();
+    }
+  };
+  v.requestVideoFrameCallback(step);
+})().catch(e => out({ ok: false, error: String(e) }));
+</script>
