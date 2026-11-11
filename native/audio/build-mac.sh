@@ -8,6 +8,7 @@
 # Outputs (native/audio/build/ is git-ignored):
 #   build/mac/beamer-audio          universal (arm64 + x86_64) helper: engine + Mac backend
 #   build/mac/backend_check         universal test harness for the Mac backend alone (not shipped)
+#   build/mac/video_check           universal test harness for the Mac video backend alone (camera CW3, not shipped)
 #   build/mac/BeamerAudio.driver    the HAL plug-in (mac-driver/build.sh, which also stages it in
 #                                   ~/Developer/beamer-hal-staging for beamer-hal)
 # Objects are cached per arch under build/obj/<arch>/ and rebuilt only when the source or one of the
@@ -27,7 +28,7 @@ MONO="$TP/monocypher-4.0.2"
 JSON="$TP/nlohmann-json-3.11.3"
 SPEEX="$TP/speexdsp-1.2.1"
 FRAMEWORKS=(-framework CoreAudio -framework AudioToolbox -framework CoreFoundation -framework Foundation
-            -framework AVFoundation)
+            -framework AVFoundation -framework CoreMedia -framework CoreVideo -framework VideoToolbox)
 
 ROOT="$(cd "$HERE/../.." && pwd)"
 # No home-folder path may end up in a binary (the app build refuses them): __FILE__ and debug info
@@ -120,11 +121,13 @@ engine_sources() {
 HAVE_ENGINE=0
 [ -f "$ENGINE/sources.txt" ] && [ -d "$OPUS" ] && HAVE_ENGINE=1
 
-MAC_BACKEND=(backend_mac.mm devices_mac.mm tap_mac.mm vmic_mac.mm)
+MAC_BACKEND=(backend_mac.mm devices_mac.mm tap_mac.mm vmic_mac.mm
+             video_backend_mac.mm camera_mac.mm scale_mac.mm videoenc_mac.mm synth_mac.mm)
 jobs_file="$OBJ/jobs.txt"
 : > "$jobs_file"
 helper_objs=()
 check_objs=()
+video_objs=()
 for arch in "${ARCHS[@]}"; do
     add() {  # group src list-var...
         local group="$1" src="$2"; shift 2
@@ -134,8 +137,9 @@ for arch in "${ARCHS[@]}"; do
         local v
         for v in "$@"; do eval "$v+=(\"\$obj\")"; done
     }
-    for f in "${MAC_BACKEND[@]}"; do add mm "$HERE/mac/$f" helper_objs check_objs; done
+    for f in "${MAC_BACKEND[@]}"; do add mm "$HERE/mac/$f" helper_objs check_objs video_objs; done
     add mm "$HERE/mac/backend_check.mm" check_objs
+    add mm "$HERE/mac/video_check.mm" video_objs
     if [ $HAVE_ENGINE = 1 ]; then
         add mm "$HERE/mac/main.mm" helper_objs
         while IFS= read -r src; do
@@ -176,6 +180,7 @@ link() {  # name objs-for-all-archs...
 }
 
 link backend_check "${check_objs[@]}"
+link video_check "${video_objs[@]}"
 if [ $HAVE_ENGINE = 1 ]; then
     link beamer-audio "${helper_objs[@]}"
 else
