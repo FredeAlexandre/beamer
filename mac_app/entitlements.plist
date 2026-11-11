@@ -11,5 +11,9 @@
          Beamer as the responsible process, so the app carries it too. -->
     <key>com.apple.security.device.audio-input</key>
     <true/>
+    <!-- Camera (camera PHASE2 §9.1): the same rule as the microphone. The helper captures and
+         macOS attributes the capture to Beamer, so the app and its python carry it too. -->
+    <key>com.apple.security.device.camera</key>
+    <true/>
 </dict>
 </plist>

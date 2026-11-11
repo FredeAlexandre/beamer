@@ -87,7 +87,7 @@ for name in packages:
     if ($LASTEXITCODE -ne 0) { throw 'Portable licence collection failed' }
 
     # A new COLLECT payload contains no settings, pairings, logs, caches or host identity.
-    $Unexpected = Get-ChildItem $Payload -Force | Where-Object Name -notin @('Beamer.exe', 'beamer-audio.exe', '_internal', 'Beamer.portable', 'LICENSE', 'licences', 'THIRD-PARTY-NOTICES.txt')
+    $Unexpected = Get-ChildItem $Payload -Force | Where-Object Name -notin @('Beamer.exe', 'beamer-audio.exe', 'camera', '_internal', 'Beamer.portable', 'LICENSE', 'licences', 'THIRD-PARTY-NOTICES.txt')
     if ($Unexpected) { throw 'Unexpected files in portable payload' }
     if ((Get-AuthenticodeSignature $Executable).Status -ne 'NotSigned') { throw 'The portable candidate must be unsigned' }
     New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null

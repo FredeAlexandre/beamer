@@ -2,10 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- The audio helper, Contents/MacOS/beamer-audio (PHASE2 §10.1): hardened runtime, microphone
-     capture and nothing else. It links only system frameworks, so library validation stays on. -->
+     and camera capture (camera PHASE2 §9.1) and nothing else. It links only system frameworks, so
+     library validation stays on. -->
 <plist version="1.0">
 <dict>
     <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <key>com.apple.security.device.camera</key>
     <true/>
 </dict>
 </plist>

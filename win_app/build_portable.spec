@@ -59,12 +59,19 @@ audio_helper = source_dir.parent / "native" / "audio" / "build" / "win" / "beame
 audio_toc = [("beamer-audio.exe", str(audio_helper), "EXECUTABLE")] if audio_helper.is_file() else []
 if not audio_toc:
     print(f"WARNING: no {audio_helper}: the portable build carries no audio helper")
+# Camera (camera PHASE2 9.2): the Beamer Camera source DLL goes to camera\ beside beamer-audio.exe, where
+# the helper's vcam-install looks for it. As an EXECUTABLE entry it lands at the top of the folder, not in
+# _internal, and its destination keeps the sub-folder.
+camera_dll = audio_helper.parent / "camera" / "BeamerCameraSource.dll"
+camera_toc = [("camera\\BeamerCameraSource.dll", str(camera_dll), "EXECUTABLE")] if camera_dll.is_file() else []
+if not camera_toc:
+    print(f"WARNING: no {camera_dll}: the portable build carries no Beamer Camera")
 
 portable = COLLECT(
     executable,
     filtered_binaries,
     analysis.datas,
-    audio_toc,
+    audio_toc + camera_toc,
     strip=False,
     upx=False,
     name="Beamer-portable",

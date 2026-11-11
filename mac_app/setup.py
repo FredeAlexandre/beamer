@@ -107,6 +107,11 @@ setup(
                 # Audio (PHASE2 §10.1): the helper is Beamer's child, so these prompts name Beamer.
                 "NSMicrophoneUsageDescription": "Beamer sends this Mac's microphone to the machine you are working on when you choose it on the Audio page.",
                 "NSAudioCaptureUsageDescription": "Beamer sends this Mac's sound to another machine when you choose it on the Audio page.",
+                # Camera (camera PHASE2 §9.1): the helper captures, Beamer is the responsible process.
+                # The reaction gestures (thumbs up -> balloons) are off unless the user turns them on;
+                # macOS 13 ignores the key.
+                "NSCameraUsageDescription": "Beamer sends this Mac's camera to another computer while an app there uses Beamer Camera, after you choose it on the Audio & Camera page.",
+                "NSCameraReactionEffectGesturesEnabledDefault": False,
                 "CFBundleLocalizations": ["en", "it"],
                 "CFBundleDevelopmentRegion": "en_GB",
             },

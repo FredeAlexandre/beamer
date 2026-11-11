@@ -132,6 +132,75 @@ function Update-BeamerGameInputRecovery([switch]$Remove) {
     $folder.RegisterTaskDefinition($taskName, $definition, (0x6 -bor 0x10), 'S-1-5-18', $null, 5, $sddl) | Out-Null
 }
 
+# Beamer Camera (camera PHASE2 §9.2). `beamer-audio.exe vcam-install` (elevated) puts the source DLL in
+# %ProgramFiles%\Beamer\Camera\<version>\, its log folder in %ProgramData%\Beamer\Camera, the COM class in
+# HKLM and HKLM\SOFTWARE\Beamer\Camera. Only an elevated process can delete those, so every elevated
+# maintenance run clears what is stale and the uninstall run removes the lot. The uninstaller has already
+# run `beamer-audio.exe vcam-remove` (unelevated) to Remove() the camera itself.
+$BeamerCameraClsid = '{19FCB9D1-E91E-45D0-B865-75D8F6D98A91}'
+
+function Get-BeamerCameraPaths {
+    return @{
+        ClsidKey = "HKLM:\SOFTWARE\Classes\CLSID\$BeamerCameraClsid"
+        CameraKey = 'HKLM:\SOFTWARE\Beamer\Camera'
+        ProgramFolder = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFiles)) 'Beamer\Camera'
+        DataFolder = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::CommonApplicationData)) 'Beamer\Camera'
+    }
+}
+
+# Deletes a folder or registry key, then its `Beamer` parent when that is left empty. Returns $false when
+# it could not be deleted (a file in use: Frame Server holds the DLL it loaded), $true when it is gone.
+function Remove-BeamerCameraItem([string]$Path) {
+    if (Test-Path -LiteralPath $Path) {
+        try { Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop } catch { }
+        if (Test-Path -LiteralPath $Path) { return $false }
+    }
+    $parent = Split-Path -Parent $Path
+    if ((Split-Path -Leaf $parent) -eq 'Beamer' -and (Test-Path -LiteralPath $parent) -and
+        -not (Get-ChildItem -LiteralPath $parent -Force -ErrorAction SilentlyContinue) -and
+        -not (Get-Item -LiteralPath $parent -Force).Property) {
+        Remove-Item -LiteralPath $parent -Force -ErrorAction SilentlyContinue
+    }
+    return $true
+}
+
+function Remove-BeamerCamera([hashtable]$Paths = (Get-BeamerCameraPaths)) {
+    foreach ($key in @($Paths.ClsidKey, $Paths.CameraKey)) {
+        if (-not (Remove-BeamerCameraItem $key)) { throw "Could not delete $key" }
+    }
+    $locked = @()
+    foreach ($folder in @($Paths.ProgramFolder, $Paths.DataFolder)) {
+        if (-not (Remove-BeamerCameraItem $folder)) { $locked += $folder }
+    }
+    if (-not $locked) { return }
+    # Frame Server keeps the DLL (and its log) open while a Beamer Camera source object lives. Stopping
+    # it pauses every camera for about a second; Windows starts it again at the next camera use.
+    Stop-Service -Name 'FrameServer' -Force -ErrorAction Stop
+    foreach ($folder in $locked) {
+        for ($attempt = 1; -not (Remove-BeamerCameraItem $folder); $attempt++) {
+            if ($attempt -ge 10) { throw "Could not delete $folder" }
+            Start-Sleep -Milliseconds 500
+        }
+    }
+}
+
+# Install and repair: version folders other than the registered one are left over from updates whose old
+# DLL Frame Server still held. Never stops Frame Server: a folder still in use waits for the next run.
+function Remove-BeamerCameraStaleVersions([hashtable]$Paths = (Get-BeamerCameraPaths)) {
+    if (-not (Test-Path -LiteralPath $Paths.ProgramFolder) -or -not (Test-Path -LiteralPath $Paths.CameraKey)) { return }
+    $current = (Get-ItemProperty -LiteralPath $Paths.CameraKey -ErrorAction SilentlyContinue).DllPath
+    if (-not $current) { return }
+    $currentFolder = [IO.Path]::GetFullPath((Split-Path -Parent $current))
+    foreach ($folder in @(Get-ChildItem -LiteralPath $Paths.ProgramFolder -Directory -Force)) {
+        if ([string]::Equals([IO.Path]::GetFullPath($folder.FullName), $currentFolder, [StringComparison]::OrdinalIgnoreCase)) { continue }
+        try {
+            Remove-Item -LiteralPath $folder.FullName -Recurse -Force -ErrorAction Stop
+        } catch {
+            Write-Warning "Beamer Camera: $($folder.FullName) is still in use; the next maintenance run deletes it."
+        }
+    }
+}
+
 if ($MyInvocation.InvocationName -ne '.') {
     try {
         $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -148,10 +217,13 @@ if ($MyInvocation.InvocationName -ne '.') {
         if ($Remove) {
             Update-BeamerGameInputRecovery -Remove
             Remove-BeamerFirewall -ExePath $ExePath
+            Remove-BeamerCamera
         } else {
             Repair-BeamerFirewall -ExePath $ExePath
             Update-BeamerGameInputRecovery
             Repair-BeamerGameInput
+            # Leftover camera versions are harmless (~200 KB each): never a reason to fail an install.
+            try { Remove-BeamerCameraStaleVersions } catch { Write-Warning "Beamer Camera: stale versions not cleared: $_" }
         }
         exit 0
     } catch {

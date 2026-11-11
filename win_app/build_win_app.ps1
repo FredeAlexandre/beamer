@@ -99,6 +99,15 @@ if (Test-Path $AudioBuild) {
     if (-not (Test-Path $AudioHelper)) { throw "build-win.cmd did not produce $AudioHelper" }
     Sign-BeamerArtifact $AudioHelper
     Write-Output "Built $AudioHelper"
+    # Camera (camera PHASE2 9.2): build-win.cmd also builds the Beamer Camera source DLL into camera\,
+    # which the installers ship beside the helper. A tree without its build script makes no DLL.
+    $CameraDll = Join-Path $ProjectDir 'native\audio\build\win\camera\BeamerCameraSource.dll'
+    if (Test-Path $CameraDll) {
+        Sign-BeamerArtifact $CameraDll
+        Write-Output "Built $CameraDll"
+    } else {
+        Write-Warning "build-win.cmd made no $CameraDll`: Beamer is built without Beamer Camera"
+    }
 } else {
     Write-Warning 'No native\audio\build-win.cmd in this tree: Beamer is built without the audio helper (beamer-audio.exe)'
 }

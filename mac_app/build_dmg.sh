@@ -213,8 +213,8 @@ sign_app() {
     while IFS= read -r binary; do
         local entitle=()
         [ "$binary" = "$app/Contents/MacOS/python" ] && entitle=(--entitlements "$entitlements")
-        # The audio helper gets the microphone entitlement only, and an identifier of Beamer's
-        # family rather than its file name.
+        # The audio helper gets the microphone and camera entitlements only, and an identifier of
+        # Beamer's family rather than its file name.
         [ "$binary" = "$app/Contents/MacOS/beamer-audio" ] \
             && entitle=(--entitlements "$SCRIPT_DIR/entitlements-audio.plist" --identifier "$bundle_id.audio")
         codesign --force --sign "$identity" --options runtime $TIMESTAMP ${entitle[@]+"${entitle[@]}"} "$binary" || return 1
@@ -260,6 +260,14 @@ if [ -f "$APP/Contents/MacOS/beamer-audio" ]; then
         | grep -F com.apple.security.device.audio-input >/dev/null \
         || { echo "beamer-audio is signed without com.apple.security.device.audio-input" >&2; exit 1; }
 fi
+# Camera (camera PHASE2 §9.1): the hardened runtime denies capture silently without the entitlement,
+# on the helper that captures and on the app and python that macOS holds responsible for it.
+for signed in "$APP" "$APP/Contents/MacOS/python" "$APP/Contents/MacOS/beamer-audio"; do
+    [ -e "$signed" ] || continue
+    codesign -d --entitlements - --xml "$signed" 2>/dev/null \
+        | grep -F com.apple.security.device.camera >/dev/null \
+        || { echo "${signed#$APP/} is signed without com.apple.security.device.camera" >&2; exit 1; }
+done
 # The same checks the installer makes as root, run here so a bundle it would refuse never ships.
 if [ -d "$AUDIO_RESOURCES/BeamerAudio.driver" ]; then
     /bin/bash "$AUDIO_RESOURCES/install-driver.sh" --check

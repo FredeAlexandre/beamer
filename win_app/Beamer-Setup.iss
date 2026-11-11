@@ -16,6 +16,14 @@
 #else
 #pragma warning "No " + AudioHelperSource + ": this installer carries no audio helper"
 #endif
+; Camera (camera PHASE2 9.2): the Beamer Camera source DLL ships in {app}\camera\, beside the helper that
+; installs it elevated from the page (beamer-audio.exe vcam-install). Frame Server never loads this copy.
+#define CameraDllSource AddBackslash(SourcePath) + "..\native\audio\build\win\camera\BeamerCameraSource.dll"
+#if FileExists(CameraDllSource)
+#define CameraDll
+#else
+#pragma warning "No " + CameraDllSource + ": this installer carries no Beamer Camera"
+#endif
 
 [Setup]
 AppId={{9A4E2B1F-4309-4E65-B86D-C7B9F4F64D01}
@@ -60,6 +68,9 @@ Source: "dist\Beamer.exe"; DestDir: "{app}"; Flags: ignoreversion
 #ifdef AudioHelper
 Source: "{#AudioHelperSource}"; DestDir: "{app}"; Flags: ignoreversion
 #endif
+#ifdef CameraDll
+Source: "{#CameraDllSource}"; DestDir: "{app}\camera"; Flags: ignoreversion
+#endif
 Source: "Install-Maintenance.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "Invoke-InstallMaintenance.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
@@ -77,6 +88,11 @@ Type: files; Name: "{userstartup}\Beamer.lnk"
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "Beamer"; Flags: deletevalue
 
 [UninstallRun]
+#ifdef AudioHelper
+; Camera (camera PHASE2 9.2): first Remove() this user's Beamer Camera, unelevated and best effort; the
+; maintenance entry below then deletes its registration and folders in its one elevated step.
+Filename: "{app}\beamer-audio.exe"; Parameters: "vcam-remove"; WorkingDir: "{app}"; Flags: runhidden waituntilterminated skipifdoesntexist; RunOnceId: "BeamerCameraRemove"
+#endif
 ; The same fixed maintenance entry removes only this user's tasks and this executable's rules.
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\Invoke-InstallMaintenance.ps1"" -ExePath ""{app}\Beamer.exe"" -Remove"; Flags: runhidden waituntilterminated; RunOnceId: "BeamerCleanup"
 

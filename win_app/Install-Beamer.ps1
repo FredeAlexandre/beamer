@@ -20,6 +20,7 @@ $InstallDir = Join-Path $env:LOCALAPPDATA 'Beamer'
 $ExeSource = Join-Path $PSScriptRoot 'dist\Beamer.exe'
 $ExeDestination = Join-Path $InstallDir 'Beamer.exe'
 $HelperSource = Join-Path (Split-Path -Parent $PSScriptRoot) 'native\audio\build\win\beamer-audio.exe'
+$CameraDllSource = Join-Path (Split-Path -Parent $PSScriptRoot) 'native\audio\build\win\camera\BeamerCameraSource.dll'
 
 # Copies with retries: an exe can stay locked for a moment after its process has gone, so the copy
 # can fail with "being used by another process" straight after Wait-Process returns.
@@ -81,6 +82,27 @@ function Install-BeamerAudioHelper {
     }
 }
 
+# Camera (camera PHASE2 9.2): the Beamer Camera source DLL in camera\ beside the helper, which installs it
+# elevated from the page (vcam-install). Frame Server never loads this copy, so it is never locked. A
+# build without the DLL removes the installed one, so the folder always matches the commit. This script
+# has no uninstall path: a camera installed here is removed from the page or with the two helper verbs
+# (native\audio\vcam-win\README.md).
+function Install-BeamerCameraDll {
+    param([Parameter(Mandatory = $true)][string]$Source, [Parameter(Mandatory = $true)][string]$InstallDir)
+    $Folder = Join-Path $InstallDir 'camera'
+    $Destination = Join-Path $Folder 'BeamerCameraSource.dll'
+    if (-not (Test-Path $Source)) {
+        if (Test-Path $Folder) {
+            Remove-Item -Path $Folder -Recurse -Force
+            Write-Host "This build has no Beamer Camera: removed $Folder"
+        }
+        return
+    }
+    New-Item -ItemType Directory -Path $Folder -Force | Out-Null
+    Copy-WithRetry -Source $Source -Destination $Destination
+    Write-Host "Installed $Destination"
+}
+
 & "$PSScriptRoot\build_win_app.ps1"
 if (-not (Test-Path $ExeSource)) { throw 'The Windows build did not produce Beamer.exe' }
 
@@ -90,6 +112,7 @@ $InstalledProcesses | Stop-Process -Force
 $InstalledProcesses | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
 Copy-WithRetry -Source $ExeSource -Destination $ExeDestination
 Install-BeamerAudioHelper -Source $HelperSource -InstallDir $InstallDir
+Install-BeamerCameraDll -Source $CameraDllSource -InstallDir $InstallDir
 
 $Shell = New-Object -ComObject WScript.Shell
 $StartMenuPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Beamer.lnk'
