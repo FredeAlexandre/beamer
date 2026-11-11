@@ -215,6 +215,7 @@ class CameraSource : public Source {
   std::map<std::pair<int, int>, std::unique_ptr<Scaler>> scalers_;  // video queue only
   std::string effects_ = "?", by_other_ = "?";                       // ctl queue only
   uint32_t index_ = 0;                                               // video queue only
+  int last_w_ = 0, last_h_ = 0;                                      // video queue only
 };
 
 }  // namespace beamer::audio::macvideo
@@ -271,14 +272,16 @@ bool CameraSource::open(AVCaptureDevice* dev, int wt, int ht, std::string* err) 
   }
   [session_ addInput:input_];
   [session_ addOutput:output_];
-  // The format is picked here, never scaled by AVFoundation (C1); setting it after addInput turns the
-  // session preset into InputPriority.
-  if ([dev lockForConfiguration:&e]) {
+  // The format is picked here, never scaled by AVFoundation (C1). On macOS the session resets the active
+  // format when it starts running (there is no InputPriority preset), unless the device stays locked for
+  // configuration until startRunning has returned (seen here: unlocked, the camera delivered its default
+  // 1920x1080 instead of the chosen 1280x720). So: lock, set, commit, start, re-check, unlock.
+  const bool locked = [dev lockForConfiguration:&e];
+  if (locked) {
     dev.activeFormat = fmt;
     if (has30) dev.activeVideoMinFrameDuration = CMTimeMake(1, 30);
     // activeVideoMaxFrameDuration stays the device default (auto exposure may drop to 15 fps in low
     // light) until Alex's low-light test decides (§4.11, §11 open point 3).
-    [dev unlockForConfiguration];
   } else {
     vlog("warn", "camera %s: lockForConfiguration failed (%s); default format kept", key_.c_str(),
          e.localizedDescription.UTF8String);
@@ -321,6 +324,14 @@ bool CameraSource::open(AVCaptureDevice* dev, int wt, int ht, std::string* err) 
   AVCaptureSession* s = session_;
   dispatch_async(ctl_q_, ^{
     [s startRunning];
+    if (locked) {
+      if (dev.activeFormat != fmt) {
+        vlog("info", "camera %s: the session changed the format at start; set again", self->key_.c_str());
+        dev.activeFormat = fmt;
+        if (has30) dev.activeVideoMinFrameDuration = CMTimeMake(1, 30);
+      }
+      [dev unlockForConfiguration];
+    }
     if (s.isRunning) g_sessions_running++;
     else if (*alive) self->retry_start();
   });
@@ -386,6 +397,12 @@ void CameraSource::on_sample(CMSampleBufferRef sb) {
   const uint64_t cap = (uint64_t)host_time_to_ns(pts);
   const int w = (int)CVPixelBufferGetWidth(pb), h = (int)CVPixelBufferGetHeight(pb);
   const CropRect crop = crop_16x9(w, h);
+  if (w != last_w_ || h != last_h_) {  // what the camera really delivers (it may differ from the format)
+    vlog("info", "camera %s delivers %dx%d '%.4s'", key_.c_str(), w, h,
+         [&] { static thread_local char c[5]; uint32_t t = CVPixelBufferGetPixelFormatType(pb); c[0] = t >> 24; c[1] = t >> 16; c[2] = t >> 8; c[3] = t; c[4] = 0; return c; }());
+    last_w_ = w;
+    last_h_ = h;
+  }
   std::lock_guard<std::mutex> lk(mu_);
   const uint32_t idx = index_++;
   if (listeners_.empty()) return;

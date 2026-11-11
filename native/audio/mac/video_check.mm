@@ -582,20 +582,23 @@ int cmd_run(const RunOpts& o) {
   for (auto& kv : win) if (kv.first >= 1 && kv.first < last) w1.push_back(kv.second);  // full windows after the IDR's
   double w1_dev = 0;
   for (double x : w1) w1_dev = std::max(w1_dev, std::fabs(x * 1000 / o.bitrate - 1) * 100);
-  // bitrate change: first 300 ms window (from the change) whose rate is within 20 % of the new target
+  // bitrate change: time from set_bitrate to the end of the first 3 consecutive AUs (captured after the call)
+  // whose mean size is within 30 % of the new per-frame budget (bps / 30 / 8), and the rate of the next 1 s
   std::string change_s = "[";
   for (auto& c : changes) {
-    double eff = -1;
-    for (int k = 0; k < 40; k++) {
-      uint64_t a0 = c.first + k * 50000000ULL, a1 = a0 + 300000000ULL;
-      double bits = 0;
-      int nfr = 0;
-      for (auto& a : sink.aus) if (!a.idr && a.rx_ns >= a0 && a.rx_ns < a1) { bits += a.size * 8.0; nfr++; }
-      if (nfr < 5) continue;
-      double rate = bits / 0.3;
-      if (std::fabs(rate / c.second - 1) <= 0.2) { eff = k * 50 + 300; break; }
+    double eff = -1, next_kbps = 0;
+    std::vector<const Au*> after;
+    for (auto& a : sink.aus) if (!a.idr && (int64_t)a.capture_ns >= c.first) after.push_back(&a);
+    const double budget = c.second / 30.0 / 8.0;
+    for (size_t k = 0; k + 3 <= after.size(); k++) {
+      double m = (after[k]->size + after[k + 1]->size + after[k + 2]->size) / 3.0;
+      if (std::fabs(m / budget - 1) <= 0.3) { eff = (after[k + 2]->rx_ns - c.first) / 1e6; break; }
     }
-    change_s += (change_s.size() > 1 ? "," : "") + J().i("bps", c.second).num("effective_within_ms", eff, 0).done();
+    double bits = 0;
+    for (auto* a : after) if (a->capture_ns < c.first + 1000000000ULL) bits += a->size * 8.0;
+    next_kbps = bits / 1000.0;
+    change_s += (change_s.size() > 1 ? "," : "") + J().i("bps", c.second).num("effective_ms", eff, 0)
+                    .num("next_1s_kbps", next_kbps, 0).done();
   }
   change_s += "]";
   std::vector<double> sc = take_scale_times(), en = take_encode_times();
@@ -797,7 +800,8 @@ int cmd_ltr(int w0, int h0) {
   std::string sizes = "[";
   for (auto& s : rx.refresh_sizes) sizes += (sizes.size() > 1 ? "," : "") + J().i("frame", s.first).i("bytes", (long long)s.second).done();
   sizes += "]";
-  out(J().str("ev", "ltr").b("ok", fails == 0).i("fails", fails).i("aus", n_now()).i("decode_errors", dec.errors)
+  out(J().str("ev", "ltr").b("ok", fails == 0).i("fails", fails).str("permission", camera_permission())
+          .i("capture_device_creations", capture_device_creations()).i("aus", n_now()).i("decode_errors", dec.errors)
           .i("refresh_ok", rx.refresh_ok).i("refresh_bad", rx.refresh_bad).raw("refreshes", sizes));
   return fails ? 1 : 0;
 }
@@ -851,7 +855,8 @@ int cmd_warm(int n) {
   int standby_adopted = 0;
   for (auto& e : senc) standby_adopted += e.rfind("standby", 0) == 0;
   be->set_encoder_standby(EncoderStandby{});
-  out(J().str("ev", "warm").str("cold_encoder", ecold).raw("cold_first_au_ms", dist(cold).done())
+  out(J().str("ev", "warm").str("permission", camera_permission()).i("capture_device_creations", capture_device_creations())
+          .str("cold_encoder", ecold).raw("cold_first_au_ms", dist(cold).done())
           .raw("warm_first_au_ms", dist(warm).done()).str("warm_encoder_last", wenc.empty() ? "" : wenc.back())
           .raw("standby_first_au_ms", dist(standby).done()).i("standby_adopted", standby_adopted).i("n", n)
           .str("standby_encoder_last", senc.empty() ? "" : senc.back()));
