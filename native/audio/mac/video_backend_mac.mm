@@ -40,16 +40,31 @@ std::string fmt1(double v) {
 
 class MacVideoBackend;
 
+std::atomic<bool> g_test_fail_wake_buffer{false};
+std::atomic<int> g_wake_attempts{0}, g_wake_encodes{0};
+
+// The handle whose EncoderSink callback (on_frame / on_camera_event) runs on this thread, if any (R3 #5).
+thread_local const void* t_in_sink = nullptr;
+struct SinkScope {
+  const void* prev;
+  explicit SinkScope(const void* h) : prev(t_in_sink) { t_in_sink = h; }
+  ~SinkScope() { t_in_sink = prev; }
+};
+
 // One video send stream: a listener on a capture source and one VT session (§4.11).
-// Locks: mu_ (recursive: encoder, format, request flags) before out_mu_ (token map, pending acks; never held
-// across a call out). sink_mu_ (recursive) serialises every EncoderSink call and guards closed_; no
-// CameraHandle method takes it, so the engine may call any of them from inside on_frame / on_camera_event.
+// Locks, in this order: enc_mu_ (recursive: the encoder object and every call into it: encode, flush, set_*,
+// replacement) before mu_ (recursive: format, request flags) before out_mu_ (token map, pending acks; never held
+// across a call out). sink_mu_ (recursive) serialises every EncoderSink call and guards closed_; no CameraHandle
+// method takes it. From inside on_frame / on_camera_event the engine may call every CameraHandle method except
+// two (R3 #5): set_format is deferred to the stream's queue (it would wait for its own callback in
+// VTCompressionSessionCompleteFrames), and destroying the handle there aborts the process with a message (the
+// callback would return into a freed object). CW2's engine does neither.
 class MacCameraHandle : public CameraHandle, public FrameListener {
  public:
   // capture_start_ns: when this stream's capture started (the source's start, or the attach to a running one)
   MacCameraHandle(MacVideoBackend* be, const CameraSpec& spec, EncoderSink* sink, std::unique_ptr<Encoder> enc,
                   std::shared_ptr<Source> src, int64_t capture_start_ns)
-      : be_(be), spec_(spec), sink_(sink), fmt_(spec.fmt), enc_(std::move(enc)), src_(std::move(src)) {
+      : be_(be), spec_(spec), sink_(sink), enc_(std::move(enc)), fmt_(spec.fmt), src_(std::move(src)) {
     open_ns_ = capture_start_ns;
     fps_ = spec.fmt.fps == 15 ? 15 : 30;
     wire_encoder(enc_.get());
@@ -100,16 +115,27 @@ class MacCameraHandle : public CameraHandle, public FrameListener {
     acks_pending_.push_back(it->second.token);
     acked_since_idr_ = true;
   }
+  // Never wait for an encode in progress (the encoder wake's first encode takes ~40 ms, R3 #6): applied now when
+  // the encoder is free, else by the next encode (pending_*).
   void set_bitrate(int bps) override {
-    std::lock_guard<std::recursive_mutex> lk(mu_);
     if (bps <= 0) return;
-    spec_.bitrate = bps;
-    if (enc_) enc_->set_bitrate(bps);
+    {
+      std::lock_guard<std::recursive_mutex> lk(mu_);
+      spec_.bitrate = bps;
+    }
+    std::unique_lock<std::recursive_mutex> el(enc_mu_, std::try_to_lock);
+    if (el && enc_) enc_->set_bitrate(bps);
+    else pending_bitrate_ = bps;
   }
   void set_fps(int fps) override {
-    std::lock_guard<std::recursive_mutex> lk(mu_);
-    fps_ = fps <= 15 ? 15 : 30;
-    if (enc_) enc_->set_fps(fps_);
+    int f;
+    {
+      std::lock_guard<std::recursive_mutex> lk(mu_);
+      f = fps_ = fps <= 15 ? 15 : 30;
+    }
+    std::unique_lock<std::recursive_mutex> el(enc_mu_, std::try_to_lock);
+    if (el && enc_) enc_->set_fps(f);
+    else pending_fps_ = f;
   }
   void set_format(const VideoFormat& f) override;
   void set_input_paused(bool p) override {
@@ -154,6 +180,7 @@ class MacCameraHandle : public CameraHandle, public FrameListener {
   void on_encoded(const EncOut& o) {
     std::lock_guard<std::recursive_mutex> lk(sink_mu_);
     if (closed_) return;
+    SinkScope scope(this);
     EncodedFrame ef;
     ef.data = o.data;
     ef.len = o.len;
@@ -181,7 +208,14 @@ class MacCameraHandle : public CameraHandle, public FrameListener {
   }
   void emit(const std::string& what, const std::string& detail) {
     std::lock_guard<std::recursive_mutex> lk(sink_mu_);
-    if (!closed_) sink_->on_camera_event(what, detail);
+    if (closed_) return;
+    SinkScope scope(this);
+    sink_->on_camera_event(what, detail);
+  }
+  void apply_pending_locked() {  // enc_mu_ held
+    if (!enc_) return;
+    if (int b = pending_bitrate_.exchange(0)) enc_->set_bitrate(b);
+    if (int f = pending_fps_.exchange(0)) enc_->set_fps(f);
   }
   void tick() {
     const int n = captured_.exchange(0);
@@ -191,18 +225,29 @@ class MacCameraHandle : public CameraHandle, public FrameListener {
   // frame, whatever the session's age (measured, cw3.md). Until the stream's first real frame is submitted
   // (the camera's start: 0.2-0.8 s), encode a black frame every 200 ms and drop its output inside the
   // encoder: no AU reaches the engine, the first real frame is still a forced IDR (§2.4 start_encoding).
+  // Every attempt counts (also when the black buffer cannot be made), so it always ends after 20 (R3 #6). The
+  // encode runs under enc_mu_ only, never mu_: the engine's calls (request_idr, set_input_paused...) do not wait
+  // for it, and a camera frame arriving meanwhile waits for it on enc_mu_ without holding mu_.
   void wake() {
+    int n;
     {
       std::lock_guard<std::recursive_mutex> lk(mu_);
-      if (submitted_real_ || woken_ >= 20 || !enc_) return;  // <= 4 s (the engine stops a silent stream at 3 s)
+      if (submitted_real_ || woken_ >= kMaxWakes) return;  // <= 4 s (the engine stops a silent stream at 3 s)
+      n = woken_++;
+      g_wake_attempts++;
+      // wake_buf_ is touched only here (timer_q_, serial) and in the destructor after timer_q_ is drained
       if (!wake_buf_ || (int)CVPixelBufferGetWidth(wake_buf_) != fmt_.w || (int)CVPixelBufferGetHeight(wake_buf_) != fmt_.h)
         make_wake_buffer();
-      if (wake_buf_) {
+    }
+    if (wake_buf_) {
+      std::lock_guard<std::recursive_mutex> el(enc_mu_);
+      if (!submitted_real_ && enc_) {
         std::string err;
         // pts before any capture time this stream can see, increasing by 1 ms per wake frame
-        const uint64_t pts = (uint64_t)(open_ns_ - 2000000000LL) + (uint64_t)woken_ * 1000000ULL;
+        const uint64_t pts = (uint64_t)(open_ns_ - 2000000000LL) + (uint64_t)n * 1000000ULL;
+        apply_pending_locked();
         enc_->encode(wake_buf_, pts, false, false, {}, &err, true);
-        woken_++;
+        g_wake_encodes++;
       }
     }
     MacCameraHandle* self = this;
@@ -214,6 +259,7 @@ class MacCameraHandle : public CameraHandle, public FrameListener {
   void make_wake_buffer() {  // mu_ held
     if (wake_buf_) CVPixelBufferRelease(wake_buf_);
     wake_buf_ = nullptr;
+    if (g_test_fail_wake_buffer.load()) return;
     if (CVPixelBufferCreate(nullptr, fmt_.w, fmt_.h, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
                             (__bridge CFDictionaryRef) @{(id)kCVPixelBufferIOSurfacePropertiesKey : @{}}, &wake_buf_) != kCVReturnSuccess)
       return;
@@ -227,15 +273,18 @@ class MacCameraHandle : public CameraHandle, public FrameListener {
   MacVideoBackend* be_;
   CameraSpec spec_;
   EncoderSink* sink_;
-  // mu_: encoder, format, flags
+  // enc_mu_: the encoder object and calls into it
+  std::recursive_mutex enc_mu_;
+  std::unique_ptr<Encoder> enc_;
+  std::atomic<int> pending_bitrate_{0}, pending_fps_{0};
+  // mu_: format, flags
   std::recursive_mutex mu_;
   VideoFormat fmt_;
-  std::unique_ptr<Encoder> enc_;
   bool started_ = false, paused_ = false, want_idr_ = false, want_refresh_ = false;
   int fps_ = 30;
   uint64_t parity_ = 0;  // fps 15: every other captured frame
-  bool submitted_real_ = false;
-  int woken_ = 0;
+  std::atomic<bool> submitted_real_{false};
+  int woken_ = 0;  // wake attempts (mu_)
   CVPixelBufferRef wake_buf_ = nullptr;
   std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true);
   std::recursive_mutex sink_mu_;
@@ -262,6 +311,7 @@ class MacCameraHandle : public CameraHandle, public FrameListener {
  public:
   // video_check hooks
   int64_t open_ns() const { return open_ns_; }
+  static constexpr int kMaxWakes = 20;
 };
 
 class MacVideoBackend : public VideoBackend {
@@ -345,19 +395,28 @@ class MacVideoBackend : public VideoBackend {
   }
 
   // ---- from handles ----
-  void handle_closed(MacCameraHandle* h) {
-    {
-      std::lock_guard<std::mutex> lk(mu_);
-      handles_.erase(h);
-    }
+  // First thing in ~MacCameraHandle (R3 #3): once it returns, follow_preferred / resolve_lost (backend queue, under
+  // mu_) can no longer reach the handle, so none of them adds it to a (shared) source while it is being destroyed.
+  void handle_closing(MacCameraHandle* h) {
+    std::lock_guard<std::mutex> lk(mu_);
+    handles_.erase(h);
+  }
+  void handle_closed() {  // last thing in ~MacCameraHandle
     std::lock_guard<std::mutex> lk(standby_mu_);
     if (standby_spec_.on) ensure_standby_locked();  // a new standby right after, while warm holds (§4.11)
   }
   void handle_lost(MacCameraHandle* h) {
+    uint64_t gen = 0;
+    {
+      std::lock_guard<std::mutex> lk(mu_);
+      auto it = handles_.find(h);
+      if (it == handles_.end()) return;
+      gen = it->second;  // a later handle at the same address is not this one
+    }
     MacVideoBackend* self = this;
     std::shared_ptr<std::atomic<bool>> alive = alive_;
     dispatch_async(q_, ^{
-      if (*alive) self->resolve_lost(h);
+      if (*alive) self->resolve_lost(h, gen);
     });
   }
 
@@ -533,8 +592,8 @@ class MacVideoBackend : public VideoBackend {
     std::vector<MacCameraHandle*> hs;
     {
       std::lock_guard<std::mutex> lk(mu_);
-      for (MacCameraHandle* h : handles_)
-        if (h->follows_preferred()) hs.push_back(h);
+      for (auto& kv : handles_)
+        if (kv.first->follows_preferred()) hs.push_back(kv.first);
     }
     for (MacCameraHandle* h : hs) {
       void* dev = find_camera("");
@@ -554,27 +613,27 @@ class MacVideoBackend : public VideoBackend {
     }
   }
 
-  void resolve_lost(MacCameraHandle* h) {  // q_
-    {
-      std::lock_guard<std::mutex> lk(mu_);
-      if (!handles_.count(h)) return;
-      if (h->follows_preferred()) {
-        if (void* dev = find_camera("")) {
-          auto cur = h->source();
-          AVCaptureDevice* d = (__bridge AVCaptureDevice*)dev;
-          if (!cur || cur->key() != std::string(d.uniqueID.UTF8String ?: "")) {
-            std::string err;
-            if (auto next = source_for(dev, h->fmt_w(), h->fmt_h(), &err)) {
-              h->switch_source(next);
-              return;
-            }
+  void resolve_lost(MacCameraHandle* h, uint64_t gen) {  // q_
+    // mu_ is held to the end: ~MacCameraHandle starts with handle_closing (mu_), so `h` stays alive meanwhile.
+    std::lock_guard<std::mutex> lk(mu_);
+    auto it = handles_.find(h);
+    if (it == handles_.end() || it->second != gen) return;
+    if (h->follows_preferred()) {
+      if (void* dev = find_camera("")) {
+        auto cur = h->source();
+        AVCaptureDevice* d = (__bridge AVCaptureDevice*)dev;
+        if (!cur || cur->key() != std::string(d.uniqueID.UTF8String ?: "")) {
+          std::string err;
+          if (auto next = source_for(dev, h->fmt_w(), h->fmt_h(), &err)) {
+            h->switch_source(next);
+            return;
           }
         }
       }
     }
     h->emit_lost();
-    VideoBackendListener* l = listener();
-    if (l) l->camera_lost(h, "gone");  // the engine closes the handle (maybe from inside this call)
+    // the engine resolves `h` to its stream now and closes the handle later, on another thread (it waits for mu_)
+    if (listener_) listener_->camera_lost(h, "gone");
   }
 
   bool dev_ = false, prewarm_ = false;
@@ -582,7 +641,8 @@ class MacVideoBackend : public VideoBackend {
   std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true);
   std::mutex mu_;  // listener_, handles_
   VideoBackendListener* listener_ = nullptr;
-  std::set<MacCameraHandle*> handles_;
+  std::map<MacCameraHandle*, uint64_t> handles_;  // -> generation (unique per handle)
+  uint64_t handle_gen_ = 0;
   std::mutex sources_mu_;
   std::map<std::string, std::weak_ptr<Source>> sources_;
   std::mutex standby_mu_;
@@ -603,6 +663,14 @@ class MacVideoBackend : public VideoBackend {
 // ---------------------------------------------------------------------------------------------- handle
 
 MacCameraHandle::~MacCameraHandle() {
+  if (t_in_sink == this) {
+    // R3 #5: the EncoderSink callback on this thread's stack would return into a freed handle. A programming
+    // error in the engine (CW2's never does it): fail at once, with a message, rather than corrupt memory.
+    vlog("error", "camera handle destroyed from inside its own EncoderSink callback: aborting");
+    fprintf(stderr, "beamer-audio: camera handle destroyed from inside its own EncoderSink callback\n");
+    abort();
+  }
+  be_->handle_closing(this);  // first (R3 #3): the backend queue can no longer switch or report this handle
   std::shared_ptr<Source> src;
   {
     std::lock_guard<std::mutex> lk(src_mu_);
@@ -620,7 +688,7 @@ MacCameraHandle::~MacCameraHandle() {
   }
   std::unique_ptr<Encoder> e;
   {
-    std::lock_guard<std::recursive_mutex> lk(mu_);
+    std::lock_guard<std::recursive_mutex> el(enc_mu_);
     e = std::move(enc_);
   }
   const int64_t t0 = now_ns();
@@ -632,12 +700,24 @@ MacCameraHandle::~MacCameraHandle() {
     src_.reset();  // the last stream on a camera stops its capture (async, camera_mac.mm)
   }
   src.reset();
-  be_->handle_closed(this);
+  be_->handle_closed();
 }
 
 void MacCameraHandle::set_format(const VideoFormat& f) {
   if (f.w < 16 || f.h < 16 || (f.w & 1) || (f.h & 1)) return;
-  int bitrate;
+  if (t_in_sink == this) {
+    // R3 #5: from inside on_frame / on_camera_event. Flushing the old session here would wait for this very
+    // callback (deadlock): done on the stream's queue instead, right after. The destructor drains that queue.
+    MacCameraHandle* self = this;
+    std::shared_ptr<std::atomic<bool>> alive = alive_;
+    const VideoFormat ff = f;
+    dispatch_async(timer_q_, ^{
+      if (*alive) self->set_format(ff);
+    });
+    vlog("info", "set_format %dx%d from inside an encoder callback: deferred to the stream queue", f.w, f.h);
+    return;
+  }
+  int bitrate, fps;
   {
     std::lock_guard<std::recursive_mutex> lk(mu_);
     if (f.w == fmt_.w && f.h == fmt_.h) {
@@ -645,10 +725,11 @@ void MacCameraHandle::set_format(const VideoFormat& f) {
       return;
     }
     bitrate = spec_.bitrate;
+    fps = fps_;
   }
   std::string err;
   double ms = 0;
-  auto next = Encoder::create(f.w, f.h, bitrate, fps_, spec_.ltr, &err, &ms);
+  auto next = Encoder::create(f.w, f.h, bitrate, fps, spec_.ltr, &err, &ms);
   if (!next) {
     vlog("warn", "set_format %dx%d: %s", f.w, f.h, err.c_str());
     return;
@@ -656,9 +737,10 @@ void MacCameraHandle::set_format(const VideoFormat& f) {
   wire_encoder(next.get());
   std::unique_ptr<Encoder> old;
   {
-    std::lock_guard<std::recursive_mutex> lk(mu_);
+    std::lock_guard<std::recursive_mutex> el(enc_mu_);  // no encode meanwhile
     old = std::move(enc_);
-    if (old) old->flush();  // its last AUs reach the sink before the new session's IDR
+    if (old) old->flush();  // its last AUs reach the sink before the new session's IDR (mu_ not held)
+    std::lock_guard<std::recursive_mutex> lk(mu_);
     {
       std::lock_guard<std::mutex> lk2(out_mu_);
       tokens_.clear();  // the new session has no LTR; acks of old frames must never reach it
@@ -681,6 +763,7 @@ void MacCameraHandle::on_captured(const Frame& f) {
     emit("running", "");
     emit("camera_ms", fmt1((now_ns() - open_ns_) / 1e6));
   }
+  std::lock_guard<std::recursive_mutex> el(enc_mu_);  // waits for an encoder wake in progress (not holding mu_)
   std::lock_guard<std::recursive_mutex> lk(mu_);
   if (!started_ || paused_ || !enc_) return;  // not submitted: nothing is encoded, no AU is lost
   if (fps_ == 15 && (parity_++ & 1)) return;
@@ -696,6 +779,7 @@ void MacCameraHandle::on_captured(const Frame& f) {
     acks.swap(acks_pending_);
   }
   std::string err;
+  apply_pending_locked();
   if (enc_->encode(pb, f.capture_ns, idr, refresh, acks, &err)) {
     submitted_real_ = true;
     want_idr_ = false;
@@ -785,7 +869,7 @@ std::unique_ptr<CameraHandle> MacVideoBackend::open_camera(const CameraSpec& spe
   auto h = std::make_unique<MacCameraHandle>(this, s, sink, std::move(enc), src, capture_start);
   {
     std::lock_guard<std::mutex> lk(mu_);
-    handles_.insert(h.get());
+    handles_[h.get()] = ++handle_gen_;
   }
   h->begin(detail);
   vlog("info", "camera stream opened: %s, %dx%d, encoder %s", src->native().c_str(), f.w, f.h, detail.c_str());
@@ -797,6 +881,9 @@ std::unique_ptr<CameraHandle> MacVideoBackend::open_camera(const CameraSpec& spe
 std::atomic<double> g_last_stop_ms{0};
 void note_stop_ms(double ms) { g_last_stop_ms = ms; }
 double last_stop_ms() { return g_last_stop_ms.load(); }
+void test_fail_wake_buffer(bool on) { g_test_fail_wake_buffer = on; }
+int wake_attempts_total() { return g_wake_attempts.load(); }
+int wake_encodes_total() { return g_wake_encodes.load(); }
 
 }  // namespace macvideo
 

@@ -170,7 +170,11 @@ class CameraSource;
 
 namespace beamer::audio::macvideo {
 
-class CameraSource : public Source {
+// Blocks on ctl_q_ (start, retry, notifications, the 1 s timer) hold a weak_ptr and lock it for their whole run
+// (R3 #4): the destructor does not wait for ctl_q_, so a raw `self` checked against `alive` could be freed between
+// the check and the use. A block that ends up holding the last reference runs the destructor on ctl_q_, which is
+// fine: it only queues the stop there.
+class CameraSource : public Source, public std::enable_shared_from_this<CameraSource> {
  public:
   CameraSource() = default;
   ~CameraSource() override;
@@ -293,7 +297,7 @@ bool CameraSource::open(AVCaptureDevice* dev, int wt, int ht, std::string* err) 
   // interruption / runtime error -> interrupted, retried every 2 s; device gone -> lost
   NSNotificationCenter* nc = NSNotificationCenter.defaultCenter;
   std::shared_ptr<std::atomic<bool>> alive = alive_;
-  CameraSource* self = this;
+  std::weak_ptr<CameraSource> weak = weak_from_this();  // make_camera_source owns it through make_shared
   NSOperationQueue* oq = [[NSOperationQueue alloc] init];
   oq.underlyingQueue = ctl_q_;
   oq.maxConcurrentOperationCount = 1;
@@ -301,44 +305,53 @@ bool CameraSource::open(AVCaptureDevice* dev, int wt, int ht, std::string* err) 
     observers_.push_back([nc addObserverForName:n object:obj queue:oq usingBlock:block]);
   };
   on(AVCaptureSessionRuntimeErrorNotification, session_, ^(NSNotification* note) {
-    if (!*alive) return;
+    auto self = weak.lock();
+    if (!self || !*alive) return;
     NSError* er = note.userInfo[AVCaptureSessionErrorKey];
     vlog("warn", "camera %s: capture runtime error: %s", self->key_.c_str(), er.localizedDescription.UTF8String ?: "?");
     if (!self->interrupted_.exchange(true)) self->event("interrupted", "runtime_error");
     self->retry_start();
   });
   on(AVCaptureSessionWasInterruptedNotification, session_, ^(NSNotification*) {
-    if (!*alive) return;
+    auto self = weak.lock();
+    if (!self || !*alive) return;
     if (!self->interrupted_.exchange(true)) self->event("interrupted", "interrupted");
   });
   on(AVCaptureSessionInterruptionEndedNotification, session_, ^(NSNotification*) {
-    if (!*alive) return;
+    auto self = weak.lock();
+    if (!self || !*alive) return;
     if (self->interrupted_.exchange(false)) self->event("resumed", "");
   });
   on(AVCaptureDeviceWasDisconnectedNotification, dev, ^(NSNotification*) {
-    if (!*alive) return;
+    auto self = weak.lock();
+    if (!self || !*alive) return;
     if (!self->lost_.exchange(true)) self->event("lost", "gone");
   });
 
   // start at once (Deviation 3: the camera warms up while the open round trip runs)
   AVCaptureSession* s = session_;
+  const std::string key = key_;  // copies: the block may outlive the source (it is not kept alive by it)
   dispatch_async(ctl_q_, ^{
-    [s startRunning];
+    [s startRunning];  // 0.2-0.8 s; the source may be destroyed meanwhile (its stop is queued behind this block)
     if (locked) {
       if (dev.activeFormat != fmt) {
-        vlog("info", "camera %s: the session changed the format at start; set again", self->key_.c_str());
+        vlog("info", "camera %s: the session changed the format at start; set again", key.c_str());
         dev.activeFormat = fmt;
         if (has30) dev.activeVideoMinFrameDuration = CMTimeMake(1, 30);
       }
       [dev unlockForConfiguration];
     }
-    if (s.isRunning) g_sessions_running++;
-    else if (*alive) self->retry_start();
+    if (s.isRunning) {
+      g_sessions_running++;
+    } else if (auto self = weak.lock()) {
+      if (*alive) self->retry_start();
+    }
   });
   timer_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, ctl_q_);
   dispatch_source_set_timer(timer_, dispatch_time(DISPATCH_TIME_NOW, 200 * NSEC_PER_MSEC), NSEC_PER_SEC, 50 * NSEC_PER_MSEC);
   dispatch_source_set_event_handler(timer_, ^{
-    if (*alive) self->tick();
+    auto self = weak.lock();
+    if (self && *alive) self->tick();
   });
   dispatch_resume(timer_);
   return true;
@@ -346,10 +359,11 @@ bool CameraSource::open(AVCaptureDevice* dev, int wt, int ht, std::string* err) 
 
 void CameraSource::retry_start() {
   std::shared_ptr<std::atomic<bool>> alive = alive_;
-  CameraSource* self = this;
+  std::weak_ptr<CameraSource> weak = weak_from_this();
   AVCaptureSession* s = session_;
   dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), ctl_q_, ^{
-    if (!*alive || self->lost_) return;
+    auto self = weak.lock();
+    if (!self || !*alive || self->lost_) return;
     if (s.isRunning) {
       if (self->interrupted_.exchange(false)) self->event("resumed", "");
       return;

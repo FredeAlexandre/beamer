@@ -970,6 +970,165 @@ int run_disclaimed(int argc, char** argv) {
   return WIFEXITED(st) ? WEXITSTATUS(st) : 3;
 }
 
+// ---- R3 #5 / #6: re-entrant handle calls and the encoder wake, on the synthetic camera (no permission needed).
+// Each case runs in a child process (posix_spawn of this binary), so a deadlock or a crash is reported, not hung on.
+int run_child(const std::vector<std::string>& args, double timeout_s, int* term_sig, bool* timed_out) {
+  char path[PROC_PIDPATHINFO_MAXSIZE];
+  proc_pidpath(getpid(), path, sizeof path);
+  std::vector<std::string> a = {path};
+  a.insert(a.end(), args.begin(), args.end());
+  std::vector<char*> av;
+  for (auto& x : a) av.push_back(const_cast<char*>(x.c_str()));
+  av.push_back(nullptr);
+  pid_t pid = 0;
+  if (posix_spawn(&pid, path, nullptr, nullptr, av.data(), environ) != 0) return -1;
+  int st = 0;
+  *timed_out = false;
+  *term_sig = 0;
+  const int64_t end = now_ns() + (int64_t)(timeout_s * 1e9);
+  for (;;) {
+    pid_t r = waitpid(pid, &st, WNOHANG);
+    if (r == pid) break;
+    if (now_ns() > end) {
+      *timed_out = true;
+      kill(pid, SIGKILL);
+      waitpid(pid, &st, 0);
+      return -1;
+    }
+    sleep_ms(20);
+  }
+  if (WIFSIGNALED(st)) {
+    *term_sig = WTERMSIG(st);
+    return -1;
+  }
+  return WIFEXITED(st) ? WEXITSTATUS(st) : -1;
+}
+
+CameraSpec synth_spec(int w = 1280, int h = 720) {
+  CameraSpec spec;
+  spec.fmt = VideoFormat{w, h, 30};
+  spec.test = "synth";
+  return spec;
+}
+
+// set_format from inside on_frame (the 10th AU): returns at once, and an IDR at the new size follows.
+int child_setformat() {
+  auto be = make_backend();
+  Listener lis;
+  be->set_listener(&lis);
+  Sink sink;
+  sink.print_events = false;
+  std::string err;
+  std::unique_ptr<CameraHandle> h = be->open_camera(synth_spec(), &sink, &err);
+  if (!h) return 2;
+  CameraHandle* raw = h.get();
+  std::atomic<double> call_ms{-1};
+  sink.hook = [&](const Au& a) {
+    if (a.n != 10) return;
+    const int64_t t0 = now_ns();
+    raw->set_format(VideoFormat{640, 360, 30});
+    call_ms = (now_ns() - t0) / 1e6;
+  };
+  h->start_encoding();
+  sink.wait_aus(70, 6);
+  bool idr_small = false;
+  size_t n = 0;
+  {
+    std::lock_guard<std::mutex> lk(sink.mu);
+    n = sink.aus.size();
+    for (auto& a : sink.aus)
+      if (a.n > 10 && a.idr && a.w == 640 && a.h == 360) idr_small = true;
+  }
+  h.reset();
+  const bool ok = call_ms.load() >= 0 && call_ms.load() < 20 && idr_small;
+  out(J().str("ev", "reentry_setformat").b("ok", ok).num("call_ms", call_ms.load()).b("idr_640x360_after", idr_small).i("aus", (int)n));
+  return ok ? 0 : 1;
+}
+
+// destroying the handle from inside on_frame: must abort with a message (never return into a freed handle)
+int child_destroy() {
+  auto be = make_backend();
+  Listener lis;
+  be->set_listener(&lis);
+  Sink sink;
+  sink.print_events = false;
+  std::string err;
+  std::unique_ptr<CameraHandle> h = be->open_camera(synth_spec(), &sink, &err);
+  if (!h) return 2;
+  sink.hook = [&](const Au& a) {
+    if (a.n == 5) h.reset();
+  };
+  h->start_encoding();
+  sleep_ms(3000);
+  return 0;  // not aborted: the check fails
+}
+
+// the black wake buffer cannot be made: the wake stops after 20 attempts (not a 5 Hz timer for the handle's life)
+int child_wakebound() {
+  test_fail_wake_buffer(true);
+  auto be = make_backend();
+  Listener lis;
+  be->set_listener(&lis);
+  Sink sink;
+  sink.print_events = false;
+  std::string err;
+  std::unique_ptr<CameraHandle> h = be->open_camera(synth_spec(), &sink, &err);  // never started: no real frame
+  if (!h) return 2;
+  sleep_ms(5500);
+  const int a1 = wake_attempts_total();
+  sleep_ms(1500);
+  const int a2 = wake_attempts_total(), enc = wake_encodes_total();
+  h.reset();
+  const bool ok = a1 == 20 && a2 == 20 && enc == 0;
+  out(J().str("ev", "reentry_wakebound").b("ok", ok).i("attempts_5_5s", a1).i("attempts_7s", a2).i("encodes", enc));
+  return ok ? 0 : 1;
+}
+
+// engine calls during the encoder wake: request_idr / set_input_paused never wait for the wake's encode
+int child_wakelock() {
+  auto be = make_backend();
+  Listener lis;
+  be->set_listener(&lis);
+  Sink sink;
+  sink.print_events = false;
+  double worst = 0;
+  for (int round = 0; round < 3; round++) {
+    sleep_ms(3000);  // the encoder service idles again (the slow first encode comes back after ~1-2 s idle)
+    std::string err;
+    std::unique_ptr<CameraHandle> h = be->open_camera(synth_spec(), &sink, &err);
+    if (!h) return 2;
+    const int64_t end = now_ns() + 1000000000LL;  // the wake encodes at 0, 200, 400... ms (not started)
+    while (now_ns() < end) {
+      const int64_t t0 = now_ns();
+      h->request_idr();
+      h->set_input_paused(false);
+      worst = std::max(worst, (now_ns() - t0) / 1e6);
+      sleep_ms(0.5);
+    }
+    h.reset();
+  }
+  const bool ok = worst < 10;
+  out(J().str("ev", "reentry_wakelock").b("ok", ok).num("worst_call_ms", worst).i("wake_encodes", wake_encodes_total()));
+  return ok ? 0 : 1;
+}
+
+int cmd_reentry() {
+  int fails = 0;
+  auto report = [&](const char* name, const std::vector<std::string>& args, bool expect_abort, double timeout) {
+    int sig = 0;
+    bool to = false;
+    const int rc = run_child(args, timeout, &sig, &to);
+    const bool ok = expect_abort ? sig == SIGABRT : (rc == 0 && !to);
+    if (!ok) fails++;
+    out(J().str("ev", "reentry").str("case", name).b("ok", ok).i("rc", rc).i("signal", sig).b("timed_out", to));
+  };
+  report("set_format inside on_frame", {"reentry-child", "setformat"}, false, 15);
+  report("destroy inside on_frame aborts", {"reentry-child", "destroy"}, true, 15);
+  report("wake bounded without a buffer", {"reentry-child", "wakebound"}, false, 20);
+  report("engine calls never wait for the wake encode", {"reentry-child", "wakelock"}, false, 30);
+  return fails ? 1 : 0;
+}
+
 int cmd_guard() {
   auto be = make_backend();
   Listener lis;
@@ -1046,6 +1205,15 @@ int main(int argc, char** argv) {
     }
     if (cmd == "idlecost") return cmd_idlecost(arg(argc, argv, "--mode", "session"), atof(arg(argc, argv, "--minutes", "10").c_str()));
     if (cmd == "guard") return cmd_guard();
+    if (cmd == "reentry") return cmd_reentry();
+    if (cmd == "reentry-child" && argc > 2) {
+      const std::string c = argv[2];
+      if (c == "setformat") return child_setformat();
+      if (c == "destroy") return child_destroy();
+      if (c == "wakebound") return child_wakebound();
+      if (c == "wakelock") return child_wakelock();
+      return 2;
+    }
     fprintf(stderr, "unknown command %s\n", cmd.c_str());
     return 2;
   }

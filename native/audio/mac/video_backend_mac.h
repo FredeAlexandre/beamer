@@ -50,6 +50,11 @@ int capture_sessions_running();
 std::string camera_permission();
 void note_stop_ms(double ms);        // a stream's encoder invalidation time (handle destructor)
 double last_stop_ms();
+// video_check hooks for the encoder wake (R3 #6): make the black wake buffer "fail" to be created, and the totals
+// over all handles of wake attempts and of wake frames actually encoded.
+void test_fail_wake_buffer(bool on);
+int wake_attempts_total();
+int wake_encodes_total();
 std::vector<double> take_scale_times();   // ms per VTPixelTransferSession call since the last take
 std::vector<double> take_encode_times();  // ms submit -> output per AU since the last take  // granted | denied | undetermined | restricted | unknown (re-read each call)
 
