@@ -55,6 +55,15 @@ _CAP_FOR = {protocol.MSG_GESTURE: "gestures", protocol.MSG_TEXT: "text", protoco
 # The audio control plane (fork; dev/audio/PHASE2.md §5): every `audio_*` type needs `audio`.
 _CAP_FOR.update(dict.fromkeys(("audio_hello", "audio_devices", "audio_route", "audio_flow", "audio_open", "audio_opened",
                                "audio_close", "audio_frame", "audio_watch", "audio_stats", "audio_test"), "audio"))
+# Camera (fork; dev/camera/PHASE2.md §5.1): no new cap, every `camera_*` type rides `audio`. Kept beside
+# _CAP_FOR, whose `audio` entries stay exactly the audio types; `_cap_for` reads both.
+_CAMERA_CAP_FOR = dict.fromkeys(("camera_devices", "camera_route", "camera_open", "camera_opened", "camera_close"),
+                                "audio")
+
+
+def _cap_for(kind):
+    """The capability a peer must announce for a message type, or None."""
+    return _CAP_FOR.get(kind) or _CAMERA_CAP_FOR.get(kind)
 
 
 class LinkEnded(Exception):
@@ -787,7 +796,7 @@ class OutboundLink:
             if not data.get("text") and "image" not in data:
                 return True
             message = {"type": kind, "data": data}
-        elif _CAP_FOR.get(kind) is not None and _CAP_FOR[kind] not in self._caps:
+        elif _cap_for(kind) is not None and _cap_for(kind) not in self._caps:
             return True
         return self._enqueue(message, seq=False)
 

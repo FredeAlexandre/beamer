@@ -90,6 +90,8 @@ setup(
                 "core.fx_light", "core.fx_material", "core.fx_folio", "core.fx_selvedge",
                 "core.audio", "core.audio.helper", "core.audio.model", "core.audio.planner", "core.audio.service",
                 "core.audio.store", "core.audio.view", "core.audio.wire",
+                "core.camera", "core.camera.model", "core.camera.part", "core.camera.planner", "core.camera.store",
+                "core.camera.texts", "core.camera.view", "core.camera.wire",
             ],
             "iconfile": "../Beamer.icns",
             "plist": {

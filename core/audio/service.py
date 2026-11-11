@@ -25,10 +25,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional, Protocol
 
-from core import protocol
+from core import feature_flags, protocol
 from core.audio import helper as helper_module
 from core.audio import model, planner, store, wire
 from core.audio.model import AudioSnapshot, DeviceRef, MachineAudio, RouteStatus, StreamView
+from core.i18n import tr
 
 log = logging.getLogger("beamer.audio")
 
@@ -135,6 +136,16 @@ def _test_signal_ok(signal):
         return False
 
 
+# core.camera imports core.audio, so this module reaches it lazily (the part is made in __init__).
+CAMERA_FEATURE = "camera1"     # audio_hello.features word (camera PHASE2 §5.1; core.camera.wire.FEATURE)
+VIDEO_FEATURE = "video1"       # the engine has the video plane (camera PHASE2 §3.1; core.camera.wire.VIDEO_FEATURE)
+
+
+def _is_camera(message):
+    """A `camera_*` message (camera PHASE2 §5): rides cap `audio`, handled by the camera part."""
+    return isinstance(message, dict) and isinstance(message.get("type"), str) and message["type"].startswith("camera_")
+
+
 def _usable_host(host):
     return isinstance(host, str) and host and not host.startswith("127.") and host != "localhost"
 
@@ -150,6 +161,88 @@ def snapshot_data(snap: AudioSnapshot) -> dict:
             "streams": [dataclasses.asdict(stream) for stream in snap.streams], "helper": snap.helper,
             "permission": dict(snap.permission), "aec_mode": snap.aec_mode, "aec_active": snap.aec_active,
             "howls": [dataclasses.asdict(howl) for howl in snap.howls], "vmic_exclusive": snap.vmic_exclusive}
+
+
+class _CameraContext:
+    """The `MediaContext` the CameraPart reaches the service through (camera PHASE2 §7.1). Every call
+    runs on the service's worker; nothing here blocks or touches another thread's state."""
+
+    def __init__(self, service):
+        self._service = service
+        self.own = service._own
+        self.clock = service._clock
+        self.wall = service._wall
+        self.logger = service._log
+
+    def post(self, peer, message):
+        sent = self._service._post(peer, message)
+        if sent:
+            self._service._log_camera_message("to", peer, message)
+        return sent
+
+    def helper_send(self, command, reply=None):
+        self._service._helper_send(command, reply)
+
+    def helper_state(self):
+        return self._service._helper_state
+
+    def helper_features(self):
+        return frozenset(self._service._helper_info.get("features", ()))
+
+    def flow_for(self, peer):
+        state = self._service._peers.get(peer)
+        if state is None or state.flow is None or not state.flow.agreed:
+            return None
+        return state.flow.id
+
+    def peer_has_udp(self, peer):
+        return bool(_usable_host(self._service._host.peer_host(peer)))
+
+    def new_stream_id(self):
+        return self._service._new_stream()
+
+    def new_key(self):
+        return _key()
+
+    def peers_with(self, feature):
+        return frozenset(ident for ident, peer in self._service._peers.items()
+                         if peer.direct and feature in peer.hello.get("features", ()))
+
+    def direct(self):
+        return self._service._direct()
+
+    def online(self):
+        service = self._service
+        return model.online(service._own, service._direct(), service._machines)
+
+    def audio_machines(self):
+        return dict(self._service._machines)
+
+    def machine_name(self, machine):
+        """Own -> this machine's name; else the audio list's name; else the link's peer name; else
+        "Machine · <last 6>" (the order of core/audio/view.py `_Names`)."""
+        service = self._service
+        if machine == service._own:
+            return service._host.own_name()
+        held = service._machines.get(machine)
+        if held is not None and held.name:
+            return held.name
+        try:
+            name = service._host.peer_name(machine) if machine else ""
+        except Exception:
+            name = ""
+        return name or tr("Machine · {id}").format(id=(machine or "")[-6:])
+
+    def outbox_depth(self, peer):
+        return self._service._host.outbox_depth(peer)
+
+    def changed(self):
+        self._service._camera_changed = True
+
+    def schedule(self, at):
+        # The part calls this only when its (single) next wake-up changes, so the latest value is its
+        # nearest one; a wake it dropped is replaced, never kept (a kept earlier one would hide it).
+        self._service._camera_wake = at
 
 
 class AudioService:
@@ -211,6 +304,13 @@ class AudioService:
         self._wake_at = None
         self._dirty = True
         self.link_out_dropped = 0
+        # Camera (camera PHASE2 §7.1): a CameraPart in this worker, through a MediaContext.
+        self._camera = None
+        self._camera_wake = None
+        self._camera_changed = False
+        if feature_flags.CAMERA:
+            from core.camera.part import CameraPart
+            self._camera = CameraPart(_CameraContext(self), self._state_dir, self._platform)
 
     # Any thread ---------------------------------------------------------------------------------
 
@@ -287,6 +387,28 @@ class AudioService:
 
     def retry_helper(self) -> None:
         self._queue.put(("call", "_retry_helper", ()))
+
+    # Camera (camera PHASE2 §7.1): thin setters that enqueue to the worker, and a plain read.
+
+    def camera_snapshot(self):
+        """The camera part's last published CameraSnapshot (None without the camera feature)."""
+        part = self._camera
+        return part.snapshot() if part is not None else None
+
+    def set_camera(self, machine: Optional[str], device) -> None:
+        self._queue.put(("call", "_camera_call", ("set_camera", (machine, device))))
+
+    def set_quality(self, size: str) -> None:
+        self._queue.put(("call", "_camera_call", ("set_quality", (size,))))
+
+    def set_camera_sharing(self, on: bool) -> None:
+        self._queue.put(("call", "_camera_call", ("set_sharing", (bool(on),))))
+
+    def ask_camera_permission(self) -> None:
+        self._queue.put(("call", "_camera_call", ("ask_permission", ())))
+
+    def refresh_camera_install(self) -> None:
+        self._queue.put(("call", "_camera_call", ("refresh_install", ())))
 
     def pump(self, limit=100000) -> int:
         """Handle everything queued, and what that queues in turn, then the timers that are due: the
@@ -399,7 +521,7 @@ class AudioService:
         self._dirty = True
 
     def _next_deadline(self):
-        deadlines = [moment for moment in (self._save_at, self._wake_at) if moment is not None]
+        deadlines = [moment for moment in (self._save_at, self._wake_at, self._camera_wake) if moment is not None]
         if self._dev is not None:
             deadlines.append(self._dev_at + DEV_POLL)
         if self._levels_dirty:
@@ -412,6 +534,9 @@ class AudioService:
         now = self._clock()
         if self._wake_at is not None and now >= self._wake_at:
             self._wake_at = None
+            self._dirty = True
+        if self._camera_wake is not None and now >= self._camera_wake:
+            self._camera_wake = None
             self._dirty = True
         if self._dev is not None and now - self._dev_at >= DEV_POLL:
             self._dev_at = now
@@ -442,6 +567,11 @@ class AudioService:
             self._log.exception("audio: subscriber failed")
 
     def _shutdown(self):
+        if self._camera is not None:
+            try:
+                self._camera.shutdown()     # camera_close {shutdown}, helper stops, camera.json saved
+            except Exception:
+                self._log.exception("camera: shutdown failed")
         for (kind, peer), send in list(self._sends.items()):
             self._close_send(kind, peer, "shutdown")
         for stream, recv in list(self._recvs.items()):
@@ -495,6 +625,8 @@ class AudioService:
 
     def _new_stream(self):
         used = set(self._recvs) | {send.stream for send in self._sends.values()}
+        if self._camera is not None:
+            used |= self._camera.stream_ids()
         if self._loop is not None:
             used.add(self._loop.stream)
         while True:
@@ -520,7 +652,18 @@ class AudioService:
 
     def _hello(self):
         helper = self._helper_state if self._helper_state in wire.HELPER_STATES else "failed"
-        return wire.hello(self._platform, helper, self._listen(), self._helper_info.get("features", ()))
+        features = set(self._helper_info.get("features", ()))
+        if self._camera is not None and self._announces_camera():
+            features.add(CAMERA_FEATURE)
+        return wire.hello(self._platform, helper, self._listen(), features)
+
+    def _announces_camera(self):
+        """`camera1` in our audio_hello: the flag is on and the helper has the video plane (§5.1)."""
+        return bool(feature_flags.CAMERA) and VIDEO_FEATURE in self._helper_info.get("features", ())
+
+    def _peer_has(self, peer, feature):
+        state = self._peers.get(peer)
+        return state is not None and state.direct and feature in state.hello.get("features", ())
 
     # Links --------------------------------------------------------------------------------------
 
@@ -537,6 +680,8 @@ class AudioService:
             self._peers[peer] = _Peer(caps)
         if "audio" not in caps:
             return
+        if self._camera is not None:
+            self._camera.link_up(peer)
         self._post(peer, self._hello())
         own = self._machines.get(self._own)
         if own is not None:
@@ -549,6 +694,8 @@ class AudioService:
             self._post(peer, wire.watch(True))
 
     def _on_link_down(self, peer):
+        if self._camera is not None:
+            self._camera.link_down(peer)    # first: its streams on this peer's flow stop before the flow
         state = self._peers.pop(peer, None)
         if state is None:
             return
@@ -570,6 +717,12 @@ class AudioService:
         state = self._peers.get(peer)
         if state is None or not state.audio:
             return
+        if _is_camera(message):
+            # camera_* ride cap `audio` (camera PHASE2 §5.1); without the camera feature they are ignored.
+            if self._camera is not None:
+                self._log_camera_message("from", peer, message)
+                self._camera.link_message(peer, message)
+            return
         read = wire.read(message, now=self._wall())
         if read is None:
             if wire.is_audio(message):
@@ -582,6 +735,9 @@ class AudioService:
     def _on_audio_hello(self, peer, state, data):
         before = state.hello
         state.hello = data
+        if (self._camera is not None and CAMERA_FEATURE in data["features"]
+                and (before is None or CAMERA_FEATURE not in before.get("features", ()))):
+            self._log.info("camera: %s speaks %s", self._host.peer_name(peer) or peer, CAMERA_FEATURE)
         if data["min_v"] > wire.VERSION:
             self._log.info("audio: a peer needs audio protocol %d, treating it as without audio", data["min_v"])
             return
@@ -760,6 +916,8 @@ class AudioService:
                    "source": send.source, "codec": wire.CODECS[send.spec.kind], "key": send.key,
                    "mute_local": send.spec.mute_local,
                    "aec": {"reference": send.spec.aec_reference} if send.spec.aec else None}
+        if self._time_map_for(peer):
+            command["sr"] = True        # the flow's time_map covers this stream (camera PHASE2 §4.2, §4.9)
         send.helper_started = True
 
         def reply(event, send=send, key=key):
@@ -771,6 +929,12 @@ class AudioService:
         if not self._helper_send(command, reply):
             send.state, send.error = "failed", "helper"
             send.helper_started = False
+
+    def _time_map_for(self, peer):
+        """Audio `send` gets `sr:true` only when the peer announced `video1` (so an old peer never
+        receives a time_map) and our own helper has it too (it is the one that sends the map)."""
+        return (self._camera is not None and self._peer_has(peer, VIDEO_FEATURE)
+                and VIDEO_FEATURE in self._helper_info.get("features", ()))
 
     def _on_audio_close(self, peer, state, data):
         stream = data["stream"]
@@ -909,6 +1073,10 @@ class AudioService:
 
     def _on_helper(self, event):
         name = event.get("ev")
+        # The camera part sees every helper event first and consumes its own (cameras, vcam, camera,
+        # video stream_state, video link_out). `_state` reaches it through `_helper_gone`.
+        if self._camera is not None and name != "_state" and self._camera.helper_event(event):
+            return
         if name == "_state":
             self._helper_gone(event.get("state", "starting"))
         elif name == "ready":
@@ -952,8 +1120,10 @@ class AudioService:
         elif name == "stats":
             streams = event.get("streams")
             if isinstance(streams, dict):
+                video = self._camera.stream_ids() if self._camera is not None else frozenset()
                 self._stats = {int(key): value for key, value in streams.items()
-                               if str(key).isdigit() and isinstance(value, dict)}
+                               if str(key).isdigit() and isinstance(value, dict) and int(key) not in video
+                               and value.get("kind") != "video"}
         elif name == "howl":
             self._on_howl(event)
         elif name == "permission":
@@ -1008,6 +1178,9 @@ class AudioService:
 
     def _helper_gone(self, state):
         """The helper process is (re)starting or failed: its flows and streams are gone (§5.4)."""
+        if self._camera is not None:
+            # Its video streams too (camera_close {helper}); the part re-plans on `ready` (camera §5.3).
+            self._camera.helper_event({"ev": "_state", "state": state})
         self._helper_state = state if state in ("starting", "failed") else "starting"
         for (kind, peer) in list(self._sends):
             send = self._sends.pop((kind, peer))
@@ -1145,6 +1318,22 @@ class AudioService:
         if self._helper is not None:
             self._helper.retry()
 
+    def _camera_call(self, method, args):
+        if self._camera is not None:
+            getattr(self._camera, method)(*args)
+
+    def _log_camera_message(self, direction, peer, message):
+        """`camera_devices` in the log, both ways (rare: link up, a camera, demand or install change):
+        what tells from the log alone that two machines exchanged their camera state."""
+        if message.get("type") != "camera_devices":
+            return
+        data = message.get("data") if isinstance(message.get("data"), dict) else {}
+        vcam = data.get("virtual_camera") if isinstance(data.get("virtual_camera"), dict) else {}
+        cameras = data.get("cameras") if isinstance(data.get("cameras"), list) else ()
+        self._log.info("camera: camera_devices %s %s (rev %s, status %s, %d cameras, sharing %s, install %s, in use %s)",
+                       direction, self._host.peer_name(peer) or peer, data.get("rev"), data.get("status"),
+                       len(cameras), data.get("sharing"), vcam.get("install"), vcam.get("in_use"))
+
     # Dev command files (§8.1) -------------------------------------------------------------------
 
     def _dev_poll(self):
@@ -1165,6 +1354,8 @@ class AudioService:
             self._settle()
         status = {"snapshot": snapshot_data(self._snapshot), "stats": {str(key): value for key, value in self._stats.items()},
                   "link_out_dropped": self.link_out_dropped, "wall": self._wall(), "test_source": self._test_source}
+        if self._camera is not None:
+            status["camera"] = self._camera.dev_status()
         temporary = self._state_dir / f".{DEV_STATUS}.tmp"
         try:
             temporary.write_text(json.dumps(status, indent=1, sort_keys=True), encoding="utf-8")
@@ -1180,6 +1371,8 @@ class AudioService:
             if not isinstance(item[1], dict) or item[1].get("ev") == "levels":
                 return
             record = dict(item[1])
+            if record.get("ev") == "link_out" and record.get("video") is True and isinstance(record.get("p"), list):
+                record["p"] = len(record["p"])      # video in link state: the count, not ~1 MB/s of packets
         elif kind in ("link_up", "link_down"):
             record = {"ev": "_" + kind, "peer": item[1]}
         else:
@@ -1224,6 +1417,8 @@ class AudioService:
             if "helper_dev" in item and isinstance(item["helper_dev"], dict):
                 # the helper's own dev switches (drop_udp, loss_pct, reset_stats); needs `--dev`
                 self._helper_send(dict(item["helper_dev"], cmd="dev"))
+            if self._camera is not None and isinstance(item, dict):
+                self._camera.dev_command(item)      # the camera keys (camera PHASE2 §7.4)
 
     # Settling: own list, plan, snapshot ---------------------------------------------------------
 
@@ -1295,8 +1490,16 @@ class AudioService:
         wakes = [moment for moment in (plan.wake_at, howl_expiry) if moment is not None]
         self._wake_at = min(wakes) if wakes else None
         snap = self._compose_snapshot(plan, direct, online, howls)
-        if snap != self._snapshot:
+        changed = snap != self._snapshot
+        if changed:
             self._snapshot = snap
+        if self._camera is not None:
+            try:
+                self._camera.apply(self._clock())
+            except Exception:
+                self._log.exception("camera: apply failed")
+        if changed or self._camera_changed:
+            self._camera_changed = False
             for fn in self._listeners(self._subscribers):
                 self._call(fn)
 

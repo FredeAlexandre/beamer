@@ -487,7 +487,7 @@ Capabilities say what a machine does with a message it receives:
 | `layout` | with `settings`, it sends and receives the shared tile picture (`settings.data.layout`) |
 | `displays` | with `layout`, it sends and receives each machine's logical display rectangles and display-targeted edges |
 | `ping_rtt` | it sends and answers response-time probes on `ping` in both directions |
-| `audio` | (fork) it runs the audio control plane: it sends and receives the `audio_*` messages (section 11) |
+| `audio` | (fork) it runs the audio control plane: it sends and receives the `audio_*` messages (section 11), and the `camera_*` messages when both ends announce `camera1` (section 12) |
 
 A sender does not send a message its peer's capabilities do not cover. A receiver that gets one
 anyway drops it, and still acknowledges it when it carries a `seq`.
@@ -1636,6 +1636,75 @@ entries are never deleted.
   travel as `audio_frame` (at most 32 kb/s mic, 48 kb/s system), dropped while the link's queue holds
   more than 64 messages so input is never held up; UDP is probed every second and taken back after
   1 s of UDP.
+
+## 12. Camera (inside capability `audio`, fork)
+
+This fork also carries a Mac's camera to the "Beamer Camera" of a Windows PC (design:
+`dev/camera/PHASE2.md` §5). The control plane rides on the links as `camera_*` messages; the video
+itself goes over the audio UDP flow of section 11 as another stream kind, and falls back to the link
+the same way. No new capability, wire version 6 unchanged; machines without the feature word see
+nothing new.
+
+### Rules
+
+- No new cap (still 14 of 16). `camera_*` messages need cap `audio` on both ends **and** the word
+  `camera1` in the peer's `audio_hello.features`; nothing `camera_*` is ever posted to a peer without
+  it. A machine announces `camera1` when the fork's camera feature is on and its audio helper
+  announces `video1` (the video plane). Links drop `camera_*` to and from a peer without `audio`, as
+  they drop `audio_*`.
+- Same rules as section 11: no `seq`, not input, unknown fields ignored, a malformed one ignored
+  (never ends a link), the same "which link" rule. Limits: 16 cameras per machine, 16 `native`
+  formats per camera, `key` up to 200 characters, `name` 128, `app` 128, each message under 16 KiB.
+- Video in link state (fallback) and every video feedback packet ride the existing `audio_frame`.
+
+### Messages
+
+| type | data | scope |
+|---|---|---|
+| `camera_devices` | `{"machine":id,"rev":int,"platform","status":"ok"\|"starting"\|"failed"\|"no_video","features":["camera_capture"\|"virtual_camera"],"test_source":"synth..."\|null,"cameras":[{"key","name","transport","native":["1920x1080@30",...]}],"preferred":key\|null,"permission":"granted"\|"denied"\|"undetermined"\|"restricted"\|"unknown"\|null,"sharing":bool\|null,"capture":{"state":"idle"\|"starting"\|"running"\|"interrupted"\|"failed","by_other":bool,"effects":[...],"error":code\|null},"virtual_camera":{"install":"ok"\|"missing"\|"outdated"\|"broken"\|"unsupported","present":bool,"in_use":bool,"app":str\|null,"want":{"w","h","fps"}\|null}}` | flooded; `sharing` only from a Mac about itself, `test_source` only from a dev Mac |
+| `camera_route` | the route document below | flooded, merged entry by entry |
+| `camera_open` | `{"stream":u32,"flow","codec":{"name":"h264","profile":"constrained_high","w","h","fps":30,"bitrate","mtu":1200,"ltr":true},"key":b64,"camera":{"key","name"}\|null,"for":{"set_at","by"}}` | direct, camera machine to sink |
+| `camera_opened` | `{"stream","ok":bool,"error":"not_installed"\|"outdated"\|"helper"\|"unsupported"\|"not_source"\|null}` | direct, sink to camera machine |
+| `camera_close` | `{"stream","reason":"route"\|"demand"\|"permission"\|"sharing_off"\|"camera_gone"\|"helper"\|"shutdown"\|"no_receiver"\|"error"}` | direct, either side |
+
+The route document (`camera_route`):
+
+```json
+{"camera":  {"machine":"<id>|null","device":{"key":"...","name":"..."}|null,"set_at":1793000000,"by":"<id>"},
+ "quality": {"size":"720p|1080p","set_at":1793000000,"by":"<id>"}}
+```
+
+Stamps and merging as in `audio_route`; unknown top-level entries are kept and forwarded unchanged.
+`camera.machine` null is off. The Mac's "Share the camera" switch is not in the route: it is that Mac's
+`sharing` in its own `camera_devices`, and no other machine can change it.
+
+### Across the cluster
+
+- `camera_devices` and `camera_route` spread like `audio_devices` and `audio_route` (own `rev` per
+  machine, forwarded unchanged to every other direct peer with `camera1`; on link up, or when a peer
+  first announces `camera1`, each side sends its own list, every list it holds and its route). Who is
+  online is the audio part's answer; the camera keeps no graph of its own.
+- On demand: the camera machine sends to a sink only while an app there has Beamer Camera open
+  (`virtual_camera.in_use`), plus 3 s, at the cluster quality (1280x720 2.5 Mbit/s or 1920x1080
+  5 Mbit/s, 30 fps). It starts its helper stream and sends `camera_open` at once; the sink accepts only
+  from the camera machine of its own route, with Beamer Camera installed and its helper ready, else it
+  refuses with the matching error and the camera machine stops at once. A stream whose receiver never
+  asks for a picture (3 s) or goes silent (5 s) is stopped by the helper and closed `no_receiver`.
+- Link down with P: every video stream with P stops at once. Helper restart: its video streams are
+  closed with `camera_close {"reason":"helper"}`, then planned again.
+
+### The media flow
+
+- Video is a stream kind on the section 11 flow: codec id 2 (H.264), a 12-byte video header inside the
+  sealed payload (`frame u32, frag u16, nfrag u16, vflags u8, ltr u8, enc_delay u16`), UDP payloads of
+  at most 1200 bytes, a 1024-packet replay window per video stream.
+- New packet types: `nack` (7) and `pli` (8) on a video stream's receiver direction, and `time_map` (9),
+  a flow control packet (stream 0, flow key). A `time_map` covers video streams and the audio streams a
+  machine sends with `sr` set, which it sets only towards a peer whose `audio_hello` announces `video1`;
+  a flow to any other peer never carries one, and older helpers drop types 7 and 8.
+- Fallback: in link state the video goes as `audio_frame` at 1 Mbit/s 15 fps, one frame's packets per
+  message, dropped (a whole frame at a time) while the link's queue holds more than 32 messages;
+  feedback packets follow the audio rule of 64.
 
 ## Versions
 
