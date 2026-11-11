@@ -98,7 +98,7 @@ class ConvergenceTests(ClusterBase):
             elif action < 0.7:
                 net.cut_udp(self.mac, self.pc, rng.random() < 0.5)
             elif action < 0.72:
-                self.pc.service.camera_dev({"camera_refuse": rng.choice([None, None, "not_source", "helper",
+                self.pc.camera_dev({"camera_refuse": rng.choice([None, None, "not_source", "helper",
                                                                          "silent"])})
             elif action < 0.75:
                 # Refusals by the PC's install state and by its helper's recv (not_installed, outdated).
@@ -115,7 +115,7 @@ class ConvergenceTests(ClusterBase):
                 net.advance(round(rng.random() * 4, 1))
             net.check_camera()
         net.cut_udp(self.mac, self.pc, False)
-        self.pc.service.camera_dev({"camera_refuse": None})
+        self.pc.camera_dev({"camera_refuse": None})
         self.pc.video.recv_error = None
         for x, y in pairs:
             net.link(x, y)
@@ -199,7 +199,7 @@ class ScenarioTests(ClusterBase):
     def test_refusal_of_every_code(self):
         self.cluster()
         for code in ("not_source", "helper"):
-            self.pc.service.camera_dev({"camera_refuse": code})
+            self.pc.camera_dev({"camera_refuse": code})
             self.start_stream()
             self.assertFalse(self.mac.video.camera_on(), code)
             sends = len(self.mac.helper.commands("send"))
@@ -209,21 +209,21 @@ class ScenarioTests(ClusterBase):
             self.pc.set_in_use(False)
             self.net.advance(4)
         for install, code in (("missing", "not_installed"), ("outdated", "outdated")):
-            self.pc.service.camera_dev({"camera_refuse": None})
+            self.pc.camera_dev({"camera_refuse": None})
             self.pc.video.recv_error = code                         # the helper refuses the recv
             self.start_stream()
             self.assertFalse(self.mac.video.camera_on())
             self.pc.video.recv_error = None
             self.pc.set_in_use(False)
             self.net.advance(4)
-        self.pc.service.camera_dev({"camera_refuse": None})
+        self.pc.camera_dev({"camera_refuse": None})
         self.start_stream()
         self.assertTrue(self.mac.video.camera_on())
         self.assertClean()
 
     def test_silent_receiver_backoff(self):
         self.cluster()
-        self.pc.service.camera_dev({"camera_refuse": "silent"})
+        self.pc.camera_dev({"camera_refuse": "silent"})
         self.mac.service.set_camera(self.mac.id, None)
         self.settle()
         before = self.mac.video.camera_starts
@@ -234,7 +234,7 @@ class ScenarioTests(ClusterBase):
             on += 0.1 if self.mac.video.camera_on() else 0.0
         self.assertEqual(self.mac.video.camera_starts - before, 3)   # at t = 0, ~13 s, ~46 s
         self.assertLessEqual(on, 3 * 3.5)
-        self.pc.service.camera_dev({"camera_refuse": None})
+        self.pc.camera_dev({"camera_refuse": None})
         self.pc.set_in_use(False)
         self.net.advance(4)
         self.pc.set_in_use(True)

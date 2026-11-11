@@ -135,7 +135,17 @@ class Node:
 
     @property
     def part(self):
-        return self.service.camera if self.camera else None
+        """The node's CameraPart (`camera` on the stand-in; CW6's service may name it `_camera`)."""
+        if not self.camera:
+            return None
+        return getattr(self.service, "camera", None) or getattr(self.service, "_camera", None)
+
+    def camera_dev(self, item):
+        """A §7.4 dev command item, through the worker as the dev command file would deliver it."""
+        if hasattr(self.service, "camera_dev"):
+            self.service.camera_dev(item)
+        else:
+            self.service._queue.put(("call", "_dev_command", (item,)))
 
     @property
     def video(self):
