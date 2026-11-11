@@ -3,13 +3,15 @@
 Date 2026-11-11. Branch `feat/camera` (from `feat/audio`). Inputs: `PHASE1.md` (verdicts), the operator
 decisions in `STATUS.md` and in D1's brief, `reports/c1.md`, `c2.md`, `c3.md`, the prototypes in `proto/`, and
 the audio system this extends: `dev/audio/PHASE2.md` (cited as **A§n**) and its code (`native/audio`,
-`core/audio`, the Audio pages). C4 (end-to-end prototype) runs in parallel: every number it owns is marked
-**[C4]** and will be amended when `reports/c4.md` lands. This document is the contract for the implementation
-agents; section numbers (§) are referenced by the work packages in §12.
+`core/audio`, the Audio pages), and `reports/c4.md` (the measured end-to-end chain, `proto/e2e/`). This document
+is the contract for the implementation agents; section numbers (§) are referenced by the work packages in §12.
 
 Revision D2 (same day): integrates the R1 review (`reviews/r1-phase2.md`) and the operator's rulings on it;
 the finding-by-finding resolution is `reviews/r1-resolution.md`. `video_backend.h` and `shm_protocol.h` were
 changed by this revision; they freeze when CW2 / CW5 commit them (§12).
+
+Revision D3 (same day): folds in C4's measurements and its "changes for Phase 2" with the operator's rulings on
+them (late frames, placeholders, warm encoder, playout floor); what changed where is §13. D2's R1 fixes are kept.
 
 ## 0. Decisions at a glance
 
@@ -18,8 +20,8 @@ changed by this revision; they freeze when CW2 / CW5 commit them (§12).
 | 1 | Process | **No new helper.** Video is a second backend of the existing `beamer-audio` helper (name kept, §2.3): Mac capture + VideoToolbox in ObjC++ (`native/audio/mac/`), Windows MF decode + virtual-camera feed in C++ (`native/audio/win/`), the transport in the portable engine (`native/audio/engine/video_*`). A new interface `video_backend.h` sits beside the unchanged `backend.h` (§2.4). |
 | 2 | Windows camera | Own media source DLL `BeamerCameraSource.dll` (`native/audio/vcam-win/`), loaded by Frame Server, **owns the shared memory and treats everything the helper writes there as hostile** (§4.6.3); the helper creates the camera **System lifetime, CurrentUser access**, unelevated, at every start (idempotent). Decode stays in the helper (MF H.264, D3D11, `AVLowLatencyMode`, software fallback). Shared-memory protocol §4.6.2. |
 | 3 | Media plane | Stream kind `video` on the **existing UDP flow**, packet v1 header unchanged, codec id 2 (H.264), 12 B video header, <= 1200 B UDP payload; new ptypes `nack` (7), `pli` (8) on the video stream, `time_map` (9) on the flow's control channel; 28 B video receiver report; replay window 1024 for video (§4.1-4.2). **One frame numbering**: the engine numbers each AU when the encoder hands it over; a number is never reused or skipped, so any AU dropped after that is a visible hole (§4.1). |
-| 4 | Recovery | NACK (<= 3 tries, holes <= 64 packets, within the frame deadline) + **LTR refresh from LTRs the receiver reported inside a clean run**; IDR only at stream start, size change, decoder reopen or last resort, **always paced (3x bitrate)**; start/size IDRs deduplicated and <= 1 per 1 s, recovery IDRs <= 1 per 2 s; no FEC, no periodic intra refresh, no ABR (safety step-down only) (§4.3-4.5, §4.10). |
-| 5 | Playout | Adaptive deadline p99(10 s) + 8 ms in [50, 150] ms on a flow clock offset estimated from the existing ping/pong; late frames decoded, never shown; hold the last good frame across loss, `reconnecting` placeholder after 2 s of hold (engine-driven, §4.5); placeholder after 250 ms with nothing feeding the camera (§4.6.4). |
+| 4 | Recovery | NACK (<= 3 tries, holes <= 64 packets, within the frame deadline) + **LTR refresh from LTRs the receiver reported inside a clean run**; IDR only at stream start, size change, decoder reopen or last resort, **always paced at 4x the bitrate on an absolute schedule** (C4: 0 loss in 300 IDRs); start/size IDRs deduplicated and <= 1 per 1 s, recovery IDRs <= 1 per 2 s; no FEC, no periodic intra refresh, no ABR (safety step-down only) (§4.3-4.5, §4.10). C4 measured this loop end to end: 11 of 11 recoveries by refresh, 0 corrupt frames shown. |
+| 5 | Playout | Adaptive deadline D = p99(10 s) + 8 ms in [floor, 150] ms, **measured from encoder output**, floor 50 ms (dev setting only), on a flow clock offset **re-estimated continuously** from the existing ping/pong (C4: 10.5 ppm drift). **Late frames are shown on arrival** (never one older than the last shown, never one with an incomplete reference chain), then playout re-converges; nothing is shown before a stream's first IDR. Hold the last good frame across loss, `reconnecting` placeholder after 2 s of hold (engine-driven, §4.5); placeholder after **500 ms** with nothing feeding the camera (§4.6.4). |
 | 6 | Wire | **No new cap** (still 14 of 16): camera messages ride cap `audio`, announced by the feature word `camera1` in `audio_hello`. New types `camera_devices`, `camera_route` (flooded), `camera_open`, `camera_opened`, `camera_close` (direct). Fallback packets stay in `audio_frame`; **all feedback (RR, NACK, PLI, time map) also travels over the link in link state** (§4.10, §5). |
 | 7 | Routing | Cluster-wide **active camera** (machine + camera, or off) and a cluster-wide **quality** (720p / 1080p), like the active mic. It feeds the "Beamer Camera" of every machine that has one, **only while an app there has it open** (on demand), always at the cluster quality (the PC source scales to the app's size). Model allows any source -> any sink; implemented: Mac source -> Windows sink (§6). |
 | 8 | Kill switch | **"Stop Sharing the Camera" is a Mac-local switch** (`sharing` in that Mac's own `camera_devices`, persisted there): while it is off the Mac refuses to start its camera whatever the route says, and no other machine can turn it back on; PCs show "Turned off on <Mac>" (§6.1, §8.5). |
@@ -27,13 +29,15 @@ changed by this revision; they freeze when CW2 / CW5 commit them (§12).
 | 10 | UI | The **Audio page becomes "Audio & Camera"** (same key, place and shortcut) with a **Camera** module under the Microphone module, a camera badge and arrow on the shared machine map, and Mac menu items (sharing switch, permission) (§8). |
 | 11 | Install / permissions | PC: one elevated step offered from the page ("Install Beamer Camera", UAC prompt) runs `beamer-audio.exe vcam-install`: DLL to `%ProgramFiles%\Beamer\Camera\<dll version>\`, HKLM COM class + `HKLM\SOFTWARE\Beamer\Camera`; uninstall through Beamer's existing elevated maintenance step. Mac: `NSCameraUsageDescription`, `com.apple.security.device.camera` on app and helper; **the macOS prompt is only ever triggered by an action on the Mac** (choosing its camera on the Mac's page, or "Allow Camera Access…" on the Mac) (§9). |
 | 12 | Capture size | The Mac always encodes exactly the cluster quality (1280x720 or 1920x1080): a format by size when the camera has it, else the smallest larger format, **centre-cropped to 16:9 and scaled** (§4.11). One scaled picture per camera; one encoder session per sink stream (§4.11, operator note in §11). |
-| 13 | Lip sync | Every video stream, and every audio stream to a peer with `video1`, is covered by the flow's `time_map` (capture-time mapping) from day one. Policy: on a PC receiving both the Mac mic and the Mac camera, video is held back to the mic's presentation delay, within 0..150 ms; audio is never delayed for video (§4.9). Implemented by CW10. |
+| 13 | Lip sync | Every video stream, and every audio stream to a peer with `video1`, is covered by the flow's `time_map` (capture-time mapping) from day one. Policy: on a PC receiving both the Mac mic and the Mac camera, video is held back to the mic's presentation delay, within 0..150 ms; audio is never delayed for video (§4.9; C4: video leads by ~45-90 ms with the shared-mode mic). Implemented by CW10. |
+| 15 | Warm start | The camera starts only on demand (camera light only while a PC app uses it); the helper and a **standby VideoToolbox session** at the cluster size stay ready while this Mac is the route's camera machine, so a stream's encoder is ready in ~0-4 ms instead of 150-170 ms (C4) (§4.11). |
 | 14 | Tests | Python `unittest` with the fake helper grown a video side; engine C++ tests; a **null video backend** (fake encoder + reference-checking fake decoder) so two null helpers exercise the whole video protocol on one machine; shared-memory fuzzing of the DLL; OS acceptance per backend; a two-machine E2E harness `dev/camera/e2e/` built on `dev/audio/e2e` (§10). |
 
 ### Deviations from the operator decisions (with reasons)
 
 1. **Placeholder vs network stalls (clarification).** "Placeholder after 250 ms of no frames" is applied to
-   *nothing feeding the camera*: no stream, stream starting, helper gone or stuck. During a Wi-Fi stall of a
+   *nothing feeding the camera*: no stream, stream stopped, helper gone or stuck; after C4 the operator set
+   that threshold to **500 ms** (250 ms would flash at an 80-packet loss, C4 Q3). During a Wi-Fi stall of a
    running stream the helper keeps the camera fed with the **last good frame for up to 2 s** (C3: "hold the
    last frame, not black, during the stall"; stalls of 0.5-1.5 s are normal here), then switches to the
    placeholder "Reconnecting to <Mac>". Reason: a placeholder flashing in a call at every 0.3-1.5 s Wi-Fi
@@ -46,7 +50,9 @@ changed by this revision; they freeze when CW2 / CW5 commit them (§12).
    the receiver's start PLI, so nothing is lost to an unknown stream id. Reason: on-demand start latency.
    §4.7.
 4. **Helper name kept** `beamer-audio` (C1 offered `beamer-media`): the PC's firewall allowance is for
-   `beamer-audio.exe` (`dev/audio/TEST-ALEX.md` §1), and the name is in packaging, tests and Alex's notes.
+   `beamer-audio.exe` (`dev/audio/TEST-ALEX.md` §1), and the name is in packaging, tests and Alex's notes. C4
+   confirmed the stake: its new receiver executable triggered the Windows Firewall prompt the first time it
+   bound a UDP port in Alex's session.
 
 The operator accepted these four. The operator's later rulings on R1 replace two earlier defaults: "Stop
 Sharing the Camera" is a Mac-local switch, not a cluster-wide route change (§6.1); the Windows multi-app
@@ -75,7 +81,10 @@ setting is shown as a static help line, and the `busy` state is gone (§8.6). No
 - **Verified LTR**: an LTR frame number inside a clean run the receiver reported (§4.3); the only LTRs the
   sender acknowledges to the encoder.
 - **Demand**: an app on T has Beamer Camera open (the source DLL is streaming).
-- **Playout deadline D**: time from capture to display on T (§4.5). **Hold**: re-showing the last good frame.
+- **Encoder output time**: when the AU reached the engine (`on_frame`); capture time + the AU's `enc_delay`
+  (§4.1). **Playout deadline D**: time from encoder output to display on T (§4.5.3), as C3/C4 measured it;
+  capture time stays the reference for lip sync (§4.9). **Late**: a kept picture decoded after its present time;
+  it is shown on arrival (§4.5.4). **Hold**: re-showing the last good frame.
 - **Sharing switch**: the Mac-local "Share the camera" on/off (§6.1); off = the Mac never starts its camera.
 
 ## 2. Code layout, ownership, native build
@@ -178,6 +187,11 @@ VideoToolbox, Media Foundation, D3D11, Direct2D/DirectWrite and WIC are OS frame
 - The video stream must share the flow's socket, keys, probing, hole punch, receiver reports and link
   fallback (C3 Q1), and audio must be scheduled ahead of video on that socket (C3 Q2): both only work in the
   process that owns the flow. A second process would need its own flow (C3: no gain, double machinery).
+- **Firewall (C4):** on the PC a new executable that binds a UDP port in the user's session gets the Windows
+  Firewall prompt (`NotifyOnListen` is on; sending first does not prevent it), and C4's receiver got two
+  "Query User" Allow rules that way. `beamer-audio.exe` already has the installer's rules, so video adds no
+  prompt only if it stays in that process. No camera component other than the helper ever opens a socket
+  (the source DLL and the `vcam-win` tools have no network).
 - TCC attribution is the same either way (Beamer.app is responsible for any child, C1 Q6); encoder crashes
   are already isolated in Apple's `VTEncoderXPCService`; on Windows a decoder crash kills only the helper
   (the source DLL then shows its placeholder, Beamer restarts the helper, A§8.2 watchdog).
@@ -227,6 +241,7 @@ struct CameraSpec { std::string device;       // "" = system-preferred (followed
                     VideoFormat fmt;          // output size: 1280x720 or 1920x1080, fps 30 (§4.11)
                     int bitrate = 2500000; bool ltr = true;
                     std::string test;  };     // --dev only: "synth" or "synth:WxH" = synthetic camera of that native size
+struct EncoderStandby { bool on = false; VideoFormat fmt; int bitrate = 2500000; };   // §4.11 warm start
 class CameraHandle {                          // one capture tap + one encoder session; all calls thread-safe
  public:
   virtual ~CameraHandle() = default;
@@ -284,6 +299,9 @@ class VideoBackend {
   virtual CameraSnapshot cameras() = 0;                 // empty on Windows
   virtual void request_permission() = 0;                // Mac: async prompt; listener on answer
   virtual std::unique_ptr<CameraHandle> open_camera(const CameraSpec&, EncoderSink*, std::string* err) = 0;
+  // Mac: keep (on) or release (off) one idle encoder session of that size, no camera, no frames; open_camera
+  // adopts it when the size matches (§4.11). Windows and null: recorded only. Idempotent.
+  virtual void set_encoder_standby(const EncoderStandby&) = 0;
   virtual VcamState vcam() = 0;                         // Windows; Mac returns install "unsupported"
   virtual bool vcam_enable(bool on, std::string* err) = 0;   // create+Start the System/CurrentUser camera
   // Texts per state ("off","waiting","waiting_permission","sharing_off","denied","error","starting",
@@ -343,11 +361,12 @@ Error strings follow A§2.4 (`"<code>: message"`); codes for video: `no_camera`,
 | `send` (audio) | existing fields + `sr` (bool, default false) | `sr:true`: the stream's (`ts`, capture time) pairs go into the flow's `time_map` (§4.2). Beamer sets it only when the peer announced `video1`, so old peers never see a `time_map` |
 | `recv` | `kind:"video"`, `stream`, `flow`, `key`, `codec`, `sink` `{"virtual_camera": true}` | opens a sink (fails while another sink is open), shows `starting`, sends PLI `start` per §4.5.6, then §4.5 |
 | `video_config` | `stream` (a video send), any of `w`,`h`,`fps`,`bitrate` | live reconfiguration; a size change gives one paced IDR (the receiver needs no message: SPS carries the size) |
+| `video_warm` | `on` (bool), `w`, `h`, `bitrate` | `set_encoder_standby` (§4.11): Mac keeps one idle encoder session of that size ready (no camera, nothing encoded) or releases it; elsewhere accepted and ignored. Sent by the part when the plan's `warm` changes (§6.4) |
 | `video_link` | `stream`, `paused` (bool, optional), `dropped` (list of frame numbers, optional) | Beamer's link outbox is full (§4.10): `paused` -> `set_input_paused` (capture keeps running, no AU lost); `dropped` -> the sender ignores NACKs for those frames and calls `request_ltr_refresh()` at once |
 | `cameras` | - | emit `cameras` now |
 | `permission_request` | `what:"camera"` | Mac: `requestAccessForMediaType:AVMediaTypeVideo` (the prompt names Beamer); answered `ok` at once, the result comes as a `permission` event; elsewhere error `unsupported`. Beamer sends it only for an action on the Mac (§9.1) |
 | `vcam` | `enable` (bool, optional), `placeholders` `{"<state>":{"title","line"},...}` (optional), `idle` (state name, optional) | Windows: create/Start the camera if installed (async; `vcam` event `creating` while it takes up to ~5 s the first time), store the placeholder texts, set the state shown while no sink is open (§4.6.4); Mac: error `unsupported` |
-| `dev` | with `--dev`, additions: `video_loss` `{"pct":0..100,"burst":mean packets}` (drop video at send: iid when burst 0, else Gilbert), `video_drop_ms` (drop all video for that long), `video_drop_au` (n: drop the next n AUs **after** numbering, tests §4.3 holes), `vcam_kill_beat` (stop the heartbeat, tests the DLL placeholder), `idr_pace_x` (2.0..6.0, default 3.0), `sync_offset_ms` (§4.9) | E2E and acceptance switches |
+| `dev` | with `--dev`, additions: `video_loss` `{"pct":0..100,"burst":mean packets}` (drop video at send: iid when burst 0, else Gilbert), `video_drop_ms` (drop all video for that long), `video_drop_pk` (n: do not send the next n video media packets; they stay in the history, so NACK can repair them: C4's burst cases), `video_drop_au` (n: drop the next n AUs **after** numbering, tests §4.3 holes), `vcam_kill_beat` (stop the heartbeat, tests the DLL placeholder), `idr_pace_x` (2.0..6.0, default **4.0**), **`playout_floor_ms`** (20..150, default 50; applies at once to every video recv stream of this helper: the playout floor tuning knob, never in the UI, §4.5.3), `sync_offset_ms` (§4.9) | E2E, acceptance and tuning switches |
 
 `stop` (A§3.2) also stops video streams; on a Mac video send it closes the encoder at once and the capture
 session within 500 ms when no other stream uses that camera (camera light off).
@@ -358,10 +377,10 @@ session within 500 ms when no other stream uses that camera (camera light off).
 |---|---|
 | `cameras` | `cameras` `[{key,name,transport,native:["1920x1080@30",...],preferred}]`, `preferred` (key or null), `permission`. After `ready` (Mac), on every change (debounced 300 ms), on `cameras` |
 | `vcam` | `install` (`ok`/`missing`/`outdated`/`broken`/`unsupported`), `dll_version`, `loaded_version`, `bundled_version`, `present`, `creating`, `in_use`, `app` (string or null), `want` (`{"w","h","fps"}` or null), `error`. After `ready` (Windows) and on every change; `in_use` on at once, off after 300 ms without a stream |
-| `camera` | `stream`, `state` (`starting`/`running`/`interrupted`/`lost`/`stopped`), `device` (key in use), `native` (capture format, `"1920x1440@30"`), `format` (sent, `"1280x720@30"`), `fps` (measured, last 1 s), `by_other` (another app on the Mac also uses the camera, when known), `effects` (list of active macOS effects: `center_stage`,`portrait`,`studio_light`,`background`,`reactions`,`edge_light`; macOS 14+) |
+| `camera` | `stream`, `state` (`starting`/`running`/`interrupted`/`lost`/`stopped`), `device` (key in use), `native` (capture format, `"1920x1440@30"`), `format` (sent, `"1280x720@30"`), `fps` (measured, last 1 s), `by_other` (another app on the Mac also uses the camera, when known), `effects` (list of active macOS effects: `center_stage`,`portrait`,`studio_light`,`background`,`reactions`,`edge_light`; macOS 14+); at `starting`/`running` also `encoder` (`standby`/`warm`/`cold`: adopted standby session, new session in a warm process, first session of the process) and `encoder_ms` (time to a ready session), `camera_ms` (capture start -> first captured frame) |
 | `permission` | gains `camera` (`granted`/`denied`/`undetermined`/`restricted`/`unknown`); Mac re-reads an `undetermined` state every 2 s and at once after `permission_request` completes (A§3.3 rule) |
 | `stream_state` | unchanged shape; `error` codes for video: `no_camera`, `permission`, `not_installed`, `decoder`, `internal` |
-| `stats` | video send: `dir`,`kind:"video"`,`path`,`kbps`,`bitrate` (target), `fps`, `frames`, `idr`, `refresh`, `nack_rx`, `retx`, `pli_rx`, `q_drop` (AUs dropped after numbering), `paused_ms` (input paused), `pace_ms` (mean pacer wait), `enc_ms` (mean), `cam_fps`, `step` (rate-ladder level 0..2), `link_paused`, `rtt_ms`, `verified_ltr` (newest). Video recv: `dir`,`kind:"video"`,`path`,`kbps`,`fps_shown`,`frozen_ms` (display ticks without a new picture), `held_ms`, `late`, `lost` (frames, after repair), `holes` (frame-number holes), `nack_tx`, `retx_ok`, `pli_tx`, `target_ms` (D), `d_p99_ms`, `dec_ms`, `decoder` (`hw`/`sw`), `sync_ms` (lip-sync hold, §4.9), `offset_age_s`, `w`,`h`. Counters per interval as A§3.3 |
+| `stats` | video send: `dir`,`kind:"video"`,`path`,`kbps`,`bitrate` (target), `fps`, `frames`, `idr`, `refresh`, `nack_rx`, `retx`, `pli_rx`, `q_drop` (AUs dropped after numbering), `paused_ms` (input paused), `pace_ms` (mean pacer wait), `enc_ms` (mean), `cam_fps`, `step` (rate-ladder level 0..2), `link_paused`, `rtt_ms`, `verified_ltr` (newest). Video recv: `dir`,`kind:"video"`,`path`,`kbps`,`fps_shown`,`frozen_ms` (display ticks without a new picture), `held_ms`, `late` (kept pictures shown after their present time), `skipped` (kept pictures never shown: older than one already shown, or pool full), `lost` (frames, after repair), `holes` (frame-number holes), `nack_tx`, `retx_ok`, `pli_tx`, `target_ms` (D), `floor_ms`, `d_p99_ms`, `dec_ms`, `decoder` (`hw`/`sw`), `sync_ms` (lip-sync hold, §4.9), `offset_ms` (current clock offset), `offset_age_s`, `w`,`h`. Counters per interval as A§3.3 |
 | `link_out` | unchanged for audio and for feedback (RR, NACK, PLI, time map: ordinary events, never marked `video`); video media packets come in separate events `{"ev":"link_out","flow":..,"p":[...],"video":true,"frame":N,"end":bool}`, each holding packets of one frame only (`end` on the frame's last event) |
 
 ### 3.4 Example session (PC app opens Beamer Camera; abbreviated)
@@ -369,6 +388,7 @@ session within 500 ms when no other stream uses that camera (camera light off).
 ```
 PC  -> {"cmd":"vcam","placeholders":{"waiting":{"title":"Waiting for alexandres-macbook-air","line":"MacBook Air Camera"},"starting":{...},"reconnecting":{...},...},"idle":"waiting"}
 PC  <- {"ev":"vcam","install":"ok","dll_version":1,"loaded_version":1,"bundled_version":1,"present":true,"creating":false,"in_use":true,"app":"Microsoft Teams","want":{"w":1280,"h":720,"fps":30},"error":null}
+    (earlier, when the route named this Mac: Mac -> {"cmd":"video_warm","on":true,"w":1280,"h":720,"bitrate":2500000})
     (PC Beamer floods camera_devices; the Mac's planner wants ("video", PC): sharing on, permission granted)
 Mac -> {"cmd":"send","req":7,"stream":1288,"flow":"9f2c01aa","kind":"video","source":{"camera":null},"codec":{"name":"h264","profile":"constrained_high","w":1280,"h":720,"fps":30,"bitrate":2500000,"mtu":1200,"ltr":true},"key":"..."}
 Mac <- {"ev":"ok","req":7}
@@ -391,10 +411,13 @@ PC  <- {"ev":"stream_state","stream":1288,"state":"running","device":"vcam"}
   `capture_ns` (wraps after 13 h; compare modulo 2^32), `nsamp=0`, `channels=0`, `flags` bit1 marker on the
   first packet of the stream, `reserved=0`.
 - AEAD plaintext = **12 B video header** + fragment:
-  `frame u32 | frag u16 | nfrag u16 | vflags u8 | ltr u8 | rsv u16` (big endian).
+  `frame u32 | frag u16 | nfrag u16 | vflags u8 | ltr u8 | enc_delay u16` (big endian).
   `frame`: the §1 frame number (assigned in `on_frame`, the same number everywhere). `vflags`: bit0 IDR, bit1
-  refresh, bit2 this AU is an LTR, bits 3-7 0. `ltr`: 1 when the AU is an LTR, else 0 (VideoToolbox tokens
-  never travel). Fragment: <= 1148 B of the AU, cut at any byte; `nfrag` <= 1024 (a 1080p IDR is ~225). UDP
+  refresh, bit2 this AU is an LTR, bit3 **behind IDR** (the AU reached the pacer while packets of an IDR were
+  still waiting: its arrival measures the IDR's pacing, not the network; C4's `kBehindIdr`), bits 4-7 0.
+  `ltr`: 1 when the AU is an LTR, else 0 (VideoToolbox tokens never travel). `enc_delay`: encoder output time
+  minus capture time, in 0.1 ms, saturating at 65535 (the engine takes `now_ns()` in `on_frame`); it moves the
+  playout reference from capture to encoder output (§4.5.3) without a second timestamp. Fragment: <= 1148 B of the AU, cut at any byte; `nfrag` <= 1024 (a 1080p IDR is ~225). UDP
   payload <= 1200 B (Tailscale MTU 1280).
 - Sealed with the stream key, sender direction (A§4.1 nonce rule), by the stream's sender thread only.
   Replay window per video recv stream: **1024** packets (`ReplayWindowN<1024>`, 16 x u64).
@@ -422,7 +445,7 @@ other thread touches a receiver-direction `Sealer`.
 | `kNack` 7 | `n u8` (1..32), then `n` x (`seq_base u64`, `mask u16`: bit i = seq_base+1+i also missing) | at once when a gap appears (a packet arrives with seq > highest+1: reorder was 0 in every C3 run); repeated after max(2 x RTT, 15 ms), at most 3 times per seq, only while that frame's present time has not passed and the hole is <= 64 packets. Also in link state (§4.10) |
 | `kPli` 8 | `last_clean u32` (newest clean frame, or 0xFFFFFFFF = none), `reason u8` (0 loss, 1 start, 2 decoder error, 3 stalled, 4 size), `rsv u8` | §4.5.6 |
 | `kTimeMap` 9 (flow control, stream 0) | `n u8` (1..32), then `n` x (`stream u32`, `ts u32`, `sender_ns u64` = `now_ns` at the capture of that `ts`) | every 1 s per flow, and in the first `tick` after a covered stream sent its first media packet; covers every video send stream and every audio send stream with `sr:true` on that flow; nothing is sent when it would be empty (so a flow to an old peer never carries one). Lets the receiver map any `ts` to the sender's clock (§4.5.3, §4.9). For video the mapping is exact for the stream's life (ts is derived from `capture_ns`); for audio (device clock) it is refreshed every second |
-| `kRR` 5 (video) | 28 B: `newest_ts u32`, `margin u16` (min playout margin over the interval, 0.1 ms, 0 = late), `hi_seq_lo u32`, `lost u32` (frames lost after repair, cumulative), `late u16` (cumulative), `clean_since u32` (first frame of the newest clean run, 0xFFFFFFFF = none yet), `acked u32` (newest frame of that run), `recv_kbps u16`, `flags u8` (bit0 broken now), `rsv u8` | every 50 ms per video recv stream **regardless of what this side sends** (`Flow::send_rr` keeps its 10 ms audio rule; video has its own 50 ms timer), plus at once when a refresh/IDR starts a new clean run |
+| `kRR` 5 (video) | 28 B: `newest_ts u32`, `margin u16` (min playout margin over the interval, 0.1 ms, 0 = late), `hi_seq_lo u32`, `lost u32` (frames lost after repair, cumulative), `late u16` (cumulative), `clean_since u32` (first frame of the newest clean run, 0xFFFFFFFF = none yet), `acked u32` (newest frame of that run), `recv_kbps u16`, `flags u8` (bit0 broken now), `rsv u8` | every 50 ms per video recv stream **regardless of what this side sends** (`Flow::send_rr` keeps its 10 ms audio rule; video has its own 50 ms timer), plus at once when a refresh/IDR starts a new clean run. C4 sent its RR every 10 ms; 50 ms only makes the newest verified LTR up to 50 ms older, which no recovery depends on (C4's refresh after a 1.5 s blackout used an LTR verified before it), and the immediate RR keeps the post-recovery ack fast |
 
 Audio RR stays 6 B; a sender tells the two apart by the stream kind it knows. Old helpers drop `kNack`/`kPli`
 (unknown stream) and never receive a `time_map` (gated by `sr` / `video1`).
@@ -439,7 +462,7 @@ Audio RR stays 6 B; a sender tells the two apart by the stream kind it knows. Ol
 - **Backpressure keeps the reference chain intact.** While the stream's backlog (AUs queued + packets waiting
   in the pacer) exceeds 250 ms at the current release rate, or the frame queue holds >= 6 AUs, the engine calls
   `set_input_paused(true)`: the backend stops feeding captured frames to the encoder, so no AU is created and
-  none is lost; `false` again below 100 ms / 2 AUs. (An IDR paced at 3x is ~130 ms of backlog, so a normal
+  none is lost; `false` again below 100 ms / 2 AUs. (An IDR paced at 4x is 100-107 ms of backlog, C4, so a normal
   start does not pause.) `video_link paused` uses the same switch (both reasons ORed).
 - **Hard cap (defence, counted `q_drop`).** If the frame queue still reaches 16 AUs or 4 MB, the **incoming AU
   is dropped after numbering** (if it is an IDR, every queued non-IDR AU is dropped instead: they precede the
@@ -467,18 +490,34 @@ Audio RR stays 6 B; a sender tells the two apart by the stream kind it knows. Ol
   `RequireLTRAcknowledgementToken` values (from the `on_frame` return value) and sends every verified token in
   `kVTEncodeFrameOptionKey_AcknowledgedLTRTokens` (C1). LTRs decoded during a broken period, or after a hole,
   are never inside a clean run and so never acknowledged, whether or not any PLI arrived.
+- The sender thread sets `vflags` bit3 (behind IDR) on every AU it hands to the pacer while IDR packets of
+  this stream are still queued there.
 - Rate: `set_bitrate` from the safety ladder (§4.10) and from `video_config`.
 - Before the first PLI the backend produces nothing: `start_encoding()` has not been called; the camera and the
   encoder session are warm, no AU exists, no number is used.
+- **C4 on this loop.** With real VideoToolbox and the real decoder: 11 recoveries, all LTR refreshes (11-33 KB),
+  0 IDRs, 0 corrupt frames shown; the refresh arrives decoded 17-45 ms after the PLI. C4's own lesson ("ack
+  only the clean run since the last recovery, `[clean_from, acked]`") is exactly this section's verified-LTR
+  rule (D2, R1 #1/#16). C4 also recommended a receiver that starts broken and sends its **first PLI only 300 ms
+  later**, because its sender started on a separate start message and sent an IDR by itself, so an immediate
+  PLI made a second IDR. Here the start PLI *is* the start signal (nothing is encoded before it) and duplicates
+  are absorbed by the class-1 rule above (R1 #6), so the receiver keeps sending `start` at once (§4.5.6); a
+  300 ms wait would only add 300 ms to every start.
 
 ### 4.4 Pacer (per flow, `pacer.{h,cpp}`)
 
 - Video media packets only (new data and retransmissions); audio media, RR, hello, ping, `time_map`, `nack`,
   `pli` bypass it (sent at once by the network thread or their streams' threads, as today).
 - Token bucket: capacity **32 packets**, refill **25 Mbit/s** for P frames, refreshes and retransmissions
-  (effectively unpaced: they are 9-38 packets, C3). Packets of an **IDR** are released at
-  `idr_pace_x` x the stream's target bitrate (default **3.0**, `dev` 2.0-6.0): 120 KB at 7.5 Mbit/s = 128 ms,
-  256 KB at 15 Mbit/s = 137 ms. Frames queued behind an IDR wait (C3: ~100 ms once per stream start).
+  (effectively unpaced: they are 9-38 packets, C3; C4: a P frame leaves in < 0.3 ms). Packets of an **IDR** are
+  released at `idr_pace_x` x the stream's target bitrate (default **4.0**, `dev` 2.0-6.0): 120 KB at 10 Mbit/s
+  = 100 ms (720p), 256 KB at 20 Mbit/s = 107 ms (1080p). C4: 0 packets lost in 300 IDRs at 4x, and audio-like
+  packets on the same socket lost none; C3's holes all came from IDRs at >= 25 Mbit/s. Frames queued behind an
+  IDR wait (C4: they arrive 43-49 ms p50 after encoder output) and carry `vflags` bit3.
+- **Absolute schedule.** Packet `i` of an IDR is released at `t0 + bytes_before(i) / rate`, where `t0` is the
+  release of its first packet; the pacer never computes "now + interval" (C4: 0.35 ms of sleep overshoot per
+  packet made 2.5x go out at 2.0x). If the thread wakes late, every packet already due leaves at once, back to
+  back, so the IDR still finishes on time.
 - A dedicated pacer thread waits on a condition variable until the next token (the 2 ms `NetLoop` poll is too
   coarse at 25 Mbit/s). Sends go through `Flow::send_video` (UDP when up; in link state see §4.10). The pacer
   only sends stored bytes; it never seals.
@@ -488,38 +527,67 @@ Audio RR stays 6 B; a sender tells the two apart by the stream kind it knows. Ol
 1. **Reassembly** per frame number (up to 64 frames in flight; an AU completes when all `nfrag` fragments are
    in). Gaps in `seq` -> NACK (§4.2).
 2. **Clean/broken** (the only correctness signal: C2 Q5, corrupt pictures decode silently).
-   - A frame number is **lost** when its present time passes while it is incomplete, when NACK gives up on one
-     of its packets (3 tries or hole > 64), when it is a hole (a newer frame completed and this number never
-     got a packet before its present time), or, in link state, as soon as a newer frame completes (the link
-     delivers in order).
+   - A frame number is **lost** only on evidence of loss, never for mere delay: when NACK gives up on one of
+     its packets (3 tries, or at once for a hole > 64 packets), when its present time passes while it is
+     incomplete **and a packet with a higher `seq` has arrived** (its missing packets were not repaired in
+     time), when it is a hole (a newer frame has packets and this number got none before its present time), or,
+     in link state, as soon as a newer frame completes (the link delivers in order). A frame that is merely
+     delayed (nothing newer arrived: a Wi-Fi spike delays everything behind it) is not lost; it completes late
+     and is shown late (item 4). C4 drew this line the same way: 76-110 late frames per 10 min shown late, 0 visible
+     freezes. During a blackout nothing newer arrives, so the loss is found by the first packet after it
+     (PLI `stalled`, item 6).
    - The stream starts broken. Frame `f` is **clean** iff it is complete **and** (a) it is an IDR, or (b) it is
      a refresh (it references only verified LTRs, which by §4.3 are frames this receiver itself reported
      clean), or (c) frame `f-1` is clean and decoded ok. A lost frame, or a decoder error on any frame, makes
-     the stream broken; nothing but a complete IDR or refresh makes it clean again.
-   - Every complete AU is passed to the decoder in frame order (`decode(keep = clean)`), including AUs of a
-     broken period, so the decoder's reference state follows the encoder's (C2: recovery is bit-exact from
-     the refresh on).
+     the stream broken; nothing but a complete IDR or refresh makes it clean again. **Nothing is kept or shown
+     before the stream's first complete IDR**, so the `starting` placeholder stays until then (C4).
+   - AUs before the stream's first complete IDR (and before the first IDR after a decoder reopen) are discarded
+     without decoding: the decoder has no SPS/PPS yet, and their errors must not count toward the reopen rule
+     (item 6). From that IDR on, every complete AU is passed to the decoder in frame order
+     (`decode(keep = clean)`), including AUs of a broken period, so the decoder's reference state follows the
+     encoder's (C2: recovery is bit-exact from the refresh on; C4: 9 frames decoded while broken, none shown).
    - `on_decoded(f, ok=false)` revokes `f` and every later kept picture: the engine calls `drop()` for them,
      never presents them, goes broken and sends PLI reason 2. The clean run in the RR (`acked`) only advances
      over frames already reported `on_decoded(ok)`.
-3. **Playout deadline.** For each frame, `d` = completion time (receiver clock) - capture time mapped to the
-   receiver clock: `sender_ns` from the flow's `time_map` for that `ts`, minus the flow's **clock offset**.
+3. **Playout deadline.** For each frame, `d` = completion time (receiver clock) - **encoder output time**
+   mapped to the receiver clock: `sender_ns` from the flow's `time_map` for that `ts` (the capture time) plus
+   the AU's `enc_delay` (§4.1), minus the flow's **clock offset**. D is measured from encoder output, as C3 and
+   C4 measured it, so the floor keeps its measured meaning whatever the camera's own (unmeasured, 25-70 ms
+   assumed) delay and jitter, e.g. 15 fps in low light; capture time stays the lip-sync reference (§4.9).
    - **Clock offset** (new, in `Flow`): each pong already carries `t0` (our send), `t1` (peer receive), `t2`
      (peer send) and we know `t3` (our receive): `offset = ((t1 - t0) + (t2 - t3)) / 2` (peer clock minus
      ours). The flow keeps the sample with the **lowest RTT among the last 10 pongs** (10 s at the 1 s ping
-     period) and exports it atomically with its age. Pings are UDP-only, so in link state the last estimate is
-     kept: drift is 19-25 ppm (C3), i.e. <= 1.5 ms per minute, which the p99 tracking below absorbs. If a stream
-     completes its first frame before any pong (flow already in link state), a provisional offset is taken
-     from that frame (`completion - sender_ns - 20 ms`) and replaced by the first pong estimate.
-   - Target `D` = p99 of `d` over the last 10 s (IDR frames excluded: paced on purpose) + 8 ms, clamped **[50,
-     150] ms**, rises at once, falls by at most 15 ms per 0.5 s (C3 Q4: ~70 ms here). Present time = mapped
-     capture time + D + lip-sync hold (§4.9).
-4. **Presenter** (video thread): presents each kept picture at its present time; a picture completed after its
-   present time + one frame period is **late**: decoded, never shown, unless it is the newest (then shown at
-   once: after a stall the display jumps to the newest frame). Backlog older than **D + hold + 150 ms** is
-   decoded without being kept. When nothing new is presentable, the engine calls `hold()`; after **2 s** of
-   hold it calls `show_placeholder("reconnecting")` (Deviation 1); the next clean picture is `present()`ed and
-   the camera is live again. From `recv` until the first clean picture the engine shows `starting`.
+     period) and exports it atomically with its age. **The offset is re-estimated continuously and every
+     frame's `d` and present time use the current value**, never one fixed at stream start: the Mac and PC
+     clocks drift -6.5 to +10.5 ppm and the rate wanders between runs (C4: 18 ms in 30 min; a start-time offset
+     would have moved the buffer by that much), and C4's receiver, doing exactly this (min-RTT ping of the last
+     10 s), kept its hold at 44.6 ms p50 in every 5-min window. Pings are UDP-only, so in link state the last
+     estimate is kept: drift is <= 25 ppm (C3 19-25, C4 <= 10.5), i.e. <= 1.5 ms per minute, which the p99
+     tracking below absorbs. If a stream completes its first frame before any pong (flow already in link
+     state), a provisional offset is taken from that frame (`completion - sender_ns - enc_delay - 20 ms`) and
+     replaced by the first pong estimate.
+   - Target `D` = p99 of `d` over the last 10 s + 8 ms, clamped **[floor, 150] ms**, rises at once, falls by at
+     most 15 ms per 0.5 s. IDR frames and frames with `vflags` bit3 (behind IDR) are excluded from the p99: they
+     measure the deliberate pacing, not the network (C4 did the same). **Floor 50 ms** (C3/C4), settable only
+     by the dev key `playout_floor_ms` (20..150, §3.2), never in the UI: C4's what-if says 30 ms would cut ~20 ms
+     for ~2 % late frames; decide with the real camera and lip sync (§11 open point 5). C4 measured D at the
+     floor for 80-98 % of frames and a hold of 44-45 ms p50; one Wi-Fi spike (133 ms) kept D above 70 ms for
+     ~12 s. Present time = mapped encoder output time + D + lip-sync hold (§4.9).
+4. **Presenter** (video thread): presents each kept picture at its present time. A kept picture decoded
+   after its present time is **late** and is **presented as soon as it is decoded** (C4: dropping late frames
+   turns every Wi-Fi spike into a freeze; showing them is a small judder), with two limits:
+   - **never backwards**: a picture older than the last presented one is dropped, and when a newer kept
+     picture is already decoded the older one is dropped instead of presented (after a burst the display goes
+     straight to the newest);
+   - **never an incomplete reference chain**: only `keep = true` pictures (clean, item 2) are ever presented;
+     a late arrival does not relax that.
+   An IDR (the first one of a stream included) is late by construction (paced, 100-107 ms) and so is shown at
+   once, never held to its deadline. Later frames keep their own present times, so playout re-converges by
+   itself: C4's stream started ~300 ms behind and settled to 57 ms within 0.3 s, because late frames never
+   delay the ones after them. Backlog older than **D + hold + 150 ms** is decoded without being kept. When
+   nothing new is presentable, the engine calls `hold()`; after **2 s** of hold it calls
+   `show_placeholder("reconnecting")` (Deviation 1); the next clean picture is `present()`ed and the camera is
+   live again. From `recv` until the first clean picture (the first IDR, item 2) the engine shows `starting`.
 5. **RR** every 50 ms (§4.2): `clean_since`/`acked` = the newest clean run, `acked` advancing only over frames
    decoded ok.
 6. **PLI** (sealed by the network thread, §4.2):
@@ -543,7 +611,8 @@ path in the user session, 1.8 / 2.8 ms). Software fallback when no D3D11 video d
 via `MF_E_TRANSFORM_STREAM_CHANGE` (new output type, no message needed); an output type with odd sizes or larger
 than `kMaxW x kMaxH` is refused (`size_rejected`, nothing written to a slot). Kept pictures go to a pool of
 **12 NV12 buffers** at the stream size: (D 150 + hold 150 ms) / 33 ms + 2 = 12, enough for the worst present
-delay; when the pool is exhausted the oldest unpresented kept picture is dropped (counted `late`). `present`
+delay; when the pool is exhausted the oldest unpresented kept picture is dropped, never shown (counted
+`skipped`). `present`
 copies the picture into the next live slot (0.07-0.13 ms, C2).
 
 #### 4.6.2 Shared memory protocol (`native/audio/vcam-win/shm_protocol.h`, verbatim contract for CW4/CW5)
@@ -636,7 +705,7 @@ bad value must never make it read outside its own memory, crash, or leak another
    `kDataOffset + i * kSlotBytes`; `magic`/`version`/`header_bytes`/`slot_count` are never read back.
 2. Each helper-written field is read **once** into a local (atomic or volatile load) and validated before use:
    `mode` in `{0,1,2,3}`, else treated as none; `latest < kLiveSlots`, else none; `beat_qpc` within
-   `[now - 250 ms, now + 1 s]`, else stale; `helper_pid` is never used for anything but the log.
+   `[now - 500 ms, now + 1 s]`, else stale; `helper_pid` is never used for anything but the log.
 3. Slot read under the seqlock: `s1 = seq` must be even; copy `w`, `h`, `stride` to locals and require `w`, `h`
    even, `kMinW <= w <= kMaxW`, `kMinH <= h <= kMaxH`, `w <= stride <= 4096`, and `stride * h * 3 / 2 <=
    kSlotBytes` (64-bit arithmetic); copy `stride * h * 3 / 2` bytes into a **source-private buffer**; re-read
@@ -652,20 +721,34 @@ one of the offered types, else 1280x720; `streaming` is 0/1; `state_seq` only co
 
 | Condition (checked by the source on every delivery) | Picture |
 |---|---|
-| no section writer, `beat_qpc` older than **250 ms** or invalid (Beamer not running, helper dead or stuck), or a refused object (§4.6.3) | built-in image (`placeholder_builtin.inc`, Beamer dark surface, logo, "Beamer Camera", "Waiting for Beamer") + a small moving dot |
+| no section writer, `beat_qpc` older than **500 ms** or invalid (Beamer not running, helper dead or stuck), or a refused object (§4.6.3) | built-in image (`placeholder_builtin.inc`, Beamer dark surface, logo, "Beamer Camera", "Waiting for Beamer") + a small moving dot |
 | `mode == Waiting` | slot 3 (the helper's placeholder) + moving dot |
 | `mode == Live` or `Hold` | the newest valid live slot, repeated until a newer one |
 
 **Heartbeat = liveness of the presenting thread.** `beat_qpc` is written by the thread that owns the picture,
 in the same loop iteration that presents or re-presents it: the sink's presenter (video thread) while a sink is
 open, the vcam idle loop otherwise; never by a separate timer. A wedged engine therefore turns into the
-built-in image within 250 ms, well before the Python watchdog restarts the helper.
+built-in image within 500 ms, well before the Python watchdog restarts the helper.
+
+**Two thresholds, two situations** (operator rulings on D1's Deviation 1 and on C4):
+- **A live stream stalls** (sink open, packets stop or the stream is broken): the presenter keeps beating and
+  re-presenting the last good picture (`hold`), up to **2 s**, then `reconnecting`. An 80-packet loss (300 ms)
+  or a 1.5 s Wi-Fi blackout is a freeze, never a placeholder (C4 Q3).
+- **Nothing feeds the camera** (the stream stopped, or the helper is gone or stuck): the last picture stays
+  for **500 ms**, then a placeholder: the helper's `idle` placeholder when a stream ended (the vcam idle loop
+  re-presents the last picture in `hold` mode for 500 ms after the sink closed, then switches to waiting,
+  unless a new sink has shown a picture by then); the DLL's built-in image when the heartbeat is older than
+  500 ms. When there is no last picture (an app just opened the camera and no stream ran), the placeholder is
+  shown from the first delivered frame: there is nothing to hold, and the camera never shows black. C2
+  recommended 250 ms; C4 showed 250 ms would flash at an 80-packet loss and kept 500 ms.
 
 The helper (not the DLL) decides between live, hold and waiting, driven by the engine (§4.5.4):
 - **waiting** (slot 3) whenever no sink is open, with the `idle` state's texts from `vcam` (`off`, `waiting`,
-  `waiting_permission`, `sharing_off`, `denied`, `error`, chosen by Python, §6.4), and at once (well under 250
-  ms) when the sink closes;
-- **starting** (slot 3) from `open_sink` until the first clean picture;
+  `waiting_permission`, `sharing_off`, `denied`, `error`, chosen by Python, §6.4); after a sink closes, 500 ms
+  of `hold` on its last picture first (above);
+- **starting** (slot 3) from `open_sink` until the stream's first clean picture, which is always its first IDR
+  (§4.5.2): nothing new is shown before it. If `open_sink` comes while the previous stream's last picture is
+  still held (< 500 ms after its sink closed), that picture stays until the 500 ms end, then `starting`;
 - **live** from the first clean picture; **hold** while a running stream has nothing new to present; after
   **2 s** of hold the engine calls `show_placeholder("reconnecting")` -> waiting with the `reconnecting` texts;
   back to live on the next clean picture.
@@ -701,34 +784,62 @@ never used to infer that a second app was refused (the source cannot see refused
    C2) -> T's part republishes `camera_devices` (flood, direct link); the camera shows T's `idle` placeholder
    (e.g. `waiting`) until a sink opens.
 2. S's part receives it -> planner wants `("video", T)` (sharing on, permission granted, §6.4) -> **at the same
-   time**: helper `send` (camera + encoder start in parallel: encoder session ~150 ms, C1) and `camera_open`
-   to T.
+   time**: helper `send` (the camera starts; the encoder is the standby session, ready in ~0-4 ms, §4.11) and
+   `camera_open` to T.
 3. T accepts (S is T's route camera machine, §6.4 rule 5) -> helper `recv` (the engine shows `starting`) ->
-   `camera_opened ok`; T's recv stream sends PLI `start` every 100 ms until an IDR's first packet arrives.
-4. S's first PLI: `start_encoding()` -> next captured frame -> IDR (37 / 56 ms, C1) -> paced ~130 ms -> T
-   reassembles, decodes (2-3 ms), presents at D, writes the slot -> the app's next sample.
+   `camera_opened ok`; T's recv stream sends PLI `start` at once and every 100 ms until an IDR's first packet
+   arrives (§4.3 explains why not 300 ms later as in C4).
+4. S's first PLI: `start_encoding()` -> next captured frame -> IDR (encoded 27 ms after its capture, C4) ->
+   paced 100 / 107 ms (4x) -> T reassembles, decodes (2-3 ms) and, the IDR being late by construction, presents
+   it at once (§4.5.4), writes the slot -> the app's next sample. The P frames behind it are late too and are
+   shown on arrival; playout settles at D within ~0.3 s (C4).
 
-Budget: Python/link hops ~10-30 ms; camera start **[C4 / C1 real camera]**; IDR encode 37-56 ms; IDR pacing
-~130 ms; D 50-70 ms; decode + slot 3-4 ms. **Target: first real frame <= 1.0 s after the app opened the camera
-(p95 <= 1.5 s)**, to be confirmed by **[C4]**; the placeholder covers the gap.
+Budget (p50; C4 measured every term of its own path, which lacks only the Python and link hops):
+
+| Term | Synthetic source | Real camera |
+|---|---|---|
+| App opens the camera -> source `Start` | 79 ms (Chrome + Frame Server, C4) | same |
+| Demand -> T's helper -> T's part, flood to S, S's part -> `send` + `camera_open` | ~10-30 ms (2 Python hops + 1 link message, estimate) | same |
+| Camera start (capture session -> first frame) | ~5 ms (synthetic, C4) | **unmeasured** (permission): 0.2-0.8 s assumed (C4), runs in parallel with the next row |
+| `camera_open` -> T `recv` -> PLI `start` reaches S | ~10-30 ms (1 link message + UDP 2-3 ms) | (hidden by the camera start) |
+| Encoder ready | 0-4 ms (standby / warm, C4: 4 ms; cold 163-174 ms) | same |
+| Next capture + IDR encode | 27 ms (C4) | + up to 1 frame period |
+| IDR pacing (4x) + network | 100-107 + 3 ms (C4) | same |
+| Decode + slot + to the app | 22-35 ms (C4: 5 ms + 17-30 ms until the app's next request) | same |
+| **First picture after the app opened** | **C4: 260 ms p50, 308 ms p95** (no Python); **expected ~280-330 ms** | **~0.5-1.1 s** |
+
+**Targets** (with margin): synthetic source (E2E `cam_start`, §10.5) first picture **p50 <= 450 ms, p95 <= 600
+ms**; real camera (H1, CW3's `camera_ms`) **p50 <= 1.0 s, p95 <= 1.5 s**. The placeholder covers the gap; exactly
+one IDR per start.
 
 Stop: the app closes -> `in_use:false` after 300 ms -> T republishes -> S's planner holds the demand **3 s**
 (apps reopen the camera when they switch resolution or open a settings preview) -> `camera_close` + helper
-`stop` -> camera light off <= 0.5 s later. Camera on for at most **~4 s** (300 ms + 3 s + link + 500 ms) after
-the last app closed it. Turning sharing off on S, or the route moving away, stops it without the hold.
+`stop` -> encoder stopped (C4: p50 24-33 ms, max 51 ms after the stop reached the Mac), camera light off <= 0.5 s
+later. Camera on for at most **~4 s** (300 ms + 3 s + link + 500 ms) after the last app closed it. Turning
+sharing off on S, or the route moving away, stops it without the hold. The standby encoder session stays
+(§4.11); the camera does not.
 
-### 4.8 Latency budget (glass to glass, 720p)
+### 4.8 Latency budget (glass to glass)
 
-| Term | Value | Source |
-|---|---|---|
-| Camera exposure + delivery to the helper | **[C1 real camera / C4]** | |
-| Crop/scale (only for a camera without the exact size) | ~1 ms (VT pixel transfer, GPU) | estimate, CW3 measures |
-| Encode | ~5 ms | C1 |
-| Pacing (P frames) | ~0 (bucket) | C3 |
-| Playout deadline D (from capture, includes network + jitter allowance) | 50-70 ms | C3 |
-| Decode + slot + source delivery | 2.4 ms (720p) / 4 ms (1080p) | C2 |
-| App pipeline | Chrome 2-3 ms, DirectShow apps ~33 ms | C2 |
-| **Total (excluding camera)** | **~60-80 ms** for MF/browser apps; **[C4]** measured | |
+C4 measured every term after the camera, 10 min per size, p50 / p95 (ms):
+
+| Term | 720p30 2.5 Mbit/s | 1080p30 5 Mbit/s | Source |
+|---|---|---|---|
+| Camera exposure + delivery to the helper | **unmeasured**, 25-70 assumed | same | C1 blocked (permission); H1 / CW3 `camera_ms` |
+| Crop/scale (only for a camera without the exact size) | ~1 (VT pixel transfer, GPU) | ~1 | estimate, CW3 measures |
+| Encode (capture -> encoder output = `enc_delay`) | 5.2 / 5.4 | 4.0 / 4.2 | C4 |
+| Pacing (P frames) | 0.1 / 0.2 | 0.1 / 0.2 | C4 |
+| Network (Wi-Fi) | 3.2 / 8.1 (p99 33) | 3.3 / 9.4 (p99 38) | C4 |
+| Decode (MF HW + readback) | 1.9 / 2.0 | 3.1 / 3.3 | C4 |
+| Hold until the present time (D = 50 from encoder output, at the floor 80-98 % of frames) | 44.8 / 47.3 | 43.6 / 49.6 | C4 |
+| Virtual camera + app (Chrome) | 2.1 / 2.5 | 2.4 / 2.7 | C4 (DirectShow apps ~+33, C2) |
+| **Total, capture -> app (synthetic, measured end to end)** | **57.5 / 60.3** (p99 65) | **56.8 / 63.3** (p99 107) | C4 |
+| **Glass to app with the real camera** | **~85-130 p50** (C4 + the assumed camera) | same | |
+
+The playout hold is ~80 % of the latency. The floor (dev setting, §4.5.3) is the lever: 30 ms would give ~37
+ms synthetic for ~2 % late frames. The lip-sync hold (§4.9) comes on top when the PC also receives the Mac's
+mic. Targets (E2E `cam_latency`, §10.5): synthetic capture -> app **p50 <= 70 ms, p95 <= 90 ms, p99 <= 140 ms**
+at both sizes.
 
 ### 4.9 Lip sync
 
@@ -737,16 +848,19 @@ the last app closed it. Turning sharing off on S, or the route moving away, stop
   `audio_present_delay` = (now - sender capture time of the sample being rendered, mapped with the flow offset)
   + the render path latency (WASAPI period x queue; for CABLE the measured constant of A WP12: shared ~65 ms,
   exclusive ~30 ms beyond the render buffer, configured per mode); the video recv stream publishes its own
-  `video_present_delay` = D + decode. Both streams are on the same flow (same sender, same clock, same offset
+  `video_present_delay` = `enc_delay` + D + source delivery (~2 ms), i.e. from capture, like the audio side. Both streams are on the same flow (same sender, same clock, same offset
   estimate), so the offset and its error **cancel in the difference**: lip sync does not depend on the offset's
   accuracy, only on both streams using the same value.
 - Policy (CW10): on a machine T that receives **both** the active mic stream from S (into its virtual mic) and
   a video stream from S, the video presenter adds `hold = clamp(audio_present_delay - video_present_delay,
   0, 150 ms)`, smoothed (EWMA 2 s, changes <= 10 ms per second), applied only after both streams have run 2 s.
   Audio is **never** delayed for video (calls are judged by audio delay); if video is the slower path (audio
-  leads), nothing is done, and the stats show the negative skew. With today's numbers (Mac mic -> PC app ~110
-  ms low-latency / ~170 ms shared, video ~70-90 ms) the hold is ~20-100 ms. The mic stream carries the time
-  map only because the PC peer announces `video1` (Beamer sets `sr`).
+  leads), nothing is done, and the stats show the negative skew. C4's numbers: Mac mic -> PC app via CABLE
+  172 ms (shared) / 120 ms (low-latency), video 57 ms from a synthetic source, i.e. ~82-127 ms with the assumed
+  25-70 ms camera, so **video leads by ~45-90 ms (shared) / -7..+38 ms (low-latency)**; the shared case is at or
+  beyond EBU R37's 60 ms and is what this hold fixes (expected hold ~45-90 ms in shared mode, ~0-40 ms in
+  low-latency mode; video then lands at ~170 ms, fine for calls). The mic stream carries the time map only
+  because the PC peer announces `video1` (Beamer sets `sr`).
 - Stats: `sync_ms` (current hold) on the video recv stream. Dev override `dev {"sync_offset_ms": n}` for
   measurement.
 - Out of the engine's view: an app's own A/V buffering (e.g. Teams). Not compensated.
@@ -810,9 +924,31 @@ the last app closed it. Turning sharing off on S, or the route moving away, stop
 - VT: `EnableLowLatencyRateControl` + `RequireHardwareAcceleratedVideoEncoder` (fail rather than the 436 ms
   software encoder), `RealTime`, `ExpectedFrameRate` 30, `AllowFrameReordering` false (so encoder output order
   = decode order = frame-number order), `ProfileLevel` `H264_ConstrainedHigh_AutoLevel`, `AverageBitRate`,
-  `EnableLTR`; public keys only (no `MaxRefreshFrameIntervalDuration`). Session created as soon as the stream
-  opens, kept for its life; re-created on a size change (new SPS/PPS + IDR). Before `start_encoding()` and while
-  `set_input_paused(true)`, captured frames are not submitted.
+  `EnableLTR`; public keys only (no `MaxRefreshFrameIntervalDuration`). The stream's session is ready as soon as
+  the stream opens (the standby one, below, or a new one), kept for its life; re-created on a size change (new
+  SPS/PPS + IDR). Before `start_encoding()` and while `set_input_paused(true)`, captured frames are not
+  submitted.
+- **Warm start: what stays ready, what is torn down** (C4: a new session takes 4 ms while the process has used
+  VideoToolbox before, 163-174 ms for the first one of the process; on-demand start is then limited by the
+  camera and the IDR pacing, not by VideoToolbox).
+
+  | Kept warm | When | Cost |
+  |---|---|---|
+  | The helper process (`beamer-audio`, already resident for audio) | always while Beamer runs | none new |
+  | **One standby `VTCompressionSession`** at the cluster size and bitrate, configured as above, no frame ever submitted, no camera attached | while the plan's `warm` is set (§6.4 rule 8): this Mac is the route's camera machine, sharing on, permission granted, a camera resolvable | unmeasured idle cost; C4 measured `VTEncoderXPCService` at 42 MB RSS and 1.3 % CPU **while encoding 720p30**; idle it encodes nothing. CW3 measures RSS, CPU and energy impact of the idle standby over 10 min |
+
+  | Torn down | When |
+  |---|---|
+  | `AVCaptureSession` and the scaler (camera light) | <= 500 ms after the last video send stream on that camera stops (§3.2 `stop`); never started without a stream: **the camera is on only while a PC app uses it** |
+  | The stream's encoder session | when its stream stops (its reference/LTR state belongs to that stream); a new standby is created right after, while `warm` holds |
+  | The standby session | when `warm` clears (route moved away, sharing off, permission lost), on a quality change (re-created at the new size), and at helper exit |
+
+  `open_camera` adopts the standby when its size equals `CameraSpec.fmt` (bitrate set on adoption), else creates
+  a session in the already warm process; the `camera` event reports `encoder` and `encoder_ms` (§3.3). With
+  several sinks, only the first stream adopts the standby. If CW3 measures a material idle cost (> 0.2 % of a
+  core or > 30 MB beyond the helper's resident set), the standby is replaced by **pre-warming**: create and
+  invalidate one session when `warm` sets, which keeps the XPC service warm (C4's 3 s gaps all got the 4 ms
+  case) at no idle cost; CW3 reports which one ships, with first-AU times after 1, 10 and 60 min idle.
 - Observe `systemPreferredCamera` (KVO) when the source is null: switch devices in place (new format choice,
   IDR). Session interruption / runtime error -> `camera` `interrupted` and retry every 2 s; device gone ->
   `camera_lost`.
@@ -852,7 +988,7 @@ the last app closed it. Turning sharing off on S, or the route moving away, stop
 - Link down with P: video streams with P stop at once (camera off on S when no other stream uses it).
   Helper restart: every video stream of this machine is closed (`camera_close {reason:"helper"}`), status
   `starting`, then re-planned on `ready`. A PC helper restart leaves the camera in apps: the DLL shows its
-  built-in placeholder within 250 ms, then the new helper's placeholder/live picture.
+  built-in placeholder within 500 ms, then the new helper's placeholder/live picture.
 
 ## 6. Route model
 
@@ -909,6 +1045,8 @@ class CameraPlan:
     needs_permission: bool                      # own machine is S and its permission is undetermined:
                                                 # Mac notice + menu item (§8.5); never a prompt by itself
     idle_placeholder: str | None                # own machine is a sink: vcam `idle` state when no sink is open
+    warm: tuple[int, int, int] | None           # own machine is S, ready to send: (w, h, bitrate) of the standby
+                                                # encoder session (§4.11); None = release it
     wake_at: float | None
 ```
 
@@ -937,6 +1075,10 @@ Rules (each machine evaluates the same function and acts on its own part):
    `no_virtual_camera`, `error`.
 7. Sink idle placeholder (own machine is a sink with no open sink): `off` (route off), `sharing_off`,
    `waiting_permission`, `denied`, `error` (S's capture failed), else `waiting`.
+8. `warm` (own machine = S only): `(w, h, bitrate)` of the cluster quality when rule 2 holds (S has
+   `camera_capture`, sharing on, permission granted, a camera resolvable), whether or not any sink has demand;
+   else None. The part sends `video_warm` when it changes and again after every helper `ready` (§3.2). It
+   never opens the camera.
 
 ### 6.5 Beyond Mac -> Windows (model only)
 
@@ -978,7 +1120,7 @@ class CameraPart:
     def link_down(self, peer: str) -> None
     def link_message(self, peer: str, message: dict) -> None   # camera_*
     def link_out(self, peer: str, event: dict) -> None         # video link_out: drop rule §4.10
-    def apply(self, now: float) -> None                        # plan + diff; called after every audio apply and on wake
+    def apply(self, now: float) -> None                        # plan + diff (+ `video_warm` on a `warm` change); called after every audio apply and on wake
     def snapshot(self) -> CameraSnapshot
     def stream_ids(self) -> frozenset[int]                     # for the service's _new_stream
     def dev_command(self, item: dict) -> bool                  # §7.4; True if it used a key
@@ -1263,7 +1405,9 @@ C2 Q6), so there is no `busy` state.
 - **Dev**: `ssh lebig` sessions are elevated (C2), so a dev agent runs `beamer-audio.exe vcam-install ...`
   over ssh with no UAC; `dev/deploy.sh` is not changed by this design (operator-owned); CW9 documents the
   one-liner in `native/audio/vcam-win/README.md`.
-- No firewall change: the DLL has no network; the helper's existing allowance covers video.
+- No firewall change: the DLL has no network; the helper's existing allowance covers video. This is a hard
+  rule, not a convenience: C4's separate receiver executable triggered the Windows Firewall prompt (and got
+  "Query User" Allow rules) the first time it bound UDP in Alex's session (§2.3).
 - Signing: both binaries signed with `Sign-BeamerArtifact` when a signtool identity exists (Smart App Control
   risk, §11).
 
@@ -1291,15 +1435,17 @@ C2 Q6), so there is no `busy` state.
   **sharing off** (no send whatever the route; every sink `sharing_off`; a newer route naming the Mac does not
   change it); missing camera and return; preferred camera followed; not installed/outdated; not direct;
   loopback-only; size = cluster quality whatever `want` (360p, 720p, 1080p apps); Mac as T ->
-  `no_virtual_camera`; Linux peer ignored; idle placeholder per state.
+  `no_virtual_camera`; Linux peer ignored; idle placeholder per state; **`warm`** set on S without any demand
+  when rule 2 holds, None on every other machine, cleared by sharing off / permission lost / route moved,
+  new size on a quality change.
 - `test_camera_part` with `FakeHelper` + `fake_video` and a fake `MediaContext`: send+open at once on demand,
   close after the hold, `video_config` on quality change without reopen, `camera_opened` failure and retry
   rule, **`permission_request` sent only by a local `set_camera(own, …)` or `ask_permission()`, never by a merged
   route or a PC demand**, `sharing` persisted and applied before the first plan, `camera_open` from a peer that
   is not the route's S refused `not_source`, a second accepted open closes the first recv, placeholders pushed
   on every sink status change, link_out video drop over 32 drops every later event of the same frame and
-  reports it, pause after 1 s, helper restart closes and re-plans, `dev_command` keys, never blocks a link
-  thread.
+  reports it, pause after 1 s, helper restart closes and re-plans, `video_warm` sent on each `warm` change and
+  after every helper `ready` (never `send` without demand), `dev_command` keys, never blocks a link thread.
 - `test_camera_cluster` (harness extension): 3 machines (Mac source, PC sink, Linux without `audio`) + one
   fork machine without `camera1`: convergence < 50 rounds for 200 seeded edit/partition sequences; no
   `camera_*` ever posted to a peer without `audio` or without `camera1`; a Mac with sharing off never sends,
@@ -1310,7 +1456,7 @@ C2 Q6), so there is no `busy` state.
 
 ### 10.2 Engine (`native/audio/tests/video_tests.cpp`, in `engine_tests`)
 
-Video header/nack/pli/time-map/RR round trips and limits; `ReplayWindowN<1024>` (in-order, reorder, replay, too
+Video header (incl. `enc_delay` saturation and `vflags` bit3)/nack/pli/time-map/RR round trips and limits; `ReplayWindowN<1024>` (in-order, reorder, replay, too
 old); fragmentation of AUs 1 B..300 KB and reassembly with any fragment order; **frame numbering**: numbers
 assigned in `on_frame`, returned to the backend, contiguous; **queue overflow** with the null encoder (forced
 backlog): backpressure pauses input with 0 AUs lost, and the hard cap's drops appear as holes, the sender
@@ -1320,11 +1466,18 @@ restart); RR clean runs -> verified LTRs -> `acknowledge_ltr` (lost PLIs and los
 acknowledgement of a corrupt LTR); sender recovery state machine against a fake `CameraHandle` (PLI -> refresh,
 duplicate ignored, 3 failed refreshes -> IDR, recovery IDR limit 2 s; **start PLIs repeated during a paced IDR
 give exactly one IDR**; decoder reopen -> start -> IDR, never a refresh; start/size limit 1 per 1 s); pacer
-timing (IDR at 3x bitrate within ±5 %, bucket 32 packets, audio bypass); **time map** (sent only for covered
+timing (IDR at 4x bitrate within ±5 % **with 0.35 ms of injected sleep overshoot per wake-up**: absolute
+schedule, C4; bucket 32 packets, audio bypass; behind-IDR flag on the AUs queued during an IDR); **time map** (sent only for covered
 streams, never moves a stream's seq or loss; audio stream loss unchanged with `sr:true`); clock offset from
-synthetic pong samples (min-RTT pick, stale in link state, provisional seed); playout target on synthetic
-delay traces (p99 + 8 within [50,150], rise/fall rules), presenter late/newest rule, backlog threshold with
-hold, hold -> 2 s -> `show_placeholder("reconnecting")` -> back to live; lip-sync hold computation (CW10 part);
+synthetic pong samples (min-RTT pick, stale in link state, provisional seed) and **a 30-min synthetic run with
+±25 ppm drift: present-time error stays < 2 ms and D unchanged** (C4: a fixed offset would drift 18 ms);
+playout target on synthetic delay traces (p99 + 8 within [floor,150] from encoder output, IDR and behind-IDR
+frames excluded, rise/fall rules, `playout_floor_ms` applied live); **lost vs late** (a frame delayed with
+nothing newer is late, not lost; a frame incomplete at its present time behind a newer packet is lost);
+**presenter: late kept pictures shown on decode, never one older than the last shown, never a `keep=false`
+picture, IDR shown at once, re-convergence to D after a 300 ms late start**; AUs before the first IDR not
+decoded and the `starting` placeholder kept until it; backlog threshold with hold, hold -> 2 s ->
+`show_placeholder("reconnecting")` -> back to live; lip-sync hold computation (CW10 part);
 rate ladder transitions; link-state switch (video only on the video outbox with frame-tagged events, feedback
 also in the link outbox, NACK on, fps 15, **LTR refreshes still answered over the link**). ASan/UBSan and TSan
 builds on the Mac, **TSan with forced PLI/NACK storms** (loss 20 %, decoder errors injected every 50 ms,
@@ -1337,7 +1490,7 @@ builds on the Mac, **TSan with forced PLI/NACK storms** (loss 20 %, decoder erro
   its frame number (from `on_frame`'s return) and its references (previous frame, or the verified LTR set for a
   refresh, or none for an IDR) in its bytes; honours every `CameraHandle` call, including real LTR bookkeeping
   (LTR every 30 frames), `set_input_paused` and `set_format`; reports `native` and always emits the requested
-  output size.
+  output size; records `set_encoder_standby` calls (the `encoder` field reports `standby` on adoption).
 - Sink: a fake decoder that tracks reference validity exactly like an infinite-GOP H.264 decoder (a frame is
   correct iff all its references are correct and its bytes are complete) and **counts any `keep=true` picture
   that is not correct** (must stay 0); records present times and placeholder states; settable `vcam_in_use`,
@@ -1347,7 +1500,8 @@ builds on the Mac, **TSan with forced PLI/NACK storms** (loss 20 %, decoder erro
 ### 10.4 OS acceptance (per backend WP, real hardware)
 
 Mac: `cameras` inventory, synthetic source through VT (native 1280x720, 1920x1440, 1080x1920, 640x480 -> exact
-output size, crop geometry checked on the code strip / test pattern), real camera once permission exists (H1,
+output size, crop geometry checked on the code strip / test pattern), standby / warm / cold encoder start times
+and the standby's idle cost (§4.11), real camera once permission exists (H1,
 needs a deployed Beamer.app: an agent-shell helper is attributed to T3 Code, C1 Q6). Windows: C1's recordings
 through `recv` into the real DLL, consumers `camprobe` (MF), ffmpeg dshow, headless Chrome/Edge
 (`proto/win/web/gum.html`) in Alex's session through the scheduled-task trick
@@ -1355,22 +1509,25 @@ through `recv` into the real DLL, consumers `camprobe` (MF), ffmpeg dshow, headl
 
 ### 10.5 Two-machine E2E (`dev/camera/e2e/`)
 
-Built on `dev/audio/e2e` (imports `beamer.py`, `clock.py`, never edits them) and on C4's tools when they land
-(`proto/e2e`). The Mac sends its helper's synthetic source (C1 code strip: frame number + Mac host time in
-every picture); the PC reads frames with `camprobe read --strip c1` in Alex's session; Mac/PC clocks fitted by
-`clock.py`. Cases and pass marks:
+Built on `dev/audio/e2e` (imports `beamer.py`, `clock.py`, never edits them) and on C4's tools (`proto/e2e`:
+`analyze.py` per-frame stage join, `analyze_q23.py`, `dfloor.py`, the PC sampler). The Mac sends its helper's
+synthetic source (C1 code strip: frame number + Mac host time in every picture); the PC reads frames with
+`camprobe read --strip c1` in Alex's session; Mac/PC clocks fitted by `clock.py`. A case that reads frames in a
+browser (C4's `web/gum4.html`) must correct the browser clock: Chrome's `performance` time drifts -25 ppm
+against Windows time (C4). Pass marks are C4's measurements plus a margin for the Python/link hops and Wi-Fi
+variance; C4's value is given for each. Cases and pass marks:
 
 | Case | What | Pass |
 |---|---|---|
-| `cam_start` | open Beamer Camera on the PC 20 times (10 s on, 10 s off) | first real frame <= 1.0 s p50, <= 1.5 s p95 **[C4 adjusts]**; placeholder before it, never black; exactly 1 IDR per start |
-| `cam_latency` | 10 min, 720p and 1080p | capture->app (synthetic, i.e. excluding the camera) p50 <= 90 ms, p95 <= 130 ms **[C4 adjusts]** |
-| `cam_loss` | `video_loss` 0.5 % bursty (mean 6) and 1 % iid, 10 min each; then `video_drop_au 1` every 30 s for 5 min | frozen <= 300 / 200 ms/min; IDR count = 1 (start); 0 corrupt pictures (code strip checks); each dropped AU recovered by a refresh |
-| `cam_stall` | `video_drop_ms 1500` every 2 min, 10 min | hold then recovery <= 1 RTT + 2 frames after the drop; recovery by refresh, no IDR; `reconnecting` never shown (< 2 s) |
+| `cam_start` | open Beamer Camera on the PC 20 times (10 s on, 10 s off), synthetic source, 720p | first Mac picture **p50 <= 450 ms, p95 <= 600 ms** after the app opened the camera (C4: 260 / 308 ms at 4x without the Python hops); the placeholder before it, never black, never a picture before the stream's first IDR; exactly 1 IDR per start; `encoder` `standby` (or `warm`) in every start after the first. Real camera: H1, p50 <= 1.0 s, p95 <= 1.5 s |
+| `cam_latency` | 10 min each, 720p and 1080p, no mic stream to the PC (lip-sync hold 0), floor 50 | capture -> app (synthetic, i.e. excluding the camera) **p50 <= 70 ms, p95 <= 90 ms, p99 <= 140 ms** (C4: 57.5 / 60.3 / 65 at 720p, 56.8 / 63.3 / 107 at 1080p); late frames <= 20/min (C4: 7.6-11); 0 corrupt |
+| `cam_loss` | (a) `video_drop_pk` 1, 5, 30, 80 packets, 5 times each, 720p; (b) `video_loss` 0.5 % bursty (mean 6) and 1 % iid, 10 min each; (c) `video_drop_au 1` every 30 s for 5 min | (a) 1 and 5 packets: repaired by NACK, no PLI, frozen max <= 60 ms (C4: 0 p50, 52 max); 30: frozen p50 <= 100, max <= 200 ms (C4: 63 / 137); 80: PLI -> refresh, frozen p50 <= 400, max <= 500 ms (C4: 300 / 336); (b) frozen <= 300 / 200 ms/min; (a)-(c) IDR count = 1 (start), every recovery a refresh, 0 corrupt pictures (code strip checks), each dropped AU recovered by a refresh |
+| `cam_stall` | `video_drop_ms 1500` every 2 min, 10 min | hold, then a clean picture <= 120 ms after the drop ends (C4: frozen = drop + 66 ms p50, + 103 max; refresh decoded 17-45 ms after the PLI); recovery by refresh, no IDR; `reconnecting` never shown (< 2 s); no placeholder at all |
 | `cam_fallback` | `drop_udp` 30 s during a mic + camera session, with `video_loss` 1 % on the link side | video on the link <= 1.1 Mbit/s; RRs and PLIs seen by the Mac over the link; recovery by refresh (no IDR after the start); mic glitches/min not above the audio-only fallback run + 1; resumes on UDP <= 2.5 s |
-| `cam_stop` | close the PC app | Mac camera stopped (`camera` `stopped`) <= **4.0 s** after the app closed |
+| `cam_stop` | close the PC app | Mac camera stopped (`camera` `stopped`) <= **4.0 s** after the app closed; helper `stop` -> encoder stopped <= 100 ms (C4: max 51 ms); the standby session still present afterwards |
 | `cam_killswitch` | sharing off on the Mac (dev command), then the PC sets the route to the Mac camera and opens Beamer Camera | the Mac never starts capture (`camera` events), PC status `sharing_off`, PC app shows the `sharing_off` placeholder; sharing on -> first real frame within the `cam_start` budget |
-| `cam_helper_kill` | kill the PC helper while streaming | DLL built-in placeholder <= 300 ms; live again <= 5 s after the watchdog restart |
-| `cam_soak` | 30 min mic + camera, Wi-Fi as is | <= 1 frozen episode > 500 ms per 10 min outside logged Wi-Fi stalls; every hole > 5 packets logged with frame type; memory growth < 5 MB both helpers; CPU Mac helper < 6 %, PC helper < 5 % of a core; mic `loss_pct` not above an audio-only run (no phantom loss from the time map) |
+| `cam_helper_kill` | kill the PC helper while streaming | last picture held, then the DLL built-in placeholder <= 600 ms after the kill (500 ms threshold); live again <= 5 s after the watchdog restart |
+| `cam_soak` | 30 min mic + camera, 720p, Wi-Fi as is | <= 1 frozen episode > 500 ms per 10 min outside logged Wi-Fi stalls; 0 corrupt; capture -> app p50 of every 5-min window within ±3 ms of the first window (continuous clock offset; C4: 57.0 ± 0.1 with 10.5 ppm drift), `sync_ms` excluded; every hole > 5 packets logged with frame type (expected: none inside a 4x IDR); memory growth < 5 MB for both helpers and `VTEncoderXPCService` (C4: Mac sender +2.5 MB, unexplained); CPU Mac helper < 6 %, PC helper < 5 %, Frame Server < 1.5 % of a core (C4, video alone: Mac 1.3 % + VT 1.3 %, PC 3.1 %, Frame Server 0.8 %); mic `loss_pct` not above an audio-only run (no phantom loss from the time map) |
 | `cam_lipsync` (CW10) | flash + beep test source on the Mac mic and camera | A/V offset at the PC within -20..+40 ms (audio later = positive) |
 | `cam_oldpeer` | PC <-> asusrog | link unaffected, no `camera_*` and no `time_map` sent to it (logs, `n_rejected` unchanged on asusrog) |
 
@@ -1382,18 +1539,21 @@ still listed; **H5** low light and effects look (C1 Needs Alex 2-3); **H6** one 
 
 ## 11. Risks and open points
 
-1. **Camera numbers missing** until H1 (cold start, capture latency, low-light fps): the start and latency
-   targets carry **[C4]** marks.
+1. **Camera numbers missing** until H1 (cold start, capture latency, low-light fps): C4 measured everything
+   after the camera; the real-camera start target (<= 1.0 s p50) and the glass-to-app estimate (~85-130 ms)
+   rest on an assumed 0.2-0.8 s cold start and 25-70 ms capture delay.
 2. **Smart App Control / WDAC** would likely block an unsigned DLL in Frame Server: sign when an identity
    exists; detect `install: broken` (CLSID present, activation fails) and say so.
 3. **Logoff/reboot, sleep/resume, fast user switching** untested for the System-lifetime camera (H4); the helper
    re-runs create+Start at every start anyway (idempotent).
 4. **Silent decoder corruption**: correctness rests on §4.5.2's clean-run rules and on acknowledging only
    verified LTRs; the null sink's "0 corrupt kept pictures", the queue-overflow test and the E2E code-strip
-   check are the guards. Residual: the real decoder's long-term reference state after a lost AU is trusted to
-   follow the encoder's (C2 measured bit-exact LTR recovery; **[C4]** runs the real loop).
-5. **Keyframe-triggered Wi-Fi holes** (C3): IDRs paced at 3x (4x untested); soak logs holes > 5 packets with
-   frame type; `idr_pace_x` tunable.
+   check are the guards. C4 ran the real VideoToolbox -> MF loop with these rules: 0 corrupt frames shown
+   (code strip + PSNR oracle), 9 broken frames decoded and held back. Residual: an implementation bug in the
+   same rules; the guards above stay.
+5. **Keyframe-triggered Wi-Fi holes** (C3): IDRs paced at 4x (C4: 0 loss in 300 IDRs); 1080p's 20 Mbit/s is
+   close to the 25 Mbit/s that lost packets in C3 and was one 5-min run; soak logs holes > 5 packets with frame
+   type; `idr_pace_x` tunable (3x if 1080p shows holes).
 6. **One app at a time** on the PC (Windows default); only a static help line, Beamer cannot see a refused
    second app.
 7. **Elevation UX**: `ShellExecuteEx runas` from a per-user app; over-the-shoulder admin accounts handled by
@@ -1406,7 +1566,15 @@ still listed; **H5** low light and effects look (C1 Needs Alex 2-3); **H6** one 
     cameras without an exact format; soak checks.
 12. **Same-user processes can write the shared memory**: the source validates everything (§4.6.3), so the worst
     case is a wrong picture in the user's own camera, never a Frame Server crash or a leak.
-13. **[C4]** risks from the end-to-end prototype.
+13. **From C4:**
+    - one Wi-Fi spike keeps D ~10 s higher (p99 over 10 s; +50 ms for ~2 % of a 1080p run); with late frames
+      shown, a shorter memory would cost only judder (open point 5);
+    - the standby encoder session's idle cost is unmeasured (§4.11: CW3 measures, pre-warming is the fallback);
+      how long VideoToolbox stays warm with no session is unknown;
+    - lip sync with the shared-mode mic stays ~45-90 ms off (video early) until CW10 lands;
+    - the Mac sender grew 2.5 MB in 30 min, unexplained: the soak watches the helper and `VTEncoderXPCService`;
+    - measurement traps for the harness: Chrome's clock drifts -25 ppm; Windows `WSAEventSelect` events stay
+      signalled until reset (a C4 receiver spun a core: CW4's video thread must reset or use auto-reset events).
 
 Open points (operator defaults in force, Alex may override):
 1. Page name "Audio & Camera" (operator default): cheap to revert.
@@ -1415,7 +1583,10 @@ Open points (operator defaults in force, Alex may override):
 4. **For the operator**: "one encode" read as one encoded *size* per cluster; with several PCs this design keeps
    one VT session per PC (independent LTR/ack state, +~2 % CPU per extra PC). Sharing one encoder across PCs
    would couple their recovery (any PC's PLI refreshes all, acks must be verified by all); change §4.11 if that
-   was meant.
+   was meant. (Accepted by the operator after D2.)
+5. **Playout floor and spike memory**: floor 50 ms by default, dev key only (operator); C4's what-if favours
+   30 ms (-20 ms for ~2 % late frames, now judder rather than freezes). Decide with the real camera and the
+   lip-sync hold (in shared mic mode the hold adds 45-90 ms anyway, which makes the floor moot there).
 
 ## 12. Work packages
 
@@ -1441,7 +1612,7 @@ CW11.**
 
 ### CW1 Python camera control plane (Mac agent)
 - Goal: `core/camera` minus `view.py`: wire, model, planner (incl. sharing switch, cluster-size rule,
-  accept-from-S), store, part (incl. `dev_command`/`dev_status`, `stream_ids`, permission only on local actions,
+  accept-from-S, `warm` rule 8), store, part (incl. `dev_command`/`dev_status`, `stream_ids`, permission only on local actions,
   link_out drop rule), fake video helper; tests; cluster harness extension.
 - Owns: `core/camera/{__init__,wire,model,planner,store,part,fake_video}.py`,
   `core/tests/test_camera_{wire,model,planner,part,cluster}.py`; hunks in `core/audio/fake_helper.py`
@@ -1462,7 +1633,8 @@ CW11.**
   `native/audio/tests/{video_tests.cpp,two_helpers_video.py}`; hunks of §2.2 in `packet.*`, `flow.*`,
   `streams.*`, `helper.*`, `sources.txt`, `build-tests.{sh,cmd}`, `tests/null_main.cpp`,
   `tests/golden_control.txt`.
-- Inputs: C3 report Q1-Q5, §2.4, §3, §4, §10.2, §10.3. Depends on: nothing. **First commit: `video_backend.h`
+- Inputs: C3 report Q1-Q5, C4 report (Q1-Q4, surprises 4-5, changes), `proto/e2e/win/camrecv.cpp` (receiver
+  logic as measured), §2.4, §3, §4, §10.2, §10.3. Depends on: nothing. **First commit: `video_backend.h`
   verbatim.**
 - Acceptance: engine tests pass on the Mac (plain, ASan/UBSan, TSan incl. the PLI/NACK storm run) and the PC;
   existing audio tests, golden lines (plus the new ones) and `two_helpers.py` unchanged; audio stream loss
@@ -1471,7 +1643,8 @@ CW11.**
   300 ms after `send`, exactly 1 IDR; 1 % iid -> frozen <= 200 ms/min and 0 IDRs after the start; 0.5 %
   Gilbert (mean 6) -> frozen <= 400 ms/min; 1.5 s drop -> clean again <= RTT + 2 frames after it ends, by
   refresh; `video_drop_au` and forced queue overflow -> recovery by refresh; **0 incorrect kept pictures** in
-  every run; no 10 ms window carries more than 3.0x bitrate x 10 ms + 32 packets during an IDR; audio
+  every run; no 10 ms window carries more than 4.0x bitrate x 10 ms + 32 packets during an IDR, and each IDR
+  finishes within ±5 % of size / (4 x bitrate) (absolute schedule); audio
   `late+plc` within +1/min of the same run without video; link state (`drop_udp`): video <= 1.1 Mbit/s, only via
   frame-tagged `link_out` with `video:true`, RR/PLI/time map via ordinary `link_out`, LTR refreshes (not IDRs)
   answer PLIs; engine video CPU < 1 % of a core per helper (null encode/decode excluded).
@@ -1484,7 +1657,8 @@ CW11.**
   size; `main.mm` and `build-mac.sh` hunks.
 - Owns: `native/audio/mac/{video_backend_mac.h,video_backend_mac.mm,camera_mac.mm,scale_mac.mm,videoenc_mac.mm,synth_mac.mm,video_check.mm}`;
   hunks in `main.mm`, `build-mac.sh`.
-- Inputs: C1 report, `proto/mac/src` (lift `capture.mm`/`encode.mm`/`synth.mm`), §2.4, §3.3, §4.3, §4.11.
+- Inputs: C1 report, C4 report Q2 and `proto/e2e/mac/camsend.mm` (VT session reuse, token map, stop path),
+  `proto/mac/src` (lift `capture.mm`/`encode.mm`/`synth.mm`), §2.4, §3.3, §4.3, §4.11.
   Depends on: CW2's `video_backend.h` (local harness until the engine lands). Real-camera items (marked H1)
   need permission granted to a **deployed Beamer.app**, i.e. CW9's packaging and an operator deploy
   (`dev/deploy.sh`); CW3 finishes without them and lists them.
@@ -1492,7 +1666,11 @@ CW11.**
   synthetic 720p30 through the helper: encode p95 <= 8 ms, 1 s bitrate within ±10 %, helper CPU < 4 % of a core;
   synthetic native 1920x1440, 1760x1328, 1080x1920 and 640x480 -> output exactly 1280x720 and 1920x1080, crop
   per §4.11 (test-pattern geometry within 2 px), scaler p95 <= 2 ms; `request_ltr_refresh` after
-  `acknowledge_ltr` gives a non-IDR AU <= 40 KB (720p); without acks an IDR; `on_frame` numbers map to the right
+  `acknowledge_ltr` gives a non-IDR AU <= 40 KB (720p); without acks an IDR; **warm start (§4.11)**: with the
+  standby session `open_camera` -> first AU (synthetic) p95 <= 50 ms and `encoder` = `standby`; first session of
+  a fresh helper reported (`cold`, ~150-175 ms); first-AU times after 1, 10 and 60 min idle with the standby and
+  with pre-warming only; idle standby cost over 10 min (helper + `VTEncoderXPCService` RSS and CPU) reported,
+  and the shipped variant chosen by the §4.11 rule; `stop` -> encoder invalidated <= 100 ms (C4: max 51); `on_frame` numbers map to the right
   tokens across `set_input_paused` and `set_format`; `set_bitrate` effective within 300 ms; `set_format` -> IDR
   at the new size; builds and runs on macOS 13 API level (no unguarded 14+ symbol: `-Wunguarded-availability`
   clean); universal binary (`lipo -archs` = `x86_64 arm64`). H1 items: `stop` -> capture session stopped <= 500
@@ -1515,7 +1693,9 @@ CW11.**
   forced software works (CPU < 30 % of a core at 1080p); an SPS of 2560x1440 is rejected (`size_rejected`, no
   slot written); `vcam in_use` <= 50 ms after an app opens the camera, off 300 ms after it closes; `app` reported
   for Chrome and `camprobe`; placeholder on screen <= 100 ms after a `vcam` idle change; `starting` at
-  `open_sink`, hold then `reconnecting` at 2 s; a wedged presenter (test hook) -> DLL built-in image <= 300 ms;
+  `open_sink`, hold then `reconnecting` at 2 s; sink closed -> last picture held 500 ms then the `idle`
+  placeholder, and a new sink presenting within 500 ms shows no placeholder; a wedged presenter (test hook) ->
+  DLL built-in image <= 600 ms (500 ms threshold); network events reset after each wait (C4 surprise 6);
   a pre-created foreign `.Demand` event is refused; `vcam-install`/`vcam-uninstall` work elevated (ssh) and exit
   3 unelevated, `vcam-remove` works unelevated; install states `missing/ok/outdated/broken` and
   `loaded_version` detected; simulated device removal -> software decode within 1 s and back to hardware after
@@ -1530,7 +1710,7 @@ CW11.**
   Depends on: nothing.
 - Acceptance (installed with `vcam-install` or a local script until CW4 lands): MF, DirectShow (ffmpeg dshow),
   headless Chrome/Edge see "Beamer Camera"; 720p/1080p/360p NV12 @30 for 60 s with 0 gaps; `feeder` -> app p95
-  <= 1.0 ms (720p) / 1.5 ms (1080p); built-in placeholder 250 ±50 ms after the heartbeat stops; `mode`
+  <= 1.0 ms (720p) / 1.5 ms (1080p); built-in placeholder 500 ±50 ms after the heartbeat stops; `mode`
   waiting -> slot 3 within one frame; repeated Stop/Shutdown idempotent (state_seq increments, no crash);
   **`shmfuzz` from Alex's unelevated session writing random and boundary values into every helper-written field
   at 1 kHz for 10 min while `camprobe` reads: Frame Server never crashes or restarts, every delivered frame is
@@ -1548,7 +1728,7 @@ CW11.**
 - Owns: §2.2 hunks in `core/link.py`, `core/receiver.py`, `mac_app/bridge.py`, `win_app/sender.py`,
   `win_app/kvm_bridge_win.py` (message forwarding only), `core/audio/service.py`, `core/feature_flags.py`,
   `WIRE.md`, `mac_app/setup.py` (`includes`); new `core/tests/test_camera_link_gating.py`.
-- Inputs: §2.2, §4.9 (`sr`), §5, §7.1, §7.4. Depends on: CW1 (`part.py` API).
+- Inputs: §2.2, §4.9 (`sr`), §5, §7.1, §7.4. Depends on: CW1 (`part.py` API, incl. `video_warm`).
 - Acceptance: gating test (initiator and responder links drop `camera_*` without `audio`; the part sends nothing
   to a peer without `camera1`); a service test that `_new_stream` never returns a camera stream id, that audio
   `send` carries `sr:true` only to a `video1` peer, and that each §7.4 dev command reaches the part (and
@@ -1619,7 +1799,8 @@ CW11.**
   shared and in low-latency mode.
 
 ### CW11 Two-machine E2E harness and soak (Mac agent with ssh)
-- Goal: §10.5 (all cases except `cam_lipsync`'s analysis, which CW10 adds).
+- Goal: §10.5 (all cases except `cam_lipsync`'s analysis, which CW10 adds), reusing C4's analysis tools where
+  they fit (stage join, freeze/episode analysis, samplers) and correcting any browser clock (§10.5).
 - Owns: `dev/camera/e2e/**` (may import `dev/audio/e2e/*` and C4's `dev/camera/proto/e2e/*`; edits neither).
 - Depends on: CW1-CW6 and CW9 merged (the §7.4 dev commands are CW6 + CW1); CW7/CW8 not needed.
 - Acceptance: every case runs unattended from the Mac and writes `runs/<case>/result.json`; pass marks of §10.5
@@ -1647,9 +1828,40 @@ audio; `locales/` belongs to the merge step. `core/audio/service.py` is CW6's al
 the audio pages are CW7/CW8's alone for their hunk; engine files are CW2's alone until it merges (CW10 after);
 `native/audio/vcam-win/README.md` is CW5's, with CW9's dev-install section agreed.
 
-## 13. C4 amendment points
+## 13. C4 amendments applied (revision D3)
 
-When `reports/c4.md` lands, update: PHASE1 §1 (C4 table) and §2 (camera start, glass-to-glass); §4.7 start
-budget and target; §4.8 total; §10.5 pass marks of `cam_start` and `cam_latency`; §11 risk 13; any change C4
-forces in the recovery loop (§4.3 PLI classes and acks from clean runs, RR cadence §4.2) or the start sequence
-(§4.7 step 2-4).
+C4 (`reports/c4.md`) measured the whole chain; its numbers replace every former [C4] mark and its "changes
+for Phase 2" are integrated where they belong:
+
+- **IDR pacing 4x on an absolute schedule** (was 3x): §0 #4, §3.2 `idr_pace_x`, §4.3 backpressure note, §4.4,
+  §10.2, CW2 acceptance, §11 risk 5.
+- **Late frames shown on arrival** (was "decoded, never shown"), never backwards, never with an incomplete
+  reference chain; IDR shown at once; playout re-converges: §0 #5, §1 terms, §4.5.4, `late`/`skipped` stats
+  (§3.3, §4.6.1), §10.2. Consequence: **lost now needs evidence of loss**, a merely delayed frame is late
+  (§4.5.2).
+- **Nothing shown before a stream's first IDR**; AUs before it are not decoded: §4.5.2, §4.6.4, §10.2, §10.5
+  `cam_start`.
+- **Acks from the clean run since the last recovery**: already D2's verified-LTR rule (R1 #1/#16); C4's
+  validation and the RR cadence (50 ms kept) noted in §4.2, §4.3. C4's "first PLI 300 ms later" not adopted
+  (§4.3: it conflicts with D2's start-PLI rule, R1 #6).
+- **Encoder kept warm**: standby VideoToolbox session while this Mac is the route's camera machine, camera
+  still on demand only; kept / torn down / cost table and a measured fallback (pre-warming): §0 #15, §2.4
+  `set_encoder_standby`, §3.2 `video_warm`, §3.3 `encoder`/`encoder_ms`/`camera_ms`, §4.7, §4.11, §6.4
+  rule 8, §7.1, §10.1, §10.3, §10.4, CW1/CW3 acceptance.
+- **Continuous clock offset** made explicit with C4's drift (-6.5..+10.5 ppm, 18 ms / 30 min): §4.5.3, §10.2
+  30-min drift test, §10.5 `cam_soak`.
+- **Playout measured from encoder output** (as C3/C4), via the new `enc_delay` field (former `rsv` of the video
+  header) and the behind-IDR flag (`vflags` bit3) excluded from the p99: §1, §4.1, §4.3, §4.4, §4.5.3, §4.9.
+- **Playout floor 50 ms, dev setting only** (`playout_floor_ms`): §0 #5, §3.2, §3.3 `floor_ms`, §4.5.3, §11
+  open point 5.
+- **Lip sync**: C4's offsets (video ~45-90 ms early in shared mic mode) in §0 #13 and §4.9; policy unchanged
+  (delay video, never audio).
+- **Placeholder threshold 500 ms** for "nothing feeds the camera" (was 250), the 2 s hold before "Reconnecting"
+  on a live stream kept: Deviation 1, §0 #5, §4.6.3 (`beat_qpc` window), §4.6.4 (two thresholds, sink-close
+  hold), §5.3, §10.5 `cam_helper_kill`, CW4/CW5 acceptance.
+- **Firewall: video stays in `beamer-audio.exe`** (C4's prompt): Deviation 4, §2.3, §9.2.
+- **Measured budgets and targets**: §4.7 start budget table and targets (synthetic p50 <= 450 / p95 <= 600 ms;
+  real camera <= 1.0 / 1.5 s), §4.8 per-stage latency table (synthetic 57 ms p50; target p50 <= 70, p95 <= 90,
+  p99 <= 140 ms), §10.5 pass marks of `cam_start`, `cam_latency`, `cam_loss` (+ C4's burst cases via the new
+  dev key `video_drop_pk`), `cam_stall`, `cam_stop`, `cam_soak`; §11 risks 1, 4, 5, 13.
+- `PHASE1.md`: C4 table, numbers that drive the design, risks 3, 4, 9.

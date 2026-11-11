@@ -1,9 +1,10 @@
 # Camera across Beamer: Phase 1 conclusions (technical proof)
 
 Date 2026-11-11. Branch `feat/camera`. Synthesis of the Phase 1 work packages C1 (Mac capture + VideoToolbox),
-C2 (Windows 11 virtual camera), C3 (transport over the Mac <-> PC link); C4 (end-to-end chain) is still
-running and its rows are marked **[C4]**. Details, methods and raw tables: `reports/c1.md`, `c2.md`, `c3.md`
-and the prototypes in `proto/`. Machines: MacBook Air M5 (macOS 27.2), PC `lebig` (Windows 11 25H2 build
+C2 (Windows 11 virtual camera), C3 (transport over the Mac <-> PC link) and C4 (the end-to-end chain: Mac
+synthetic source -> VideoToolbox LTR -> paced UDP -> PC receiver -> MF decode -> virtual camera -> Chrome).
+Details, methods and raw tables: `reports/c1.md`, `c2.md`, `c3.md`, `c4.md` and the prototypes in `proto/`
+(C4: `proto/e2e/`). Machines: MacBook Air M5 (macOS 27.2), PC `lebig` (Windows 11 25H2 build
 26200, Ryzen 5 7600X, RX 7900 XT), both on home Wi-Fi, installed Beamer (audio) running during C3.
 
 ## 1. Verdicts
@@ -39,20 +40,23 @@ and the prototypes in `proto/`. Machines: MacBook Air M5 (macOS 27.2), PC `lebig
 |---|---|---|
 | Wire | **Same UDP flow and helper as audio, new stream kind `video`**, packet v1 header unchanged, 12 B video header, fragments <= 1148 B (UDP payload <= 1200 B), new `nack`/`pli`/`sr` packets, 24 B video receiver report, 1024-packet replay window for video. | c3 Q1 |
 | Wi-Fi at 2.5 / 5 Mbit/s | Fine: frame network delay p50 2.5-3.3 ms, p99 22-34 ms; audio p95 unchanged (6.8 ms alone, 5.9-8.6 with video). **Every burst loss (27-82 packets, with 50-60 ms of audio) began inside a large keyframe sent unpaced.** | c3 Q2 |
-| Pacing | P/LTR frames through a 32-packet / 25 Mbit/s bucket (in effect unpaced); IDRs paced at 2.5-4x the bitrate (2.5x: 0 loss in 600 keyframes, +111 ms; 4x untested). | c3 Q2 |
+| Pacing | P/LTR frames through a 32-packet / 25 Mbit/s bucket (in effect unpaced); IDRs paced at 2.5-4x the bitrate (2.5x: 0 loss in 600 keyframes, +111 ms; 4x: see C4, now the choice). | c3 Q2 |
 | Recovery | **NACK (<= 3 tries, holes <= 64 packets, within the deadline) + LTR refresh on PLI; IDR only at start / last resort.** 177 ms frozen/min under 0.5 % bursty loss vs 1,350 for IDR-on-PLI; no FEC, no intra refresh. | c3 Q3 |
-| Playout | Adaptive: p99 of the last 10 s + 8 ms, floor 50, cap 150 ms, **~70 ms** here: <= 1 late frame/min. Late frames decoded, never shown; jump to newest after a stall. | c3 Q4 |
+| Playout | Adaptive: p99 of the last 10 s + 8 ms, floor 50, cap 150 ms, **~70 ms** here: <= 1 late frame/min. Late frames decoded, never shown; jump to newest after a stall. (**Superseded by C4**: late frames are shown on arrival; D sits at its 50 ms floor.) | c3 Q4 |
 | Bitrate control | No ABR needed on this LAN; a safety step-down from the receiver report (5 -> 2.5 -> 1.2 Mbit/s). | c3 Q4 |
 | TCP fallback | Video ~1 Mbit/s (720p15) on the link only, dropped before audio (outbox > 32), paused after 1 s of backlog; never on the SSH tunnel. | c3 Q5 |
 
-### C4: end-to-end chain [C4]
+### C4: end-to-end chain
 
 | Question | Answer | Evidence |
 |---|---|---|
-| Glass-to-glass latency, synthetic source -> PC app (p50 / p95) | **[C4]** | `reports/c4.md` |
-| Real NACK/LTR loop (ack path, refresh on a real PLI, frozen ms/min under injected loss) | **[C4]** | |
-| On-demand start: PC app opens -> first real frame | **[C4]** | |
-| 30-min stability (frames lost, freezes, memory, CPU both sides) | **[C4]** | |
+| Latency, synthetic source -> Chrome on the PC (p50 / p95 / p99) | **Go. 720p30 2.5 Mbit/s 57.5 / 60.3 / 65.3 ms; 1080p30 5 Mbit/s 56.8 / 63.3 / 107 ms** (10 min each, 0 corrupt). The playout hold is ~80 % of it: 44-45 ms (D at its 50 ms floor, measured from encoder output, for 80-98 % of frames); encode 4-5, pacing 0.1, network 3.2 p50 (p99 33-38), decode 1.9 / 3.1, virtual camera + Chrome 2.1-2.4 ms. With the real camera's own delay (unmeasured, assumed 25-70 ms): **~85-130 ms glass to browser p50**. | c4 Q1 |
+| Real NACK/LTR loop | **Works as designed; 0 corrupt frames reached the browser** (code strip + PSNR oracle on 7,220 frames). 1 and 5 lost packets: NACK, 0 ms frozen; 30: NACK, 50-70 ms frozen (late frames); 80: PLI -> LTR refresh (11-33 KB), 300 ms frozen (≈ the burst); 1.5 s blackout: 1.57 s frozen, refresh 17-45 ms after the PLI. **11 recoveries, 11 LTR refreshes, 0 IDRs.** Acks must name the clean run since the last recovery (`[clean_from, acked]`). | c4 Q3 |
+| IDR pacing at 4x the bitrate | **0 packets lost in 300 IDRs** (720p 120 KB at 10 Mbit/s, 1080p 256 KB at 20 Mbit/s), IDR sent in 100 / 107 ms; audio-like packets on the same socket: 0 lost. A pacer must keep an absolute schedule (sleep overshoot turned 2.5x into 2.0x). | c4 Q3 |
+| On demand | **20/20 per setting.** Chrome opens Beamer Camera -> first Mac picture **p50 260 ms / p95 308 ms at 4x** (324 / 338 at 2.5x): Chrome's own open 79 ms + paced IDR 100 ms dominate. Encoder session **4 ms when the process is warm** (cold, first of the process: 163-174 ms). Close -> Mac encoder stopped **p50 24-33 ms, max 51 ms**. Real camera cold start not measured (assumed 0.2-0.8 s -> ~0.5-1.1 s in practice). | c4 Q2 |
+| 30-min stability (720p) | **Stable.** 54,000 frames, 0 corrupt, 1 gap > 100 ms; latency p50 57.0 ms in every 5-min window. Clocks drifted **10.5 ppm (18 ms / 30 min)**, other runs -6.5 to +0.9 ppm: the receiver tracked the offset continuously, hold stayed 44.6 ms. Memory flat (Mac sender +2.5 MB, unexplained, watch). CPU (% of a core): PC receiver 3.1 % (720p) / 5.2 % (1080p), Frame Server 0.8 %; Mac sender 1.3 % + VT 1.3 %. | c4 Q4 |
+| Lip sync (pointer) | Video reaches the PC app in 57 ms (synthetic), Mac mic via CABLE in 172 ms (shared) / 120 ms (low-latency): with a 25-70 ms camera, **video leads audio by 45-90 ms (shared) / -7..+38 ms (low-latency)**. Delay video, never audio. | c4 Q5 |
+| Firewall | A **new** PC executable binding UDP in the user's session triggers the Windows Firewall prompt (Allow rules were created for the prototype, then removed): video must live in `beamer-audio.exe`, which has installer rules. | c4 Cleanup |
 
 ## 2. Numbers that drive the design
 
@@ -66,11 +70,16 @@ and the prototypes in `proto/`. Machines: MacBook Air M5 (macOS 27.2), PC `lebig
 | Helper -> app through the source | 0.5 / 1.0 ms | §4.6 |
 | Network frame delay | p50 ~3 ms, p99 22-34 ms | §4.5 playout |
 | Playout delay | adaptive 50-150 ms, ~70 ms here | §4.5 |
-| IDR pacing | 2.5-4x bitrate (~100-130 ms per IDR) | §4.4 |
-| Placeholder threshold | 250 ms without frames (C2 prototype used 500) | §4.6.4 |
-| Mac mic -> PC app (audio, for lip sync) | ~110 ms low-latency / ~170 ms shared (`dev/audio/STATUS.md` WP12, WP16) | §4.9 |
-| Camera start (Mac) | **[C4]** / C1 real-camera run | §4.7 |
-| Glass-to-glass | **[C4]**; estimate: capture ? + 5 + playout 50-70 + 3 + 1 ms + app | §4.8 |
+| IDR pacing | **4x bitrate** (C4: 0 loss in 300 IDRs), 100 ms (720p) / 107 ms (1080p) per IDR, absolute schedule | §4.4 |
+| Placeholder threshold | **500 ms** with nothing feeding the camera (C2 recommended 250; C4: 250 would flash at an 80-packet loss); 2 s of hold before "Reconnecting" on a live stream | §4.6.4 |
+| Playout floor | 50 ms from encoder output (C3/C4); a 30 ms floor saves 20 ms for ~2 % late frames (C4 what-if) | §4.5.3 |
+| Clock drift Mac vs PC | -6.5 to +10.5 ppm, wandering (C4); 19-25 ppm (C3) | §4.5.3 |
+| Mac mic -> PC app (audio, for lip sync) | ~120 ms low-latency / ~170 ms shared (`dev/audio/STATUS.md` WP12, WP16; C4 Q5) | §4.9 |
+| Encoder start (Mac) | 4 ms warm (VT XPC service alive), 163-174 ms cold (C4) | §4.7, §4.11 |
+| Camera start (Mac) | **unmeasured** (permission): assumed 0.2-0.8 s; C1 real-camera run / H1 | §4.7 |
+| First picture after the app opens (synthetic) | 260 ms p50 / 308 ms p95 at 4x (C4) | §4.7, §10.5 |
+| Capture -> app (synthetic) | 57 ms p50, 60-63 ms p95 (C4) | §4.8, §10.5 |
+| Glass-to-glass (real camera) | ~85-130 ms p50 (C4 + an assumed 25-70 ms camera) | §4.8 |
 
 ## 3. Open risks
 
@@ -79,15 +88,28 @@ and the prototypes in `proto/`. Machines: MacBook Air M5 (macOS 27.2), PC `lebig
 2. **Admin step on the PC** (HKLM COM + DLL under Program Files); DLL updates need it again; Smart App
    Control / WDAC would likely want a signed DLL (untested).
 3. **Silent decoder corruption**: correctness of what the PC shows depends entirely on the receiver's own
-   loss tracking (C2 Q5).
-4. **Keyframe-triggered Wi-Fi holes** (C3): mechanism inferred, 4 events in 70 min; IDR pacing at 4x not run.
-   A soak must log every hole > 5 packets with the frame type.
+   loss tracking (C2 Q5). C4 ran the real loop with 0 corrupt frames shown (9 broken frames decoded and held
+   back), which validates the rules, not an implementation.
+4. **Keyframe-triggered Wi-Fi holes** (C3): mechanism inferred, 4 events in 70 min, all at >= 25 Mbit/s. C4: 0
+   loss in 300 IDRs at 4x, but 1080p's 20 Mbit/s is close to 25 and was one 5-min run. A soak must log every
+   hole > 5 packets with the frame type.
 5. **One app at a time** on the PC unless the per-camera multi-app toggle is on.
 6. **Untested on Windows**: logoff/reboot survival of the System-lifetime camera, sleep/resume, GPU driver
    reset (software fallback), apps that change resolution mid-stream, Teams/Zoom/Discord, Camera app.
 7. **TCP fallback** measured only through an SSH stand-in, not Beamer's base64 JSON link.
 8. **"(Caméra virtuelle Windows)" suffix** on the name, no known way to remove it.
-9. **[C4]** risks from the end-to-end run.
+9. **From C4:**
+   - the real camera's own delay and cold start are the one unmeasured latency term (assumed 25-70 ms and
+     0.2-0.8 s);
+   - one Wi-Fi spike pins the adaptive playout ~10 s higher (+50 ms; 2 % of a 10-min 1080p run);
+   - lip sync in shared mic mode: video ~45-90 ms ahead of the audio, at or beyond EBU R37 until video is
+     delayed to match;
+   - VideoToolbox stays warm only while the encoding process lives; how long it stays warm when idle is
+     unmeasured;
+   - a new PC executable that opens a UDP port prompts the Windows Firewall;
+   - Chrome's `performance` clock drifts -25 ppm against Windows time (any browser-based measurement must
+     correct it);
+   - the Mac sender grew 2.5 MB in 30 min, unexplained (watch in the Phase 2 soak).
 
 ## 4. What still needs Alex
 
