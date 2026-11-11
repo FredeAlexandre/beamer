@@ -6,6 +6,9 @@ and streams as plain dicts. `FakeHelper` wraps it in-process with `HelperProcess
 (`start`, `send`, `stop`, `retry`, `state`) and adds test controls (devices, `in_use`, crash).
 `python -m core.audio.fake_helper --control ...` runs it over stdio, for `HelperProcess` tests; flags
 after the usual ones make it misbehave on purpose.
+
+With `video=True` (camera, dev/camera/PHASE2.md §10.1), commands it does not know, and the video
+`send`/`recv`/`stop`, go to `core.camera.fake_video.FakeVideo` (`engine.video`).
 """
 
 import argparse
@@ -44,7 +47,7 @@ def default_devices(platform="macos"):
 class FakeEngine:
     """The helper's command handling without sound: `handle(command)` -> list of events."""
 
-    def __init__(self, platform="macos", devices=None, features=None, restored=0):
+    def __init__(self, platform="macos", devices=None, features=None, restored=0, video=False):
         self.platform = platform
         self.devices = copy.deepcopy(devices or default_devices(platform))
         self.features = list(FEATURES.get(platform, []) if features is None else features)
@@ -58,13 +61,20 @@ class FakeEngine:
         self.next_port = 50000
         self.mic_error = None     # tests: an error code every mic `send` gets (e.g. "permission")
         self.system_error = None  # tests: the same for system sends
+        self.video = None         # the camera's fake video side (core.camera.fake_video), when asked for
+        if video:
+            from core.camera.fake_video import FakeVideo
+            self.video = FakeVideo(self, platform, **(video if isinstance(video, dict) else {}))
 
     def ready(self):
         features = list(self.features)
+        if self.video is not None:
+            features += [word for word in self.video.features() if word not in features]
         if self.vmic_exclusive and self.platform == "windows" and "vmic_exclusive" not in features:
             features.append("vmic_exclusive")
-        return [{"ev": "ready", "proto": 1, "version": VERSION, "platform": self.platform,
-                 "features": features, "restored": self.restored}, self.devices_event()]
+        events = [{"ev": "ready", "proto": 1, "version": VERSION, "platform": self.platform,
+                   "features": features, "restored": self.restored}, self.devices_event()]
+        return events + (self.video.ready_events() if self.video is not None else [])
 
     def devices_event(self):
         return dict({"ev": "devices"}, **copy.deepcopy(self.devices))
@@ -77,6 +87,10 @@ class FakeEngine:
         name = command.get("cmd")
         req = command.get("req")
         method = getattr(self, f"_cmd_{name}", None) if isinstance(name, str) else None
+        if self.video is not None and (method is None or name in ("send", "recv", "stop")):
+            video = self.video.handle
+            method = (lambda command, video=video, audio=method:
+                      video(command) or (audio(command) if audio is not None else ([], "unknown_cmd")))
         if method is None:
             return [self._error(req, "unknown_cmd", f"unknown command {name!r}")]
         try:
@@ -137,6 +151,8 @@ class FakeEngine:
         if self.flows.pop(command["flow"], None) is None:
             return [], "unknown_flow"
         events = [{"ev": "flow_state", "flow": command["flow"], "state": "closed", "rtt_ms": None}]
+        if self.video is not None:
+            events += self.video.flow_closed(command["flow"])
         for stream in [stream for stream, value in self.streams.items() if value.get("flow") == command["flow"]]:
             del self.streams[stream]
             events.append({"ev": "stream_state", "stream": stream, "state": "stopped", "device": None})
@@ -232,10 +248,12 @@ class FakeHelper:
     come back on its reader thread. Same interface as HelperProcess, plus test controls."""
 
     def __init__(self, cmd=None, deliver=None, *, platform="macos", devices=None, features=None,
-                 auto_ready=True, restored=0):
+                 auto_ready=True, restored=0, video=False):
         self.cmd = cmd
         self._deliver = deliver
-        self.engine = FakeEngine(platform, devices, features, restored)
+        self.engine = FakeEngine(platform, devices, features, restored, video)
+        if self.engine.video is not None:
+            self.engine.video.emit = lambda events: self._emit(events) if self._state == "ok" else None
         self.auto_ready = auto_ready
         self._state = "stopped"
         self.sent = []
@@ -277,6 +295,8 @@ class FakeHelper:
         self._state = "stopped"
         self.engine.flows.clear()
         self.engine.streams.clear()
+        if self.engine.video is not None:
+            self.engine.video.reset()
 
     def retry(self):
         if self._state == "failed":
@@ -300,6 +320,8 @@ class FakeHelper:
         """The helper died: its flows and streams are gone; it starts again unless `restart` is False."""
         self.engine.flows.clear()
         self.engine.streams.clear()
+        if self.engine.video is not None:
+            self.engine.video.reset()
         self.engine.restored = restored
         self._state = "starting"
         self._deliver({"ev": "_state", "state": "starting", "why": "exited"})
