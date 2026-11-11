@@ -68,7 +68,7 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 | CW5 Windows camera source DLL | **done** (`0ff0bfd`, `shm_protocol.h` `5adb0d8` unchanged): MF/DirectShow/Chrome/Edge see it, 720p/1080p/360p 60 s at 30.0 fps 0 gaps; feeder -> app p95 0.54/0.80 ms; built-in placeholder 507-509 ms; 20 open/close cycles OK; 10 min fuzz from Alex's session (592k writes) -> Frame Server never crashed, only valid/built-in frames shown; squatted event refused; ACL SYSTEM+LocalService+owner; Frame Server 1.44 % core at 1080p. **DLL update needs no restart**: Frame Server stops ~30 s after the last app closes, next open loads the new DLL. PC cleanup verified by operator |
 | CW7 Page model, Mac UI, menu | **done** (`0449147`, milestone 1 `cde2cad`): page "Audio & Camera", Camera module, map badge/arrow, menu items; 31 view + 36 audio view tests, 16 renders (8 states light/dark) reviewed by operator (consistent with the Audio page); main thread max 13.5 ms per refresh at 4 Hz. Contract additions accepted (extra view fields with defaults, Retry = same route again / `retry_helper`, `no_virtual_camera` line) |
 | CW6 Link and service integration | running (started on CW1 done) |
-| CW9b Packaging part 2 (real DLL + helper, real install/remove/update round trip on the PC, i18n string, README) | running |
+| CW9b Packaging part 2 | **done** (`dbeff7d`): real DLL + helper build, portable layout OK (unsigned: no Certum cert on the PC, as today); real elevated `vcam-install` -> camera created in ~150 ms, MF + DirectShow 90 frames/3 s no gap; `vcam-remove` + `Remove-BeamerCamera` remove everything; update 1 -> 2 while an app streams: no gap (1193 frames), old folder freed after Frame Server's 30 s idle stop, page shows Update -> Close apps... -> Installed; i18n string fixed; vcam-win README dev install section. Full `Install-Maintenance -Remove` not run (would remove the installed Beamer's tasks/firewall rules) -> H7. PC cleanup verified, 632 firewall rules unchanged |
 | CW8 Qt Camera module (PC) | **done** (`f15e93e`): 27 tests, win_app suite = known failures + stale catalogue + CW9's i18n string; 22 renders; install/update/repair/remove via `vcam_install` (mocked), confirmation on Remove; Ctrl+3 opens "AUDIO & CAMERA"; Linux keeps "Audio" with the module hidden. Sidebar showed "Audio_Camera" (`&` mnemonic) -> operator fixed `win_app/widgets.py` (`59a2bfd`, PageButton escapes `&`), 153 page tests pass on lebig |
 | CW9 Packaging, install, permissions | **part 1 done** (`8e14cb8`, code `d6859c5`): camera entitlement on app + python + helper (checked on a private Beamer Dev build, deleted), Info.plist keys, `build_dmg.sh` guard, Inno script (not compiled: no ISCC on lebig), `Install-Beamer.ps1` camera step, portable build puts `camera\BeamerCameraSource.dll` beside `beamer-audio.exe` (stub binaries), `vcam_install.py` 30 tests Mac + lebig, `Install-Maintenance -Remove` on a fake install. Touched `win_app/build_portable.ps1` outside its list (needed; accepted). **Part 2 (CW9b) after CW4+CW5:** rebuild PC with the real DLL, `-Remove` on a real dev install, README section for vcam-win (text in cw9.md). Inno compile needs Inno Setup 6 on lebig (Alex's call, later) |
 
@@ -79,7 +79,9 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 - `texts.py`: "denied" line should point to System Settings; name the preferred camera instead of "Default camera".
 - DONE: "Restart Windows to finish updating Beamer Camera." replaced by "Close apps that use the
   camera to finish updating Beamer Camera." (operator decision).
-- `win_app/vcam_install.py:91` hard-coded log string flagged by i18n coverage (CW9b).
+- `vcam-uninstall` (CW4) leaves empty `HKLM\SOFTWARE\Beamer`, `Program Files\Beamer`, `ProgramData\Beamer` (harmless,
+  `Remove-BeamerCamera` deletes them).
+- DONE (CW9b): `win_app/vcam_install.py:91` hard-coded log string flagged by i18n coverage (CW9b).
 
 ## Lessons (operator)
 
