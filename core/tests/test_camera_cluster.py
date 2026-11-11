@@ -97,9 +97,16 @@ class ConvergenceTests(ClusterBase):
                     node.helper.ready()
             elif action < 0.7:
                 net.cut_udp(self.mac, self.pc, rng.random() < 0.5)
-            elif action < 0.75:
+            elif action < 0.72:
                 self.pc.service.camera_dev({"camera_refuse": rng.choice([None, None, "not_source", "helper",
                                                                          "silent"])})
+            elif action < 0.75:
+                # Refusals by the PC's install state and by its helper's recv (not_installed, outdated).
+                if rng.random() < 0.5:
+                    install = rng.choice(["ok", "ok", "missing", "outdated", "broken"])
+                    self.pc.video.set_vcam(install=install, present=install == "ok")
+                else:
+                    self.pc.video.recv_error = rng.choice([None, "not_installed", "outdated", "internal"])
             elif action < 0.85:
                 for _ in range(rng.randint(0, 3)):
                     net.round()
@@ -109,6 +116,7 @@ class ConvergenceTests(ClusterBase):
             net.check_camera()
         net.cut_udp(self.mac, self.pc, False)
         self.pc.service.camera_dev({"camera_refuse": None})
+        self.pc.video.recv_error = None
         for x, y in pairs:
             net.link(x, y)
         rounds = net.settle(limit=200)
