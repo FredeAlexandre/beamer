@@ -72,6 +72,9 @@ bool display_size_ok(int w, int h);
 // UV plane starts at `pitch * coded_h` (the coded height, e.g. 1088 for 1080p) into `dst` (stride `dst_stride`,
 // UV at dst_stride * h). Only rows 0..h-1 and 0..h/2-1 are read.
 void copy_nv12_display(const uint8_t* src, size_t pitch, int coded_h, int w, int h, uint8_t* dst, size_t dst_stride);
+// How many bytes from `src` copy_nv12_display reads with these arguments (SIZE_MAX when they make no sense): a
+// decoder buffer shorter than that is never copied (R3 #11).
+size_t nv12_bytes_read(size_t pitch, int coded_h, int w, int h);
 // Annex-B access unit contains an IDR slice (nal_unit_type 5).
 bool au_has_idr(const uint8_t* au, size_t len);
 // §4.6.3, other direction: the source's want_* is used only when it is one of kOffered, else kOffered[0].
@@ -118,7 +121,9 @@ class H264Decoder {
     ComPtr<ID3D11Texture2D> staging_;
     bool hw_ = false, provides_ = false, fake_removed_ = false;
     DWORD out_size_ = 0;
-    int w_ = 0, h_ = 0, coded_h_ = 0;
+    int w_ = 0, h_ = 0, coded_w_ = 0, coded_h_ = 0;
+    size_t linear_pitch_ = 0;   // row pitch of a linear output buffer: MF_MT_DEFAULT_STRIDE or the coded width
+    uint64_t short_buffers_ = 0;  // output buffers too short for the picture: not copied
     std::string info_;
 };
 
@@ -321,6 +326,7 @@ class WinVideoSink : public VideoSinkHandle {
     // decoder-thread state
     std::unique_ptr<H264Decoder> dec_;
     std::unique_ptr<H264Decoder> standby_hw_;  // hardware decoder waiting for an IDR to replace software
+    std::string standby_info_;                 // its description, reported with decoder_hw at the take-over
     bool awaiting_idr_ = true;
     bool sw_after_loss_ = false;
     int64_t hw_retry_at_ = 0;

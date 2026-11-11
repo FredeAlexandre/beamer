@@ -78,9 +78,18 @@ This is what the page's "Install Beamer Camera…" and "Remove…" do (`win_app/
 ```powershell
 $sid = (New-Object Security.Principal.NTAccount 'lebig\alex').Translate([Security.Principal.SecurityIdentifier]).Value
 $h = "$env:LOCALAPPDATA\Beamer\beamer-audio.exe"     # or a build: native\audio\build\win\beamer-audio.exe
-& $h vcam-install --owner-sid $sid                    # elevated; one JSON line, exit 0
+$dll = Join-Path (Split-Path $h) 'camera\BeamerCameraSource.dll'
+$sha = (Get-FileHash $dll -Algorithm SHA256).Hash
+& $h vcam-install --owner-sid $sid --dll-sha256 $sha  # elevated; one JSON line, exit 0
 & $h vcam-status                                      # install ok, dll_version, loaded_version, bundled_version, present
 ```
+
+`--dll-sha256` is required: the helper copies the DLL into the protected version folder first, hashes the copy
+there and registers nothing on a mismatch (`dll_hash_mismatch`), so a DLL swapped in a user-writable folder
+between the hash and the elevated copy is never registered. Every folder (`Program Files\Beamer\Camera\<v>`,
+`ProgramData\Beamer\Camera`) must be a real folder owned by Administrators or SYSTEM (it then gets a protected
+ACL); one that a non-administrator made, or a junction/symbolic link, stops the install with `unsafe_folder`
+and its path: delete it as administrator and install again (R3 #1).
 
 Without `--dll` the helper installs `<its folder>\camera\BeamerCameraSource.dll` (the build and every package
 put it there) into `%ProgramFiles%\Beamer\Camera\<kDllVersion>\`. The install creates no camera: a helper
@@ -95,8 +104,9 @@ Remove (script-installed or dev machines; the Inno uninstaller does this itself)
 & $h vcam-uninstall     # elevated: COM class, HKLM\SOFTWARE\Beamer\Camera, the two Camera folders
 ```
 
-`vcam-uninstall` leaves the empty `Beamer` parents (`HKLM\SOFTWARE\Beamer`, `%ProgramFiles%\Beamer`,
-`%ProgramData%\Beamer`); `Remove-BeamerCamera` from `win_app\Install-Maintenance.ps1` (dot-source the script
+`vcam-uninstall` deletes through handles and never follows a link (a junction there is removed itself, not
+its target); it also removes the `Beamer` parents (`HKLM\SOFTWARE\Beamer`, `%ProgramFiles%\Beamer`,
+`%ProgramData%\Beamer`) when they are empty. `Remove-BeamerCamera` from `win_app\Install-Maintenance.ps1` (dot-source the script
 elevated, then call the function) removes the same items and those parents. Both stop `FrameServer` only when
 the DLL is still loaded (an app has a camera open, or less than ~30 s since one closed). Exit codes: 0 ok,
 2 bad arguments, 3 not elevated, 4 failed.

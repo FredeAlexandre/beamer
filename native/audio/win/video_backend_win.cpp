@@ -10,8 +10,9 @@
 // thread: the first decoder at open_sink, a reopen after 3 errors in 10 s, software after a device loss, and the
 // hardware retry 30 s later. An IDR arriving while a decoder is being made is kept (with the AUs behind it, <= 1 s)
 // and decoded when it is ready; other AUs without a decoder are reported on_decoded(ok=false). A new decoder reports
-// "decoder_hw" / "decoder_sw" and is fed nothing before an IDR. The hardware retry is seamless: software keeps
-// decoding until the hardware decoder gets its IDR.
+// "decoder_hw" / "decoder_sw" (before the backlog's results) and is fed nothing before an IDR. The hardware retry
+// is seamless: software keeps decoding until the stream's next IDR, where the hardware decoder takes over and only
+// then reports "decoder_hw" (R3 #2); no IDR is forced for it.
 #include "video_backend_win.h"
 
 #include <mferror.h>
@@ -206,10 +207,13 @@ void WinVideoSink::adopt_pending() {
         return;
     }
     if (d->hw() && dec_ && !dec_->hw() && sw_after_loss_) {
-        // Back to hardware after a device loss: keep software running until the hardware decoder gets an IDR.
+        // Back to hardware after a device loss: software keeps decoding (and the picture keeps moving) until the
+        // stream's next IDR, where the hardware decoder takes over (process()). No event here: the engine treats
+        // decoder_hw as "a new decoder needs an IDR" and would revoke the pictures and force one (R3 #2). The event
+        // comes at the take-over, with that IDR handed and not yet decoded, so the engine asks for nothing.
         standby_hw_ = std::move(d);
-        BLOG_I("video sink: hardware decoder ready, waiting for an IDR: %s", info.c_str());
-        l_->on_sink_event("decoder_hw", info);
+        standby_info_ = info;
+        BLOG_I("video sink: hardware decoder ready, waiting for the next IDR: %s", info.c_str());
         return;
     }
     dec_ = std::move(d);
@@ -327,6 +331,8 @@ void WinVideoSink::process(const Job& j) {
         awaiting_idr_ = true;
         set_kind();
         BLOG_I("video sink: back to the hardware decoder at frame %u", frame);
+        l_->on_sink_event("decoder_hw", standby_info_);  // before this IDR's on_decoded (engine: no PLI)
+        standby_info_.clear();
     }
     if (fake_remove_.exchange(false) && dec_ && dec_->hw()) dec_->simulate_device_removed();
     if (!dec_) {

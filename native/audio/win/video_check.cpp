@@ -10,7 +10,7 @@
 //                                                    validation, InstallGuid, placeholder render, app usage (fake
 //                                                    HKCU tree), install states (test HKLM keys; needs elevation)
 //   video_check setup --reg K --owner-sid S [--dll P] [--guid G] | clear --reg K       (elevated) test install keys
-//   video_check standin --reg K [--version V] [--dll-version N] [--squat] [--seconds N]
+//   video_check standin --reg K [--version V] [--dll-version N] [--squat] [--foreign-owner] [--seconds N]
 //        (elevated, session 0 is fine) owns Global\BeamerCamera.<guid>.Shm/.Frame like the source DLL and applies
 //        the commands the harness writes into Global\BeamerCamera.<guid>.Ctl (streaming, want); --squat pre-creates
 //        the .Demand event itself (a foreign owner), --version writes another layout version
@@ -295,6 +295,7 @@ struct Events : VideoBackendListener, VideoSinkListener {
     WinVideoBackend* backend = nullptr;
     // decode bookkeeping (on_decoded comes from the sink's decoder thread)
     std::atomic<uint32_t> decoding{0};
+    std::atomic<int64_t> last_idr{-1};           // frame number of the newest IDR handed to the sink
     std::atomic<int> lagged{0}, ok_count{0}, fail_count{0};
     std::vector<double> dec_ms;                  // under mu
     std::map<uint32_t, bool> results;            // under mu
@@ -332,7 +333,11 @@ struct Events : VideoBackendListener, VideoSinkListener {
     }
     void on_sink_event(const std::string& what, const std::string& detail) override {
         std::lock_guard<std::mutex> g(mu);
-        ev.push_back({now_ms(), what + ":" + detail});
+        // The engine's rule for a new decoder (R3 #2): ask for an IDR only when none is in the sink, i.e. no IDR
+        // was handed whose on_decoded has not come yet (both arrive on this thread, in order).
+        const int64_t li = last_idr.load();
+        const bool idr_in_sink = what.rfind("decoder_", 0) == 0 && li >= 0 && !results.count(uint32_t(li));
+        ev.push_back({now_ms(), what + ":" + detail + (idr_in_sink ? "|idr_in_sink" : "")});
     }
     std::vector<std::pair<double, std::string>> take() {
         std::lock_guard<std::mutex> g(mu);
@@ -347,6 +352,7 @@ struct Stream {
     size_t idx = 0;
     uint32_t frame = 0;
     bool need_idr = false;
+    int idrs_sent = 0;  // restarts from the file's IDR asked for by the engine stand-in (the first IDR not counted)
 };
 
 // Feeds one AU and, like the engine's presenter, keeps ticking hold() (every 33 ms) until its on_decoded arrives;
@@ -355,11 +361,13 @@ bool feed(WinVideoSink* sink, Events& ev, Stream& s) {
     if (s.need_idr) {
         s.idx = 0;  // PLI start/size answered by the file's first AU (an IDR)
         s.need_idr = false;
+        s.idrs_sent++;
     }
     const auto& au = s.aus[s.idx % s.aus.size()];
     s.idx++;
     uint32_t f = s.frame++;
     ev.decoding = f;
+    if (au_has_idr(au.data(), au.size())) ev.last_idr = int64_t(f);
     double t0 = now_ms();
     sink->decode(au.data(), au.size(), f, true);  // returns at once (queued)
     bool ok = false, got = false;
@@ -412,6 +420,12 @@ void unit(const std::vector<std::wstring>& a) {
         check(ok, "NV12 copy: Y rows 0..h-1, UV from pitch*coded_h");
         check(std::find(dst.begin(), dst.end(), 0xEE) == dst.end(), "NV12 copy: nothing of rows 1080-1087 copied");
         check(dst.size() == size_t(1920) * 1080 * 3 / 2 && dst.size() <= vcam::kSlotBytes, "1080p picture fits a slot");
+        // R3 #11: the exact read extent, so a short decoder buffer is never copied
+        check(nv12_bytes_read(pitch, ch, w, h) == pitch * ch + pitch * (h / 2 - 1) + w && nv12_bytes_read(pitch, ch, w, h) <= src.size(),
+              "NV12 read extent (1080p, pitch 2048) inside the coded buffer");
+        check(nv12_bytes_read(1280, 720, 1272, 720) == size_t(1280) * 720 + size_t(1280) * 359 + 1272, "NV12 read extent, cropped 1272 in 1280");
+        check(nv12_bytes_read(1000, 720, 1272, 720) == SIZE_MAX && nv12_bytes_read(1280, 700, 1280, 720) == SIZE_MAX,
+              "NV12 read extent: pitch < width or coded height < height refused");
     }
     // IDR scan
     {
@@ -610,7 +624,21 @@ int standin(const std::vector<std::wstring>& a) {
     const uint32_t version = uint32_t(_wtoi(arg_after(a, L"--version", L"1").c_str()));
     const uint32_t dllv = uint32_t(_wtoi(arg_after(a, L"--dll-version", L"1").c_str()));
     const double seconds = _wtof(arg_after(a, L"--seconds", L"600").c_str());
-    std::wstring sddl = L"D:P(A;;GA;;;SY)(A;;GA;;;LS)(A;;GA;;;BA)(A;;GA;;;" + i.owner_sid + L")";
+    // Owner SYSTEM, like the DLL's objects (LocalService); the helper refuses any other owner (R3 #7). Setting an
+    // owner other than oneself needs SeRestorePrivilege (elevated). --foreign-owner keeps this process's default
+    // owner (Administrators): a squatter.
+    const bool foreign = has_arg(a, L"--foreign-owner");
+    if (!foreign) {
+        HANDLE tok = nullptr;
+        TOKEN_PRIVILEGES tp{};
+        if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &tok) && LookupPrivilegeValueW(nullptr, SE_RESTORE_NAME, &tp.Privileges[0].Luid)) {
+            tp.PrivilegeCount = 1;
+            tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+            AdjustTokenPrivileges(tok, FALSE, &tp, 0, nullptr, nullptr);
+        }
+        if (tok) CloseHandle(tok);
+    }
+    std::wstring sddl = std::wstring(foreign ? L"" : L"O:SY") + L"D:P(A;;GA;;;SY)(A;;GA;;;LS)(A;;GA;;;BA)(A;;GA;;;" + i.owner_sid + L")";
     PSECURITY_DESCRIPTOR sd = nullptr;
     ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &sd, nullptr);
     SECURITY_ATTRIBUTES sa{sizeof sa, sd, FALSE};
@@ -724,7 +752,8 @@ std::string play(Rig& rig, const std::wstring& file, double seconds, const std::
         for (auto& e : rig.ev.take()) {
             const std::string& w = e.second;
             if (w.rfind("decoder_", 0) == 0) {
-                s.need_idr = true;  // engine: a new decoder gets an IDR (PLI start)
+                // engine: a new decoder gets an IDR (PLI start), unless the sink holds one for it (R3 #2)
+                if (w.find("|idr_in_sink") == std::string::npos) s.need_idr = true;
                 kinds += std::string(kinds.empty() ? "" : ",") + json_str(w.substr(0, w.find(':')) + "@" + std::to_string(int(e.first - t0)));
             } else if (w.rfind("size_rejected", 0) == 0) {
                 rejects++;
@@ -756,10 +785,10 @@ std::string play(Rig& rig, const std::wstring& file, double seconds, const std::
     snprintf(b, sizeof b,
              "\"decoder\":\"%s\",\"aus\":%zu,\"fed\":%u,\"decoded_ok\":%d,\"presented\":%d,\"dec_ms_p50\":%.2f,\"dec_ms_p95\":%.2f,"
              "\"dec_ms_max\":%.2f,\"decoder_lag_frames\":%d,\"backlogged\":%llu,\"size_rejected_events\":%d,\"discarded\":%llu,\"errors\":%llu,\"device_lost\":%llu,"
-             "\"skipped\":%llu,\"cpu_pct_core\":%.1f,\"decoder_events\":[%s],\"output_type\":\"%dx%d coded h %d\",\"slow_calls\":[%s]",
+             "\"skipped\":%llu,\"cpu_pct_core\":%.1f,\"idr_restarts\":%d,\"decoder_events\":[%s],\"output_type\":\"%dx%d coded h %d\",\"slow_calls\":[%s]",
              sink->decoder_kind().c_str(), s.aus.size(), s.frame, rig.ev.ok_count.load(), presented, pct(rig.ev.dec_ms, 0.5), pct(rig.ev.dec_ms, 0.95),
              pct(rig.ev.dec_ms, 1.0), rig.ev.lagged.load(), (unsigned long long)c.backlogged, rejects, (unsigned long long)c.discarded, (unsigned long long)c.decode_errors,
-             (unsigned long long)c.device_lost, (unsigned long long)c.skipped, cpu / wall * 100.0, kinds.c_str(), c.w, c.h, c.coded_h, rig.ev.slow.c_str());
+             (unsigned long long)c.device_lost, (unsigned long long)c.skipped, cpu / wall * 100.0, s.idrs_sent, kinds.c_str(), c.w, c.h, c.coded_h, rig.ev.slow.c_str());
     if (stopped) {
         // keep the sink open a moment with the error placeholder, beating, as the engine would until close
         for (int i = 0; i < 10; i++) {
@@ -1115,6 +1144,49 @@ int scenario(const std::vector<std::wstring>& a) {
     return 2;
 }
 
+// R3 #11: a stream whose display width is below its coded width (e.g. 1272 inside 1280), decoded straight through
+// H264Decoder (hardware or software): the picture is a black left part and a white right part split at
+// --edge (ffmpeg drawbox); in every decoded row the edge must be at the same column (a wrong row pitch shears it).
+int cropcheck(const std::vector<std::wstring>& a) {
+    const std::wstring file = a.size() > 2 ? a[2] : L"";
+    const bool hw = !has_arg(a, L"--sw");
+    const int edge = _wtoi(arg_after(a, L"--edge", L"636").c_str());
+    auto aus = split_annexb(read_file(file));
+    std::string info;
+    HRESULT hr = S_OK;
+    auto d = H264Decoder::create(hw, &info, &hr);
+    if (!d) {
+        printf("{\"cropcheck\":false,\"error\":%s}\n", json_str(info).c_str());
+        return 4;
+    }
+    std::vector<uint8_t> pic;
+    int pics = 0, bad_rows = 0, rows = 0, w = 0, h = 0, worst = 0;
+    for (size_t i = 0; i < aus.size(); i++) {
+        DecodeOut r = d->decode(aus[i].data(), aus[i].size(), uint32_t(i), [&](int pw, int ph) -> uint8_t* {
+            pic.assign(size_t(pw) * ph * 3 / 2, 0);
+            w = pw;
+            h = ph;
+            return pic.data();
+        });
+        if (r.result != DecodeResult::kOk || pic.empty()) continue;
+        pics++;
+        for (int y = 0; y < h; y += 7) {
+            const uint8_t* row = &pic[size_t(y) * w];
+            int x = 0;
+            while (x < w && row[x] < 128) x++;  // first bright pixel
+            rows++;
+            const int off = std::abs(x - edge);
+            worst = std::max(worst, off);
+            if (off > 2) bad_rows++;
+        }
+    }
+    const bool ok = pics > 0 && bad_rows == 0;
+    printf("{\"cropcheck\":%s,\"decoder\":\"%s\",\"display\":\"%dx%d\",\"pictures\":%d,\"rows_checked\":%d,\"rows_bad\":%d,"
+           "\"worst_edge_offset\":%d}\n",
+           ok ? "true" : "false", hw ? "hw" : "sw", w, h, pics, rows, bad_rows, worst);
+    return ok ? 0 : 1;
+}
+
 // install / vcam {} without a helper restart: the backend's own view through the test keys
 int cmd_installflow(const std::vector<std::wstring>& a) {
     WinVideoOptions o;
@@ -1158,6 +1230,7 @@ int wmain(int argc, wchar_t** argv) {
     if (c == L"setup") return setup(a);
     if (c == L"clear") return clear(a);
     if (c == L"standin") return standin(a);
+    if (c == L"cropcheck") return cropcheck(a);
     if (c == L"play") return cmd_play(a);
     if (c == L"scenario") return scenario(a);
     if (c == L"installflow") return cmd_installflow(a);

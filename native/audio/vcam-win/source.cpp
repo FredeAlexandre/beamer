@@ -30,6 +30,7 @@
 #include <ksmedia.h>
 #include <ksproxy.h>
 #include <wrl.h>
+#include <winternl.h>
 #include <atomic>
 #include <cstdarg>
 #include <cstdio>
@@ -91,6 +92,140 @@ bool in_frame_server() {
 // %ProgramData%\Beamer\Camera\source.log, Frame Server only. Rate: a token bucket of 3 lines refilled at 1
 // line/s (so on average at most 1 line/s; lines over the budget are counted and the count is appended to the
 // next line written). Rotated to source.log.1 at 1 MB. The folder is created by vcam-install.
+//
+// Never through a link (R3 #1): this runs as LocalService, and a user who could plant a junction or link in that
+// path would get LocalService to create, append to or overwrite a file of their choice. So: Beamer and Camera are
+// opened one at a time relative to the ProgramData handle without following reparse points, each must be a real
+// folder owned by Administrators or SYSTEM (vcam-install made them so; a non-administrator's folder never is), and
+// the log is created and rotated through the Camera folder's handle (rename in place), never by path. The file must
+// be a plain file with one link. Anything else: no log line (nothing else changes).
+#ifndef FILE_OPEN
+#define FILE_OPEN 0x00000001
+#endif
+#ifndef FILE_OPEN_IF
+#define FILE_OPEN_IF 0x00000003
+#endif
+#ifndef FILE_DIRECTORY_FILE
+#define FILE_DIRECTORY_FILE 0x00000001
+#endif
+#ifndef FILE_NON_DIRECTORY_FILE
+#define FILE_NON_DIRECTORY_FILE 0x00000040
+#endif
+#ifndef FILE_SYNCHRONOUS_IO_NONALERT
+#define FILE_SYNCHRONOUS_IO_NONALERT 0x00000020
+#endif
+#ifndef FILE_OPEN_REPARSE_POINT
+#define FILE_OPEN_REPARSE_POINT 0x00200000
+#endif
+using NtCreateFileFn = NTSTATUS(NTAPI*)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PIO_STATUS_BLOCK, PLARGE_INTEGER, ULONG, ULONG, ULONG,
+                                        ULONG, PVOID, ULONG);
+
+// One path component inside the open folder `dir`; a reparse point there is opened as itself, never followed.
+HANDLE open_rel_nofollow(HANDLE dir, const wchar_t* name, ACCESS_MASK access, ULONG share, ULONG disposition, ULONG options) {
+  static const auto nt_create = reinterpret_cast<NtCreateFileFn>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtCreateFile"));
+  if (!nt_create) return nullptr;
+  UNICODE_STRING us;
+  us.Buffer = const_cast<PWSTR>(name);
+  us.Length = us.MaximumLength = (USHORT)(wcslen(name) * sizeof(wchar_t));
+  OBJECT_ATTRIBUTES oa;
+  InitializeObjectAttributes(&oa, &us, OBJ_CASE_INSENSITIVE, dir, nullptr);
+  IO_STATUS_BLOCK io{};
+  HANDLE h = nullptr;
+  NTSTATUS st = nt_create(&h, access | SYNCHRONIZE, &oa, &io, nullptr, FILE_ATTRIBUTE_NORMAL, share, disposition,
+                          options | FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT, nullptr, 0);
+  return st < 0 ? nullptr : h;
+}
+
+// A real folder (not a link) owned by Administrators or SYSTEM.
+bool trusted_folder(HANDLE h) {
+  BY_HANDLE_FILE_INFORMATION fi{};
+  if (!GetFileInformationByHandle(h, &fi) || (fi.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) ||
+      !(fi.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+    return false;
+  PSID owner = nullptr;
+  PSECURITY_DESCRIPTOR sd = nullptr;
+  if (GetSecurityInfo(h, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &owner, nullptr, nullptr, nullptr, &sd) != ERROR_SUCCESS) return false;
+  bool ok = owner && (IsWellKnownSid(owner, WinBuiltinAdministratorsSid) || IsWellKnownSid(owner, WinLocalSystemSid));
+  LocalFree(sd);
+  return ok;
+}
+
+// A plain file with a single name (no link, no hard link to a file elsewhere).
+bool plain_file(HANDLE h, ULONGLONG* size) {
+  BY_HANDLE_FILE_INFORMATION fi{};
+  if (!GetFileInformationByHandle(h, &fi) || (fi.dwFileAttributes & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY)) ||
+      fi.nNumberOfLinks != 1)
+    return false;
+  *size = ((ULONGLONG)fi.nFileSizeHigh << 32) | fi.nFileSizeLow;
+  return true;
+}
+
+// Rename the open file inside its own folder: NtSetInformationFile(FileRenameInformation) with a bare name and no
+// root renames in the handle's folder; no path is resolved (kernel32's SetFileInformationByHandle would resolve a
+// bare name under the process's current directory and move the file there).
+bool rename_in_place(HANDLE h, const wchar_t* name) {
+  using NtSetInformationFileFn = NTSTATUS(NTAPI*)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, ULONG);
+  static const auto nt_set = reinterpret_cast<NtSetInformationFileFn>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtSetInformationFile"));
+  if (!nt_set) return false;
+  const size_t n = wcslen(name);
+  std::vector<uint8_t> buf(sizeof(FILE_RENAME_INFO) + n * sizeof(wchar_t));
+  auto* ri = reinterpret_cast<FILE_RENAME_INFO*>(buf.data());
+  ri->ReplaceIfExists = TRUE;
+  ri->RootDirectory = nullptr;
+  ri->FileNameLength = (DWORD)(n * sizeof(wchar_t));
+  memcpy(ri->FileName, name, n * sizeof(wchar_t));
+  IO_STATUS_BLOCK io{};
+  return nt_set(h, &io, ri, (ULONG)buf.size(), 10 /* FileRenameInformation */) >= 0;
+}
+
+struct OwnedHandle {
+  HANDLE h = nullptr;
+  explicit OwnedHandle(HANDLE x) : h(x == INVALID_HANDLE_VALUE ? nullptr : x) {}
+  ~OwnedHandle() {
+    if (h) CloseHandle(h);
+  }
+  OwnedHandle(const OwnedHandle&) = delete;
+  OwnedHandle& operator=(const OwnedHandle&) = delete;
+};
+
+// Appends `n` bytes to the log as above; false when the path is not safe (nothing written).
+bool append_log_nofollow(const std::wstring& program_data, const char* data, DWORD n) {
+  OwnedHandle pd(CreateFileW(program_data.c_str(), FILE_TRAVERSE | FILE_LIST_DIRECTORY, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                             nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr));
+  if (!pd.h) return false;
+  // no delete share: neither folder can be renamed or replaced while the line is written
+  OwnedHandle beamer(open_rel_nofollow(pd.h, L"Beamer", FILE_TRAVERSE | FILE_READ_ATTRIBUTES | READ_CONTROL, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                       FILE_OPEN, FILE_DIRECTORY_FILE));
+  if (!beamer.h || !trusted_folder(beamer.h)) return false;
+  OwnedHandle camera(open_rel_nofollow(beamer.h, L"Camera", FILE_TRAVERSE | FILE_ADD_FILE | FILE_READ_ATTRIBUTES | READ_CONTROL,
+                                       FILE_SHARE_READ | FILE_SHARE_WRITE, FILE_OPEN, FILE_DIRECTORY_FILE));
+  if (!camera.h || !trusted_folder(camera.h)) return false;
+  const DWORD access = FILE_APPEND_DATA | FILE_READ_ATTRIBUTES | DELETE;
+  const DWORD share = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
+  ULONGLONG size = 0;
+  HANDLE f = open_rel_nofollow(camera.h, L"source.log", access, share, FILE_OPEN_IF, FILE_NON_DIRECTORY_FILE);
+  if (!f) return false;
+  if (!plain_file(f, &size)) {
+    CloseHandle(f);
+    return false;
+  }
+  if (size > 1024 * 1024) {  // rotate: source.log -> source.log.1 in the same folder, then a fresh source.log
+    const bool renamed = rename_in_place(f, L"source.log.1");
+    CloseHandle(f);
+    if (!renamed) return false;
+    f = open_rel_nofollow(camera.h, L"source.log", access, share, FILE_OPEN_IF, FILE_NON_DIRECTORY_FILE);
+    if (!f) return false;
+    if (!plain_file(f, &size)) {
+      CloseHandle(f);
+      return false;
+    }
+  }
+  DWORD w = 0;
+  const bool ok = WriteFile(f, data, n, &w, nullptr) && w == n;
+  CloseHandle(f);
+  return ok;
+}
+
 class Log {
  public:
   void line(const char* fmt, ...) {
@@ -127,22 +262,14 @@ class Log {
       wchar_t pd[MAX_PATH];
       DWORD k = ExpandEnvironmentStringsW(L"%ProgramData%", pd, MAX_PATH);
       path_ = (k > 0 && k < MAX_PATH && pd[0] != L'%') ? pd : L"C:\\ProgramData";
-      path_ += L"\\Beamer\\Camera\\source.log";
     }
-    WIN32_FILE_ATTRIBUTE_DATA fa;
-    if (GetFileAttributesExW(path_.c_str(), GetFileExInfoStandard, &fa) && (fa.nFileSizeHigh || fa.nFileSizeLow > 1024 * 1024))
-      MoveFileExW(path_.c_str(), (path_ + L".1").c_str(), MOVEFILE_REPLACE_EXISTING);
-    HANDLE f = CreateFileW(path_.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_ALWAYS,
-                           FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (f == INVALID_HANDLE_VALUE) return;
-    DWORD w;
-    WriteFile(f, buf, (DWORD)n, &w, nullptr);
-    CloseHandle(f);
+    if (!append_log_nofollow(path_, buf, (DWORD)n)) unsafe_++;  // counted; nothing written
   }
 
  private:
   std::mutex mu_;
-  std::wstring path_;
+  std::wstring path_;  // %ProgramData%
+  unsigned long long unsafe_ = 0;
   double tokens_ = 3;
   ULONGLONG last_ms_ = GetTickCount64();
   unsigned long long suppressed_ = 0;
@@ -401,6 +528,12 @@ void copy_nv12(const uint8_t* src, uint32_t w, uint32_t h, uint32_t ss, uint8_t*
 
 class Source;
 
+// R3 #12: Stream::parent_ is a raw pointer (the source owns the stream; a reference back would be a cycle). The
+// source's last Release and its destructor run under this lock, and the destructor clears parent_ under it, so
+// GetMediaSource (same lock) either AddRefs a live source before its count can reach 0, or sees nullptr. Taken
+// before any Stream::mu_.
+std::recursive_mutex g_parent_mu;
+
 // ------------------------------------------------------------------------------------------------ stream
 class Stream : public RuntimeClass<RuntimeClassFlags<ClassicCom>, ChainInterfaces<IMFMediaStream2, IMFMediaStream, IMFMediaEventGenerator>,
                                    IKsControl, FtmBase> {
@@ -411,6 +544,10 @@ class Stream : public RuntimeClass<RuntimeClassFlags<ClassicCom>, ChainInterface
   void StartStreaming(IMFMediaType* type);
   void StopStreaming();
   void Shutdown();
+  void DetachParent() {  // g_parent_mu held (~Source)
+    std::lock_guard<std::recursive_mutex> g(mu_);
+    parent_ = nullptr;
+  }
   ComPtr<IMFAttributes> attrs;
 
   // IMFMediaEventGenerator
@@ -500,10 +637,17 @@ class Stream : public RuntimeClass<RuntimeClassFlags<ClassicCom>, ChainInterface
   Copy copy_slot(vc::Header* hd, uint32_t idx, uint32_t* seq_out);
   void reject(const char* what, uint64_t a, uint64_t b);
   bool deliver(Kind kind);
+  // R3 #12: the delivery thread holds a COM reference to its stream (taken in Initialize) and a reference to this
+  // DLL, so neither can go away under it even if Shutdown's bounded wait gives up; it drops both on its way out.
   static DWORD WINAPI thread_main(void* p) {
-    ((Stream*)p)->run();
+    auto* s = (Stream*)p;
+    s->run();
+    HMODULE self = s->module_;
+    s->Release();
+    if (self) FreeLibraryAndExitThread(self, 0);
     return 0;
   }
+  HMODULE module_ = nullptr;
 
   std::recursive_mutex mu_;
   Source* parent_ = nullptr;   // raw: the source owns the stream; Shutdown breaks the link
@@ -647,8 +791,17 @@ class Source : public RuntimeClass<RuntimeClassFlags<ClassicCom>, ChainInterface
   IFACEMETHODIMP KsEvent(PKSEVENT, ULONG, LPVOID, ULONG, ULONG*) override { return HRESULT_FROM_WIN32(ERROR_SET_NOT_FOUND); }
 
   ~Source() {
+    {
+      std::lock_guard<std::recursive_mutex> pg(g_parent_mu);  // held already when reached through Release()
+      if (stream_) stream_->DetachParent();
+    }
     if (stream_) stream_->Shutdown();
     drop_shared();
+  }
+  // The last Release (and so the destructor) runs under g_parent_mu: see Stream::GetMediaSource (R3 #12).
+  STDMETHOD_(ULONG, Release)() override {
+    std::lock_guard<std::recursive_mutex> pg(g_parent_mu);
+    return RuntimeClass::Release();
   }
 
  private:
@@ -699,11 +852,21 @@ HRESULT Stream::Initialize(Source* parent, bool live) {
   timer_ = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
   if (!timer_) timer_ = CreateWaitableTimerW(nullptr, FALSE, nullptr);
   if (!stop_ev_ || !request_ev_ || !timer_) return HRESULT_FROM_WIN32(GetLastError());
+  GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, reinterpret_cast<LPCWSTR>(&thread_main), &module_);
+  AddRef();  // the thread's reference (released by thread_main)
   thread_ = CreateThread(nullptr, 0, thread_main, this, 0, nullptr);
-  return thread_ ? S_OK : HRESULT_FROM_WIN32(GetLastError());
+  if (!thread_) {
+    const DWORD e = GetLastError();
+    if (module_) FreeLibrary(module_);
+    module_ = nullptr;
+    Release();
+    return HRESULT_FROM_WIN32(e);
+  }
+  return S_OK;
 }
 
 IFACEMETHODIMP Stream::GetMediaSource(IMFMediaSource** out) {
+  std::lock_guard<std::recursive_mutex> pg(g_parent_mu);  // the source cannot reach 0 references meanwhile
   std::lock_guard<std::recursive_mutex> g(mu_);
   if (!out) return E_POINTER;
   if (!parent_ || !q_) return MF_E_SHUTDOWN;

@@ -27,6 +27,12 @@ bool display_size_ok(int w, int h) {
            uint32_t(h) <= vcam::kMaxH;
 }
 
+size_t nv12_bytes_read(size_t pitch, int coded_h, int w, int h) {
+    if (w <= 0 || h <= 1 || coded_h < h || pitch < size_t(w)) return SIZE_MAX;
+    // last byte copy_nv12_display reads: UV row h/2-1, column w-1
+    return pitch * size_t(coded_h) + pitch * size_t(h / 2 - 1) + size_t(w);
+}
+
 void copy_nv12_display(const uint8_t* src, size_t pitch, int coded_h, int w, int h, uint8_t* dst, size_t dst_stride) {
     for (int y = 0; y < h; y++) memcpy(dst + size_t(y) * dst_stride, src + size_t(y) * pitch, size_t(w));
     const uint8_t* uv = src + pitch * size_t(coded_h);
@@ -128,8 +134,12 @@ HRESULT H264Decoder::set_output() {
         if (FAILED(hr)) return hr;
         UINT32 ow = 0, oh = 0;
         MFGetAttributeSize(o.Get(), MF_MT_FRAME_SIZE, &ow, &oh);
-        w_ = int(ow);
+        w_ = coded_w_ = int(ow);
         h_ = coded_h_ = int(oh);
+        // Rows of a linear (non-2D) output buffer are the coded width apart, or MF_MT_DEFAULT_STRIDE (R3 #11)
+        UINT32 stride = 0;
+        linear_pitch_ = SUCCEEDED(o->GetUINT32(MF_MT_DEFAULT_STRIDE, &stride)) && int32_t(stride) >= int32_t(ow) ? size_t(int32_t(stride))
+                                                                                                                 : size_t(ow);
         MFVideoArea area{};
         if (SUCCEEDED(o->GetBlob(MF_MT_MINIMUM_DISPLAY_APERTURE, reinterpret_cast<UINT8*>(&area), sizeof area, nullptr)) &&
             area.Area.cx > 0 && area.Area.cy > 0) {
@@ -180,7 +190,7 @@ DecodeOut H264Decoder::decode(const uint8_t* au, size_t len, uint32_t frame,
     s->SetSampleTime(int64_t(frame) * kFrameTime);
     s->SetSampleDuration(kFrameTime);
 
-    bool got = false, rejected = false;
+    bool got = false, rejected = false, short_copy = false;
     auto drain = [&]() -> HRESULT {
         for (;;) {
             MFT_OUTPUT_DATA_BUFFER db{};
@@ -188,7 +198,7 @@ DecodeOut H264Decoder::decode(const uint8_t* au, size_t len, uint32_t frame,
             if (!provides_) {
                 ComPtr<IMFMediaBuffer> ob;
                 MFCreateSample(&mine);
-                MFCreateMemoryBuffer(out_size_ ? out_size_ : DWORD(size_t(w_) * size_t(coded_h_) * 3 / 2), &ob);
+                MFCreateMemoryBuffer(out_size_ ? out_size_ : DWORD(linear_pitch_ * size_t(coded_h_) * 3 / 2), &ob);
                 mine->AddBuffer(ob.Get());
                 db.pSample = mine.Get();
             }
@@ -249,7 +259,10 @@ DecodeOut H264Decoder::decode(const uint8_t* au, size_t len, uint32_t frame,
                 h2 = ctx_->Map(staging_.Get(), 0, D3D11_MAP_READ, 0, &m);
                 if (FAILED(h2)) return h2;
                 // The texture is the coded picture (td.Height >= coded height): its UV plane follows td.Height rows.
-                copy_nv12_display(static_cast<const uint8_t*>(m.pData), m.RowPitch, test_uv_at_display_height ? h_ : int(td.Height), w_, h_, out, size_t(w_));
+                if (int(td.Width) >= w_ && int(td.Height) >= h_ && m.RowPitch >= UINT(w_))
+                    copy_nv12_display(static_cast<const uint8_t*>(m.pData), m.RowPitch, test_uv_at_display_height ? h_ : int(td.Height), w_, h_, out, size_t(w_));
+                else
+                    short_copy = true;
                 ctx_->Unmap(staging_.Get(), 0);
                 continue;
             }
@@ -258,13 +271,26 @@ DecodeOut H264Decoder::decode(const uint8_t* au, size_t len, uint32_t frame,
             LONG pitch = 0;
             DWORD blen = 0;
             if (SUCCEEDED(ob.As(&b2)) && SUCCEEDED(b2->Lock2DSize(MF2DBuffer_LockFlags_Read, &bp, &pitch, &start, &blen))) {
-                if (pitch > 0) copy_nv12_display(bp, size_t(pitch), test_uv_at_display_height ? h_ : coded_h_, w_, h_, out, size_t(w_));
+                // Everything read must lie inside the locked buffer (R3 #11): [bp, start + blen).
+                const int ch = test_uv_at_display_height ? h_ : coded_h_;
+                const size_t need = pitch > 0 ? nv12_bytes_read(size_t(pitch), ch, w_, h_) : SIZE_MAX;
+                const size_t avail = bp >= start && size_t(bp - start) <= blen ? blen - size_t(bp - start) : 0;
+                if (need <= avail) copy_nv12_display(bp, size_t(pitch), ch, w_, h_, out, size_t(w_));
+                else {
+                    short_buffers_++;
+                    short_copy = true;
+                }
                 b2->Unlock2D();
             } else {
                 DWORD cur_len = 0;
                 if (SUCCEEDED(ob->Lock(&bp, nullptr, &cur_len))) {
-                    if (cur_len >= DWORD(size_t(w_) * coded_h_ * 3 / 2))
-                        copy_nv12_display(bp, size_t(w_), test_uv_at_display_height ? h_ : coded_h_, w_, h_, out, size_t(w_));
+                    // A linear buffer: rows are the coded width (or the default stride) apart, not the display width.
+                    const int ch = test_uv_at_display_height ? h_ : coded_h_;
+                    if (nv12_bytes_read(linear_pitch_, ch, w_, h_) <= cur_len) copy_nv12_display(bp, linear_pitch_, ch, w_, h_, out, size_t(w_));
+                    else {
+                    short_buffers_++;
+                    short_copy = true;
+                }
                     ob->Unlock();
                 }
             }
@@ -285,6 +311,10 @@ DecodeOut H264Decoder::decode(const uint8_t* au, size_t len, uint32_t frame,
     r.ms = ms_since(t0);
     if (FAILED(hr)) r.result = device_lost(hr) ? DecodeResult::kDeviceLost : DecodeResult::kError;
     else if (rejected) r.result = DecodeResult::kSizeRejected;
+    else if (short_copy) {  // the picture was not copied: never shown (a decoder error)
+        r.result = DecodeResult::kError;
+        r.hr = E_UNEXPECTED;
+    }
     else r.result = got ? DecodeResult::kOk : DecodeResult::kNoOutput;
     return r;
 }

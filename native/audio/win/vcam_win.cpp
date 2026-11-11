@@ -244,6 +244,17 @@ static std::wstring obj_name(const std::wstring& guid, const wchar_t* suffix) {
     return L"Global\\BeamerCamera." + guid + suffix;
 }
 
+// The section and frame event are the source's (Frame Server, LocalService): only LocalService or SYSTEM may own
+// them (§4.6.3, as the DLL checks them). Anything else was made by someone who wants the pictures (R3 #7).
+static bool owner_is_service(HANDLE h) {
+    PSID owner = nullptr;
+    PSECURITY_DESCRIPTOR sd = nullptr;
+    if (GetSecurityInfo(h, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION, &owner, nullptr, nullptr, nullptr, &sd) != ERROR_SUCCESS) return false;
+    const bool ok = owner && (IsWellKnownSid(owner, WinLocalServiceSid) || IsWellKnownSid(owner, WinLocalSystemSid));
+    LocalFree(sd);
+    return ok;
+}
+
 // The SIDs that may own a Demand event we did not create in this run: our user, or our token's default owner
 // (an elevated token's objects are owned by Administrators).
 static bool owner_is_us(PSID owner) {
@@ -324,8 +335,15 @@ void Vcam::open_objects_locked() {
     }
     if (!shm_->map && now >= shm_->next_open_try) {
         shm_->next_open_try = now + ms_ticks(1000);
-        HANDLE m = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE, FALSE, obj_name(shm_->guid, L".Shm").c_str());
+        HANDLE m = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE | READ_CONTROL, FALSE, obj_name(shm_->guid, L".Shm").c_str());
         if (!m) return;  // the source is not activated (no app has used the camera since Frame Server started)
+        if (!owner_is_service(m)) {
+            // Not the source's: never write a picture into it (R3 #7). Retried every 1 s (the real one may come).
+            CloseHandle(m);
+            if (shm_error_ != "squatted") BLOG_W("vcam: the shared-memory section is not owned by LocalService or SYSTEM: refused (squatted)");
+            shm_error_ = "squatted";
+            return;
+        }
         void* v = MapViewOfFile(m, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, SIZE_T(vcam::kSectionBytes));
         if (!v) {
             CloseHandle(m);
@@ -347,7 +365,12 @@ void Vcam::open_objects_locked() {
         shm_->map = m;
         shm_->base = static_cast<uint8_t*>(v);
         shm_->hdr = hdr;
-        shm_->frame = OpenEventW(EVENT_MODIFY_STATE, FALSE, obj_name(shm_->guid, L".Frame").c_str());
+        shm_->frame = OpenEventW(EVENT_MODIFY_STATE | READ_CONTROL, FALSE, obj_name(shm_->guid, L".Frame").c_str());
+        if (shm_->frame && !owner_is_service(shm_->frame)) {  // a foreign event: not signalled (the source polls)
+            CloseHandle(shm_->frame);
+            shm_->frame = nullptr;
+            BLOG_W("vcam: the frame event is not owned by LocalService or SYSTEM: not used");
+        }
         hdr->helper_pid = GetCurrentProcessId();
         if (!sink_open_) beat_locked(now);  // the idle loop owns the picture: alive from the first delivery
         seen_state_seq_ = hdr->state_seq.load(std::memory_order_acquire) - 1;  // read the state now
@@ -665,6 +688,7 @@ VcamState Vcam::state(bool trigger_create) {
     if (in_use_) s.want = VideoFormat{int(want_.w), int(want_.h), int(want_.fps)};
     else s.want = VideoFormat{0, 0, 0};
     if (!create_error_.empty()) s.error = create_error_;
+    else if (shm_error_ == "squatted") s.error = "squatted";
     else if (!demand_error_.empty()) s.error = demand_error_;
     else if (install_.install == "broken") s.error = install_.detail;
     return s;
