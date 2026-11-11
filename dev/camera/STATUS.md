@@ -65,7 +65,7 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 | CW2 Engine video transport | running (`video_backend.h` landed `e0a4ef5`) |
 | CW3 Mac camera backend | running |
 | CW4 Windows video sink | running |
-| CW5 Windows camera source DLL | running (`shm_protocol.h` `5adb0d8`, DLL `dffd9a0`); resumed after stopping while its PC test ran (camera registered, tasks CW5-* running) |
+| CW5 Windows camera source DLL | **done** (`0ff0bfd`, `shm_protocol.h` `5adb0d8` unchanged): MF/DirectShow/Chrome/Edge see it, 720p/1080p/360p 60 s at 30.0 fps 0 gaps; feeder -> app p95 0.54/0.80 ms; built-in placeholder 507-509 ms; 20 open/close cycles OK; 10 min fuzz from Alex's session (592k writes) -> Frame Server never crashed, only valid/built-in frames shown; squatted event refused; ACL SYSTEM+LocalService+owner; Frame Server 1.44 % core at 1080p. **DLL update needs no restart**: Frame Server stops ~30 s after the last app closes, next open loads the new DLL. PC cleanup verified by operator |
 | CW7 Page model, Mac UI, menu | **done** (`0449147`, milestone 1 `cde2cad`): page "Audio & Camera", Camera module, map badge/arrow, menu items; 31 view + 36 audio view tests, 16 renders (8 states light/dark) reviewed by operator (consistent with the Audio page); main thread max 13.5 ms per refresh at 4 Hz. Contract additions accepted (extra view fields with defaults, Retry = same route again / `retry_helper`, `no_virtual_camera` line) |
 | CW6 Link and service integration | running (started on CW1 done) |
 | CW8 Qt Camera module (PC) | **done** (`f15e93e`): 27 tests, win_app suite = known failures + stale catalogue + CW9's i18n string; 22 renders; install/update/repair/remove via `vcam_install` (mocked), confirmation on Remove; Ctrl+3 opens "AUDIO & CAMERA"; Linux keeps "Audio" with the module hidden. Sidebar showed "Audio_Camera" (`&` mnemonic) -> operator fixed `win_app/widgets.py` (`59a2bfd`, PageButton escapes `&`), 153 page tests pass on lebig |
@@ -76,6 +76,8 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 - Map: camera glyph `web.camera.fill` reads like a pin at 11 pt -> `video.fill`; arrow lanes are not in the
   order of the tile rows (camera row on top, its arrow is the lower one).
 - `texts.py`: "denied" line should point to System Settings; name the preferred camera instead of "Default camera".
+- "Restart Windows to finish updating Beamer Camera." is wrong in the usual case (CW5): use "Close apps that use the
+  camera to finish updating Beamer Camera." (operator decision).
 - `win_app/vcam_install.py:91` hard-coded log string flagged by i18n coverage (CW9b).
 
 ## Lessons (operator)
