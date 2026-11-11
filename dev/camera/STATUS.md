@@ -66,10 +66,17 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 | CW3 Mac camera backend | running |
 | CW4 Windows video sink | running |
 | CW5 Windows camera source DLL | running (`shm_protocol.h` `5adb0d8`, DLL `dffd9a0`); resumed after stopping while its PC test ran (camera registered, tasks CW5-* running) |
-| CW7 Page model, Mac UI, menu (wave 2, started early: CW1 milestones 1+2 landed `b9116dd`, `bf21597`) | running; milestone 1 `view.py` landed `cde2cad`; resumed after stopping with work uncommitted |
+| CW7 Page model, Mac UI, menu | **done** (`0449147`, milestone 1 `cde2cad`): page "Audio & Camera", Camera module, map badge/arrow, menu items; 31 view + 36 audio view tests, 16 renders (8 states light/dark) reviewed by operator (consistent with the Audio page); main thread max 13.5 ms per refresh at 4 Hz. Contract additions accepted (extra view fields with defaults, Retry = same route again / `retry_helper`, `no_virtual_camera` line) |
 | CW6 Link and service integration | running (started on CW1 done) |
 | CW8 Qt Camera module (PC) | running (started on CW7 milestone 1 + CW9's `vcam_install`) |
 | CW9 Packaging, install, permissions | **part 1 done** (`8e14cb8`, code `d6859c5`): camera entitlement on app + python + helper (checked on a private Beamer Dev build, deleted), Info.plist keys, `build_dmg.sh` guard, Inno script (not compiled: no ISCC on lebig), `Install-Beamer.ps1` camera step, portable build puts `camera\BeamerCameraSource.dll` beside `beamer-audio.exe` (stub binaries), `vcam_install.py` 30 tests Mac + lebig, `Install-Maintenance -Remove` on a fake install. Touched `win_app/build_portable.ps1` outside its list (needed; accepted). **Part 2 (CW9b) after CW4+CW5:** rebuild PC with the real DLL, `-Remove` on a real dev install, README section for vcam-win (text in cw9.md). Inno compile needs Inno Setup 6 on lebig (Alex's call, later) |
+
+## Polish list (operator, for a pass after E2E / Alex's feedback)
+
+- Map: camera glyph `web.camera.fill` reads like a pin at 11 pt -> `video.fill`; arrow lanes are not in the
+  order of the tile rows (camera row on top, its arrow is the lower one).
+- `texts.py`: "denied" line should point to System Settings; name the preferred camera instead of "Default camera".
+- `win_app/vcam_install.py:91` hard-coded log string flagged by i18n coverage (CW9b).
 
 ## Lessons (operator)
 
