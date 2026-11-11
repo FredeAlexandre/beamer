@@ -17,7 +17,7 @@ A page acts through the `apply_*` helpers, which call the AudioService setters (
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Mapping, Optional
 
 from core.audio import model, planner
@@ -87,13 +87,18 @@ class TileView:
     input_line: str = ""            # the machine's own default microphone, shown when it is not the active one
     listen_line: str = ""           # "Hears This Mac": an app here records the shared mic from another machine
     recording_line: str = ""        # while `recording`: one sentence saying so, for a badge's tooltip or a reader
+    # The camera (dev/camera/PHASE2.md §8.2), from page_model's `camera` extras; empty without them.
+    camera_line: str = ""           # the active camera's name on its machine's tile
+    has_active_camera: bool = False
+    camera_live: bool = False       # the camera is sent somewhere: its badge in the accent colour
+    watching_line: str = ""         # "Teams uses the camera" / "Camera ready" on a machine with Beamer Camera
 
 
 @dataclass(frozen=True)
 class Arrow:
     source: str
     target: str
-    kind: str                       # "mic" | "sound"
+    kind: str                       # "mic" | "sound" | "camera"
     state: str                      # "active" | "waiting"
     description: str
 
@@ -852,14 +857,37 @@ def _notices(snap: AudioSnapshot, names: _Names, platform: str, without_audio, d
     return tuple(notices)
 
 
+def _camera_tile(tile: TileView, camera, names: _Names) -> TileView:
+    """`tile` with the camera's marks (dev/camera/PHASE2.md §8.2-§8.3) from `camera`, a
+    core.camera.view.CameraMapExtras."""
+    has_camera = camera.source == tile.machine
+    watching = camera.watching.get(tile.machine, "")
+    if not has_camera and not watching:
+        return tile
+    parts = [tile.description]
+    if has_camera:
+        parts.append(tr("Its {camera} is the shared camera.").format(camera=camera.source_line))
+    if watching:
+        parts.append(watching + ".")
+    return replace(tile, camera_line=camera.source_line if has_camera else "", has_active_camera=has_camera,
+                   camera_live=has_camera and camera.live, watching_line=watching, description=" ".join(parts))
+
+
+def _camera_arrows(camera, names: _Names, shown) -> tuple:
+    return tuple(Arrow(source, target, "camera", state,
+                       tr("{target} sees the camera of {source}.").format(target=names(target), source=names(source)))
+                 for source, target, state in camera.arrows if source in shown and target in shown and source != target)
+
+
 def page_model(snap: AudioSnapshot, tiles: Mapping, selected: Optional[str], own_label: str,
-               peers_without_audio=(), driver: Optional[str] = None) -> AudioPage:
+               peers_without_audio=(), driver: Optional[str] = None, camera=None) -> AudioPage:
     """Everything the Audio page shows (§9.1). `tiles`: machine id -> (x, y, w, h), or the layout's
     {x, y, w, h} dicts; `selected`: the machine whose panel shows, else this one; `own_label`:
     "This Mac" / "This PC"; `peers_without_audio`: names of linked machines whose Beamer has no
     audio (the snapshot lists audio machines only); `driver`: the Mac's Beamer Microphone driver as
     mac_app/audio_driver.py states it ("missing", "outdated", "current", "newer", "no_bundle"), None
-    when unknown (the snapshot's virtual mic then decides)."""
+    when unknown (the snapshot's virtual mic then decides); `camera`: core.camera.view.map_extras(...)
+    when the camera feature is on: tiles then carry the camera's lines and `arrows` its arrows."""
     names = _Names(snap, own_label)
     shown = [snap.own] + [machine for machine in snap.machines if machine != snap.own]
     frames = _frames(shown, tiles or {})
@@ -871,6 +899,9 @@ def page_model(snap: AudioSnapshot, tiles: Mapping, selected: Optional[str], own
     choices, mic_selected = _mic_choices(snap, names, [snap.own] + [machine for machine in order if machine != snap.own])
     tile_views = tuple(_tile(snap, names, machine, frames[machine], selected) for machine in order)
     arrows = _arrows(snap, names, set(order))
+    if camera is not None:
+        tile_views = tuple(_camera_tile(tile, camera, names) for tile in tile_views)
+        arrows += _camera_arrows(camera, names, set(order))
     panel = _panel(snap, names, selected, order)
     meters = {tile.meter for tile in tile_views if tile.meter}
     meters.update(row.meter for row in panel.inputs + panel.outputs)
