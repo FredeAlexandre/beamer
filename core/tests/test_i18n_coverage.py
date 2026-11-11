@@ -20,7 +20,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ("core", "core/audio", "mac_app", "win_app")
+SOURCES = ("core", "core/audio", "core/camera", "mac_app", "win_app")
 MARKERS = {"tr", "trn", "trc", "N_"}
 WORD = re.compile(r"[A-Za-z]{2,}")
 # One lowercase word with no space is an identifier (a palette ink, a style role, a selector
