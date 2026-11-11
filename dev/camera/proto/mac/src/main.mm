@@ -83,7 +83,7 @@ static void usage() {
 "    --bitrate 2500000  --limit F (DataRateLimits = F x bitrate per 1 s)  --out FILE|-  --trace FILE\n"
 "    --profile chigh|high|main|cbaseline|baseline  --no-lowlatency  --no-realtime  --speed\n"
 "    --preset vc|hs|bal|hq  --keyint N  --force-key-every N  --force-key-at a,b,c\n"
-"    --ltr  --ltr-refresh-at a,b  --ltr-ack-delay N  --max-qp N  --verify  --verify-drop a,b  --verify-from N  --no-encode  --fast  --noise N\n"
+"    --ltr  --ltr-refresh-at a,b  --ltr-ack-delay N  --max-qp N  --bitrate-at f:bps,...  --verify  --verify-drop a,b  --verify-from N  --no-encode  --fast  --noise N\n"
 "    --pin-fps  --cycles N  --gap S  --format-index I  --pixfmt 420v|420f|yuvs|2vuy|BGRA  --hw  --effects  --stats S  --tag T\n"
 "    --encoder-id ID  --prop Key=Value (any VT session property, repeatable; true/false/number/string)\n");
 }
@@ -131,6 +131,12 @@ int main(int argc, char **argv) {
       else if (a == "--ltr-ack-delay") o.ltr_ack_delay = atoi(next());
       else if (a == "--ltr-refresh-at") o.ltr_refresh_at = parse_list(next());
       else if (a == "--max-qp") o.max_qp = atoi(next());
+      else if (a == "--bitrate-at") {
+        for (NSString *p in [@(next()) componentsSeparatedByString:@","]) {
+          NSArray *fb = [p componentsSeparatedByString:@":"];
+          if (fb.count == 2) o.bitrate_at.push_back({[fb[0] intValue], [fb[1] longLongValue]});
+        }
+      }
       else if (a == "--verify") o.verify = true;
       else if (a == "--verify-drop") { o.verify = true; o.verify_drop = parse_list(next()); }
       else if (a == "--verify-from") { o.verify = true; o.verify_from = atoi(next()); }

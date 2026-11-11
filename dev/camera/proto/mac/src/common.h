@@ -53,6 +53,7 @@ struct Opts {
   std::vector<int> ltr_refresh_at;
   int ltr_ack_delay = 3;     // frames between an LTR frame and its (simulated) receiver ack
   int max_qp = 0;
+  std::vector<std::pair<int, int64_t>> bitrate_at;  // --bitrate-at frame:bps,... (live AverageBitRate changes)
   bool verify = false;       // decode back + PSNR (synthetic)
   std::vector<int> verify_drop;  // frames withheld from the verify decoder (simulated loss)
   int verify_from = 0;       // first frame fed to the verify decoder

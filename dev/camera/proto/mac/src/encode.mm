@@ -284,6 +284,11 @@ void Encoder::encode(CVPixelBufferRef pb, const FrameRec &meta, bool forceKey, b
     r.in_ns = now_ns();
     d->pending[meta.f] = r;
   }
+  for (auto &fb : d->o.bitrate_at)
+    if (fb.first == (int)meta.f) {
+      OSStatus s2 = VTSessionSetProperty(d->s, kVTCompressionPropertyKey_AverageBitRate, (__bridge CFTypeRef) @(fb.second));
+      emit(@{@"ev" : @"bitrate_set", @"f" : @(meta.f), @"bps" : @(fb.second), @"status" : st_str(s2)});
+    }
   CMTime pts = CMTimeMake((int64_t)meta.f * 1000, (int32_t)std::lround(d->o.fps * 1000));
   CMTime dur = CMTimeMake(1000, (int32_t)std::lround(d->o.fps * 1000));
   VTEncodeInfoFlags fl = 0;
