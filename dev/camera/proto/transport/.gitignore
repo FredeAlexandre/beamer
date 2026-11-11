@@ -1,0 +1,5 @@
+out/*.npz
+out/*.log
+out/sim_smoke*.json
+out/smoke.*
+__pycache__/

@@ -1,0 +1,436 @@
+{
+ "name": "v720b",
+ "clock": {
+  "drift_ppm": 18.97,
+  "rtt_min_ms": 2.62,
+  "rtt_p50_ms": 6.72,
+  "rtt_p99_ms": 34.29,
+  "fit_resid_ms": 0.15
+ },
+ "meta": {
+  "rate": 2500000.0,
+  "fps": 30,
+  "key_every": 60,
+  "key_kb": 80.0,
+  "pace": 0.0,
+  "mtu": 1200,
+  "trace": null,
+  "duration": 600.0,
+  "audio": true,
+  "video": true,
+  "tcp": null
+ },
+ "video_pk": {
+  "sent": 172706,
+  "lost": 6,
+  "loss_pct": 0.0,
+  "burst_hist": {
+   "1": 1,
+   "2": 1,
+   "3": 1
+  },
+  "max_burst": 3,
+  "delay_ms_p50": 3.32,
+  "p95": 8.44,
+  "p99": 29.9,
+  "p1": 1.95,
+  "max": 147.74,
+  "reorder": 0
+ },
+ "frames": {
+  "n": 18000,
+  "lost": 3,
+  "lost_per_min": 0.3,
+  "delay_ms_p50": 4.65,
+  "p95": 9.94,
+  "p99": 32.06,
+  "p999": 63.55,
+  "max": 150.08,
+  "key_delay_ms_p50": 7.22,
+  "key_p95": 13.81,
+  "key_p99": 33.29,
+  "p_delay_ms_p50": 4.62,
+  "p_p95": 9.74,
+  "p_p99": 32.02,
+  "pacing_ms_p50_key": 2.56,
+  "pacing_ms_p50_p": 1.18,
+  "mean_kbps": 2505.26,
+  "key_kb_mean": 81.12,
+  "p_kb_mean": 9.24,
+  "late_or_lost_50ms_per_min": 6.6,
+  "late_or_lost_100ms_per_min": 0.7,
+  "late_or_lost_150ms_per_min": 0.4,
+  "late_or_lost_200ms_per_min": 0.3,
+  "late_or_lost_300ms_per_min": 0.3,
+  "net_ms_p50": 3.26,
+  "net_p95": 8.38,
+  "net_p99": 30.49,
+  "net_p999": 63.08,
+  "net_max": 147.59
+ },
+ "net_spikes": {
+  "per_min": 10.3,
+  "gt45ms_per_min": 3.6,
+  "gt100ms_per_min": 0.4,
+  "longest_ms": 3632.34,
+  "worst_ms": 9990.0
+ },
+ "spike_list": [
+  {
+   "t_s": 41.07,
+   "worst_ms": 61.63,
+   "pk": 4,
+   "lost": 0,
+   "len_ms": 0.05
+  },
+  {
+   "t_s": 66.17,
+   "worst_ms": 59.87,
+   "pk": 7,
+   "lost": 0,
+   "len_ms": 0.18
+  },
+  {
+   "t_s": 81.23,
+   "worst_ms": 60.35,
+   "pk": 22,
+   "lost": 0,
+   "len_ms": 433.08
+  },
+  {
+   "t_s": 86.47,
+   "worst_ms": 63.17,
+   "pk": 12,
+   "lost": 0,
+   "len_ms": 467.05
+  },
+  {
+   "t_s": 96.07,
+   "worst_ms": 57.55,
+   "pk": 36,
+   "lost": 0,
+   "len_ms": 900.22
+  },
+  {
+   "t_s": 102.93,
+   "worst_ms": 9990.0,
+   "pk": 18,
+   "lost": 2,
+   "len_ms": 33.56
+  },
+  {
+   "t_s": 106.33,
+   "worst_ms": 63.48,
+   "pk": 24,
+   "lost": 0,
+   "len_ms": 433.15
+  },
+  {
+   "t_s": 126.63,
+   "worst_ms": 54.47,
+   "pk": 7,
+   "lost": 0,
+   "len_ms": 0.07
+  },
+  {
+   "t_s": 131.43,
+   "worst_ms": 54.75,
+   "pk": 21,
+   "lost": 0,
+   "len_ms": 432.96
+  },
+  {
+   "t_s": 156.53,
+   "worst_ms": 59.8,
+   "pk": 9,
+   "lost": 0,
+   "len_ms": 0.08
+  },
+  {
+   "t_s": 157.2,
+   "worst_ms": 50.65,
+   "pk": 11,
+   "lost": 0,
+   "len_ms": 0.07
+  },
+  {
+   "t_s": 185.47,
+   "worst_ms": 147.74,
+   "pk": 514,
+   "lost": 0,
+   "len_ms": 3632.34
+  },
+  {
+   "t_s": 196.7,
+   "worst_ms": 49.19,
+   "pk": 11,
+   "lost": 0,
+   "len_ms": 232.84
+  },
+  {
+   "t_s": 211.97,
+   "worst_ms": 57.4,
+   "pk": 43,
+   "lost": 0,
+   "len_ms": 33.87
+  },
+  {
+   "t_s": 232.07,
+   "worst_ms": 51.18,
+   "pk": 27,
+   "lost": 0,
+   "len_ms": 432.77
+  },
+  {
+   "t_s": 287.5,
+   "worst_ms": 51.99,
+   "pk": 8,
+   "lost": 0,
+   "len_ms": 0.2
+  },
+  {
+   "t_s": 327.43,
+   "worst_ms": 55.69,
+   "pk": 12,
+   "lost": 0,
+   "len_ms": 0.18
+  },
+  {
+   "t_s": 347.73,
+   "worst_ms": 56.86,
+   "pk": 12,
+   "lost": 0,
+   "len_ms": 234.39
+  },
+  {
+   "t_s": 372.4,
+   "worst_ms": 57.21,
+   "pk": 26,
+   "lost": 0,
+   "len_ms": 233.63
+  },
+  {
+   "t_s": 382.43,
+   "worst_ms": 57.52,
+   "pk": 8,
+   "lost": 0,
+   "len_ms": 0.2
+  },
+  {
+   "t_s": 393.13,
+   "worst_ms": 60.29,
+   "pk": 6,
+   "lost": 0,
+   "len_ms": 0.07
+  },
+  {
+   "t_s": 402.97,
+   "worst_ms": 45.1,
+   "pk": 11,
+   "lost": 0,
+   "len_ms": 232.51
+  },
+  {
+   "t_s": 433.3,
+   "worst_ms": 60.96,
+   "pk": 12,
+   "lost": 0,
+   "len_ms": 467.97
+  },
+  {
+   "t_s": 452.93,
+   "worst_ms": 58.32,
+   "pk": 7,
+   "lost": 0,
+   "len_ms": 0.08
+  },
+  {
+   "t_s": 457.73,
+   "worst_ms": 59.99,
+   "pk": 9,
+   "lost": 0,
+   "len_ms": 0.23
+  },
+  {
+   "t_s": 462.77,
+   "worst_ms": 46.53,
+   "pk": 6,
+   "lost": 0,
+   "len_ms": 0.15
+  },
+  {
+   "t_s": 473.47,
+   "worst_ms": 46.84,
+   "pk": 8,
+   "lost": 0,
+   "len_ms": 0.2
+  },
+  {
+   "t_s": 482.57,
+   "worst_ms": 9990.0,
+   "pk": 13,
+   "lost": 3,
+   "len_ms": 33.92
+  },
+  {
+   "t_s": 498.57,
+   "worst_ms": 47.21,
+   "pk": 13,
+   "lost": 0,
+   "len_ms": 0.33
+  },
+  {
+   "t_s": 523.0,
+   "worst_ms": 54.51,
+   "pk": 23,
+   "lost": 0,
+   "len_ms": 668.01
+  },
+  {
+   "t_s": 533.7,
+   "worst_ms": 56.7,
+   "pk": 7,
+   "lost": 0,
+   "len_ms": 0.17
+  },
+  {
+   "t_s": 543.1,
+   "worst_ms": 55.27,
+   "pk": 28,
+   "lost": 0,
+   "len_ms": 434.28
+  },
+  {
+   "t_s": 553.57,
+   "worst_ms": 49.31,
+   "pk": 11,
+   "lost": 0,
+   "len_ms": 0.12
+  },
+  {
+   "t_s": 563.17,
+   "worst_ms": 47.51,
+   "pk": 8,
+   "lost": 0,
+   "len_ms": 0.22
+  },
+  {
+   "t_s": 573.2,
+   "worst_ms": 59.48,
+   "pk": 18,
+   "lost": 0,
+   "len_ms": 434.1
+  },
+  {
+   "t_s": 592.83,
+   "worst_ms": 9990.0,
+   "pk": 30,
+   "lost": 1,
+   "len_ms": 1100.32
+  }
+ ],
+ "spikes": [
+  {
+   "t_s": 41,
+   "len_s": 1,
+   "worst_ms": 62.1,
+   "lost_frames": 0
+  },
+  {
+   "t_s": 66,
+   "len_s": 1,
+   "worst_ms": 60.3,
+   "lost_frames": 0
+  },
+  {
+   "t_s": 81,
+   "len_s": 1,
+   "worst_ms": 60.7,
+   "lost_frames": 0
+  },
+  {
+   "t_s": 86,
+   "len_s": 1,
+   "worst_ms": 63.5,
+   "lost_frames": 0
+  },
+  {
+   "t_s": 102,
+   "len_s": 1,
+   "worst_ms": 9990.0,
+   "lost_frames": 1
+  },
+  {
+   "t_s": 106,
+   "len_s": 1,
+   "worst_ms": 64.0,
+   "lost_frames": 0
+  },
+  {
+   "t_s": 156,
+   "len_s": 1,
+   "worst_ms": 60.5,
+   "lost_frames": 0
+  },
+  {
+   "t_s": 185,
+   "len_s": 5,
+   "worst_ms": 150.1,
+   "lost_frames": 0
+  },
+  {
+   "t_s": 393,
+   "len_s": 1,
+   "worst_ms": 61.5,
+   "lost_frames": 0
+  },
+  {
+   "t_s": 433,
+   "len_s": 1,
+   "worst_ms": 61.5,
+   "lost_frames": 0
+  },
+  {
+   "t_s": 457,
+   "len_s": 1,
+   "worst_ms": 60.8,
+   "lost_frames": 0
+  },
+  {
+   "t_s": 482,
+   "len_s": 1,
+   "worst_ms": 9990.0,
+   "lost_frames": 1
+  },
+  {
+   "t_s": 573,
+   "len_s": 1,
+   "worst_ms": 61.2,
+   "lost_frames": 0
+  },
+  {
+   "t_s": 593,
+   "len_s": 1,
+   "worst_ms": 9990.0,
+   "lost_frames": 1
+  }
+ ],
+ "audio": {
+  "sent": 60000,
+  "lost": 0,
+  "loss_pct": 0.0,
+  "delay_ms_p50": 3.68,
+  "p95": 8.16,
+  "p99": 30.89,
+  "p999": 65.67,
+  "max": 150.0,
+  "jitter_p97_ms": 10.82,
+  "spikes_gt20ms_per_min": 53.1
+ },
+ "rr": {
+  "n": 60013,
+  "delay_ms_p50": 2.73,
+  "p95": 6.63,
+  "p99": 30.37
+ }
+}

@@ -1,0 +1,41 @@
+{
+ "name": "aonly",
+ "clock": {
+  "drift_ppm": 18.66,
+  "rtt_min_ms": 2.84,
+  "rtt_p50_ms": 5.22,
+  "rtt_p99_ms": 33.15,
+  "fit_resid_ms": 0.08
+ },
+ "meta": {
+  "rate": 2500000.0,
+  "fps": 30,
+  "key_every": 60,
+  "key_kb": 80,
+  "pace": 2.5,
+  "mtu": 1200,
+  "trace": null,
+  "duration": 600.0,
+  "audio": true,
+  "video": false,
+  "tcp": null
+ },
+ "audio": {
+  "sent": 60000,
+  "lost": 0,
+  "loss_pct": 0.0,
+  "delay_ms_p50": 3.48,
+  "p95": 6.8,
+  "p99": 30.91,
+  "p999": 54.39,
+  "max": 66.74,
+  "jitter_p97_ms": 12.28,
+  "spikes_gt20ms_per_min": 69.3
+ },
+ "rr": {
+  "n": 60022,
+  "delay_ms_p50": 2.34,
+  "p95": 5.18,
+  "p99": 30.42
+ }
+}

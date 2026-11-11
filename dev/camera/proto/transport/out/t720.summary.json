@@ -1,0 +1,131 @@
+{
+ "name": "t720",
+ "clock": {
+  "drift_ppm": 18.35,
+  "rtt_min_ms": 2.69,
+  "rtt_p50_ms": 6.04,
+  "rtt_p99_ms": 31.76,
+  "fit_resid_ms": 0.23
+ },
+ "meta": {
+  "rate": 2500000.0,
+  "fps": 30,
+  "key_every": 60,
+  "key_kb": 80.0,
+  "pace": 0.0,
+  "pace_bps": null,
+  "burst_pk": null,
+  "mtu": 1200,
+  "trace": null,
+  "duration": 300.0,
+  "audio": true,
+  "video": true,
+  "tcp": "127.0.0.1:40160"
+ },
+ "video_pk": {
+  "sent": 85918,
+  "lost": 0,
+  "loss_pct": 0.0,
+  "burst_hist": {},
+  "max_burst": 0,
+  "delay_ms_p50": 3.33,
+  "p95": 8.9,
+  "p99": 30.29,
+  "p1": 2.55,
+  "max": 657.51,
+  "reorder": 0
+ },
+ "frames": {
+  "n": 9000,
+  "lost": 0,
+  "lost_per_min": 0.0,
+  "delay_ms_p50": 4.92,
+  "p95": 10.29,
+  "p99": 32.02,
+  "p999": 360.63,
+  "max": 658.77,
+  "key_delay_ms_p50": 10.09,
+  "key_p95": 16.65,
+  "key_p99": 29.95,
+  "p_delay_ms_p50": 4.89,
+  "p_p95": 9.39,
+  "p_p99": 32.03,
+  "pacing_ms_p50_key": 2.94,
+  "pacing_ms_p50_p": 1.35,
+  "mean_kbps": 2493.56,
+  "key_kb_mean": 77.47,
+  "p_kb_mean": 9.25,
+  "late_or_lost_50ms_per_min": 4.4,
+  "late_or_lost_100ms_per_min": 3.6,
+  "late_or_lost_150ms_per_min": 3.4,
+  "late_or_lost_200ms_per_min": 3.0,
+  "late_or_lost_300ms_per_min": 2.4,
+  "net_ms_p50": 3.21,
+  "net_p95": 8.27,
+  "net_p99": 30.26,
+  "net_p999": 359.68,
+  "net_max": 657.43
+ },
+ "net_spikes": {
+  "per_min": 13.0,
+  "gt45ms_per_min": 0.6,
+  "gt100ms_per_min": 0.2,
+  "longest_ms": 667.61,
+  "worst_ms": 657.51
+ },
+ "spike_list": [
+  {
+   "t_s": 27.47,
+   "worst_ms": 97.62,
+   "pk": 19,
+   "lost": 0,
+   "len_ms": 66.32
+  },
+  {
+   "t_s": 55.63,
+   "worst_ms": 657.51,
+   "pk": 266,
+   "lost": 0,
+   "len_ms": 632.51
+  },
+  {
+   "t_s": 185.27,
+   "worst_ms": 45.26,
+   "pk": 19,
+   "lost": 0,
+   "len_ms": 233.98
+  }
+ ],
+ "spikes": [
+  {
+   "t_s": 27,
+   "len_s": 1,
+   "worst_ms": 99.6,
+   "lost_frames": 0
+  },
+  {
+   "t_s": 55,
+   "len_s": 2,
+   "worst_ms": 658.8,
+   "lost_frames": 0
+  }
+ ],
+ "audio": {
+  "sent": 30000,
+  "lost": 0,
+  "loss_pct": 0.0,
+  "delay_ms_p50": 4.03,
+  "p95": 7.42,
+  "p99": 31.0,
+  "p999": 353.94,
+  "max": 652.1,
+  "jitter_p97_ms": 10.74,
+  "spikes_gt20ms_per_min": 67.0
+ },
+ "rr": {
+  "n": 30023,
+  "delay_ms_p50": 2.39,
+  "p95": 5.58,
+  "p99": 27.51
+ }
+}

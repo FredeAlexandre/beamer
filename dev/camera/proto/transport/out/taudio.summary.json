@@ -1,0 +1,43 @@
+{
+ "name": "taudio",
+ "clock": {
+  "drift_ppm": 17.82,
+  "rtt_min_ms": 2.55,
+  "rtt_p50_ms": 5.23,
+  "rtt_p99_ms": 33.37,
+  "fit_resid_ms": 0.25
+ },
+ "meta": {
+  "rate": 2500000.0,
+  "fps": 30,
+  "key_every": 60,
+  "key_kb": 80,
+  "pace": 2.5,
+  "pace_bps": 0,
+  "burst_pk": 0,
+  "mtu": 1200,
+  "trace": null,
+  "duration": 300.0,
+  "audio": true,
+  "video": false,
+  "tcp": "127.0.0.1:40160"
+ },
+ "audio": {
+  "sent": 30000,
+  "lost": 0,
+  "loss_pct": 0.0,
+  "delay_ms_p50": 3.87,
+  "p95": 6.35,
+  "p99": 27.05,
+  "p999": 36.04,
+  "max": 46.06,
+  "jitter_p97_ms": 8.81,
+  "spikes_gt20ms_per_min": 70.6
+ },
+ "rr": {
+  "n": 30022,
+  "delay_ms_p50": 2.28,
+  "p95": 5.11,
+  "p99": 26.35
+ }
+}
