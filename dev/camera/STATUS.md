@@ -22,13 +22,19 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 
 (nothing yet)
 
+## How agents work here
+
+T3 delegates cannot get their own worktree from the operator's thread, so Phase 1 agents share the main
+clone on `feat/camera`, each in its own folder, committing only their own paths; on the PC they work in plain
+folders `C:\Users\Alex\camera-<wp>\`, never in the PC clone. Reports land in `dev/camera/reports/`.
+
 ## Phase
 
 **Phase 1: prototypes, started 2026-11-11.**
 
 | WP | What | Who / where | State |
 |---|---|---|---|
-| C1 | Mac capture + VideoToolbox H.264 low-latency encode, measures | Mac agent, branch `camera/c1` | started |
-| C2 | Windows 11 virtual camera (`MFCreateVirtualCamera`) + H.264 decode + IPC from a user-session process | Mac agent driving the PC, `camera/c2` / `pc/camera-c2` | started |
-| C3 | Video over the Mac<->PC link: packetization, loss/keyframe recovery, Wi-Fi behaviour at 2-6 Mbit/s | Mac agent + PC peer, `camera/c3` | started |
+| C1 | Mac capture + VideoToolbox H.264 low-latency encode, measures | Mac agent, `dev/camera/proto/mac/` | started 16:05 |
+| C2 | Windows 11 virtual camera (`MFCreateVirtualCamera`) + H.264 decode + IPC from a user-session process | Mac agent driving the PC, `proto/win/`, PC `~\camera-c2` | started 16:05 |
+| C3 | Video over the Mac<->PC link: packetization, loss/keyframe recovery, Wi-Fi behaviour at 2-6 Mbit/s | Mac agent + PC peer, `proto/transport/`, PC `~\camera-c3` | started 16:05 |
 | C4 | End-to-end prototype chain, glass-to-glass latency (after C1-C3) | | not started |
