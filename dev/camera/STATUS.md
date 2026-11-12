@@ -107,7 +107,9 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 | G1 French test guide | **done** (`226c08b`): `dev/camera/TEST-ALEX.md`, 7 steps (H6, H1, H2/H3, privacy, H5 + `run.py real`, H4/H9, H7), reviewed by operator; results section to fill after Q2 |
 | Q1 PC offline checks | **done** (`9661f30`): engine 65 cases / 3111 checks 0 fail on the PC; `build-win.cmd` exit 0; Qt suite 4341 tests, no camera failure; CW8 denied shots re-rendered (System Settings line, "Audio & Camera"). 2 non-camera defects -> F3 |
 | F3 Q1's defects | **done** (`4394e01`, report `9a268a4`): `SyntheticWindow` never makes an `AudioService` (2 tests failed when a built helper sat in the checkout); `core/audio/view.py` full stop inside `tr("{line}.")` |
-| Q2 E2E live (CW11 runs + CW10 lip sync PC) | **running** from ~19:35: preflight -> smoke -> all (+ cam_lipsync) -> soak -> table, report = cw11.md part 2 |
+| Q2 E2E live (CW11 runs + CW10 lip sync PC) | **stopped after smoke** (`695b9b9`, cw11.md part 2): 0 picture. Bug 1 (blocking): `synth_mac.mm` deadline on `now_ns()` (steady, counts sleep) waited with `mach_wait_until` (no sleep): 167.8 s per frame tonight, stop blocks join -> watchdog kills helper -> privacy invariant exceeded (synthetic source only). Bug 2: after the PC Beamer restart the Mac's flow offer was never answered for 7 min, no re-offer (`core/audio/service.py` `_on_audio_flow`, pre-existing audio code). Harness fixed: lock dir after repo move, strip clock offset measured per run. Mac camera permission found already granted (Alex). -> F4, F5, then redeploy + Q2b |
+| F4 Mac clock domains | **running**: synth fix, audit of all Mac/engine clock mixing, selftest independent of sleep |
+| F5 flow convergence | **running**: reconstruct the 19:50 sequence, fix every stuck path, tests |
 
 ## Lessons (operator)
 
