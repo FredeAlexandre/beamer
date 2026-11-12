@@ -1,0 +1,8 @@
+# Raw run data stays on this Mac (dumps, events, pings, status samples: tens of MB per case).
+# Committed: each case's runs/<case>_<stamp>/result.json, runs/SUMMARY.md (run.py table), runs/replay_c4.json,
+# and CW10's runs/cam_lipsync/<name>/result.json.
+runs/*/*
+!runs/*/result.json
+!runs/cam_lipsync/*/
+runs/cam_lipsync/*/*
+!runs/cam_lipsync/*/result.json
