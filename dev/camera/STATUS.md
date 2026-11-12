@@ -20,7 +20,8 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 
 ## En attente d'Alex
 
-0. **DONE 2026-11-12 evening:** PC on, Alex said "finish what's left to mark the feature done". Deployed `daf0006`
+0. **Closed 2026-11-12:** Alex: "it really seems to work well, stop optimizing, just clean up and mark it done".
+   Earlier that evening: PC on, Alex said "finish what's left to mark the feature done". Deployed `daf0006`
    then `9a268a4` on both. **H6 passed**: Alex installed Beamer Camera through the page + UAC at 19:01
    (`vcam-install exited 0`, camera create 208 ms); firewall prompt: to ask him.
 1. **Camera permission for the measurements on the real camera (C1, optional, ~3 min).** C1's request went out
@@ -108,8 +109,9 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 | Q1 PC offline checks | **done** (`9661f30`): engine 65 cases / 3111 checks 0 fail on the PC; `build-win.cmd` exit 0; Qt suite 4341 tests, no camera failure; CW8 denied shots re-rendered (System Settings line, "Audio & Camera"). 2 non-camera defects -> F3 |
 | F3 Q1's defects | **done** (`4394e01`, report `9a268a4`): `SyntheticWindow` never makes an `AudioService` (2 tests failed when a built helper sat in the checkout); `core/audio/view.py` full stop inside `tr("{line}.")` |
 | Q2 E2E live (CW11 runs + CW10 lip sync PC) | **stopped after smoke** (`695b9b9`, cw11.md part 2): 0 picture. Bug 1 (blocking): `synth_mac.mm` deadline on `now_ns()` (steady, counts sleep) waited with `mach_wait_until` (no sleep): 167.8 s per frame tonight, stop blocks join -> watchdog kills helper -> privacy invariant exceeded (synthetic source only). Bug 2: after the PC Beamer restart the Mac's flow offer was never answered for 7 min, no re-offer (`core/audio/service.py` `_on_audio_flow`, pre-existing audio code). Harness fixed: lock dir after repo move, strip clock offset measured per run. Mac camera permission found already granted (Alex). -> F4, F5, then redeploy + Q2b |
-| F4 Mac clock domains | **running**: synth fix, audit of all Mac/engine clock mixing, selftest independent of sleep |
-| F5 flow convergence | **running**: reconstruct the 19:50 sequence, fix every stuck path, tests |
+| F4 Mac clock domains | **cancelled** (Alex: feature works for him, stop optimizing). Unverified WIP saved as `dev/camera/followups/f4-mac-clocks-wip.patch` |
+| F5 flow convergence | **cancelled** (same). Unverified WIP saved as `dev/camera/followups/f5-flow-convergence-wip.patch` |
+| Cleanup | operator: Mac `$TMPDIR` exports (13) and PC `C:\Users\Alex\camera-*` (9 folders, ~1 GB) removed; PC clone clean; no leftover tasks (only `Beamer-lebig-Alex`, `Beamer-GameInputRecovery`); Beamer Camera stays installed (Alex's) |
 
 ## Lessons (operator)
 
@@ -124,7 +126,26 @@ folders `C:\Users\Alex\camera-<wp>\`, never in the PC clone. Reports land in `de
 
 ## Phase
 
-**Phase 2 implementation done (CW1-CW9, reviews R3/R4 fixed by F1/F2, locales extracted). Next: deploy (needs Alex's go) -> CW10 lip sync + CW11 E2E/soak -> polish -> test guide.** Design final at `84e4ec2` after D1 -> R1 -> D2 -> D3 (C4) -> R2 -> D4.
+**DONE 2026-11-12 (Alex's call).** Deployed `9a268a4` on both machines, Beamer Camera installed by Alex through
+the page + UAC (H6), Mac camera permission granted by Alex (H1), and Alex reports the feature works well in daily
+use. He asked to stop optimizing and close. Automated E2E (CW11 `all` + soak, CW10 lip sync on the PC) was not
+completed: it is blocked by the synthetic test source bug below, not by the real camera path.
+
+Known issues / follow-ups (not blocking, by Alex's decision):
+1. **Synthetic source waits on the wrong clock after Mac sleep** (`native/audio/mac/synth_mac.mm`: deadline on
+   steady_clock, waited with `mach_wait_until`). Affects only dev/E2E (`camera_test_source`); the real camera was
+   fixed in `5925b36`. Blocks the E2E suite until fixed; WIP in `followups/f4-mac-clocks-wip.patch` (also an audit
+   of other clock mixing; unverified).
+2. **Flow offer can be lost after a Beamer restart on the PC** (`core/audio/service.py` `_on_audio_flow`, audio
+   code from `5ccd888`): mic/camera over UDP can stay down until the helper restarts. Seen once tonight (7 min).
+   WIP in `followups/f5-flow-convergence-wip.patch` (unverified). Worth fixing if audio is ever slow to come back.
+3. To run when convenient: `e2e all` + `e2e soak` + `cam_lipsync` after 1; `run.py real` with Alex; the H checks
+   left in `TEST-ALEX.md` (H2-H5, H7, H9); `vcam-uninstall` empty-folder polish; `dev/audio/e2e/run.py` lock path
+   still `~/Developer`.
+
+History of the mission's phases:
+
+**Phase 2 implementation done (CW1-CW9, reviews R3/R4 fixed by F1/F2, locales extracted).** Design final at `84e4ec2` after D1 -> R1 -> D2 -> D3 (C4) -> R2 -> D4.
 
 | WP | What | Who / where | State |
 |---|---|---|---|

@@ -6,9 +6,13 @@ traduction pour l'instant. Compte environ 30 min, plus 15 min avec l'opérateur 
 
 ## Résultats des tests automatiques
 
-(rempli par l'opérateur après les runs E2E du 2026-11-12)
+Version installée sur les deux machines : `9a268a4` (2026-11-12).
 
-Version installée sur les deux machines : …
+- Fait le 2026-11-12 : installation de Beamer Camera par la page + UAC (étape 1, OK), autorisation caméra du
+  Mac accordée (étape 2), usage réel jugé bon par Alex. Côté PC : 65 tests moteur, 0 échec ; compilation OK ;
+  4341 tests Qt sans échec caméra.
+- Pas fait : la suite E2E automatique complète (bloquée par un bug de la source de test synthétique du Mac, pas
+  de la vraie caméra ; voir `STATUS.md`, « Known issues »). Les étapes 3 à 7 restent à faire quand tu veux.
 
 ## 0. Avant de commencer
 

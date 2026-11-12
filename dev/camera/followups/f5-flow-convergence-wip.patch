@@ -1,0 +1,360 @@
+diff --git a/core/audio/service.py b/core/audio/service.py
+index c0bf645..8aa288b 100644
+--- a/core/audio/service.py
++++ b/core/audio/service.py
+@@ -46,6 +46,12 @@ DEV_STATUS = "audio-dev-status.json"
+ DEV_EVENTS = "audio-dev-events.jsonl"   # dev only: helper events (no levels) and link changes, for the E2E harness
+ DEV_EVENTS_MAX = 20_000_000              # bytes; the file is then moved to `.1` and started again
+ HOWL_NOTICE_HOLD = 120.0   # s: the howl notice stays this long after the guard released its duck
++# A flow that is not agreed is asked for again (f5): the offerer offers again (new id) when its offer is
++# unanswered, the answerer sends `flow want` when it has no flow, after REOFFER_AFTER, doubling up to
++# REOFFER_MAX, for as long as both helpers are ok. Nothing new on the wire; an older peer converges too.
++REOFFER_AFTER = 3.0
++REOFFER_MAX = 30.0
++WANT_REOFFER_AGE = 1.0     # s: a `want` this long after our still unanswered offer re-offers at once
+ 
+ 
+ class AudioHost(Protocol):
+@@ -75,6 +81,10 @@ class _Peer:
+     hello: Optional[dict] = None
+     flow: Optional[_Flow] = None
+     watching: bool = False
++    early_offer: Optional[dict] = None      # a flow offer that came before this peer's audio_hello
++    offered_at: Optional[float] = None      # when our current offer to it was opened
++    retry_at: Optional[float] = None        # when the flow is asked for again if still not agreed
++    retries: int = 0
+ 
+     @property
+     def audio(self):
+@@ -522,6 +532,7 @@ class AudioService:
+ 
+     def _next_deadline(self):
+         deadlines = [moment for moment in (self._save_at, self._wake_at, self._camera_wake) if moment is not None]
++        deadlines += [peer.retry_at for peer in self._peers.values() if peer.retry_at is not None]
+         if self._dev is not None:
+             deadlines.append(self._dev_at + DEV_POLL)
+         if self._levels_dirty:
+@@ -541,6 +552,7 @@ class AudioService:
+         if self._dev is not None and now - self._dev_at >= DEV_POLL:
+             self._dev_at = now
+             self._dev_poll()
++        self._check_flows(now)
+         if self._dirty:
+             self._dirty = False
+             self._settle()
+@@ -735,6 +747,7 @@ class AudioService:
+     def _on_audio_hello(self, peer, state, data):
+         before = state.hello
+         state.hello = data
++        early, state.early_offer = state.early_offer, None
+         if (self._camera is not None and CAMERA_FEATURE in data["features"]
+                 and (before is None or CAMERA_FEATURE not in before.get("features", ()))):
+             self._log.info("camera: %s speaks %s", self._host.peer_name(peer) or peer, CAMERA_FEATURE)
+@@ -746,6 +759,12 @@ class AudioService:
+             self._open_flow(peer)
+         elif data["helper"] != "ok" and before is not None and before["helper"] == "ok":
+             self._drop_flow(peer)
++        if early is not None:
++            # The offer overtook this hello: they travel on the two links (WIRE.md "which link" rule;
++            # live 2026-11-12 after a PC restart, f5). It is answered now, as it would have been.
++            self._log.info("audio: answering flow offer %s from %s, which came before its audio_hello",
++                           early["flow"], self._peer_label(peer))
++            self._on_audio_flow(peer, state, early)
+ 
+     def _on_audio_devices(self, peer, state, machine):
+         if machine.id == self._own:
+@@ -794,6 +813,8 @@ class AudioService:
+         self._drop_flow(peer)
+         flow = _Flow(secrets.token_hex(4), "offer", _key())
+         state.flow = flow
++        state.offered_at = self._clock()
++        self._schedule_retry(state)
+         # `host`: the peer's address on the Beamer link, so the helper binds towards it instead of
+         # listening on every interface (an unsigned listener on the Mac's LAN side prompts the firewall).
+         host = self._host.peer_host(peer)
+@@ -829,14 +850,37 @@ class AudioService:
+     def _on_audio_flow(self, peer, state, data):
+         phase = data["phase"]
+         if not state.direct:
++            if phase == "offer" and state.hello is None:
++                state.early_offer = data    # answered when the hello comes (it may be on the other link)
++                self._log.info("audio: flow offer %s from %s came before its audio_hello; kept until the hello",
++                               data["flow"], self._peer_label(peer))
++            else:
++                self._log.info("audio: flow %s %s from %s dropped: no usable audio_hello from it",
++                               phase, data.get("flow", ""), self._peer_label(peer))
+             return
+         if phase == "want":
+-            # An offer already on its way answers it.
+-            pending = state.flow is not None and not state.flow.agreed
+-            if self._helper_state == "ok" and self._offerer(peer) and not pending:
+-                self._open_flow(peer)
++            if self._helper_state != "ok" or not self._offerer(peer):
++                self._log.info("audio: flow want from %s dropped: %s", self._peer_label(peer),
++                               "the helper is " + self._helper_state if self._helper_state != "ok"
++                               else "it is the one that offers")
++                return
++            # An offer already on its way answers it; one that went unanswered is made again.
++            flow = state.flow
++            if (flow is not None and not flow.agreed and state.offered_at is not None
++                    and self._clock() - state.offered_at < WANT_REOFFER_AGE):
++                return
++            if flow is not None and not flow.agreed:
++                self._log.info("audio: %s asks for a flow, offer %s unanswered: offering again",
++                               self._peer_label(peer), flow.id)
++            self._open_flow(peer)
+         elif phase == "offer":
+-            if self._helper_state != "ok" or self._offerer(peer):
++            if self._offerer(peer):
++                self._log.warning("audio: flow offer %s from %s dropped: this machine is the one that offers",
++                                  data["flow"], self._peer_label(peer))
++                return
++            if self._helper_state != "ok":
++                self._log.info("audio: flow offer %s from %s dropped: the helper is %s (it asks for a flow when ok)",
++                               data["flow"], self._peer_label(peer), self._helper_state)
+                 return
+             self._drop_flow(peer)
+             flow = _Flow(data["flow"], "answer", data["key"])
+@@ -849,8 +893,12 @@ class AudioService:
+         elif phase == "answer":
+             flow = state.flow
+             if flow is None or flow.id != data["flow"] or flow.role != "offer":
++                self._log.info("audio: flow answer %s from %s dropped: %s", data["flow"], self._peer_label(peer),
++                               "no offer of ours is open" if flow is None or flow.role != "offer"
++                               else f"our offer is {flow.id}")
+                 return
+             flow.agreed = True
++            state.retry_at, state.retries = None, 0
+             host = self._host.peer_host(peer)
+             if _usable_host(host) and data["port"]:
+                 self._helper_send({"cmd": "flow_remote", "flow": flow.id, "host": host, "port": data["port"]})
+@@ -858,6 +906,58 @@ class AudioService:
+             if state.flow is not None and state.flow.id == data["flow"]:
+                 self._drop_flow(peer)
+ 
++    def _peer_label(self, peer):
++        try:
++            return self._host.peer_name(peer) or peer
++        except Exception:
++            return peer
++
++    def _needs_flow(self, peer, state):
++        """Both helpers are ok and the peer speaks audio: there should be an agreed flow with it."""
++        return (state.direct and state.hello.get("helper") == "ok" and self._helper_state == "ok"
++                and self._helper is not None)
++
++    def _schedule_retry(self, state):
++        state.retry_at = self._clock() + min(REOFFER_AFTER * (2 ** min(state.retries, 8)), REOFFER_MAX)
++        state.retries += 1
++
++    def _check_flows(self, now):
++        """Every flow converges (f5). Before, an offer the answerer dropped (one that overtook the
++        audio_hello on the other link, or met a helper that was not ok) or a refused `flow_open`
++        left the flow unagreed until a helper restarted: the offerer ignored `want` while its offer
++        was pending and nothing offered again. Now, while both helpers are ok, the offerer offers
++        again (new id) when its offer is still unanswered, and the answerer sends `want` while it has
++        no flow, after REOFFER_AFTER, doubling up to REOFFER_MAX."""
++        for peer, state in sorted(self._peers.items()):
++            offerer = self._offerer(peer)
++            if not self._needs_flow(peer, state):
++                state.retry_at, state.retries = None, 0
++                continue
++            if offerer:
++                missing = state.flow is None or not state.flow.agreed
++            else:
++                missing = state.flow is None
++            if not missing:
++                state.retry_at, state.retries = None, 0
++                continue
++            if state.retry_at is None:
++                self._schedule_retry(state)     # the clock starts: the usual path agrees long before
++                continue
++            if now < state.retry_at:
++                continue
++            self._dirty = True
++            if offerer:
++                if state.flow is None:
++                    self._log.info("audio: no flow with %s: offering one", self._peer_label(peer))
++                else:
++                    self._log.info("audio: flow offer %s to %s unanswered: offering again",
++                                   state.flow.id, self._peer_label(peer))
++                self._open_flow(peer)       # schedules the next retry
++            else:
++                self._log.info("audio: no flow with %s: asking it for one", self._peer_label(peer))
++                self._post(peer, wire.flow_want())
++                self._schedule_retry(state)
++
+     def _flow_peer(self, flow_id):
+         for ident, state in self._peers.items():
+             if state.flow is not None and state.flow.id == flow_id:
+diff --git a/core/tests/test_audio_flow_convergence.py b/core/tests/test_audio_flow_convergence.py
+new file mode 100644
+index 0000000..1dd9761
+--- /dev/null
++++ b/core/tests/test_audio_flow_convergence.py
+@@ -0,0 +1,165 @@
++# SPDX-License-Identifier: GPL-3.0-only
++"""The audio flow between two machines always gets agreed (dev/camera/reports/f5.md).
++
++Each test reproduces one way the flow stayed unagreed before F5 (offer lost, nothing asks again) and
++checks that it now converges: the offer that overtook `audio_hello` on the other link (seen live after
++a PC Beamer restart, cw11.md "Bug 2"), and a `flow_open` refused by either helper."""
++
++import unittest
++
++from core.audio import service as service_module, wire
++from core.tests.audio_cluster_harness import Net
++
++# The service's retry timings (with the values F5 gave them, so this file also runs against the code
++# before F5 and shows each test failing there).
++REOFFER_AFTER = getattr(service_module, "REOFFER_AFTER", 3.0)
++REOFFER_MAX = getattr(service_module, "REOFFER_MAX", 30.0)
++
++
++def flows_posted(node):
++    return [message["data"] for _peer, message in node.host.posted if message["type"] == wire.FLOW]
++
++
++class FlowConvergenceTests(unittest.TestCase):
++    def setUp(self):
++        self.net = Net()
++        self.addCleanup(self.net.close)
++        self.mac = self.net.add(1, "mac", "macos")       # offerer (does not listen)
++        self.pc = self.net.add(2, "lebig", "windows")    # answerer (listens on 24823)
++
++    def flow(self, node, other):
++        state = node.service._peers.get(other.id)
++        return None if state is None else state.flow
++
++    def assert_agreed(self):
++        mac, pc = self.flow(self.mac, self.pc), self.flow(self.pc, self.mac)
++        self.assertIsNotNone(mac, "the offerer has no flow")
++        self.assertIsNotNone(pc, "the answerer has no flow")
++        self.assertTrue(mac.agreed, f"flow {mac.id} never answered")
++        self.assertTrue(pc.agreed)
++        self.assertEqual(mac.id, pc.id)
++        self.assertIn(mac.id, self.mac.helper.engine.flows)
++        self.assertIn(pc.id, self.pc.helper.engine.flows)
++
++    def fail_next_flow_open(self, node, code="port_in_use"):
++        engine = node.helper.engine
++        real = engine._cmd_flow_open
++        calls = []
++
++        def flow_open(command):
++            calls.append(command)
++            if len(calls) == 1:
++                return [], code
++            return real(command)
++        engine._cmd_flow_open = flow_open
++        return calls
++
++    def test_offer_that_overtakes_the_hello_is_answered(self):
++        """Live 2026-11-12 19:50:47: the Mac's hello went on the PC's link, its offer 29 ms later on its
++        own link, and reached the PC first; the PC dropped it (no hello yet) and nothing asked again."""
++        self.net.link(self.mac, self.pc)
++        self.net.pump()
++        # What the Mac posted at link-up (hello, devices, route) stays on the slower link.
++        slow = [item for item in self.net.in_flight if item[0] == self.mac.id]
++        self.net.in_flight = [item for item in self.net.in_flight if item[0] != self.mac.id]
++        self.net.round()        # the PC's hello reaches the Mac: it offers
++        offers = [item for item in self.net.in_flight
++                  if item[2]["type"] == wire.FLOW and item[2]["data"].get("phase") == "offer"]
++        self.assertEqual(len(offers), 1)
++        self.net.round()        # the offer reaches the PC before the Mac's hello
++        self.net.in_flight = slow + self.net.in_flight
++        self.net.settle()
++        self.assert_agreed()
++        self.assertEqual(len(self.mac.helper.commands("flow_open")), 1)   # answered as it was, no re-offer
++
++    def test_offer_before_hello_converges_within_seconds_even_without_the_kept_offer(self):
++        """Same order, but the offer is lost outright (as an older answerer drops it): the offerer
++        offers again on its own."""
++        self.net.link(self.mac, self.pc)
++        self.net.pump()
++        slow = [item for item in self.net.in_flight if item[0] == self.mac.id]
++        self.net.in_flight = [item for item in self.net.in_flight if item[0] != self.mac.id]
++        self.net.round()
++        self.net.in_flight = [item for item in self.net.in_flight
++                              if not (item[2]["type"] == wire.FLOW and item[2]["data"].get("phase") == "offer")]
++        self.net.in_flight = slow + self.net.in_flight
++        self.net.settle()
++        self.net.advance(REOFFER_AFTER + 0.5)
++        self.assert_agreed()
++
++    def test_answerer_flow_open_refused_once(self):
++        """The PC's helper refuses the answer's flow_open: no answer goes back, the Mac's offer would
++        stay pending forever (and `want` was ignored while it is pending)."""
++        calls = self.fail_next_flow_open(self.pc)
++        self.net.link(self.mac, self.pc)
++        self.net.settle()
++        self.assertEqual(len(calls), 1)
++        self.net.advance(REOFFER_AFTER * 2 + 1.0)
++        self.assert_agreed()
++
++    def test_offerer_flow_open_refused_once(self):
++        """The Mac's helper refuses its own flow_open: the flow is forgotten and was never opened again."""
++        calls = self.fail_next_flow_open(self.mac)
++        self.net.link(self.mac, self.pc)
++        self.net.settle()
++        self.assertEqual(len(calls), 1)
++        self.net.advance(REOFFER_AFTER * 2 + 1.0)
++        self.assert_agreed()
++
++    def test_answerer_without_a_flow_asks_again(self):
++        """The answerer has no flow but the offerer holds no pending offer (its own flow_open was refused,
++        as an older offerer without the re-offer timer would stay): the answerer's `want` gets one."""
++        self.net.link(self.mac, self.pc)
++        self.net.settle()
++        self.assert_agreed()
++        # The PC's flow is gone (its helper lost it) while the Mac keeps an agreed one, and the Mac
++        # does not offer by itself: only the PC can ask.
++        pc_state = self.pc.service._peers[self.mac.id]
++        pc_state.flow = None
++        self.net.advance(REOFFER_AFTER + 0.5)
++        self.assertIn({"phase": "want"}, flows_posted(self.pc))
++        self.net.settle()
++        self.assert_agreed()
++
++    def test_normal_link_up_costs_one_offer_and_no_want(self):
++        """No churn on the ordinary path: one offer, one answer, nothing more, also after a while."""
++        self.net.link(self.mac, self.pc)
++        self.net.settle()
++        self.net.advance(REOFFER_MAX * 2)
++        self.assert_agreed()
++        self.assertEqual(len(self.mac.helper.commands("flow_open")), 1)
++        self.assertEqual([flow["phase"] for flow in flows_posted(self.mac)], ["offer"])
++        self.assertEqual([flow["phase"] for flow in flows_posted(self.pc)], ["answer"])
++
++    def test_retries_back_off_and_stop_once_answered(self):
++        """An answerer that never answers: offers again after 3, 6, 12, 24, 30, 30 s; then it answers."""
++        engine = self.pc.helper.engine
++        real = engine._cmd_flow_open
++        refuse = [True]
++        engine._cmd_flow_open = lambda command: ([], "port_in_use") if refuse[0] else real(command)
++        self.net.link(self.mac, self.pc)
++        self.net.settle()
++        self.net.advance(3 + 6 + 12 + 24 + 30 + 30 + 1.0, step=0.5)
++        self.assertEqual(len(self.mac.helper.commands("flow_open")), 7)   # the first and 6 again
++        refuse[0] = False
++        self.net.advance(31.0, step=0.5)
++        self.assert_agreed()
++        opens = len(self.mac.helper.commands("flow_open"))
++        self.net.advance(120.0, step=1.0)
++        self.assertEqual(len(self.mac.helper.commands("flow_open")), opens)
++
++    def test_dropped_offers_are_logged_with_the_reason(self):
++        self.net.link(self.mac, self.pc)
++        self.net.pump()
++        slow = [item for item in self.net.in_flight if item[0] == self.mac.id]
++        self.net.in_flight = [item for item in self.net.in_flight if item[0] != self.mac.id]
++        self.net.round()
++        with self.assertLogs("beamer.audio", level="INFO") as logs:
++            self.net.round()
++        self.assertTrue(any("before its audio_hello" in line for line in logs.output), logs.output)
++        self.net.in_flight = slow + self.net.in_flight
++        self.net.settle()
++
++
++if __name__ == "__main__":
++    unittest.main()

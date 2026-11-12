@@ -1,0 +1,271 @@
+diff --git a/native/audio/engine/backend.h b/native/audio/engine/backend.h
+index 52d1eee..c079ec9 100644
+--- a/native/audio/engine/backend.h
++++ b/native/audio/engine/backend.h
+@@ -13,6 +13,8 @@ struct DeviceSnapshot {
+   std::string vmic_kind;                          // "beamer" | "vbcable" | ""
+   bool vmic_present = false, vmic_in_use = false; // in_use = some other process records the virtual mic
+ };
++// host_ns: the backend's own host time of the callback (Mac: mach host time, which stops while the Mac sleeps; it is
++// NOT now_ns()'s clock there). Only compared with other host_ns of the same backend (AecPath's HostClock).
+ struct CaptureSink {   // called on the backend's IO thread: no locks, no allocation, no syscalls
+   virtual void on_capture(const float* interleaved, int frames, int channels, uint64_t host_ns) = 0;
+   virtual ~CaptureSink() = default;
+diff --git a/native/audio/engine/util.h b/native/audio/engine/util.h
+index 464af2e..38b3196 100644
+--- a/native/audio/engine/util.h
++++ b/native/audio/engine/util.h
+@@ -10,7 +10,9 @@
+ 
+ namespace beamer::audio {
+ 
+-// Monotonic clock (steady_clock: mach continuous/uptime on macOS, QPC on Windows), nanoseconds.
++// Monotonic clock, nanoseconds: steady_clock. On macOS (libc++) that is CLOCK_MONOTONIC_RAW == mach_continuous_time,
++// which counts the time the Mac sleeps, so it is NOT mach host time (mach_absolute_time, CoreAudio mHostTime,
++// CoreMedia's host clock), which stops in sleep: the two differ by the total sleep since boot. QPC on Windows.
+ int64_t now_ns();
+ inline double now_s() { return static_cast<double>(now_ns()) * 1e-9; }
+ // Wall clock, milliseconds since the Unix epoch (for `t` fields).
+diff --git a/native/audio/mac/camera_mac.mm b/native/audio/mac/camera_mac.mm
+index c5ce0c1..ba48300 100644
+--- a/native/audio/mac/camera_mac.mm
++++ b/native/audio/mac/camera_mac.mm
+@@ -99,9 +99,10 @@ int capture_sessions_running() { return g_sessions_running.load(); }
+ 
+ int64_t host_time_to_ns(CMTime t) {
+   // The host time clock is mach_absolute_time (CLOCK_UPTIME_RAW: stops while the Mac sleeps). now_ns() is
+-  // steady_clock, the clock of the engine's time maps; nothing guarantees libc++ uses the same clock id, and
+-  // they would differ by the total sleep time since boot. So map through the current offset between the two
+-  // clocks instead of assuming they are equal (CW10 contract issue: lip sync off by the sleep time).
++  // steady_clock, the clock of the engine's time maps, which libc++ reads from CLOCK_MONOTONIC_RAW (counts
++  // sleep): they differ by the total sleep time since boot (167.8 s measured by Q2/F4). So map through the
++  // current offset between the two clocks (CW10 contract issue: lip sync off by the sleep time). video_check
++  // selftest checks it with a now_ns() skew seam.
+   const CMTime now_host = CMClockGetTime(CMClockGetHostTimeClock());
+   const int64_t now_steady = now_ns();
+   const int64_t pts = CMTimeConvertScale(t, 1000000000, kCMTimeRoundingMethod_RoundHalfAwayFromZero).value;
+diff --git a/native/audio/mac/mac_internal.h b/native/audio/mac/mac_internal.h
+index ea0bcf7..c51eccf 100644
+--- a/native/audio/mac/mac_internal.h
++++ b/native/audio/mac/mac_internal.h
+@@ -45,6 +45,8 @@ uint32_t transport_type(AudioObjectID dev);
+ bool streams_are_float32(AudioObjectID dev, bool input);
+ std::string os_status(OSStatus st);  // "-50" or "'who?'"
+ uint64_t host_to_ns(uint64_t host_ticks);
++// mach host time in ns (mach_absolute_time: stops while the Mac sleeps). Not the engine's now_ns() (steady_clock,
++// counts sleep): only for the backend's own intervals and as the fallback of a callback's host_ns.
+ uint64_t now_ns();
+ AudioObjectID process_object(pid_t pid);  // Core Audio process object of a pid, 0 = none yet
+ 
+diff --git a/native/audio/mac/synth_mac.mm b/native/audio/mac/synth_mac.mm
+index 0b2bbe1..da9f59a 100644
+--- a/native/audio/mac/synth_mac.mm
++++ b/native/audio/mac/synth_mac.mm
+@@ -271,27 +271,15 @@ class SynthSource : public Source {
+   void run() {
+     pthread_setname_np("beamer-video-synth");
+     pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+-    const int64_t first = start_ns_ + (int64_t)spec_.start_ms * 1000000;
++    int64_t first = start_ns_ + (int64_t)spec_.start_ms * 1000000;
+     const double period = 1e9 / 30.0;
+     for (uint32_t i = 0;; i++) {
+-      const int64_t due = first + (int64_t)(i * period);
+-      {
+-        std::unique_lock<std::mutex> lk(mu_);
+-        if (stop_) return;
+-      }
+-      // absolute schedule: mach_wait_until on the host clock (== now_ns()), woken early only by stop
+-      while (true) {
+-        int64_t now = now_ns();
+-        if (now >= due) break;
+-        std::unique_lock<std::mutex> lk(mu_);
+-        if (stop_) return;
+-        int64_t left = due - now;
+-        if (left > 3000000) { cv_.wait_for(lk, std::chrono::nanoseconds(left - 2000000)); continue; }
+-        lk.unlock();
+-        mach_timebase_info_data_t tb;
+-        mach_timebase_info(&tb);
+-        mach_wait_until((uint64_t)((__uint128_t)due * tb.denom / tb.numer));
+-      }
++      const int64_t due = first + (int64_t)(i * period);  // on now_ns()'s clock (the engine's)
++      if (!wait_until(due)) return;
++      // now_ns() counts sleep: after the Mac wakes (or a long stall) the schedule is far behind; move it to now
++      // instead of drawing the missed frames back to back
++      const int64_t late = now_ns() - due;
++      if (late > 100000000) first += late;
+       if (!pool_) continue;
+       CVPixelBufferRef pb = nullptr;
+       if (CVPixelBufferPoolCreatePixelBuffer(nullptr, pool_, &pb) != kCVReturnSuccess || !pb) continue;
+@@ -305,6 +293,34 @@ class SynthSource : public Source {
+       CVPixelBufferRelease(pb);
+     }
+   }
++  // Absolute schedule: returns once now_ns() >= due, false as soon as the source stops (stop wakes the
++  // condition variable; the precise tail below is <= 3 ms). `due` is on now_ns()'s clock (steady_clock, counts
++  // sleep), mach_wait_until on host time (stops in sleep): the tail is waited as a host deadline made from the
++  // time LEFT and the host clock's own now, never by reading `due` as a host time (F4: after the Mac had slept
++  // 168 s, each frame waited 168 s and the stop's join hung).
++  bool wait_until(int64_t due) {
++    std::unique_lock<std::mutex> lk(mu_);
++    while (!stop_) {
++      const int64_t left = due - now_ns();
++      if (left <= 0) return true;
++      if (left > 3000000) {
++        cv_.wait_for(lk, std::chrono::nanoseconds(left - 2000000));
++        continue;
++      }
++      lk.unlock();
++      mach_wait_until(mach_absolute_time() + ns_to_host_ticks(left));
++      lk.lock();
++    }
++    return false;
++  }
++  static uint64_t ns_to_host_ticks(int64_t ns) {
++    static const mach_timebase_info_data_t tb = [] {
++      mach_timebase_info_data_t t{};
++      mach_timebase_info(&t);
++      return t;
++    }();
++    return (uint64_t)((__uint128_t)ns * tb.denom / tb.numer);
++  }
+   void stamp(CVPixelBufferRef pb, uint32_t f, uint64_t cap) {
+     // re-draw only the strip with the real capture time (the rest does not depend on it)
+     CVPixelBufferLockBaseAddress(pb, 0);
+diff --git a/native/audio/mac/video_backend_mac.h b/native/audio/mac/video_backend_mac.h
+index 7dbf4f1..5f75917 100644
+--- a/native/audio/mac/video_backend_mac.h
++++ b/native/audio/mac/video_backend_mac.h
+@@ -32,14 +32,23 @@ std::unique_ptr<VideoBackend> make_mac_video_backend(const std::string& options)
+ 
+ namespace macvideo {
+ 
+-// ---- clock: the engine's now_ns() is steady_clock (engine/util.cpp); on macOS it is mach host time in
+-// ns (checked by video_check selftest). Defined here so the backend links without the engine.
++// ---- clocks. now_ns() is the engine's clock (engine/util.cpp): steady_clock, which on macOS (libc++) is
++// CLOCK_MONOTONIC_RAW == mach_continuous_time: it COUNTS the time the Mac sleeps. Mach host time
++// (mach_absolute_time, mach_wait_until, CoreMedia's host time clock, AudioTimeStamp.mHostTime) is
++// CLOCK_UPTIME_RAW: it STOPS while the Mac sleeps. The two differ by the total sleep since boot (167.8 s on
++// 2026-11-12, F4), so a now_ns() value is never a host time or the reverse: convert through the live offset
++// (host_time_to_ns) or wait relative to the clock the deadline is on (synth_mac.mm). Defined here so the backend
++// links without the engine.
++// Test seam (video_check selftest only, 0 in the product): now_ns() runs this much ahead of steady_clock, as if
++// the Mac had slept that long, so that a clock mix-up shows on any Mac.
++extern std::atomic<int64_t> g_test_clock_skew_ns;
+ inline int64_t now_ns() {
+   return std::chrono::duration_cast<std::chrono::nanoseconds>(
+              std::chrono::steady_clock::now().time_since_epoch())
+-      .count();
++             .count() +
++         g_test_clock_skew_ns.load(std::memory_order_relaxed);
+ }
+-int64_t host_time_to_ns(CMTime host_time);  // a CMTime on the host time clock -> now_ns() clock
++int64_t host_time_to_ns(CMTime host_time);  // a CMTime on the host time clock -> now_ns() clock (live offset)
+ 
+ void vlog(const char* level, const char* fmt, ...) __attribute__((format(printf, 2, 3)));
+ 
+diff --git a/native/audio/mac/video_backend_mac.mm b/native/audio/mac/video_backend_mac.mm
+index e6bc0d6..4f34701 100644
+--- a/native/audio/mac/video_backend_mac.mm
++++ b/native/audio/mac/video_backend_mac.mm
+@@ -878,6 +878,7 @@ std::unique_ptr<CameraHandle> MacVideoBackend::open_camera(const CameraSpec& spe
+ 
+ }  // namespace
+ 
++std::atomic<int64_t> g_test_clock_skew_ns{0};  // video_check selftest seam (video_backend_mac.h)
+ std::atomic<double> g_last_stop_ms{0};
+ void note_stop_ms(double ms) { g_last_stop_ms = ms; }
+ double last_stop_ms() { return g_last_stop_ms.load(); }
+diff --git a/native/audio/mac/video_check.mm b/native/audio/mac/video_check.mm
+index a47b448..aa8af85 100644
+--- a/native/audio/mac/video_check.mm
++++ b/native/audio/mac/video_check.mm
+@@ -4,7 +4,8 @@
+ // and decodes the stream back with VideoToolbox to check sizes, crop geometry and the code strip. Results are
+ // JSON lines on stdout; the backend logs on stderr.
+ //
+-//   video_check selftest                       pure rules (crop, format choice, synth spec), clock, strip
++//   video_check selftest                       pure rules (crop, format choice, synth spec), clocks, synth
++//                                              schedule (incl. a now_ns() skew seam), strip
+ //   video_check cameras                        inventory + permission (never prompts)
+ //   video_check run [--test SPEC | --camera KEY|default] [--size WxH] [--bitrate BPS] [--seconds S]
+ //                   [--start-after-ms N] [--verify] [--standby] [--bitrate-at S:BPS] [--quiet]
+@@ -352,18 +353,71 @@ int cmd_selftest() {
+     if (!ok) fails++;
+     out(J().str("ev", "check").str("what", what).b("ok", ok));
+   };
+-  // clock: engine now_ns (steady_clock) == mach host time in ns
++  // clocks (F4). now_ns() is steady_clock, which counts the Mac's sleep; mach host time does not, so they differ
++  // by the total sleep since boot (0 only on a Mac that never slept). Report that offset; check that both clocks
++  // run at the same rate, and that host_time_to_ns maps through the live offset, also with now_ns() pushed 5 s
++  // ahead (the seam: what a Mac that slept 5 s looks like), so that the check cannot pass only on a Mac that
++  // never slept.
+   {
+     mach_timebase_info_data_t tb;
+     mach_timebase_info(&tb);
+-    int64_t a = now_ns();
+-    int64_t h = (int64_t)((__uint128_t)mach_absolute_time() * tb.numer / tb.denom);
+-    int64_t b = now_ns();
+-    check(h >= a - 50000 && h <= b + 50000, "steady_clock == mach host clock (diff " + std::to_string((h - a) / 1000) + " us)");
+-    CMTime ht = CMClockGetTime(CMClockGetHostTimeClock());
+-    int64_t c = host_time_to_ns(ht), d2 = now_ns();
+-    check(std::llabs(d2 - c) < 1000000, "host_time_to_ns(CMClockGetHostTimeClock) ~ now_ns");
++    auto offset = [&] {  // now_ns() - host time (ns), read between two now_ns()
++      const int64_t a = now_ns();
++      const int64_t h = (int64_t)((__uint128_t)mach_absolute_time() * tb.numer / tb.denom);
++      const int64_t b = now_ns();
++      return a + (b - a) / 2 - h;
++    };
++    const int64_t off0 = offset();
++    sleep_ms(200);
++    const int64_t off1 = offset();
++    out(J().str("ev", "clock").num("steady_minus_host_s", off1 / 1e9, 6)
++            .num("drift_us_per_200ms", (off1 - off0) / 1e3, 1));
++    check(std::llabs(off1 - off0) < 1000000, "steady_clock and mach host time run at the same rate (" +
++                                                 std::to_string((off1 - off0) / 1000) + " us over 200 ms)");
++    for (int64_t skew : {(int64_t)0, (int64_t)5000000000LL}) {
++      g_test_clock_skew_ns = skew;
++      const CMTime ht = CMClockGetTime(CMClockGetHostTimeClock());
++      const int64_t c = host_time_to_ns(ht), d2 = now_ns();
++      check(std::llabs(d2 - c) < 1000000,
++            "host_time_to_ns(CMClockGetHostTimeClock) ~ now_ns, skew " + std::to_string(skew / 1000000000) + " s (diff " +
++                std::to_string((d2 - c) / 1000) + " us)");
++    }
++    g_test_clock_skew_ns = 0;
++  }
++  // synthetic source schedule (F4): ~30 fps, capture times on now_ns(), and a stop that returns at once, with
++  // now_ns() == steady_clock and with now_ns() 3 s ahead of host time (seam above). A wait on the wrong clock
++  // delivers no frame and holds the stop for the skew.
++  for (int64_t skew : {(int64_t)0, (int64_t)3000000000LL}) {
++    g_test_clock_skew_ns = skew;
++    struct L : FrameListener {
++      std::atomic<int> n{0};
++      std::atomic<int64_t> max_dev{0};  // |now_ns() at delivery - capture_ns|
++      void on_captured(const Frame& f) override {
++        n++;
++        const int64_t d = std::llabs(now_ns() - (int64_t)f.capture_ns);
++        if (d > max_dev) max_dev = d;
++      }
++      void on_source_event(const std::string&, const std::string&) override {}
++    } lis;
++    SynthSpec sp;
++    sp.start_ms = 0;
++    std::shared_ptr<Source> src = make_synth_source(sp, 640, 360);
++    src->add(&lis);
++    sleep_ms(1000);
++    const int n = lis.n;
++    src->remove(&lis);
++    sleep_ms(17);  // stop in the middle of a frame period
++    const int64_t t0 = now_ns();
++    src.reset();
++    const double stop_ms = (now_ns() - t0) / 1e6;
++    const std::string sk = "skew " + std::to_string(skew / 1000000000) + " s";
++    out(J().str("ev", "synth_schedule").num("skew_s", skew / 1e9, 0).i("frames_1s", n)
++            .num("stop_ms", stop_ms, 2).num("capture_dev_ms", lis.max_dev / 1e6, 3));
++    check(n >= 27 && n <= 33, "synth delivers ~30 frames in 1 s, " + sk + " (" + std::to_string(n) + ")");
++    check(stop_ms <= 50, "synth stop <= 50 ms, " + sk + " (" + std::to_string(stop_ms) + " ms)");
++    check(n > 0 && lis.max_dev < 50000000, "synth capture_ns on now_ns(), " + sk);
+   }
++  g_test_clock_skew_ns = 0;
+   // §4.11 crop examples
+   struct C { int w, h, cw, ch, x, y; };
+   for (C c : {C{1920, 1440, 1920, 1080, 0, 180}, C{1760, 1328, 1760, 990, 0, 168}, C{1552, 1552, 1552, 872, 0, 340},
