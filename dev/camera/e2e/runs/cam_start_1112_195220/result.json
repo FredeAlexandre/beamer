@@ -1,0 +1,156 @@
+{
+ "case": "cam_start",
+ "verdict": "fail",
+ "commit": "e09ea72",
+ "started": "2026-11-12 19:52:22",
+ "sessions": [
+  "start"
+ ],
+ "clock": [
+  {
+   "pings": 306,
+   "windows": 9,
+   "rtt_min_ms": 3.68,
+   "rtt_p50_ms": 6.14,
+   "rtt_p99_ms": 32.52,
+   "drift_ppm": 16.81,
+   "resid_max_ms": 0.657
+  }
+ ],
+ "checks": [
+  {
+   "name": "every open got the Mac picture",
+   "value": "0/3",
+   "mark": "3/3",
+   "pass": false
+  },
+  {
+   "name": "first picture p50 (ms)",
+   "value": null,
+   "mark": "<= 450",
+   "pass": false,
+   "note": "C4: 260 / 308 ms at 4x"
+  },
+  {
+   "name": "first picture p95 (ms)",
+   "value": null,
+   "mark": "<= 600",
+   "pass": false
+  },
+  {
+   "name": "exactly 1 IDR per start (Mac stats)",
+   "value": [
+    null,
+    null,
+    null
+   ],
+   "mark": "1 each",
+   "pass": false
+  },
+  {
+   "name": "one Mac stream per open",
+   "value": [
+    0,
+    0,
+    0
+   ],
+   "mark": "1 each",
+   "pass": false
+  },
+  {
+   "name": "placeholder before the first picture, never black",
+   "value": [
+    [
+     297,
+     0
+    ],
+    [
+     298,
+     0
+    ],
+    [
+     298,
+     0
+    ]
+   ],
+   "mark": "placeholder > 0, black 0",
+   "pass": true
+  },
+  {
+   "name": "0 corrupt pictures (code strip) while on",
+   "value": 0,
+   "mark": "0",
+   "pass": true
+  },
+  {
+   "name": "encoder standby/warm in every start after the first",
+   "value": {
+    "null": 2
+   },
+   "mark": "standby or warm",
+   "pass": false
+  },
+  {
+   "name": "Mac camera stopped after the app closed (s, max)",
+   "value": null,
+   "mark": "<= 4.0 every close",
+   "pass": false
+  },
+  {
+   "name": "helper stop -> encoder stopped (ms, max; proxy: stream end vs camera stopped)",
+   "value": null,
+   "mark": "<= 100",
+   "pass": null,
+   "note": "C4: max 51 ms; CW3: 10-14 ms"
+  },
+  {
+   "name": "standby encoder planned after the stops",
+   "value": "68/68 status samples",
+   "mark": "warm in the Mac plan",
+   "pass": true
+  },
+  {
+   "name": "camera-on invariant (\u00a76.5): Mac camera never on without a receiver",
+   "value": "no violation",
+   "mark": "on <= 3.5 s (never ran) / 5.5 s (ran) outside PC demand",
+   "pass": true
+  }
+ ],
+ "info": {
+  "first_ms": {
+   "n": 0
+  },
+  "rows": [
+   {
+    "cycle": 0,
+    "first_ms": null,
+    "first_frame": null,
+    "black_before": 0,
+    "placeholder_before": 297,
+    "streams": 0,
+    "enum_ms": 2.6,
+    "activate_ms": 66.3
+   },
+   {
+    "cycle": 1,
+    "first_ms": null,
+    "first_frame": null,
+    "black_before": 0,
+    "placeholder_before": 298,
+    "streams": 0,
+    "enum_ms": 2.6,
+    "activate_ms": 17.1
+   },
+   {
+    "cycle": 2,
+    "first_ms": null,
+    "first_frame": null,
+    "black_before": 0,
+    "placeholder_before": 298,
+    "streams": 0,
+    "enum_ms": 2.6,
+    "activate_ms": 18.3
+   }
+  ]
+ }
+}

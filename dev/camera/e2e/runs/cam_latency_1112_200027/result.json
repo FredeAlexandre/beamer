@@ -1,0 +1,130 @@
+{
+ "case": "cam_latency",
+ "verdict": "fail",
+ "commit": "e09ea72",
+ "started": "2026-11-12 20:00:30",
+ "sessions": [
+  "latency_720p"
+ ],
+ "clock": [
+  {
+   "pings": 315,
+   "windows": 9,
+   "rtt_min_ms": 3.63,
+   "rtt_p50_ms": 6.31,
+   "rtt_p99_ms": 36.63,
+   "drift_ppm": 18.24,
+   "resid_max_ms": 0.805,
+   "mac_helper_minus_app_s": 167.78425583300123,
+   "mac_clock_gap_s": null
+  }
+ ],
+ "checks": [
+  {
+   "name": "720p: capture -> app p50 (ms)",
+   "value": null,
+   "mark": "<= 70",
+   "pass": false,
+   "note": "C4: 57.5 / 60.3 / 65"
+  },
+  {
+   "name": "720p: capture -> app p95 (ms)",
+   "value": null,
+   "mark": "<= 90",
+   "pass": false
+  },
+  {
+   "name": "720p: capture -> app p99 (ms)",
+   "value": null,
+   "mark": "<= 140",
+   "pass": false
+  },
+  {
+   "name": "720p: late frames per minute (PC stats)",
+   "value": 0.0,
+   "mark": "<= 20",
+   "pass": true,
+   "note": "C4: 7.6-11"
+  },
+  {
+   "name": "720p: 0 corrupt pictures (code strip)",
+   "value": {
+    "black": 0,
+    "frames": 1785,
+    "live": 0
+   },
+   "mark": "0",
+   "pass": true
+  },
+  {
+   "name": "720p: no lip-sync hold (no mic stream)",
+   "value": 0.0,
+   "mark": "sync_ms 0",
+   "pass": true
+  },
+  {
+   "name": "720p: one stream, 1 IDR",
+   "value": {
+    "860124303": 0
+   },
+   "mark": "1",
+   "pass": false
+  },
+  {
+   "name": "camera-on invariant (\u00a76.5): Mac camera never on without a receiver",
+   "value": [
+    [
+     1081078540,
+     34.48,
+     113235.205
+    ],
+    [
+     1081078540,
+     4.75,
+     113330.013
+    ],
+    [
+     860124303,
+     4.75,
+     113330.013
+    ]
+   ],
+   "mark": "on <= 3.5 s (never ran) / 5.5 s (ran) outside PC demand",
+   "pass": false
+  }
+ ],
+ "info": {
+  "720p": {
+   "latency_ms": {
+    "n": 0
+   },
+   "integrity": {
+    "black": 0,
+    "frames": 1785,
+    "live": 0
+   },
+   "late_total": 0,
+   "minutes": 1.0,
+   "frozen_episodes_100ms": 0,
+   "pc_d_ms": {
+    "p50": 70.0,
+    "p99": 70.0,
+    "n": 64,
+    "mean": 70.0,
+    "max": 70.0,
+    "min": 70.0
+   },
+   "dec_ms": {
+    "p50": 0.0,
+    "p99": 0.0,
+    "n": 64,
+    "mean": 0.0,
+    "max": 0.0,
+    "min": 0.0
+   },
+   "decoders": {
+    "hw": 64
+   }
+  }
+ }
+}

@@ -37,9 +37,13 @@ PC_CABLE_TOOL = PC_HOME + r"\proto-audio.exe"
 CABLE_OUT = "{0.0.1.00000000}.{ddc7e301-3260-4ed3-8389-0938254820e0}"
 MAC_DIR = beamer.MAC_DIR
 PC_DIR = beamer.PC_DIR
-LAB_LOCK = Path.home() / "Developer" / ".beamer-camera-lab.lock"
-AUDIO_LAB_LOCK = Path.home() / "Developer" / ".beamer-audio-lab.lock"
-DEPLOY_LOCK = Path.home() / "Developer" / ".beamer-deploy.lock"
+# Lab locks live in ~/Developer (the checkout's old parent); since the repo moved, that folder may not exist:
+# then the checkout's parent folder is used. BEAMER_LOCK_DIR overrides both. cam_lipsync.py uses the same rule.
+LOCK_DIR = Path(os.environ.get("BEAMER_LOCK_DIR") or
+                (Path.home() / "Developer" if (Path.home() / "Developer").is_dir() else REPO.parent))
+LAB_LOCK = LOCK_DIR / ".beamer-camera-lab.lock"
+AUDIO_LAB_LOCK = LOCK_DIR / ".beamer-audio-lab.lock"
+DEPLOY_LOCK = LOCK_DIR / ".beamer-deploy.lock"
 
 mac, pc = beamer.Mac(), beamer.Pc()
 
@@ -137,6 +141,15 @@ def set_test_source(value, timeout=15.0):
 
 def mac_snapshot_ok(status):
     return bool(cam_snap(status))
+
+
+def mac_clock_gap():
+    """CLOCK_MONOTONIC_RAW (libc++ steady_clock on Apple: the helper's now_ns) - mach_absolute_time
+    (time.monotonic: the app's mono), s. The Mac's total sleep time since boot; 0 if it never slept."""
+    raw = getattr(time, "CLOCK_MONOTONIC_RAW", None)
+    if raw is None or sys.platform != "darwin":
+        return None
+    return (time.clock_gettime_ns(raw) - time.monotonic_ns()) / 1e9
 
 
 def prepare(ctx, quality="720p", test_source="synth", floor_ms=50, sharing=True, route=True):
@@ -279,7 +292,7 @@ class Session:
         beamer.scp_to(self.dir / "pc_plan.json", self.pc_dir + "\\plan.json")
         pcside = subprocess.Popen(["ssh", PC, f"{PC_PY} {PC_HOME}\\pcside_cam.py {self.pc_dir}\\plan.json"],
                                   stdout=open(self.dir / "pcside.out", "w"), stderr=subprocess.STDOUT)
-        self.meta.update(t0=t0, offset_at_plan=off)
+        self.meta.update(t0=t0, offset_at_plan=off, mac_clock_gap_s=mac_clock_gap())
         mac_res = [{"t": time.monotonic(), "procs": mac_resources()}]
         mac_status_log = open(self.dir / "mac_status.jsonl", "w")
         pc_status_log = open(self.dir / "pc_status.jsonl", "w") if self.pc_status_every else None
@@ -388,6 +401,11 @@ class Run:
         self.agent = [dict(e, t=self.clock.pc_to_mac(e["mono"])) for e in A.jl(self.dir / "pc" / "agent.jsonl")]
         self.notes = A.jl(self.dir / "notes.jsonl")
         self.mac_status = A.jl(self.dir / "mac_status.jsonl")
+        # the code strip is on the helper's clock, which is not the app's once the Mac has slept (analysis.py)
+        off = A.helper_clock_offset(self.mac_events, self.meta.get("mac_clock_gap_s"))
+        self.helper_off = off if off is not None else 0.0
+        self.clock.info = dict(self.clock.info or {}, mac_helper_minus_app_s=off,
+                               mac_clock_gap_s=self.meta.get("mac_clock_gap_s"))
         self.pc_status = A.jl(self.dir / "pc_status.jsonl")
 
     def at(self, label):
@@ -405,7 +423,8 @@ class Run:
         out = self.dir / "pc" / f"{tag}.out"
         if not dump.exists() or self.pctime is None:
             return None
-        frames = A.Frames.from_dump(A.parse_dump(dump.read_text(errors="replace")), self.pctime.unix_us, tag)
+        frames = A.Frames.from_dump(A.parse_dump(dump.read_text(errors="replace")), self.pctime.unix_us, tag,
+                                    helper_off=self.helper_off)
         summary, lines = A.parse_probe_out(out.read_text(errors="replace") if out.exists() else "")
         t_open = self.pctime.unix_us(summary["t_begin"]) if summary and summary.get("t_begin") else None
         t_closed = self.pctime.unix_us(summary["t_closed"]) if summary and summary.get("t_closed") else None

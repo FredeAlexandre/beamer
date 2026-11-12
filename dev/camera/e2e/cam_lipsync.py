@@ -56,9 +56,12 @@ PC_PROTO_SRCS = (r"C:\Users\Alex\audio-wp10\proto-audio.exe", r"C:\Users\Alex\au
 # CABLE Output's endpoint id on lebig (dev/audio/e2e/run.py CABLE_OUT)
 CABLE_OUT = "{0.0.1.00000000}.{ddc7e301-3260-4ed3-8389-0938254820e0}"
 TASK = "BeamerLipsyncAgent"
-LOCKS = (Path.home() / "Developer" / ".beamer-camera-lab.lock",)
-AUDIO_LOCK = Path.home() / "Developer" / ".beamer-audio-lab.lock"
-DEPLOY_LOCK = Path.home() / "Developer" / ".beamer-deploy.lock"
+# same rule as camlib.LOCK_DIR: ~/Developer if it exists (the checkout's old parent), else the checkout's parent
+LOCK_DIR = Path(os.environ.get("BEAMER_LOCK_DIR") or
+                (Path.home() / "Developer" if (Path.home() / "Developer").is_dir() else REPO.parent))
+LOCKS = (LOCK_DIR / ".beamer-camera-lab.lock",)
+AUDIO_LOCK = LOCK_DIR / ".beamer-audio-lab.lock"
+DEPLOY_LOCK = LOCK_DIR / ".beamer-deploy.lock"
 
 PASS_LO, PASS_HI = -20.0, 40.0   # §10.5: audio later = positive
 LEAD_S = 6.0                     # PC recorders open this long after the run start (routes set at 0)

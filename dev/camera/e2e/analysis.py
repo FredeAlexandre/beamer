@@ -3,8 +3,12 @@
 
 Everything is put on ONE time base, the Mac's monotonic clock in seconds (`mac` below). It is the clock of:
   - the Mac app's `mono` stamps in audio-dev-events.jsonl (Python time.monotonic() = mach_absolute_time),
-  - the Mac helper's now_ns() (mach_absolute_time in ns), hence the capture time the synthetic source writes
-    into the C1 code strip (ts100us = capture_ns / 1e5, modulo 2^32: wraps every 4.97 days, unwrapped here).
+  - the Mac helper's now_ns(), hence the capture time the synthetic source writes into the C1 code strip
+    (ts100us = capture_ns / 1e5, modulo 2^32: wraps every 4.97 days, unwrapped here). CAUTION (Q2, 2026-11-12):
+    the helper's now_ns() is libc++ steady_clock = CLOCK_MONOTONIC_RAW on Apple, which counts sleep, while
+    time.monotonic() = mach_absolute_time does not: once the Mac has slept they differ by the total sleep time.
+    `helper_clock_offset` measures that offset per run (stats `now_ns` vs the app's receipt `mono`) and
+    `Frames.from_dump` takes it off the strip time.
 The PC has two clocks: its monotonic clock (QueryPerformanceCounter: the PC app's `mono`, pcside/pcagent
 stamps) and its wall clock (camprobe's `t` = unix µs). `Clock` relates Mac mono <-> PC mono from the
 clock.py ping link (dev/audio/e2e/clock.py, unchanged), `Linear` relates PC unix <-> PC mono from the pairs
@@ -174,6 +178,22 @@ def parse_probe_out(text):
     return summary, lines
 
 
+def helper_clock_offset(mac_events, gap_s=None, snap_s=0.05):
+    """Mac helper clock (now_ns) - Mac app clock (mono), seconds. Each helper `stats` event carries the helper's
+    now_ns and the app's mono at receipt (a few ms later), so max(now_ns/1e9 - mono) is the offset minus the
+    smallest pipe delay. Snapped to 0 or to `gap_s` (CLOCK_MONOTONIC_RAW - mach clock, measured by the run)
+    when within `snap_s`; None without stats events (callers then assume 0, the original contract)."""
+    est = [e["now_ns"] / 1e9 - e["mono"] for e in mac_events
+           if e.get("ev") == "stats" and isinstance(e.get("now_ns"), (int, float)) and "mono" in e]
+    if not est:
+        return None
+    off = max(est)
+    for cand in (0.0, gap_s):
+        if cand is not None and abs(off - cand) <= snap_s:
+            return float(cand)
+    return off
+
+
 def unwrap_ts(ts100us, ref_mac_s):
     """Code strip time (u32, 100 µs units of the Mac's mach clock) -> Mac mono seconds, nearest to ref."""
     ref = ref_mac_s * 1e4
@@ -191,11 +211,12 @@ class Frames:
         self.rows = rows
 
     @classmethod
-    def from_dump(cls, dump_rows, to_mac, tag=""):
+    def from_dump(cls, dump_rows, to_mac, tag="", helper_off=0.0):
+        """helper_off: Mac helper clock - Mac app clock, s (`helper_clock_offset`); the strip is on the helper's."""
         out = []
         for t_us, c, f, ts in dump_rows:
             t = to_mac(t_us)
-            out.append((t, c, f, unwrap_ts(ts, t) if c == "c1" else None))
+            out.append((t, c, f, unwrap_ts(ts, t + helper_off) - helper_off if c == "c1" else None))
         return cls(out, tag)
 
     def c1(self):

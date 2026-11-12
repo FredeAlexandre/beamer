@@ -1,0 +1,98 @@
+{
+ "case": "cam_latency",
+ "verdict": "fail",
+ "commit": "e09ea72",
+ "started": "2026-11-12 19:53:49",
+ "sessions": [
+  "latency_720p"
+ ],
+ "clock": [
+  {
+   "pings": 309,
+   "windows": 9,
+   "rtt_min_ms": 4.24,
+   "rtt_p50_ms": 6.34,
+   "rtt_p99_ms": 68.33,
+   "drift_ppm": 15.9,
+   "resid_max_ms": 1.293
+  }
+ ],
+ "checks": [
+  {
+   "name": "720p: capture -> app p50 (ms)",
+   "value": null,
+   "mark": "<= 70",
+   "pass": false,
+   "note": "C4: 57.5 / 60.3 / 65"
+  },
+  {
+   "name": "720p: capture -> app p95 (ms)",
+   "value": null,
+   "mark": "<= 90",
+   "pass": false
+  },
+  {
+   "name": "720p: capture -> app p99 (ms)",
+   "value": null,
+   "mark": "<= 140",
+   "pass": false
+  },
+  {
+   "name": "720p: late frames per minute (PC stats)",
+   "value": 0.0,
+   "mark": "<= 20",
+   "pass": true,
+   "note": "C4: 7.6-11"
+  },
+  {
+   "name": "720p: 0 corrupt pictures (code strip)",
+   "value": {
+    "black": 0,
+    "frames": 1784,
+    "live": 0
+   },
+   "mark": "0",
+   "pass": true
+  },
+  {
+   "name": "720p: no lip-sync hold (no mic stream)",
+   "value": null,
+   "mark": "sync_ms 0",
+   "pass": null
+  },
+  {
+   "name": "720p: one stream, 1 IDR",
+   "value": {},
+   "mark": "1",
+   "pass": false
+  },
+  {
+   "name": "camera-on invariant (\u00a76.5): Mac camera never on without a receiver",
+   "value": "no violation",
+   "mark": "on <= 3.5 s (never ran) / 5.5 s (ran) outside PC demand",
+   "pass": true
+  }
+ ],
+ "info": {
+  "720p": {
+   "latency_ms": {
+    "n": 0
+   },
+   "integrity": {
+    "black": 0,
+    "frames": 1784,
+    "live": 0
+   },
+   "late_total": 0,
+   "minutes": 1.0,
+   "frozen_episodes_100ms": 0,
+   "pc_d_ms": {
+    "n": 0
+   },
+   "dec_ms": {
+    "n": 0
+   },
+   "decoders": {}
+  }
+ }
+}

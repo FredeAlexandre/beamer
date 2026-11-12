@@ -1,0 +1,29 @@
+{
+ "case": "cam_oldpeer",
+ "verdict": "incomplete",
+ "checks": [
+  {
+   "name": "asusrog link up",
+   "value": null,
+   "mark": "link lines present",
+   "pass": null,
+   "note": "None = asusrog offline today: run again when it is on"
+  },
+  {
+   "name": "no camera_* / time_map towards asusrog (PC log)",
+   "value": [],
+   "mark": "0 lines",
+   "pass": true
+  },
+  {
+   "name": "no warnings about asusrog",
+   "value": [],
+   "mark": "0 lines",
+   "pass": true
+  }
+ ],
+ "info": {
+  "lines": 0,
+  "note": "asusrog's own n_rejected needs a shell on asusrog (not reachable from here)"
+ }
+}

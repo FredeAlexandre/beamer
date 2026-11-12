@@ -1,0 +1,60 @@
+{
+ "case": "cam_helper_kill",
+ "verdict": "fail",
+ "commit": "e09ea72",
+ "started": "2026-11-12 19:57:23",
+ "sessions": [
+  "helper_kill"
+ ],
+ "clock": [
+  {
+   "pings": 311,
+   "windows": 9,
+   "rtt_min_ms": 5.28,
+   "rtt_p50_ms": 6.02,
+   "rtt_p99_ms": 36.19,
+   "drift_ppm": 15.4,
+   "resid_max_ms": 0.077
+  }
+ ],
+ "checks": [
+  {
+   "name": "last picture held, then the DLL's built-in placeholder (ms after the kill)",
+   "value": 547.2,
+   "mark": "<= 600 (500 ms threshold), held picture before",
+   "pass": false,
+   "note": "CW5: 507-509 ms"
+  },
+  {
+   "name": "live again after the watchdog restart (s after the new helper's ready)",
+   "value": null,
+   "mark": "<= 5.0",
+   "pass": false,
+   "note": "None s after the kill"
+  },
+  {
+   "name": "camera-on invariant (\u00a76.5): Mac camera never on without a receiver",
+   "value": [
+    [
+     1449022707,
+     4.72,
+     113142.969
+    ]
+   ],
+   "mark": "on <= 3.5 s (never ran) / 5.5 s (ran) outside PC demand",
+   "pass": false
+  }
+ ],
+ "info": {
+  "kill": {
+   "event": "kill_helper",
+   "pid": 7980,
+   "mono": 4139.6682646,
+   "mono_after": 4139.7256057,
+   "rc": 0,
+   "out": "Op\u201aration r\u201aussie\u00ff: le processus avec PID 7980 a \u201at\u201a termin\u201a.",
+   "t": 113102.62691026904
+  },
+  "held_frames": 16
+ }
+}

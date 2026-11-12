@@ -66,6 +66,22 @@ class StripTests(unittest.TestCase):
         t2 = wrap_s * 3 - 0.02                             # just before it, reference after it
         self.assertAlmostEqual(A.unwrap_ts(int(t2 * 1e4) % A.TS_WRAP, wrap_s * 3 + 0.04), t2, delta=1e-4)
 
+    def test_helper_clock_offset_after_mac_sleep(self):
+        # Q2 2026-11-12: the helper's now_ns (CLOCK_MONOTONIC_RAW) ran 167.785 s ahead of the app's mono
+        # (mach_absolute_time) after the Mac had slept; the strip is on the helper's clock.
+        gap = 167.785
+        ev = [{"ev": "stats", "now_ns": int((t + gap) * 1e9), "mono": t + 0.002 + 0.001 * (k % 3)}
+              for k, t in enumerate(range(113000, 113060))]
+        self.assertEqual(A.helper_clock_offset(ev, gap), gap)                  # snapped to the measured gap
+        self.assertAlmostEqual(A.helper_clock_offset(ev, None), gap - 0.002, delta=1e-6)
+        same = [dict(e, now_ns=int((e["mono"] - 0.002) * 1e9)) for e in ev]
+        self.assertEqual(A.helper_clock_offset(same, gap), 0.0)                # clocks equal: 0
+        self.assertIsNone(A.helper_clock_offset([{"ev": "camera", "mono": 1.0}], gap))
+        t_app, lat = 113030.0, 0.057                                           # a frame shown 57 ms after capture
+        ts = int((t_app - lat + gap) * 1e4) % A.TS_WRAP
+        fr = A.Frames.from_dump([(0, "c1", 7, ts)], lambda _: t_app, helper_off=gap)
+        self.assertAlmostEqual(fr.rows[0][0] - fr.rows[0][3], lat, delta=2e-4)
+
 
 def frames_live(t_from, t_to, lat=0.057, f0=0, period=1 / 30):
     rows, f, t = [], f0, t_from
