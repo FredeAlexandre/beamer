@@ -95,7 +95,7 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 |---|---|
 | P1 UI polish | **done** (`7620591`): `video.fill` glyph, lanes camera/mic/sound = tile row order (Mac + same one-line change in Qt, **Qt tests not run**), denied line points to System Settings (+ detail line on both pages), preferred camera named in placeholders; 181 camera core tests + Mac page tests pass; 14 Mac shots re-rendered, reviewed by operator. **Tonight:** run Qt camera tests on lebig, re-render CW8's denied shot, `i18n_extract` + commit `locales/` (5 new strings) |
 | CW10 Lip sync, Mac part (`sync.*`, tests, `cam_lipsync.py` ready to run) | running |
-| CW11a E2E harness + cases + pre-flight + run plan (no deploy) | running |
+| CW11a E2E harness | **done** (`772254b`): `dev/camera/e2e/run.py` (preflight, smoke, case, all, soak, real, table); all §10.5 cases with thresholds + camera-on invariant on every run; synthetic cases unattended, `*_real` separate (H1); replay of C4 recordings matches C4's numbers within 0.1 ms (found and fixed a 78 ms clock-sign bug in the analysis); preflight stops cleanly with the PC off and noticed the Mac's installed app (2026-11-08) has no camera. **Plan tonight** (~2 h 30 unattended after deploy): deploy ~15 min -> Beamer Camera install on lebig (Alex clicks "Install Beamer Camera…" = H6, else ssh `vcam-install`) -> `audio-dev.enabled` on the PC if missing -> preflight -> smoke (look) -> all ~95 + 12 min -> soak ~34 min -> table + report part 2. Later with Alex (~15 min): H1 grant, `run.py real` |
 
 ## Lessons (operator)
 
