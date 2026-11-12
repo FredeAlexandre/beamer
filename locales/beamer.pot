@@ -1808,11 +1808,16 @@ msgid "Something went wrong in Beamer"
 msgstr ""
 
 #: core/camera/texts.py core/camera/view.py
-msgid "Test source"
+msgid "Default camera"
 msgstr ""
 
 #: core/camera/texts.py core/camera/view.py
-msgid "Default camera"
+msgid "Test source"
+msgstr ""
+
+#: core/camera/texts.py
+#, python-brace-format
+msgid "Allow it on {machine} in System Settings > Privacy & Security > Camera"
 msgstr ""
 
 #: core/camera/texts.py
@@ -1829,6 +1834,11 @@ msgstr ""
 
 #: core/camera/texts.py
 msgid "Beamer Camera stopped"
+msgstr ""
+
+#: core/camera/texts.py
+#, python-brace-format
+msgid "Allow it in the system settings on {machine}"
 msgstr ""
 
 #: core/camera/texts.py
@@ -1952,6 +1962,10 @@ msgid "No linked PC can show it: apps on a PC use Beamer Camera."
 msgstr ""
 
 #: core/camera/view.py
+msgid "Allow it in System Settings > Privacy & Security > Camera."
+msgstr ""
+
+#: core/camera/view.py
 msgid "through the Beamer link"
 msgstr ""
 
@@ -2031,6 +2045,11 @@ msgstr ""
 #: core/camera/view.py
 #, python-brace-format
 msgid "The camera stopped on {machine}."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "Allow it on {machine} in System Settings > Privacy & Security > Camera."
 msgstr ""
 
 #: core/camera/view.py
@@ -2135,6 +2154,11 @@ msgstr ""
 #: core/camera/view.py
 #, python-brace-format
 msgid "Video needs a direct network path between {source} and {targets}."
+msgstr ""
+
+#: core/camera/view.py
+#, python-brace-format
+msgid "Allow it in the system settings on {machine}."
 msgstr ""
 
 #: core/camera/view.py
