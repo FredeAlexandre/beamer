@@ -20,6 +20,8 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 
 ## En attente d'Alex
 
+0. **Deploy go (asked 2026-11-11 late):** Alex: the PC is off, continue this evening (2026-11-12). On his
+   message: `dev/deploy.sh` both, then CW10 PC part + CW11 runs.
 1. **Camera permission for the measurements on the real camera (C1, optional, ~3 min).** C1's request went out
    in the name of T3 Code (the app agents run under); a prompt may be on the Mac's screen. Allowing it lets an
    agent run `dev/camera/proto/mac/experiments/camera_suite.sh` (cold start, capture latency, sharing with
@@ -86,6 +88,14 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 - `vcam-uninstall` (CW4) leaves empty `HKLM\SOFTWARE\Beamer`, `Program Files\Beamer`, `ProgramData\Beamer` (harmless,
   `Remove-BeamerCamera` deletes them).
 - DONE (CW9b): `win_app/vcam_install.py:91` hard-coded log string flagged by i18n coverage (CW9b).
+
+## While the PC is off (2026-11-12)
+
+| WP | State |
+|---|---|
+| P1 UI polish (glyph, arrow lanes, denied text, preferred camera name) | running (Mac only) |
+| CW10 Lip sync, Mac part (`sync.*`, tests, `cam_lipsync.py` ready to run) | running |
+| CW11a E2E harness + cases + pre-flight + run plan (no deploy) | running |
 
 ## Lessons (operator)
 
