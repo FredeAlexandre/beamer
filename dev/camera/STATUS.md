@@ -20,8 +20,9 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 
 ## En attente d'Alex
 
-0. **Deploy go (asked 2026-11-11 late):** Alex: the PC is off, continue this evening (2026-11-12). On his
-   message: `dev/deploy.sh` both, then CW10 PC part + CW11 runs.
+0. **DONE 2026-11-12 evening:** PC on, Alex said "finish what's left to mark the feature done". Deployed `daf0006`
+   then `9a268a4` on both. **H6 passed**: Alex installed Beamer Camera through the page + UAC at 19:01
+   (`vcam-install exited 0`, camera create 208 ms); firewall prompt: to ask him.
 1. **Camera permission for the measurements on the real camera (C1, optional, ~3 min).** C1's request went out
    in the name of T3 Code (the app agents run under); a prompt may be on the Mac's screen. Allowing it lets an
    agent run `dev/camera/proto/mac/experiments/camera_suite.sh` (cold start, capture latency, sharing with
@@ -96,6 +97,17 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 | P1 UI polish | **done** (`7620591`): `video.fill` glyph, lanes camera/mic/sound = tile row order (Mac + same one-line change in Qt, **Qt tests not run**), denied line points to System Settings (+ detail line on both pages), preferred camera named in placeholders; 181 camera core tests + Mac page tests pass; 14 Mac shots re-rendered, reviewed by operator. **Tonight:** run Qt camera tests on lebig, re-render CW8's denied shot, `i18n_extract` + commit `locales/` (5 new strings) |
 | CW10 Lip sync, Mac part | **done** (`886303e`): hold = clamp(audio - video, 0, 150) +-2 ms, slew <= 10 ms/s, 2 s warm-up; +-3 h offsets, +-20 ms offset error, +-25 ppm drift over 5 min: A/V gap <= 2 ms; vmic mode change tracked; no hold without a Mac mic forwarded to that PC; audio never delayed; 4 mutations caught; 65 engine cases Mac (ASan/UBSan/TSan clean); `cam_lipsync.py` ready (selftest OK). Hunks outside its list accepted (`engine_tests.cpp`, `backend.h` `render_path_ms()`, `backend_win.cpp`). Clock-domain risk (camera PTS on mach host time vs engine steady_clock) -> operator fix `camera_mac.mm` maps PTS through the live offset; helper builds, `video_check selftest` 0 fails. **Tonight:** PC engine tests + build-win, `cam_lipsync` shared + lowlat 300 s (-20..+40 ms) |
 | CW11a E2E harness | **done** (`772254b`): `dev/camera/e2e/run.py` (preflight, smoke, case, all, soak, real, table); all §10.5 cases with thresholds + camera-on invariant on every run; synthetic cases unattended, `*_real` separate (H1); replay of C4 recordings matches C4's numbers within 0.1 ms (found and fixed a 78 ms clock-sign bug in the analysis); preflight stops cleanly with the PC off and noticed the Mac's installed app (2026-11-08) has no camera. **Plan tonight** (~2 h 30 unattended after deploy): deploy ~15 min -> Beamer Camera install on lebig (Alex clicks "Install Beamer Camera…" = H6, else ssh `vcam-install`) -> `audio-dev.enabled` on the PC if missing -> preflight -> smoke (look) -> all ~95 + 12 min -> soak ~34 min -> table + report part 2. Later with Alex (~15 min): H1 grant, `run.py real` |
+
+## Evening 2026-11-12 (PC on)
+
+| WP | State |
+|---|---|
+| Repo moved | clone now `~/Repositories/github.com/FredeAlexandre/beamer`; the move's path edits (HAL staging in Application Support) committed by operator `daf0006` so deploy could run |
+| Locales | operator `bbddd1e`: P1's 5 strings extracted |
+| G1 French test guide | **done** (`226c08b`): `dev/camera/TEST-ALEX.md`, 7 steps (H6, H1, H2/H3, privacy, H5 + `run.py real`, H4/H9, H7), reviewed by operator; results section to fill after Q2 |
+| Q1 PC offline checks | **done** (`9661f30`): engine 65 cases / 3111 checks 0 fail on the PC; `build-win.cmd` exit 0; Qt suite 4341 tests, no camera failure; CW8 denied shots re-rendered (System Settings line, "Audio & Camera"). 2 non-camera defects -> F3 |
+| F3 Q1's defects | **done** (`4394e01`, report `9a268a4`): `SyntheticWindow` never makes an `AudioService` (2 tests failed when a built helper sat in the checkout); `core/audio/view.py` full stop inside `tr("{line}.")` |
+| Q2 E2E live (CW11 runs + CW10 lip sync PC) | **running** from ~19:35: preflight -> smoke -> all (+ cam_lipsync) -> soak -> table, report = cw11.md part 2 |
 
 ## Lessons (operator)
 
