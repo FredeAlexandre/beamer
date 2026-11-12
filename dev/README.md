@@ -71,9 +71,14 @@ Treat anything else as a real failure.
 
 ## Branches
 
-- `main` mirrors `upstream/main` (kalkman-code/beamer). Never commit to it.
+- `main` is the fork's own line: upstream (kalkman-code/beamer) plus this setup's fixes, the dev
+  tools and the finished features (audio and microphone, camera; merged 2026-11-12). It no longer
+  mirrors `upstream/main`: take upstream releases with `git merge upstream/main`. Feature branches
+  start from `main` and come back to it once Alex calls them done.
 - `dev/local-build` holds the fixes this setup needs (python.org 3.13.17 compileall, self-signed
-  signing identity) plus these dev tools. Feature branches start from it.
+  signing identity) plus the dev tools; it is already in `main` and kept for reference.
+- `feat/audio` and `feat/camera` are kept as they were at the merge (also tagged
+  `archive/feat-audio` and `archive/feat-camera`). Do not delete them.
 - To offer a change upstream, cherry-pick it onto a branch from `upstream/main`, sign off every
   commit (`git commit -s`), and open an issue first for anything non-trivial (see CONTRIBUTING.md).
 
