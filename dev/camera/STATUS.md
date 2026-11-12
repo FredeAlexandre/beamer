@@ -80,9 +80,9 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 
 ## Polish list (operator, for a pass after E2E / Alex's feedback)
 
-- Map: camera glyph `web.camera.fill` reads like a pin at 11 pt -> `video.fill`; arrow lanes are not in the
+- DONE (P1): Map: camera glyph `web.camera.fill` reads like a pin at 11 pt -> `video.fill`; arrow lanes are not in the
   order of the tile rows (camera row on top, its arrow is the lower one).
-- `texts.py`: "denied" line should point to System Settings; name the preferred camera instead of "Default camera".
+- DONE (P1): `texts.py`: "denied" line should point to System Settings; name the preferred camera instead of "Default camera".
 - DONE: "Restart Windows to finish updating Beamer Camera." replaced by "Close apps that use the
   camera to finish updating Beamer Camera." (operator decision).
 - `vcam-uninstall` (CW4) leaves empty `HKLM\SOFTWARE\Beamer`, `Program Files\Beamer`, `ProgramData\Beamer` (harmless,
@@ -93,7 +93,7 @@ Zoom, Discord, browsers, Camera app), built the same way as the audio feature he
 
 | WP | State |
 |---|---|
-| P1 UI polish (glyph, arrow lanes, denied text, preferred camera name) | running (Mac only) |
+| P1 UI polish | **done** (`7620591`): `video.fill` glyph, lanes camera/mic/sound = tile row order (Mac + same one-line change in Qt, **Qt tests not run**), denied line points to System Settings (+ detail line on both pages), preferred camera named in placeholders; 181 camera core tests + Mac page tests pass; 14 Mac shots re-rendered, reviewed by operator. **Tonight:** run Qt camera tests on lebig, re-render CW8's denied shot, `i18n_extract` + commit `locales/` (5 new strings) |
 | CW10 Lip sync, Mac part (`sync.*`, tests, `cam_lipsync.py` ready to run) | running |
 | CW11a E2E harness + cases + pre-flight + run plan (no deploy) | running |
 
