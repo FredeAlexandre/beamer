@@ -1493,6 +1493,11 @@ msgstr ""
 msgid "{machine}, {state}."
 msgstr ""
 
+#: core/audio/view.py win_app/pages_win.py
+#, python-brace-format
+msgid "{line}."
+msgstr ""
+
 #: core/audio/view.py
 #, python-brace-format
 msgid "Beamer heard what sounds like feedback in {source}'s sound playing on {target}, and turned it down. If Wave Link's monitor plays a microphone into the system output on {source}, turn it off."
@@ -6405,11 +6410,6 @@ msgstr ""
 #: win_app/pages_win.py
 #, python-brace-format
 msgid "{machines}."
-msgstr ""
-
-#: win_app/pages_win.py
-#, python-brace-format
-msgid "{line}."
 msgstr ""
 
 #: win_app/pages_win.py

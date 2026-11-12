@@ -111,6 +111,12 @@ class SyntheticWindow(kvm.WindowsApplication):
     def _start_receiver(self, _config):
         pass
 
+    def _make_audio(self):
+        # No AudioService: `core.audio.helper.locate()` would find a built beamer-audio.exe in the
+        # checkout (native/audio/build/win), and the window would then hold a real service. A test
+        # that needs one sets `window.audio` to a fake (test_audio_page_win.InTheWindow).
+        self._audio = self.audio = None
+
     def _build_tray(self):
         self.tray = NullTray()
         for name in ("header_action", "open_action", "status_action", "redirect_action",

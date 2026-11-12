@@ -659,7 +659,7 @@ def _tile(snap: AudioSnapshot, names: _Names, machine: str, frame, selected: str
     parts = [tr("{machine}, {state}.").format(machine=name, state=tr("online") if online else tr("offline"))]
     if has_mic:
         parts.append(tr("Its {device} is the shared microphone.").format(device=mic_line))
-    parts.append(output_line + ".")
+    parts.append(tr("{line}.").format(line=output_line))
     if recording_line:
         parts.append(recording_line)
     return TileView(machine=machine, frame=frame, title=name, subtitle=subtitle, platform=platform, own=own,
@@ -868,7 +868,7 @@ def _camera_tile(tile: TileView, camera, names: _Names) -> TileView:
     if has_camera:
         parts.append(tr("Its {camera} is the shared camera.").format(camera=camera.source_line))
     if watching:
-        parts.append(watching + ".")
+        parts.append(tr("{line}.").format(line=watching))
     return replace(tile, camera_line=camera.source_line if has_camera else "", has_active_camera=has_camera,
                    camera_live=has_camera and camera.live, watching_line=watching, description=" ".join(parts))
 
