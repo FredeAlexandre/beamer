@@ -6,7 +6,7 @@ microphone following input, next) can be built and tested end to end.
 | | Mac (hub) | Windows PC |
 |---|---|---|
 | Name | `alexandres-macbook-air` | `lebig` (Tailscale MagicDNS) |
-| Clone | `~/Developer/beamer` | `C:\Users\Alex\Developer\beamer` |
+| Clone | `~/Repositories/github.com/FredeAlexandre/beamer` | `C:\Users\Alex\Developer\beamer` |
 | Python | `mac_app/.venv` from the python.org universal2 framework (pinned in `mise.local.toml`) | `win_app\.venv`, made with `uv venv --seed --python 3.13` |
 | Installed app | `/Applications/Beamer.app`, signed "Beamer Dev" | `%LOCALAPPDATA%\Beamer\Beamer.exe` |
 | Log | `~/Library/Logs/Beamer/Beamer.log` | `%LOCALAPPDATA%\Beamer\Beamer.log` |

@@ -10,7 +10,7 @@
 #   build/mac/backend_check         universal test harness for the Mac backend alone (not shipped)
 #   build/mac/video_check           universal test harness for the Mac video backend alone (camera CW3, not shipped)
 #   build/mac/BeamerAudio.driver    the HAL plug-in (mac-driver/build.sh, which also stages it in
-#                                   ~/Developer/beamer-hal-staging for beamer-hal)
+#                                   ~/Library/Application Support/Beamer/hal-staging for beamer-hal)
 # Objects are cached per arch under build/obj/<arch>/ and rebuilt only when the source or one of the
 # headers it includes is newer (clang -MMD dependency files), or when the flags change.
 set -euo pipefail

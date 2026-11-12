@@ -7,7 +7,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$HERE/build"
 BUNDLE="$BUILD/BeamerAudio.driver"
-STAGING="${BEAMER_HAL_STAGING:-$HOME/Developer/beamer-hal-staging}"
+STAGING="${BEAMER_HAL_STAGING:-$HOME/Library/Application Support/Beamer/hal-staging}"
 SIGN_ID="Beamer Dev"
 
 rm -rf "$BUNDLE"

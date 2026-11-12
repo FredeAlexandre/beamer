@@ -12,7 +12,7 @@ on C4's recordings (`run.py replay-c4`).
 ## Run it (operator, after `dev/deploy.sh`)
 
 ```sh
-cd ~/Developer/beamer
+cd ~/Repositories/github.com/FredeAlexandre/beamer
 dev/deploy.sh                                  # same commit on both, camera included
 e2e() { uv run --python 3.13 --with numpy dev/camera/e2e/run.py "$@"; }   # bash and zsh
 e2e preflight                                 # ~10 s; STOPs with the reason if anything is missing

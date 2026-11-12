@@ -739,7 +739,7 @@ Levels -> `subscribe_levels` -> UI thread -> meters only. Nothing in the UI bloc
   `Install-Beamer-Mac.command` adds `Microphone` and `AudioCapture` to the services it resets for ad-hoc builds.
   First real prompt and grant need Alex (human check H1).
 - macOS < 14.2: no process taps; the helper omits `system_capture`/`local_mute_tap` (weak-linked, `@available`).
-- **Driver**: dev keeps `beamer-hal` (NOPASSWD) with staging dir `~/Developer/beamer-hal-staging`
+- **Driver**: dev keeps `beamer-hal` (NOPASSWD) with staging dir `~/Library/Application Support/Beamer/hal-staging`
   (build-mac.sh stages there as the prototype did). Shipped: `audio_driver.py` compares the bundled and
   installed `CFBundleVersion`; the page offers "Install Beamer Microphone" (or "Update"), which runs
   `/usr/bin/osascript -e 'do shell script "<Resources>/audio/install-driver.sh" with administrator

@@ -6,8 +6,8 @@ The app carries the driver in Contents/Resources/audio/ beside install-driver.sh
 needs root, so it is never done silently:
 
 - dev Macs have /usr/local/libexec/beamer-hal with a NOPASSWD sudo rule; it installs the bundle
-  that native/audio/build-mac.sh staged in ~/Developer/beamer-hal-staging. It is used whenever it
-  exists, so a dev Mac never shows an administrator prompt.
+  that native/audio/build-mac.sh staged in ~/Library/Application Support/Beamer/hal-staging. It is
+  used whenever it exists, so a dev Mac never shows an administrator prompt.
 - everywhere else osascript runs the bundled install-driver.sh "with administrator privileges",
   which shows the standard macOS administrator prompt.
 

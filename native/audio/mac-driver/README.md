@@ -10,7 +10,7 @@ Status (2026-11-08): **installed and validated on the Mac** through the `beamer-
 bit-exact, and the mic has an input volume and mute. Live results: "Live test results" below.
 
 ```
-./build.sh   # universal bundle -> build/BeamerAudio.driver, copied to ~/Developer/beamer-hal-staging/
+./build.sh   # universal bundle -> build/BeamerAudio.driver, copied to ~/Library/Application Support/Beamer/hal-staging/
 ./test.sh    # build.sh + drives the bundle with test/test_host (plus ASan/UBSan and TSan builds)
 sudo -n /usr/local/libexec/beamer-hal install   # copy the staged bundle into the HAL + restart coreaudiod
 swiftc -O test/ca_util.swift -o build/ca_util && (cd test && uv run --python 3.13 --with numpy live_check.py)
