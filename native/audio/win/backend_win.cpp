@@ -6,6 +6,8 @@
 // only thread that calls the stream's sink/source. Streams whose device is "" follow the Windows default (eConsole).
 #include "backend_win.h"
 
+#include "../engine/sync.h"  // cable_render_path_ms (camera lip sync)
+
 #include <shellapi.h>
 
 #include <algorithm>
@@ -40,6 +42,8 @@ class WinStream : public StreamHandle {
         std::lock_guard<std::mutex> g(m_);
         return device_;
     }
+    // camera lip sync (§4.9): the virtual mic's render path latency for the mode actually opened (engine sync.h)
+    double render_path_ms() const override { return path_ms_.load(); }
     bool start(std::string* err);
     void inject_invalidation() { inject_ = true; SetEvent(wake_); }
     bool local_unmuted();
@@ -83,6 +87,7 @@ class WinStream : public StreamHandle {
     CaptureStats stats_;           // capture streams: counters (under m_; WP14)
     HANDLE thread_ = nullptr, wake_ = nullptr, opened_ = nullptr;
     std::atomic<bool> stop_{false}, inject_{false};
+    std::atomic<double> path_ms_{-1.0};  // render_path_ms(): set at each (re)open of a virtual-mic render
     std::string open_err_;
     bool open_ok_ = false;
 };
@@ -469,6 +474,9 @@ bool WinStream::open(IMMDeviceEnumerator* e, const std::string& id, std::string*
     if (kind_ == StreamKind::Render && !c->exclusive)
         BLOG_I("render queue %.2f periods = %.1f ms", virtual_mic ? b_->opt_.vmic_queue : b_->opt_.render_queue,
                (virtual_mic ? b_->opt_.vmic_queue : b_->opt_.render_queue) * c->period_frames * 1000.0 / kRate);
+    if (kind_ == StreamKind::Render && virtual_mic)
+        path_ms_.store(cable_render_path_ms(c->exclusive ? CableMode::Exclusive
+                                            : c->low_latency ? CableMode::SharedLowLatency : CableMode::SharedDefault));
     client_ = std::move(c);
     return true;
 }

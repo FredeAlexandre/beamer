@@ -162,6 +162,7 @@ void VideoRecvCore::complete_frame(uint32_t frame, Frame& f, int64_t now) {
   }
   int64_t out;
   if (!mapped_out(f, frame, now, &out)) return;
+  enc_delay_ms_ = double(f.enc_delay) * 0.1;
   const double d = double(now - out) * 1e-6;
   if (!(f.vflags & (kVIdr | kVBehindIdr))) {
     playout_.add(now, d);
@@ -735,6 +736,13 @@ Json VideoRecvCore::stats(double dt) {
   j["decoder"] = decoder_;
   const double hold = lipsync ? lipsync->hold_ms() : 0.0;
   j["sync_ms"] = r1(hold);
+  // lip sync (§4.9): the audio side's present delay and the skew left after the hold (audio later = positive;
+  // negative = audio leads, nothing done), null without a paired mic stream; the audio path latency used
+  auto r1n = [&](double v) { return std::isfinite(v) ? Json(r1(v)) : Json(nullptr); };
+  j["sync_audio_ms"] = r1n(lipsync ? lipsync->audio_ms() : LipSyncHold::kNone);
+  j["sync_skew_ms"] = r1n(lipsync ? lipsync->skew_ms() : LipSyncHold::kNone);
+  j["sync_path_ms"] = r1n(lipsync ? lipsync->path_ms() : LipSyncHold::kNone);
+  j["sync_override"] = lipsync && lipsync->overridden();
   int64_t off = 0, age = 0;
   if (offset_source && offset_source(now_ns(), &off, &age)) {
     j["offset_ms"] = r1(double(off) * 1e-6);
@@ -753,7 +761,7 @@ Json VideoRecvCore::stats(double dt) {
   j["acked"] = acked_ == kNoFrame ? Json(nullptr) : Json(acked_);
   j["shown"] = shown_.empty() ? "live" : shown_;
   // lip sync data (§4.9): from capture, like the audio side (+ ~2 ms source delivery)
-  j["video_present_delay_ms"] = r1(d_now_ms_ + hold + 2.0);
+  j["video_present_delay_ms"] = r1(video_present_delay_ms(std::max(0.0, enc_delay_ms_), d_now_ms_) + hold);
   p_bytes_ = rx_bytes_;
   p_presented_ = presented_;
   p_frozen_ = frozen_ns_;
@@ -763,6 +771,17 @@ Json VideoRecvCore::stats(double dt) {
   return j;
 }
 
+bool VideoRecvCore::lipsync_video(int64_t now, double* video_ms, int64_t* offset_ns) {
+  std::lock_guard<std::mutex> lock(mu_);
+  if (!map_.valid() || !started_ || !live_ || !shown_.empty() || failed_ || enc_delay_ms_ < 0) return false;
+  bool ok = false;
+  const int64_t off = offset_now(now, &ok);
+  if (!ok) return false;
+  *offset_ns = off;
+  *video_ms = video_present_delay_ms(enc_delay_ms_, d_now_ms_);
+  return true;
+}
+
 // ================================================================== VideoRecvStream
 
 VideoRecvStream::VideoRecvStream(const Config& cfg, std::shared_ptr<Flow> flow, EventSink* events, FailFn on_fail,
@@ -770,7 +789,8 @@ VideoRecvStream::VideoRecvStream(const Config& cfg, std::shared_ptr<Flow> flow, 
     : StreamBase(cfg.id, "video"), cfg_(cfg), flow_(std::move(flow)), events_(events), on_fail_(std::move(on_fail)),
       core_(cfg.id, cfg.key, cfg.fps, cfg.w, cfg.h) {
   (void)events_;
-  core_.lipsync = sync;
+  sync_ = sync ? sync : &own_sync_;
+  core_.lipsync = sync_;
   core_.set_floor_ms(cfg.floor_ms);
   device_label_ = "vcam";
   Flow* f = flow_.get();

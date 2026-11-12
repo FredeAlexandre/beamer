@@ -26,7 +26,13 @@ struct CaptureSpec { CaptureKind kind; std::string device;  // "" = default (fol
                      int channels; bool mute_local = false; std::vector<int64_t> exclude_pids; };
 struct RenderSpec  { std::string device;  // "" = default output (followed), or the key
                      bool virtual_mic = false; int channels; };
-struct StreamHandle { virtual ~StreamHandle() = default; virtual std::string device_in_use() const = 0; };
+struct StreamHandle {
+  virtual ~StreamHandle() = default;
+  virtual std::string device_in_use() const = 0;
+  // Render streams: latency from the render callback to what an app capturing the device receives (ms), for lip
+  // sync (camera §4.9); < 0 = unknown. Any thread.
+  virtual double render_path_ms() const { return -1.0; }
+};
 struct BackendListener {
   virtual void devices_changed() = 0;                      // debounced 300 ms by the backend
   virtual void stream_lost(StreamHandle*, const std::string& why) = 0;  // device gone/invalidated

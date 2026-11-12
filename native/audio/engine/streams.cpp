@@ -399,6 +399,16 @@ OpenResult RecvStream::ingest(const uint8_t* data, size_t len, int64_t now, bool
   return r;
 }
 
+bool RecvStream::lipsync_audio(int64_t now, int64_t offset_ns, double path_ms, double* delay_ms) const {
+  uint32_t map_ts, rts;
+  int64_t map_ns, at;
+  if (!playing_.load(std::memory_order_relaxed) || !time_map_pair(&map_ts, &map_ns) || !render_ts(&rts, &at))
+    return false;
+  if (now - at > 500'000'000LL) return false;
+  *delay_ms = audio_present_delay_ms(rts, at, map_ts, map_ns, kRate, offset_ns, path_ms);
+  return true;
+}
+
 bool RecvStream::media_recent(int64_t now) const {
   int64_t t = last_media_ns_.load(std::memory_order_relaxed);
   return t != 0 && now - t < 1'000'000'000;

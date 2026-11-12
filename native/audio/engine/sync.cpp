@@ -89,4 +89,43 @@ double PlayoutTarget::target_ms(int64_t now) {
   return d_ms_;
 }
 
+
+// ===================================================================== lip sync (§4.9)
+
+double LipSyncPolicy::target_ms() const {
+  if (!active_) return 0.0;
+  return std::min(kMaxHoldMs, std::max(0.0, diff_));
+}
+
+double LipSyncPolicy::update(int64_t now, const LipSyncInput& in) {
+  const double dt_s = have_last_ ? double(std::max<int64_t>(0, now - last_)) * 1e-9 : 0.0;
+  last_ = now;
+  have_last_ = true;
+  // how long each stream has run without interruption
+  if (in.audio && !audio_on_) audio_since_ = now;
+  if (in.video && !video_on_) video_since_ = now;
+  audio_on_ = in.audio;
+  video_on_ = in.video;
+  const bool both = in.audio && in.video && std::isfinite(in.audio_ms) && std::isfinite(in.video_ms);
+  // the difference, smoothed (EWMA, 2 s); restarted when either stream goes away
+  if (both) {
+    const double raw = in.audio_ms - in.video_ms;
+    if (!have_diff_) {
+      diff_ = raw;
+      have_diff_ = true;
+    } else {
+      diff_ += (raw - diff_) * (1.0 - std::exp(-dt_s / kTauS));
+    }
+  } else {
+    have_diff_ = false;
+  }
+  active_ = both && now - audio_since_ >= kWarmupNs && now - video_since_ >= kWarmupNs;
+  // the applied hold moves toward the target by at most 10 ms per second (also back to 0 when inactive)
+  const double target = target_ms();
+  const double step = kSlewMsPerS * dt_s;
+  hold_ += std::max(-step, std::min(step, target - hold_));
+  hold_ = std::min(kMaxHoldMs, std::max(0.0, hold_));
+  return hold_;
+}
+
 }  // namespace beamer::audio

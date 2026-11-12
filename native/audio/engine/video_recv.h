@@ -82,6 +82,9 @@ class VideoRecvCore {
   void set_floor_ms(double f);
 
   Json stats(double dt_s);
+  // lip sync (§4.9, any thread): video_present_delay without the hold (enc_delay + D + source delivery) and the
+  // offset this stream maps with (flow estimate, else the provisional one). false: not live, or no time map/offset.
+  bool lipsync_video(int64_t now, double* video_ms, int64_t* offset_ns);
   // tests
   struct Probe {
     double target_ms, p99_ms;
@@ -181,6 +184,7 @@ class VideoRecvCore {
   int prov_samples_ = 0;
   PlayoutTarget playout_;
   double d_now_ms_ = 70;
+  double enc_delay_ms_ = -1;  // enc_delay of the newest completed frame with a time map (lip sync)
   int64_t period_ns_ = 33'333'333;
   // presenter
   std::map<uint32_t, int64_t> ready_;  // decoded kept pictures -> present time (0 = on decode)
@@ -247,6 +251,7 @@ class VideoRecvStream : public StreamBase, public VideoSinkListener {
   void on_sink_event(const std::string& what, const std::string& detail) override;
 
   VideoRecvCore& core() { return core_; }
+  LipSyncHold* sync() const { return sync_; }  // the hold this stream's presenter adds (§4.9)
   // tests: called on the video thread after each round (pump + sink calls), just before it waits again
   std::function<void(bool display_tick)> test_before_wait;
 
@@ -257,6 +262,8 @@ class VideoRecvStream : public StreamBase, public VideoSinkListener {
   EventSink* events_;
   FailFn on_fail_;
   VideoRecvCore core_;
+  LipSyncHold own_sync_;            // used when the constructor is given none (the helper: one per stream)
+  LipSyncHold* sync_ = nullptr;
   std::unique_ptr<VideoSinkHandle> sink_;
   std::mutex mu_;
   std::condition_variable cv_;

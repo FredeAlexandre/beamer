@@ -1949,8 +1949,9 @@ struct Case {
   const char* name;
   void (*fn)();
 };
-// camera PHASE2 §10.2: video cases live in video_tests.cpp
+// camera PHASE2 §10.2: video cases live in video_tests.cpp; lip sync (§4.9, CW10) in sync_tests.cpp
 const Case* video_test_cases(size_t* n);
+const Case* sync_test_cases(size_t* n);
 
 int main(int argc, char** argv) {
   std::vector<std::string> filters;
@@ -2002,6 +2003,8 @@ int main(int argc, char** argv) {
   size_t nv = 0;
   const Case* vc = video_test_cases(&nv);
   all.insert(all.end(), vc, vc + nv);
+  const Case* sc = sync_test_cases(&nv);
+  all.insert(all.end(), sc, sc + nv);
   int run = 0;
   for (const Case& c : all) {
     if (!filters.empty() &&

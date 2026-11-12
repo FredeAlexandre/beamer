@@ -168,6 +168,12 @@ class RecvStream : public StreamBase, public RenderSource {
   bool time_map_pair(uint32_t* ts, int64_t* ns) const { return tm_rx_.read(ts, ns); }
   bool render_ts(uint32_t* ts, int64_t* at_ns) const { return render_ts_.read(ts, at_ns); }
   std::atomic<double> render_latency_ms{0.0};
+  // camera §4.9 (CW10), control thread: whether this stream renders into the virtual mic; the backend's render
+  // path latency (< 0 unknown); and audio_present_delay (ms) with the given offset and path, false when the
+  // stream has no time map (no `sr`), is not playing, or rendered nothing in the last 500 ms.
+  bool virtual_mic() const { return cfg_.virtual_mic; }
+  double render_path_ms() const { return handle_ ? handle_->render_path_ms() : -1.0; }
+  bool lipsync_audio(int64_t now, int64_t offset_ns, double path_ms, double* delay_ms) const;
 
  private:
   void publish();  // IO thread: counters -> atomics

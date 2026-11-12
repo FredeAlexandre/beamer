@@ -66,12 +66,12 @@ rem C sources: Monocypher and the speexdsp echo canceller (float, kiss FFT, no c
 cl /nologo /c /O2 /MT /W3 /utf-8 /D_CRT_SECURE_NO_WARNINGS /DFLOATING_POINT /DUSE_KISS_FFT /DEXPORT= /wd4244 /wd4267 /wd4305 ^
    /I"%SPEEX%\include" /Fo"%OBJ%\engine\\" %CSRCS% || exit /b 1
 cl /nologo /c /MP /std:c++20 /O2 /MT /W4 /utf-8 /EHsc /D_CRT_SECURE_NO_WARNINGS /DNOMINMAX /DWIN32_LEAN_AND_MEAN ^
-   /wd4100 /wd4244 /wd4267 %INC% /Fo"%OBJ%\engine\\" %SRCS% "%ROOT%\tests\engine_tests.cpp" "%ROOT%\tests\video_tests.cpp" "%ROOT%\tests\null_main.cpp" || exit /b 1
+   /wd4100 /wd4244 /wd4267 %INC% /Fo"%OBJ%\engine\\" %SRCS% "%ROOT%\tests\engine_tests.cpp" "%ROOT%\tests\video_tests.cpp" "%ROOT%\tests\sync_tests.cpp" "%ROOT%\tests\null_main.cpp" || exit /b 1
 
 set "ENGOBJ="
 for /f "usebackq eol=# tokens=* delims=" %%S in ("%HERE%\sources.txt") do set "ENGOBJ=!ENGOBJ! "%OBJ%\engine\%%~nS.obj""
 set "LIBS=ws2_32.lib ole32.lib avrt.lib propsys.lib bcrypt.lib winmm.lib"
-link /nologo /OUT:"%OUT%\engine_tests.exe" "%OBJ%\engine\engine_tests.obj" "%OBJ%\engine\video_tests.obj" %ENGOBJ% "%OBJ%\opus\*.obj" %LIBS% || exit /b 1
+link /nologo /OUT:"%OUT%\engine_tests.exe" "%OBJ%\engine\engine_tests.obj" "%OBJ%\engine\video_tests.obj" "%OBJ%\engine\sync_tests.obj" %ENGOBJ% "%OBJ%\opus\*.obj" %LIBS% || exit /b 1
 link /nologo /OUT:"%OUT%\beamer-audio-null.exe" "%OBJ%\engine\null_main.obj" %ENGOBJ% "%OBJ%\opus\*.obj" %LIBS% || exit /b 1
 echo built %OUT%\engine_tests.exe and %OUT%\beamer-audio-null.exe
 

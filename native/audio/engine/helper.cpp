@@ -611,7 +611,8 @@ class Helper : public BackendListener, public VideoBackendListener {
         auto it = streams_.find(id);
         if (it != streams_.end() && it->second.vrecv) stop_stream(id, code, detail);
       });
-    }, &lipsync_);
+    }, nullptr);  // each video recv stream has its own lip-sync hold (§4.9), driven by lipsync_tick()
+    s->sync()->set_override_ms(sync_override_ms_);
     std::string code, msg;
     if (!s->start(*video_, &code, &msg)) {
       s->stop();
@@ -967,9 +968,26 @@ class Helper : public BackendListener, public VideoBackendListener {
       for (auto& kv : streams_)
         if (kv.second.vrecv) kv.second.vrecv->set_floor_ms(d);
     }
-    if (jget_num(j, "sync_offset_ms", &d)) {
-      if (d < 0 || d > 150) throw CmdError{"bad_args", "sync_offset_ms: 0..150"};
-      lipsync_.set_override_ms(d);
+    // lip sync (§4.9): `sync_offset_ms` n forces the hold of every video recv stream (0..150; null = the policy);
+    // `sync_audio_path_ms` n replaces the backend's virtual-mic render path latency (0..300; null = the backend's)
+    auto so = j.find("sync_offset_ms");
+    if (so != j.end()) {
+      if (so->is_null()) {
+        sync_override_ms_ = -1;
+      } else if (!jget_num(j, "sync_offset_ms", &d) || d < 0 || d > 150) {
+        throw CmdError{"bad_args", "sync_offset_ms: 0..150 or null"};
+      } else {
+        sync_override_ms_ = d;
+      }
+      for (auto& kv : streams_)
+        if (kv.second.vrecv) kv.second.vrecv->sync()->set_override_ms(sync_override_ms_);
+    }
+    auto sp = j.find("sync_audio_path_ms");
+    if (sp != j.end()) {
+      if (sp->is_null()) sync_path_override_ms_ = -1;
+      else if (!jget_num(j, "sync_audio_path_ms", &d) || d < 0 || d > 300)
+        throw CmdError{"bad_args", "sync_audio_path_ms: 0..300 or null"};
+      else sync_path_override_ms_ = d;
     }
     auto nv = j.find("null_video");
     if (nv != j.end() && nv->is_object()) {
@@ -1003,6 +1021,7 @@ class Helper : public BackendListener, public VideoBackendListener {
     if (it == streams_.end()) return;
     Entry e = it->second;
     streams_.erase(it);
+    lipsync_.erase(id);
     auto fit = flows_.find(e.flow);
     if (fit != flows_.end()) fit->second->detach(id);
     e.base->stop();
@@ -1128,6 +1147,7 @@ class Helper : public BackendListener, public VideoBackendListener {
       ev_->emit(Json{{"ev", "howl"}, {"stream", kv.first}, {"active", r.active},
                      {"freq_hz", std::round(r.freq_hz)}, {"duck_db", r.duck_db}});
     }
+    lipsync_tick(now);
     if (meter_on_ && now >= next_levels_ns_) {
       next_levels_ns_ = now + meter_period_ns_;
       emit_levels();
@@ -1146,6 +1166,39 @@ class Helper : public BackendListener, public VideoBackendListener {
         ev_->emit(Json{{"ev", "stats"}, {"t", wall_ms()}, {"now_ns", now_ns()},
                        {"cpu_pct", std::round(cpu_pct * 100) / 100}, {"streams", st}});
       }
+    }
+  }
+
+  // Camera lip sync (§4.9): for each video recv stream, the policy fed with its video_present_delay and the
+  // audio_present_delay of the mic stream from the same sender (same flow) rendering into the virtual mic, both
+  // with the offset the video stream maps with. A mic from another machine (another flow), a mic rendered to a
+  // speaker, or a mic without a time map (no `sr`) gives no audio input: no hold.
+  void lipsync_tick(int64_t now) {
+    for (auto& kv : streams_) {
+      const auto& v = kv.second.vrecv;
+      if (!v) continue;
+      LipSyncInput in;
+      int64_t off = 0;
+      double path = LipSyncHold::kNone;
+      in.video = v->core().lipsync_video(now, &in.video_ms, &off);
+      if (in.video) {
+        for (auto& a : streams_) {
+          const auto& r = a.second.recv;
+          if (!r || a.second.flow != kv.second.flow || !r->virtual_mic() || r->kind() != "mic") continue;
+          const double p = sync_path_override_ms_ >= 0 ? sync_path_override_ms_ : std::max(0.0, r->render_path_ms());
+          if (r->lipsync_audio(now, off, p, &in.audio_ms)) {
+            in.audio = true;
+            path = p;
+            break;
+          }
+        }
+      }
+      LipSyncPolicy& pol = lipsync_[kv.first];
+      const double hold = pol.update(now, in);
+      LipSyncHold* h = v->sync();
+      const double applied = h->overridden() ? h->override_ms() : hold;
+      h->set_policy(hold, pol.have_skew() ? pol.diff_ms() - applied : LipSyncHold::kNone,
+                    in.audio ? in.audio_ms : LipSyncHold::kNone, path);
     }
   }
 
@@ -1282,7 +1335,9 @@ class Helper : public BackendListener, public VideoBackendListener {
   std::map<std::string, Placeholder> vcam_texts_;
   std::string vcam_idle_ = "waiting", last_vcam_;
   double idr_pace_x_ = 4.0, playout_floor_ms_ = 50.0;
-  LipSyncHold lipsync_;
+  std::map<uint32_t, LipSyncPolicy> lipsync_;  // per video recv stream (§4.9)
+  double sync_override_ms_ = -1;               // dev sync_offset_ms (< 0: the policy)
+  double sync_path_override_ms_ = -1;          // dev sync_audio_path_ms (< 0: the backend's)
   int64_t next_cam_perm_ns_ = 0;
 };
 
