@@ -98,9 +98,15 @@ int capture_device_creations() { return g_capture_creations.load(); }
 int capture_sessions_running() { return g_sessions_running.load(); }
 
 int64_t host_time_to_ns(CMTime t) {
-  // The host time clock is mach_absolute_time, which is now_ns()'s clock on macOS (video_check selftest).
-  CMTime ns = CMTimeConvertScale(t, 1000000000, kCMTimeRoundingMethod_RoundHalfAwayFromZero);
-  return ns.value;
+  // The host time clock is mach_absolute_time (CLOCK_UPTIME_RAW: stops while the Mac sleeps). now_ns() is
+  // steady_clock, the clock of the engine's time maps; nothing guarantees libc++ uses the same clock id, and
+  // they would differ by the total sleep time since boot. So map through the current offset between the two
+  // clocks instead of assuming they are equal (CW10 contract issue: lip sync off by the sleep time).
+  const CMTime now_host = CMClockGetTime(CMClockGetHostTimeClock());
+  const int64_t now_steady = now_ns();
+  const int64_t pts = CMTimeConvertScale(t, 1000000000, kCMTimeRoundingMethod_RoundHalfAwayFromZero).value;
+  const int64_t host = CMTimeConvertScale(now_host, 1000000000, kCMTimeRoundingMethod_RoundHalfAwayFromZero).value;
+  return pts + (now_steady - host);
 }
 
 std::string camera_permission() {
