@@ -1706,6 +1706,44 @@ Stamps and merging as in `audio_route`; unknown top-level entries are kept and f
   message, dropped (a whole frame at a time) while the link's queue holds more than 32 messages;
   feedback packets follow the audio rule of 64.
 
+## 13. Shared displays (inside capability `audio`, fork)
+
+A monitor cabled to two machines (one input each) is owned by one of them; every other machine that
+has it turns its output to it off. With the monitor's automatic input selection on, it then shows the
+owner, and no machine lays windows out on a screen nobody sees (design: `dev/display/DESIGN.md`). No
+new capability, wire version 6 unchanged.
+
+### Rules
+
+- `display_*` messages need cap `audio` on both ends **and** the word `display1` in the peer's
+  `audio_hello.features`; nothing `display_*` is posted to a peer without it. A machine announces
+  `display1` when the feature is on and it can turn its displays off and on (macOS, Windows).
+- Same rules as section 11: no `seq`, not input, unknown fields ignored, a malformed one ignored. Limits:
+  16 displays per machine, 32 route entries, `name` 128 characters.
+- A display is named by its EDID identity, the key `<PNP id><product code>`: three upper-case letters
+  and four upper-case hex digits (`HKC2716`). Two monitors of one model on a machine are left alone.
+
+### Messages
+
+| type | data | scope |
+|---|---|---|
+| `display_state` | `{"machine":id,"rev":int,"displays":[{"key","name","on":bool}]}`: the sender's connected external displays, `on` false while it has turned one off | direct, about the sender only; on `display1` and when its displays change |
+| `display_route` | `{"owners":{"<key>":{"owner":id\|null,"set_at":ms,"by":id}}}` | flooded, merged entry by entry |
+
+Each route entry carries its own stamp (newer = higher `set_at`, in milliseconds; a tie goes to the
+larger `by`); entries are never deleted, `owner` null means not managed. A merge that learns an entry
+forwards the route to every other `display1` peer; a sender that lacked a newer entry is answered with
+the merged route.
+
+### What a machine does
+
+- For each of its displays with an owner in the route: on when it is the owner, off when the owner is
+  another machine, unless that machine is linked and its `display_state` does not list the display.
+- An owner that is away (link down, Beamer quit, machine off) changes nothing: a display turned back on
+  would not take the monitor's input back, so it would be a hidden screen. Only a new choice (this
+  machine, or not managed), or the owner saying it lacks the display, turns it back on.
+- A machine turns back on only displays it turned off itself, and never turns off its last display.
+
 ## Versions
 
 - **Wire version 6** is in Beamer 1.5.0 and later. It refuses versions 5 and below, and they refuse

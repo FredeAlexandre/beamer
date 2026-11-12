@@ -91,7 +91,7 @@ def _is_audio(message) -> bool:
     """An `audio_*` or `camera_*` message (capability `audio`, fork; dev/audio/PHASE2.md §5, camera
     messages ride the same cap and callback, dev/camera/PHASE2.md §5.1)."""
     kind = message.get("type") if isinstance(message, dict) else None
-    return isinstance(kind, str) and kind.startswith(("audio_", "camera_"))
+    return isinstance(kind, str) and kind.startswith(("audio_", "camera_", "display_"))
 
 
 def _close_socket(sock: Optional[socket.socket]) -> None:

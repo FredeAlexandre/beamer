@@ -2642,7 +2642,7 @@ class KVMController:
                     self.book.store_paired(peer, texts)
                     if self.on_paired is not None:
                         self.on_paired(peer, texts)
-            elif isinstance(kind, str) and kind.startswith(("audio_", "camera_")):
+            elif isinstance(kind, str) and kind.startswith(("audio_", "camera_", "display_")):
                 # Only enqueued: the audio service's worker deals with it (dev/audio/PHASE2.md §5.1;
                 # `camera_*` ride cap `audio` too, dev/camera/PHASE2.md §5.1).
                 audio = self.__dict__.get("_audio")

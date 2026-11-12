@@ -141,6 +141,9 @@ CAMERA_FEATURE = "camera1"     # audio_hello.features word (camera PHASE2 §5.1;
 VIDEO_FEATURE = "video1"       # the engine has the video plane (camera PHASE2 §3.1; core.camera.wire.VIDEO_FEATURE)
 
 
+DISPLAY_FEATURE = "display1"   # audio_hello.features word (shared displays; core.display.model.FEATURE)
+
+
 def _is_camera(message):
     """A `camera_*` message (camera PHASE2 §5): rides cap `audio`, handled by the camera part."""
     return isinstance(message, dict) and isinstance(message.get("type"), str) and message["type"].startswith("camera_")
@@ -245,9 +248,41 @@ class _CameraContext:
         self._service._camera_wake = at
 
 
+def _is_display(message):
+    """A `display_*` message (shared displays, fork): rides cap `audio`, handled by the display part."""
+    return isinstance(message, dict) and isinstance(message.get("type"), str) and message["type"].startswith("display_")
+
+
+class _DisplayContext:
+    """What the DisplayPart reaches the service through (core/display/part.py); worker only."""
+
+    def __init__(self, service):
+        self._service = service
+        self.own = service._own
+        self.clock = service._clock
+        self.wall = service._wall
+        self.logger = service._log
+
+    def post(self, peer, message):
+        return self._service._post(peer, message)
+
+    def peers_with(self, feature):
+        return frozenset(ident for ident, peer in self._service._peers.items()
+                         if peer.direct and feature in (peer.hello or {}).get("features", ()))
+
+    def machine_name(self, machine):
+        return _CameraContext.machine_name(self, machine)
+
+    def changed(self):
+        self._service._display_changed = True
+
+    def schedule(self, at):
+        self._service._display_wake = at
+
+
 class AudioService:
     def __init__(self, host: AudioHost, state_dir, helper_cmd, *, clock=time.monotonic, wall=time.time,
-                 helper_factory=None, logger=None):
+                 helper_factory=None, logger=None, display_backend=None):
         self._host = host
         self._state_dir = Path(state_dir)
         self._helper_cmd = list(helper_cmd) if helper_cmd else None
@@ -311,6 +346,13 @@ class AudioService:
         if feature_flags.CAMERA:
             from core.camera.part import CameraPart
             self._camera = CameraPart(_CameraContext(self), self._state_dir, self._platform)
+        # Shared displays (core/display): a DisplayPart in this worker, when the app gave a backend.
+        self._display = None
+        self._display_wake = None
+        self._display_changed = False
+        if getattr(feature_flags, "SHARED_DISPLAY", False) and display_backend is not None:
+            from core.display.part import DisplayPart
+            self._display = DisplayPart(_DisplayContext(self), self._state_dir, display_backend)
 
     # Any thread ---------------------------------------------------------------------------------
 
@@ -410,6 +452,16 @@ class AudioService:
     def refresh_camera_install(self) -> None:
         self._queue.put(("call", "_camera_call", ("refresh_install", ())))
 
+    # Shared displays: a plain read and a setter that enqueues to the worker.
+
+    def display_snapshot(self):
+        """The display part's last DisplaySnapshot (None without the feature or a backend)."""
+        part = self._display
+        return part.snapshot() if part is not None else None
+
+    def set_display_owner(self, key: str, owner: Optional[str]) -> None:
+        self._queue.put(("call", "_display_call", ("set_owner", (key, owner))))
+
     def pump(self, limit=100000) -> int:
         """Handle everything queued, and what that queues in turn, then the timers that are due: the
         threadless worker step for tests. The number of events handled."""
@@ -465,6 +517,11 @@ class AudioService:
             self._helper_cmd = helper_module.locate(self._state_dir) or self._helper_cmd
         if self._helper_cmd:
             self._start_helper()
+        if self._display is not None:
+            try:
+                self._display.start()
+            except Exception:
+                self._log.exception("display: start failed")
         self._dirty = True
         self._tick()
 
@@ -521,7 +578,8 @@ class AudioService:
         self._dirty = True
 
     def _next_deadline(self):
-        deadlines = [moment for moment in (self._save_at, self._wake_at, self._camera_wake) if moment is not None]
+        deadlines = [moment for moment in (self._save_at, self._wake_at, self._camera_wake, self._display_wake)
+                     if moment is not None]
         if self._dev is not None:
             deadlines.append(self._dev_at + DEV_POLL)
         if self._levels_dirty:
@@ -538,6 +596,12 @@ class AudioService:
         if self._camera_wake is not None and now >= self._camera_wake:
             self._camera_wake = None
             self._dirty = True
+        if self._display_wake is not None and now >= self._display_wake:
+            self._display_wake = None
+            try:
+                self._display.tick()
+            except Exception:
+                self._log.exception("display: tick failed")
         if self._dev is not None and now - self._dev_at >= DEV_POLL:
             self._dev_at = now
             self._dev_poll()
@@ -567,6 +631,11 @@ class AudioService:
             self._log.exception("audio: subscriber failed")
 
     def _shutdown(self):
+        if self._display is not None:
+            try:
+                self._display.shutdown()
+            except Exception:
+                self._log.exception("display: shutdown failed")
         if self._camera is not None:
             try:
                 self._camera.shutdown()     # camera_close {shutdown}, helper stops, camera.json saved
@@ -655,6 +724,8 @@ class AudioService:
         features = set(self._helper_info.get("features", ()))
         if self._camera is not None and self._announces_camera():
             features.add(CAMERA_FEATURE)
+        if self._display is not None:
+            features.add(DISPLAY_FEATURE)
         return wire.hello(self._platform, helper, self._listen(), features)
 
     def _announces_camera(self):
@@ -694,6 +765,8 @@ class AudioService:
             self._post(peer, wire.watch(True))
 
     def _on_link_down(self, peer):
+        if self._display is not None:
+            self._display.link_down(peer)
         if self._camera is not None:
             self._camera.link_down(peer)    # first: its streams on this peer's flow stop before the flow
         state = self._peers.pop(peer, None)
@@ -717,6 +790,11 @@ class AudioService:
         state = self._peers.get(peer)
         if state is None or not state.audio:
             return
+        if _is_display(message):
+            # display_* ride cap `audio` (shared displays); without the feature they are ignored.
+            if self._display is not None and DISPLAY_FEATURE in (state.hello or {}).get("features", ()):
+                self._display.link_message(peer, message)
+            return
         if _is_camera(message):
             # camera_* ride cap `audio` (camera PHASE2 §5.1); without the camera feature they are ignored.
             if self._camera is not None:
@@ -738,6 +816,10 @@ class AudioService:
         if (self._camera is not None and CAMERA_FEATURE in data["features"]
                 and (before is None or CAMERA_FEATURE not in before.get("features", ()))):
             self._log.info("camera: %s speaks %s", self._host.peer_name(peer) or peer, CAMERA_FEATURE)
+        if (self._display is not None and DISPLAY_FEATURE in data["features"]
+                and (before is None or DISPLAY_FEATURE not in before.get("features", ()))):
+            self._log.info("display: %s speaks %s", self._host.peer_name(peer) or peer, DISPLAY_FEATURE)
+            self._display.peer_ready(peer)
         if data["min_v"] > wire.VERSION:
             self._log.info("audio: a peer needs audio protocol %d, treating it as without audio", data["min_v"])
             return
@@ -1318,6 +1400,10 @@ class AudioService:
         if self._helper is not None:
             self._helper.retry()
 
+    def _display_call(self, method, args):
+        if self._display is not None:
+            getattr(self._display, method)(*args)
+
     def _camera_call(self, method, args):
         if self._camera is not None:
             getattr(self._camera, method)(*args)
@@ -1498,8 +1584,9 @@ class AudioService:
                 self._camera.apply(self._clock())
             except Exception:
                 self._log.exception("camera: apply failed")
-        if changed or self._camera_changed:
+        if changed or self._camera_changed or self._display_changed:
             self._camera_changed = False
+            self._display_changed = False
             for fn in self._listeners(self._subscribers):
                 self._call(fn)
 

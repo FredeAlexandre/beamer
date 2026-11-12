@@ -46,6 +46,7 @@ setup(
         "notch_beam",
         "notch_island",
         "camera_section",
+        "shared_display_mac",
         "audio_page",
         "pages",
         "pointer_hide",
@@ -92,6 +93,7 @@ setup(
                 "core.audio.store", "core.audio.view", "core.audio.wire",
                 "core.camera", "core.camera.model", "core.camera.part", "core.camera.planner", "core.camera.store",
                 "core.camera.texts", "core.camera.view", "core.camera.wire",
+                "core.display", "core.display.model", "core.display.part", "core.display.view",
             ],
             "iconfile": "../Beamer.icns",
             "plist": {

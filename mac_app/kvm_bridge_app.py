@@ -5322,7 +5322,50 @@ class TrayApp(rumps.App):
         camera_items = getattr(self, "_camera_items", None)
         if camera_items is not None:
             camera_items()
+        display_items = getattr(self, "_display_items", None)
+        if display_items is not None:
+            display_items()
         self._refresh_tray_state()
+
+    def _display_items(self):
+        """Shared displays (core/display): one item per monitor this Mac shares with a linked machine,
+        its submenu the machines that can own it and "Not managed". Rebuilt only when it changes."""
+        service = getattr(self.controller, "audio", None)
+        try:
+            from core.display import view as display_view
+            entries = display_view.menus(service.display_snapshot() if service is not None
+                                         and hasattr(service, "display_snapshot") else None, tr("This Mac"))
+        except Exception:  # a display fault must not stop the menu's status tick
+            if not getattr(self, "_display_menu_failed", False):
+                self._display_menu_failed = True
+                self.logger.exception("display: menu")
+            return
+        if entries == getattr(self, "_display_menu_key", None):
+            return
+        self._display_menu_key = entries
+        for key in getattr(self, "_display_keys", ()):
+            if key in self.menu:
+                del self.menu[key]
+        self._display_keys = []
+        anchor = "beamer-camera-allow"
+        for entry in entries:
+            key = "beamer-display-" + entry.key
+            item = _tray_item(key, callback=None)
+            for index, choice in enumerate(entry.choices):
+                child = _tray_item(f"{key}-{index}", callback=lambda _sender, k=entry.key, m=choice.machine:
+                                   self._set_display_owner(k, m))
+                child.state = choice.checked
+                item.add(child)
+                _set_tray_title(child, choice.label)
+            self.menu.insert_after(anchor, item)
+            _set_tray_title(item, entry.title)
+            anchor = key
+            self._display_keys.append(key)
+
+    def _set_display_owner(self, key, machine):
+        service = getattr(self.controller, "audio", None)
+        if service is not None and hasattr(service, "set_display_owner"):
+            service.set_display_owner(key, machine)
 
     def _machine_items(self):
         """With more than one machine to send to, Send input to each of them in place of the one

@@ -26,7 +26,7 @@ sys.path.insert(0, str(ROOT))
 from core import i18n  # noqa: E402
 
 
-SOURCES = ("core", "core/audio", "core/camera", "mac_app", "win_app")
+SOURCES = ("core", "core/audio", "core/camera", "core/display", "mac_app", "win_app")
 LOCALES = ROOT / "locales"
 TEMPLATE = LOCALES / "beamer.pot"
 FIELD = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)[^{}]*\}")

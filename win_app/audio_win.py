@@ -73,6 +73,16 @@ def log_message(direction, name, message):
                     len(data.get("outputs") or ()))
 
 
+
+def _display_backend(platform=None):
+    """Shared displays (core/display): the Windows backend when the feature is on, else None (Linux)."""
+    from core import feature_flags
+    if not getattr(feature_flags, "SHARED_DISPLAY", False):
+        return None
+    import shared_display_win
+    return shared_display_win.backend("win32" if platform in (None, "windows") and sys.platform == "win32" else "other")
+
+
 class LinkPeers:
     """Per-peer link state from the per-link events of both directions. `kind` is "out" (the link this
     machine opened) or "in" (the peer's). The caps given to the service are those of the link that
@@ -188,7 +198,12 @@ class PcAudio:
                  platform=None, logger=None):
         self.state_dir = Path(state_dir)
         self.host = PcAudioHost(server, sender, identity, name_of=name_of, platform=platform)
-        self.service = service_factory(self.host, self.state_dir, audio_helper.locate(self.state_dir), logger=logger)
+        extra = {}
+        display = _display_backend(platform)
+        if display is not None:
+            extra["display_backend"] = display
+        self.service = service_factory(self.host, self.state_dir, audio_helper.locate(self.state_dir), logger=logger,
+                                       **extra)
         self.peers = LinkPeers(self.service)
         self._started = False
         LOGGER.info("audio: this machine announces audio, helper %s", " ".join(audio_helper.locate(self.state_dir) or ()))

@@ -5085,7 +5085,11 @@ class WindowsApplication(QWidget):
         self.drive_action.triggered.connect(lambda on: self._set_every_peer("allow_drive", on))
         self.profile_menu = menu.addMenu(tr("Profile"))
         self._refresh_tray_profiles()
-        menu.addSeparator()
+        # Shared displays (core/display): one submenu per monitor this PC shares with a linked
+        # machine, filled each time the menu opens, before this separator.
+        self._display_actions = []
+        self._display_anchor = menu.addSeparator()
+        menu.aboutToShow.connect(self._refresh_tray_displays)
         self.open_action = menu.addAction(tr("Settings…"))
         self.open_action.triggered.connect(lambda _checked=False: self.show_window())
         menu.addAction(tr("Reload configuration")).triggered.connect(self.reload_config)
@@ -5099,6 +5103,37 @@ class WindowsApplication(QWidget):
         self.tray.activated.connect(self._on_tray_activated)
         self.tray.setVisible(self.tray_shown())
         self._refresh_tray_state()
+
+    def _refresh_tray_displays(self) -> None:
+        menu = getattr(self, "tray_menu", None)
+        if menu is None or not hasattr(self, "_display_anchor"):
+            return
+        for submenu in self._display_actions:
+            menu.removeAction(submenu.menuAction())
+            submenu.deleteLater()
+        self._display_actions = []
+        service = getattr(self, "audio", None)
+        try:
+            from core.display import view as display_view
+            entries = display_view.menus(service.display_snapshot() if service is not None
+                                         and hasattr(service, "display_snapshot") else None, tr("This PC"))
+        except Exception:
+            LOGGER.exception("display: tray menu")
+            return
+        for entry in entries:
+            submenu = QMenu(entry.title, menu)
+            for choice in entry.choices:
+                action = submenu.addAction(choice.label)
+                action.setCheckable(True)
+                action.setChecked(choice.checked)
+                action.triggered.connect(lambda _checked=False, k=entry.key, m=choice.machine: self._set_display_owner(k, m))
+            menu.insertMenu(self._display_anchor, submenu)
+            self._display_actions.append(submenu)
+
+    def _set_display_owner(self, key, machine) -> None:
+        service = getattr(self, "audio", None)
+        if service is not None and hasattr(service, "set_display_owner"):
+            service.set_display_owner(key, machine)
 
     def _refresh_tray_profiles(self, settings=None) -> None:
         if not hasattr(self, "profile_menu"):

@@ -1083,7 +1083,7 @@ class LinkSender:
             read = protocol.read_paired(message)
             if read is not None and self.paired_callback is not None:
                 self._call(self.paired_callback, peer, read)
-        elif isinstance(kind, str) and kind.startswith(("audio_", "camera_")):
+        elif isinstance(kind, str) and kind.startswith(("audio_", "camera_", "display_")):
             # `camera_*` ride cap `audio` and the same callback (dev/camera/PHASE2.md §5.1).
             if self.audio_callback is not None and "audio" in self.links.caps(peer):
                 self._call(self.audio_callback, peer, message)

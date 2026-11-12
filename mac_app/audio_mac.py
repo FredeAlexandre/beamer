@@ -68,6 +68,16 @@ def log_message(direction, name, message):
                     len(data.get("outputs") or ()))
 
 
+
+def _display_backend(state_dir):
+    """Shared displays (core/display): the Mac backend when the feature is on, else None."""
+    from core import feature_flags
+    if not getattr(feature_flags, "SHARED_DISPLAY", False):
+        return None
+    import shared_display_mac
+    return shared_display_mac.backend(state_dir)
+
+
 class LinkPeers:
     """Per-peer link state from the per-link events of both directions. `kind` is "out" (the link this
     machine opened) or "in" (the peer's). The caps given to the service are those of the link that
@@ -185,8 +195,12 @@ class MacAudio:
     def __init__(self, controller, state_dir, *, service_factory=AudioService, logger=None):
         self.state_dir = Path(state_dir)
         self.host = MacAudioHost(controller)
+        extra = {}
+        display = _display_backend(self.state_dir)
+        if display is not None:
+            extra["display_backend"] = display
         self.service = service_factory(self.host, self.state_dir, audio_helper.locate(self.state_dir),
-                                       logger=logger)
+                                       logger=logger, **extra)
         self.peers = LinkPeers(self.service)
         self._started = False
         LOGGER.info("audio: this Mac announces audio, %d capabilities, helper %s",

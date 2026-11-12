@@ -61,9 +61,13 @@ _CAMERA_CAP_FOR = dict.fromkeys(("camera_devices", "camera_route", "camera_open"
                                 "audio")
 
 
+# Shared displays (fork; core/display): every `display_*` type rides `audio` too.
+_DISPLAY_CAP_FOR = dict.fromkeys(("display_state", "display_route"), "audio")
+
+
 def _cap_for(kind):
     """The capability a peer must announce for a message type, or None."""
-    return _CAP_FOR.get(kind) or _CAMERA_CAP_FOR.get(kind)
+    return _CAP_FOR.get(kind) or _CAMERA_CAP_FOR.get(kind) or _DISPLAY_CAP_FOR.get(kind)
 
 
 class LinkEnded(Exception):

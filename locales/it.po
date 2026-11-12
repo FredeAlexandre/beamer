@@ -2262,6 +2262,20 @@ msgstr ""
 msgid "in use on {machine}"
 msgstr ""
 
+#: core/display/view.py
+msgid "Not managed"
+msgstr "Non gestito"
+
+#: core/display/view.py
+#, python-brace-format
+msgid "Screen {name}: not managed"
+msgstr "Schermo {name}: non gestito"
+
+#: core/display/view.py
+#, python-brace-format
+msgid "Screen {name}: {owner}"
+msgstr "Schermo {name}: {owner}"
+
 #: mac_app/audio_page.py
 msgid "Beamer wants to install Beamer Microphone, the microphone your apps hear from your other machines."
 msgstr ""
