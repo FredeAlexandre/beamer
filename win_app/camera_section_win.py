@@ -52,8 +52,9 @@ REMOVE_BUTTON = N_("Remove")
 LEGEND_CAMERA = N_("Camera")
 ROW_HEADING_WIDTH = 84
 ROW_LABEL_WIDTH = 130
-# Two or three routes between the same tiles run side by side in this order (as on the Mac page).
-ARROW_LANES = ("mic", "camera", "sound")
+# Two or three routes between the same tiles run side by side in this order (as on the Mac page): the
+# order of the tile's lines, the camera's above the mic's above the sound's.
+ARROW_LANES = ("camera", "mic", "sound")
 CAMERA_DASHES = [0.3, 2.2]
 
 
@@ -126,7 +127,7 @@ def camera_pen(pen: QPen) -> QPen:
 
 
 def lane_order(arrows, indexes) -> list:
-    """`indexes` of one pair of machines in lane order: mic, camera, sound when a camera arrow is
+    """`indexes` of one pair of machines in lane order: camera, mic, sound when a camera arrow is
     among them, else as given (so the audio-only map draws as before)."""
     kinds = [arrows[index].kind for index in indexes]
     if "camera" not in kinds:

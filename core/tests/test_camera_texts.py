@@ -60,15 +60,35 @@ class PlaceholderTextTests(unittest.TestCase):
         self.assertEqual(result["sharing_off"], {"title": "Camera turned off on alexandres-macbook-air",
                                                  "line": "Turn it on in Beamer on alexandres-macbook-air"})
         self.assertEqual(result["denied"], {"title": "alexandres-macbook-air has not allowed the camera",
-                                            "line": "Allow it in Beamer on alexandres-macbook-air"})
+                                            "line": "Allow it on alexandres-macbook-air in System Settings > "
+                                                    "Privacy & Security > Camera"})
         self.assertEqual(result["reconnecting"], {"title": "Reconnecting to alexandres-macbook-air",
                                                   "line": "MacBook Air Camera"})
         self.assertEqual(result["error"]["title"], "Beamer Camera stopped")
 
-    def test_default_camera_when_the_route_follows_the_preferred_one(self):
+    def test_the_preferred_camera_by_name_when_the_route_follows_it(self):
+        # As the page names it (core.camera.view.camera_name).
         result = texts.placeholder_texts(snap(device=None), names)
-        self.assertEqual(result["waiting"]["line"], "Default camera")
-        self.assertEqual(result["reconnecting"]["line"], "Default camera")
+        self.assertEqual(result["waiting"]["line"], "MacBook Air Camera")
+        self.assertEqual(result["reconnecting"]["line"], "MacBook Air Camera")
+        self.assertEqual(result["starting"]["title"], "Starting MacBook Air Camera")
+        # "Default camera" only when the list does not name it: no preferred camera, or no list held.
+        unnamed = snap(device=None)
+        unnamed = replace(unnamed, machines={MAC: replace(unnamed.machines[MAC], preferred=None)})
+        self.assertEqual(texts.placeholder_texts(unnamed, names)["waiting"]["line"], "Default camera")
+        self.assertEqual(texts.placeholder_texts(snap(machine=GHOST), names)["waiting"]["line"], "Default camera")
+
+    def test_denied_points_to_the_system_settings_of_the_camera_machine(self):
+        mac = texts.placeholder_texts(snap(), names)["denied"]["line"]
+        self.assertEqual(mac, "Allow it on alexandres-macbook-air in System Settings > Privacy & Security > Camera")
+        self.assertNotIn("Beamer", mac)
+        current = snap()
+        other = replace(current, machines={MAC: replace(current.machines[MAC], platform="linux")})
+        self.assertEqual(texts.placeholder_texts(other, names)["denied"]["line"],
+                         "Allow it in the system settings on alexandres-macbook-air")
+        # A machine this one holds no list for: taken as a Mac (camera access is a macOS permission).
+        self.assertIn("System Settings > Privacy & Security > Camera",
+                      texts.placeholder_texts(snap(machine=GHOST), names)["denied"]["line"])
 
     def test_test_source_replaces_the_camera_name(self):
         result = texts.placeholder_texts(snap(device=CameraRef("cam-1", "MacBook Air Camera"),

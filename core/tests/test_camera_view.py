@@ -59,11 +59,20 @@ class StatusLinesFromTheMac(unittest.TestCase):
                 self.assertTrue(section.shown)
                 self.assertEqual(section.state, make().camera.status.state)
 
-    def test_detail_while_streaming_only(self):
+    def test_detail_while_streaming_or_denied(self):
         self.assertEqual(mac_section(cf.streaming()).detail, "1280x720 · 30 fps · 72 ms")
         self.assertEqual(mac_section(cf.reduced()).detail, "1280x720 · 15 fps · 180 ms · through the Beamer link")
-        for name in ("off", "idle", "denied", "sharing_off"):
+        for name in ("off", "idle", "sharing_off"):
             self.assertEqual(mac_section(cf.FIXTURES[name]()).detail, "", name)
+        # Denied: where the owner allows it, macOS's System Settings (not Beamer), on the camera machine.
+        self.assertEqual(mac_section(cf.denied()).detail, "Allow it in System Settings > Privacy & Security > Camera.")
+        self.assertEqual(pc_section(cf.FIXTURES_PC["denied"]()).detail,
+                         "Allow it on MacBook Air in System Settings > Privacy & Security > Camera.")
+        fixture = cf.FIXTURES_PC["denied"]()
+        machines = dict(fixture.camera.machines)
+        machines[MAC] = replace(machines[MAC], platform="linux")      # not a Mac: no macOS path
+        other = replace(fixture, camera=replace(fixture.camera, machines=machines))
+        self.assertEqual(pc_section(other).detail, "Allow it in the system settings on MacBook Air.")
 
     def test_an_app_without_a_name_and_several_sinks(self):
         fixture = cf.streaming()

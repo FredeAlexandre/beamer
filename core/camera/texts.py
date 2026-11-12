@@ -12,7 +12,7 @@ template as `{fields}`, never through `tr()`.
 
 from typing import Callable, Optional
 
-from core.camera.model import CameraSnapshot
+from core.camera.model import CameraSnapshot, camera_by_key
 from core.i18n import N_, tr
 
 # Why a stream stopped, as a detail line (the `error` placeholder's `<reason>`): engine and helper
@@ -44,12 +44,30 @@ def _source_text(snap: CameraSnapshot, name: Callable[[str], str]) -> str:
 
 
 def _camera_text(snap: CameraSnapshot) -> str:
+    """The camera by name: the dev test source, the route's camera, else the preferred camera the
+    route follows when that machine's list has it (as the page names it), else "Default camera"."""
     machine = snap.route.camera.machine
     held = snap.machines.get(machine) if machine is not None else None
     if held is not None and held.test_source:
         return tr("Test source")
     device = snap.route.camera.device
-    return device.name if device is not None and device.name else tr("Default camera")
+    if device is not None and device.name:
+        return device.name
+    if device is None and held is not None:
+        preferred = camera_by_key(held.cameras, held.preferred)
+        if preferred is not None and preferred.name:
+            return preferred.name
+    return tr("Default camera")
+
+
+def _denied_text(snap: CameraSnapshot, source: str) -> str:
+    """Where the camera machine's owner allows the camera: macOS's System Settings pane (camera access
+    is a macOS permission; a machine of unknown platform is taken as a Mac), not Beamer."""
+    machine = snap.route.camera.machine
+    held = snap.machines.get(machine) if machine is not None else None
+    if held is not None and held.platform and held.platform != "macos":
+        return tr("Allow it in the system settings on {machine}").format(machine=source)
+    return tr("Allow it on {machine} in System Settings > Privacy & Security > Camera").format(machine=source)
 
 
 def _error_reason(snap: CameraSnapshot) -> Optional[str]:
@@ -84,7 +102,7 @@ def placeholder_texts(snap: CameraSnapshot, name: Callable[[str], str]) -> dict:
         "sharing_off": entry(tr("Camera turned off on {machine}").format(machine=source),
                              tr("Turn it on in Beamer on {machine}").format(machine=source)),
         "denied": entry(tr("{machine} has not allowed the camera").format(machine=source),
-                        tr("Allow it in Beamer on {machine}").format(machine=source)),
+                        _denied_text(snap, source)),
         "error": entry(tr("Beamer Camera stopped"), reason_text(reason)),
         "starting": entry(tr("Starting {camera}").format(camera=camera),
                           tr("on {machine}").format(machine=source)),

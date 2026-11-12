@@ -98,7 +98,7 @@ class CameraSection:
     selected: str
     line: str                       # status sentence (§8.4)
     tone: str                       # its tone (TONES)
-    detail: str                     # "1280x720 · 30 fps · 72 ms" while streaming, else ""
+    detail: str                     # "1280x720 · 30 fps · 72 ms" while streaming, where to allow it if denied
     quality_label: str              # "Quality"
     quality_choices: tuple          # Choice "720p", "1080p"
     quality_selected: str
@@ -355,8 +355,18 @@ def _status_line(snap: CameraSnapshot, names, platform: str):
     return line, FAULT, ACTION_RETRY, tr("Retry")
 
 
-def _detail(snap: CameraSnapshot) -> str:
-    """"1280x720 · 30 fps · 72 ms" for the first live stream, with the link fallback said."""
+def _detail(snap: CameraSnapshot, names) -> str:
+    """"1280x720 · 30 fps · 72 ms" for the first live stream, with the link fallback said; while the
+    camera machine denies access, where its owner allows it (macOS's System Settings, not Beamer)."""
+    if snap.status.state == "denied":
+        source = snap.route.camera.machine
+        if source == snap.own:
+            return tr("Allow it in System Settings > Privacy & Security > Camera.")
+        held = _machine(snap, source)
+        name = names(source) if source is not None else tr("another machine")
+        if held is not None and held.platform and held.platform != "macos":
+            return tr("Allow it in the system settings on {machine}.").format(machine=name)
+        return tr("Allow it on {machine} in System Settings > Privacy & Security > Camera.").format(machine=name)
     if snap.status.state not in LIVE_STATES:
         return ""
     live = [stream for stream in snap.streams if stream.state == "running"]
@@ -553,7 +563,7 @@ def camera_section(snap: CameraSnapshot, audio, own_label: str, platform: str) -
         help_action, help_label = ACTION_CAMERA_SETTINGS, tr("Camera settings")
     return CameraSection(
         label=tr("Camera your apps see"), choices=choices, selected=selected,
-        line=line, tone=tone, detail=_detail(snap),
+        line=line, tone=tone, detail=_detail(snap, names),
         quality_label=tr("Quality"), quality_choices=_quality_choices(),
         quality_selected=snap.route.quality.size if snap.route.quality.size in QUALITY_KEYS else model.DEFAULT_QUALITY,
         hint=hint, help=help_line, help_action=help_action,

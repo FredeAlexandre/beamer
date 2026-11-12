@@ -36,9 +36,10 @@ SETTINGS_URLS = {
     "open_system_audio_settings": "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture",
 }
 # Camera (dev/camera/PHASE2.md §8): how each route kind's arrow is drawn, and the order two or three
-# routes between the same tiles run side by side.
+# routes between the same tiles run side by side: top to bottom (left to right between stacked tiles)
+# as the tile's lines read, the camera's above the mic's above the sound's.
 ARROW_DASHES = {"mic": [5, 4], "camera": [0.5, 4.5], "sound": None}
-ARROW_LANES = ("mic", "camera", "sound")
+ARROW_LANES = ("camera", "mic", "sound")
 
 
 def camera_on():
@@ -291,7 +292,7 @@ class AudioMap(AppKit.NSView):
             "track": _box("well", None, 1.5),
             "bar": _box("signal", None, 1.5),
             "recording": _glyph("record.circle", 12, "signal"),
-            "camera": _glyph("web.camera.fill", 11, "ink_3"),
+            "camera": _glyph("video.fill", 11, "ink_3"),
             "camera_text": _text_layer(theme.TYPE["note"], "ink_2", Quartz.kCAAlignmentLeft),
         }
         parts["title"].setFont_(theme.font(theme.TYPE["body"], 600))
@@ -429,7 +430,7 @@ class AudioMap(AppKit.NSView):
             if arrow.source not in frames or arrow.target not in frames:
                 continue
             siblings = pairs[frozenset((arrow.source, arrow.target))]
-            # Routes between the same machines run side by side: the mic, the camera, the sound.
+            # Routes between the same machines run side by side: the camera, the mic, the sound.
             kinds = sorted({sibling.kind for sibling in siblings},
                            key=lambda kind: ARROW_LANES.index(kind) if kind in ARROW_LANES else len(ARROW_LANES))
             if len(kinds) == 1:

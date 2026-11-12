@@ -123,6 +123,27 @@ class CameraModuleTests(CameraFlag):
         self.assertIn(list(camera_view_dashes()), [list(line.lineDashPattern() or []) for line in shown])
         self.assertFalse(control.window.isVisible())
 
+    def test_the_arrow_lanes_follow_the_tile_lines(self):
+        # Streaming: the mic and the camera both run between the Mac and lebig. On the tile the camera's
+        # line sits above the mic's, so the camera's arrow runs above the mic's too (same layer space).
+        import Quartz
+        import audio_page
+        _control, page, _service = build(cf.streaming())
+        parts = page.map.parts[MAC]
+        self.assertLess(parts["camera_text"].frame().origin.y, parts["mic_text"].frame().origin.y)
+        middles = {}
+        for line, _head in page.map.arrow_layers:
+            if line.isHidden():
+                continue
+            dashes = [float(value) for value in (line.lineDashPattern() or [])]
+            kind = next(kind for kind, pattern in audio_page.ARROW_DASHES.items() if (pattern or []) == dashes)
+            middles[kind] = Quartz.CGRectGetMidY(Quartz.CGPathGetBoundingBox(line.path()))
+        self.assertEqual(set(middles), {"mic", "camera"})
+        self.assertLess(middles["camera"], middles["mic"])
+        self.assertEqual(audio_page.ARROW_LANES, ("camera", "mic", "sound"))
+        # The tile's camera glyph is a video camera, which this macOS draws.
+        self.assertIsNotNone(AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_("video.fill", None))
+
     def test_the_module_sits_between_the_notices_and_the_machines(self):
         _control, page, _service = build(cf.idle())
         order = list(page.body.arrangedSubviews())

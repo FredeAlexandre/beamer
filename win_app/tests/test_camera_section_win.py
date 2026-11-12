@@ -134,13 +134,14 @@ class SectionFor(unittest.TestCase):
 
 
 class Geometry(unittest.TestCase):
-    def test_lanes_run_mic_camera_sound_only_with_a_camera_arrow(self):
+    def test_lanes_run_camera_mic_sound_only_with_a_camera_arrow(self):
+        # The tile's lines read camera, mic, sound from the top: the lanes follow them.
         arrows = (view.Arrow("a", "b", "sound", "active", ""), view.Arrow("a", "b", "camera", "active", ""),
                   view.Arrow("b", "a", "mic", "active", ""))
-        self.assertEqual(camera_section_win.lane_order(arrows, [0, 1, 2]), [2, 1, 0])
+        self.assertEqual(camera_section_win.lane_order(arrows, [0, 1, 2]), [1, 2, 0])
         offsets = audio_page_win.arrow_offsets(arrows)
-        self.assertLess(offsets[2], offsets[1])
-        self.assertLess(offsets[1], offsets[0])
+        self.assertLess(offsets[1], offsets[2])
+        self.assertLess(offsets[2], offsets[0])
         audio_only = arrows[:1] + arrows[2:]
         self.assertEqual(camera_section_win.lane_order(audio_only, [0, 1]), [0, 1])
 
