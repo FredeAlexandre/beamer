@@ -22,3 +22,6 @@ docs/pdf/
 
 # Offscreen audit fixtures, measurements and renders.
 /renders/
+
+# Cargo build output.
+/target/

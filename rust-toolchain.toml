@@ -1,0 +1,5 @@
+# Exactly Rune's channel (#22): this moves only together with Rune's pin in Cargo.toml, in the
+# same commit. rustup installs it on first use; CI and xtask run `rustup toolchain install`.
+[toolchain]
+channel = "1.99.1"
+components = ["clippy", "rustfmt", "llvm-tools"]

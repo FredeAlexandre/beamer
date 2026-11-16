@@ -1,0 +1,36 @@
+[workspace]
+resolver = "3"
+# Crates live flat in crates/, directory name = crate name, every one `beamer-*` (#16, ADR 0004).
+members = ["crates/*", "xtask"]
+
+[workspace.package]
+edition = "2024"
+publish = false
+
+[workspace.dependencies]
+# Rune from our mirror at its pin (#26, ADR 0001). Bumping it moves, in one commit: this rev, every
+# rev in [patch.crates-io] below, the channel in rust-toolchain.toml and Cargo.lock. Its features
+# are chosen by the crate that uses it.
+rune = { git = "https://github.com/FredeAlexandre/rune", rev = "0796df5fa269b85d4fc04786bbd37f7349eb6606", default-features = false }
+
+# Rune's own [patch] table at the pin, copied: a dependency's [patch] doesn't apply to the
+# workspace that depends on it. A missing entry still builds but silently drops Rune's patch.
+# Until a crate depends on Rune, Cargo warns that these patches are unused.
+[patch.crates-io]
+wgpu-hal = { git = "https://github.com/FredeAlexandre/rune", rev = "0796df5fa269b85d4fc04786bbd37f7349eb6606" }
+winit = { git = "https://github.com/FredeAlexandre/rune", rev = "0796df5fa269b85d4fc04786bbd37f7349eb6606" }
+parley_engine = { git = "https://github.com/FredeAlexandre/rune", rev = "0796df5fa269b85d4fc04786bbd37f7349eb6606" }
+accesskit_windows = { git = "https://github.com/FredeAlexandre/rune", rev = "0796df5fa269b85d4fc04786bbd37f7349eb6606" }
+accesskit_macos = { git = "https://github.com/FredeAlexandre/rune", rev = "0796df5fa269b85d4fc04786bbd37f7349eb6606" }
+
+# Rune's dev profile, copied for the same reason: with full debug info a single Rune test build
+# used 18-23 GB of RAM (#26).
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.release]
+# A panic hook writes the crash log and the watchdog restarts the app (ADR 0004).
+panic = "abort"

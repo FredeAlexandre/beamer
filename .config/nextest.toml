@@ -1,0 +1,9 @@
+# Nextest runs every merge gate's tests (#22). A failed test is retried once, and a test that
+# passes only on its retry still fails the run: a flaky test is a bug to fix, not noise to absorb.
+
+# `flaky-result` arrived in nextest 0.9.131. An older nextest would ignore it and pass flaky tests.
+nextest-version = { required = "0.9.131" }
+
+[profile.default]
+retries = 1
+flaky-result = "fail"
