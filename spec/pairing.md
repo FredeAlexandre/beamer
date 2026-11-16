@@ -536,10 +536,10 @@ The rules that hold whoever takes part without the code to one guess against eac
 > - model: link
 
 > r[pairing.dormant.kept]
-> A dormant peer keeps its zones, the edge chosen to face it and its place on the crossing map, but none of its
-> zones leads anywhere while it is dormant, and it blocks no other peer's zone or place on the
-> crossing map. Once it is no longer dormant, its zones lead to it again, laid out with the other
-> peers' as the crossing map places them.
+> A dormant peer keeps its zones, the edge chosen to face it and its place on the crossing map,
+> but none of its zones leads anywhere while it is dormant, and it blocks no other peer's zone or
+> place on the crossing map. Once it is no longer dormant, its zones lead to it again, laid out
+> with the other peers' as the crossing map places them.
 
 > r[pairing.dormant.repair]
 > Pairing again with a dormant peer, one with the same public key, replaces it rather than being
