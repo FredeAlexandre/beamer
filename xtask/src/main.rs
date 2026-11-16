@@ -2,6 +2,7 @@
 
 mod audit;
 mod blind;
+mod checklist;
 mod copy_tests;
 mod deps;
 mod digest;
@@ -77,6 +78,26 @@ enum Command {
         /// The mutants.out directories, one per shard.
         #[arg(required = true, value_name = "MUTANTS_OUT")]
         runs: Vec<PathBuf>,
+    },
+    /// Open the milestone's checklist issue for Alex: a box per `human`-tier rule, with what to
+    /// do and what to see. Run again, it updates that issue (#49).
+    Checklist {
+        /// The milestone, such as `M1`.
+        milestone: String,
+        /// The GitHub repository the issue is in, as owner/name.
+        #[arg(
+            long,
+            value_name = "OWNER/NAME",
+            default_value = "FredeAlexandre/beamer"
+        )]
+        repo: String,
+        /// The machine-tier report to link: a URL, or a file to upload as a secret gist.
+        /// Defaults to the newest JSON report in dev/.reports/, where `cargo xtask machine`
+        /// writes them.
+        #[arg(long, value_name = "FILE|URL")]
+        report: Option<String>,
+        #[command(flatten)]
+        root: Root,
     },
 }
 
@@ -159,6 +180,17 @@ fn main() -> ExitCode {
             complete,
         })),
         Command::KillMatrix { runs } => exit(kill_matrix::run(&runs)),
+        Command::Checklist {
+            milestone,
+            repo,
+            report: given,
+            root,
+        } => report(checklist::run(&checklist::Options {
+            root: &root.dir(),
+            milestone: &milestone,
+            repo: &repo,
+            report: given.as_deref(),
+        })),
     }
 }
 
