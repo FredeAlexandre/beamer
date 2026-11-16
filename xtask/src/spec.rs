@@ -565,16 +565,21 @@ impl Parser<'_> {
                 (act, see) => {
                     let missing: Vec<&str> = [
                         act.is_none().then_some("`- do: <what Alex does>`"),
-                        see.is_none().then_some("`- see: <what he sees, hears or feels>`"),
+                        see.is_none()
+                            .then_some("`- see: <what he sees, hears or feels>`"),
                     ]
                     .into_iter()
                     .flatten()
                     .collect();
-                    self.problem(number, Some(id), format!(
-                        "a `human`-tier rule is checked by Alex from the milestone checklist, \
+                    self.problem(
+                        number,
+                        Some(id),
+                        format!(
+                            "a `human`-tier rule is checked by Alex from the milestone checklist, \
                          so it says what he does and what he sees: add {}",
-                        missing.join(" and ")
-                    ));
+                            missing.join(" and ")
+                        ),
+                    );
                 }
             }
             return;

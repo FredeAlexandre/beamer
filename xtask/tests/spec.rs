@@ -262,7 +262,9 @@ fn only_a_human_tier_rule_says_what_to_do_and_see() {
     ] {
         Example::new()
             .validate_with(&format!("> r[example.zone.extra]\n> Text.\n>\n{rule}"))
-            .fails_saying(&format!("a `{marker}:` marker on a rule that is not `human` tier"));
+            .fails_saying(&format!(
+                "a `{marker}:` marker on a rule that is not `human` tier"
+            ));
     }
 }
 
