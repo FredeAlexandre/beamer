@@ -133,8 +133,8 @@ because the alternatives failed for them.
   [code search for `github.com/anomalyco/rune`](https://github.com/search?q=%22github.com%2Fanomalyco%2Frune%22&type=code).
   None of them is large.
 
-*Inference:* dropping Rune would mean rewriting the UI of Hex and four younger apps. Hex is the
-company's second-largest product by stars. That is far costlier for them than keeping Rune.
+*Inference:* dropping Rune would mean rewriting the UI of Hex and four younger apps. Hex (7k stars,
+about 10k downloads of 3.x) is one of their larger products. That is far costlier for them than keeping Rune.
 
 ## 3. Activity signals
 
