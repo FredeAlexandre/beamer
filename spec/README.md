@@ -88,7 +88,9 @@ core/tests/test_store.py::test_merge_order
 - **The test** is named as pytest names it: its path at `archive/python`, any classes it sits in,
   then the function, joined by `::`. Every `def test_*` and `async def test_*` at module level or
   in a class counts, in every `.py` file. A function nested in a function doesn't.
-- **The owner domain** is the file the test is in. Each test is in the ledger once.
+- **The owner domain** is the file the test is in. Each test is in the ledger once. How #51 chose
+  each test's owner, and the choices that were ambiguous, are in
+  [`ledger/README.md`](ledger/README.md).
 - **The fate** follows the test, after blanks, and is one of four:
   - `mined: <rule id>, …`: mined into these rules, named without their version;
   - `dropped: <reason>`: the feature is dropped, per #11;

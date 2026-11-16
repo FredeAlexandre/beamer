@@ -1,0 +1,33 @@
+# The display domain's slice of the Python ledger, laid out by #51.
+# Owner domains and the ambiguous assignments: spec/ledger/README.md.
+core/tests/test_display.py::ModelTests::test_choose_is_always_newer
+core/tests/test_display.py::ModelTests::test_display_types_ride_the_audio_capability
+core/tests/test_display.py::ModelTests::test_keys
+core/tests/test_display.py::ModelTests::test_messages_round_trip
+core/tests/test_display.py::ModelTests::test_route_merge_by_stamp
+core/tests/test_display.py::ModelTests::test_want_never_leaves_a_hidden_screen
+core/tests/test_display.py::PartTests::test_a_display_turned_off_by_someone_else_is_left_alone
+core/tests/test_display.py::PartTests::test_a_route_from_the_peer_is_applied_and_forwarded
+core/tests/test_display.py::PartTests::test_failure_backs_off
+core/tests/test_display.py::PartTests::test_handing_the_display_to_the_peer_turns_it_off_here
+core/tests/test_display.py::PartTests::test_menus
+core/tests/test_display.py::PartTests::test_owner_going_away_keeps_the_display_off
+core/tests/test_display.py::PartTests::test_restart_remembers_the_route
+core/tests/test_display.py::PartTests::test_state_only_from_the_machine_itself
+core/tests/test_display.py::ServiceTests::test_two_services_hand_the_display_over
+core/tests/test_display.py::ServiceTests::test_without_a_backend_no_feature_word
+core/tests/test_identify_screens_core.py::IdentifyLinkTests::test_existing_link_delivers_both_directions_without_taking_input_ownership
+core/tests/test_identify_screens_core.py::IdentifyLinkTests::test_older_inbound_peer_gets_no_new_message
+core/tests/test_identify_screens_core.py::IdentifyLinkTests::test_older_outbound_peer_is_a_successful_no_op
+core/tests/test_identify_screens_core.py::IdentifyLinkTests::test_receiver_ignores_unnegotiated_and_unknown_requests
+core/tests/test_identify_screens_core.py::IdentifyProtocolTests::test_message_round_trips_without_changing_wire_version
+core/tests/test_identify_screens_core.py::IdentifyProtocolTests::test_rejects_invalid_labels_before_showing_any_overlay
+core/tests/test_identify_screens_core.py::ScreenNumberTests::test_numbers_follow_map_order_even_with_split_display_offsets
+core/tests/test_identify_screens_core.py::ScreenNumberTests::test_single_display_fallback_needs_no_saved_geometry
+mac_app/tests/test_identify_screens.py::MapTests::test_compact_titles_keep_readable_width_and_separate_number_and_cycle_rows
+mac_app/tests/test_identify_screens.py::MapTests::test_display_badges_match_overlay_labels_including_single_display
+mac_app/tests/test_identify_screens.py::MapTests::test_numbers_do_not_overlap_name_status_or_footer_on_stacked_or_split_displays
+mac_app/tests/test_identify_screens.py::MapTests::test_smallest_valid_tiles_keep_title_number_and_cycle_within_the_tile
+mac_app/tests/test_identify_screens.py::RoutingTests::test_inbound_only_link_receives_once_and_dual_link_is_not_duplicated
+mac_app/tests/test_identify_screens.py::RoutingTests::test_local_and_peer_labels_match_the_map_and_older_peers_receive_nothing
+mac_app/tests/test_identify_screens.py::RoutingTests::test_received_request_is_local_only_and_requires_capable_desktop
