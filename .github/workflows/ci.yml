@@ -179,7 +179,8 @@ jobs:
           tool: cargo-nextest@0.9.152,cargo-mutants@27.1.0
       - name: cargo mutants --in-diff
         # Only the code this PR changes, in the crates this runner mutates, against tests/ only
-        # (.cargo/mutants.toml). Any missed or timed-out mutant fails the gate.
+        # (.cargo/mutants.toml): those of every crate that reaches the mutant, so a rule tested
+        # from beamer-sim counts (#135). Any missed or timed-out mutant fails the gate.
         run: cargo xtask mutants --runner ${{ matrix.runner }} --in-diff origin/rust
       - uses: actions/upload-artifact@v4
         if: failure()

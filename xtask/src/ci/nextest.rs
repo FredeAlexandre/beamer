@@ -104,6 +104,17 @@ pub fn failures(xml: &str) -> Result<Vec<Failed>> {
     Ok(failed)
 }
 
+/// How long the tests of a nextest JUnit report took to run, in seconds, builds left out.
+pub fn run_time(xml: &str) -> Result<f64> {
+    let doc = roxmltree::Document::parse(xml)
+        .map_err(|e| format!("nextest's JUnit report doesn't parse: {e}"))?;
+    Ok(doc
+        .root_element()
+        .attribute("time")
+        .and_then(|t| t.parse().ok())
+        .unwrap_or(0.0))
+}
+
 /// Whether a test's output is a panic at a `todo!()`: the line after `panicked at` is the
 /// `todo!()` message, bare or with its own message after a colon.
 fn panics_at_todo(output: &str) -> bool {

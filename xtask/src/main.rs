@@ -127,7 +127,8 @@ enum Command {
     },
     /// Run cargo-mutants on the crates a runner mutates, as the merge gate (`--in-diff`) and the
     /// nightly do (#33): `.cargo/mutants.toml`'s test filter, less the spec tests merged red, and
-    /// no mutants of `todo!()` bodies. Exits with cargo-mutants' code: 2 missed, 3 timed out.
+    /// no mutants of `todo!()` bodies. Each mutant meets the spec tests of every crate that
+    /// reaches it (#135). Exits with cargo-mutants' code: 2 missed, 3 timed out.
     Mutants {
         #[arg(long, value_enum)]
         runner: ci::crates::Runner,

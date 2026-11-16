@@ -304,3 +304,169 @@ fn a_change_outside_the_runner_s_code_passes_without_mutating() {
         run.text
     );
 }
+
+// Cross-crate kills (#135): a rule's spec tests sit behind the highest seam that reaches it, often
+// another crate's tests/. A mutant counts as caught when the tests/ of any crate that depends on
+// the mutated one kill it.
+
+/// `beamer-types` with `is_big`, which only `beamer-sim`'s spec tests test; `beamer-sim` depends on
+/// it. On a branch cut from `main`, with the repo's mutants and nextest configs.
+fn tested_from_sim() -> Workspace {
+    let ws = Workspace::new(&["beamer-types", "beamer-sim"]);
+    ws.write(".config/nextest.toml", NEXTEST_CONFIG);
+    ws.write(".cargo/mutants.toml", MUTANTS_CONFIG);
+    ws.write(
+        "crates/beamer-sim/Cargo.toml",
+        "[package]\nname = \"beamer-sim\"\nversion = \"0.0.0\"\nedition = \"2024\"\n\n\
+         [dependencies]\nbeamer-types = { path = \"../beamer-types\" }\n",
+    );
+    ws.commit("beamer-sim depends on beamer-types");
+    ws.git(&["switch", "--quiet", "-c", "task"]);
+    ws.write(
+        "crates/beamer-types/src/lib.rs",
+        "pub fn is_big(n: u32) -> bool {\n    n > 100\n}\n",
+    );
+    ws.write(
+        "crates/beamer-sim/tests/spec.rs",
+        "#[test]\nfn is_big_above_100() {\n    assert!(beamer_types::is_big(101));\n    \
+         assert!(!beamer_types::is_big(100));\n}\n",
+    );
+    ws.commit("is_big, tested from beamer-sim");
+    ws
+}
+
+#[test]
+fn the_gate_counts_a_mutant_killed_by_a_dependent_crate_s_spec_tests() {
+    let ws = tested_from_sim();
+    let run = mutants_gate(&ws);
+    run.passes();
+    assert!(
+        run.text
+            .contains("running the spec tests of beamer-sim, beamer-types")
+            && run.text.contains("5 mutants tested")
+            && run.text.contains(": 5 caught"),
+        "expected is_big's 5 mutants caught by beamer-sim's tests:\n{}",
+        run.text
+    );
+}
+
+#[test]
+fn the_nightly_counts_a_mutant_killed_by_a_dependent_crate_s_spec_tests() {
+    let ws = tested_from_sim();
+    let run = ws.xtask(&[
+        "mutants",
+        "--runner",
+        "linux",
+        "--shard",
+        "0/1",
+        "--",
+        "--no-fail-fast",
+    ]);
+    run.passes();
+    assert!(
+        run.text
+            .contains("running the spec tests of beamer-sim, beamer-types")
+            && run.text.contains("5 mutants tested")
+            && run.text.contains(": 5 caught"),
+        "expected is_big's 5 mutants caught by beamer-sim's tests:\n{}",
+        run.text
+    );
+}
+
+#[test]
+fn a_dependent_crate_s_unit_tests_still_kill_no_mutant() {
+    let ws = tested_from_sim();
+    ws.write("crates/beamer-sim/tests/spec.rs", "");
+    ws.write(
+        "crates/beamer-sim/src/lib.rs",
+        "#[cfg(test)]\nmod scaffolding {\n    #[test]\n    fn big() {\n        \
+         assert!(beamer_types::is_big(101));\n        assert!(!beamer_types::is_big(100));\n    \
+         }\n}\n",
+    );
+    ws.commit("is_big, unit-tested from beamer-sim");
+    mutants_gate(&ws).fails_naming(&["replace is_big -> bool with true", "MISSED"]);
+}
+
+#[test]
+fn a_mutant_no_spec_test_reaches_is_missed() {
+    let ws = tested_from_sim();
+    ws.write("crates/beamer-sim/tests/spec.rs", "");
+    ws.commit("no test of is_big");
+    mutants_gate(&ws).fails_naming(&["replace is_big -> bool with true", "MISSED"]);
+}
+
+#[test]
+fn a_dependent_crate_s_red_test_and_the_todo_it_meets_are_left_out() {
+    let ws = tested_from_sim();
+    ws.write(
+        "crates/beamer-types/src/lib.rs",
+        "pub fn is_big(n: u32) -> bool {\n    n > 100\n}\n\n\
+         pub fn is_small(_n: u32) -> bool {\n    todo!()\n}\n",
+    );
+    ws.write(
+        "crates/beamer-sim/tests/small.rs",
+        "#[test]\nfn is_small_below_10() {\n    assert!(beamer_types::is_small(9));\n}\n",
+    );
+    ws.commit("a todo!() in beamer-types and its red test in beamer-sim");
+    let run = mutants_gate(&ws);
+    run.passes();
+    assert!(
+        run.text
+            .contains("leaving out beamer-sim::small is_small_below_10, red at a todo!()")
+            && run.text.contains("leaving out 1 todo!() bodies")
+            && run.text.contains(": 5 caught")
+            && !run.text.contains("replace is_small"),
+        "expected the red test and the todo!() body left out, and is_big's mutants caught:\n{}",
+        run.text
+    );
+}
+
+#[test]
+fn only_the_crates_that_reach_a_mutated_crate_run_their_tests() {
+    // beamer-core reaches beamer-types through a dependency, beamer-sim through beamer-core, and
+    // beamer-viewmodel through a dev-dependency on beamer-sim. beamer-input doesn't reach it.
+    let ws = Workspace::new(&[
+        "beamer-types",
+        "beamer-core",
+        "beamer-sim",
+        "beamer-viewmodel",
+        "beamer-input",
+    ]);
+    ws.write(".config/nextest.toml", NEXTEST_CONFIG);
+    ws.write(".cargo/mutants.toml", MUTANTS_CONFIG);
+    let manifest = |name: &str, deps: &str| {
+        ws.write(
+            &format!("crates/{name}/Cargo.toml"),
+            &format!(
+                "[package]\nname = \"{name}\"\nversion = \"0.0.0\"\nedition = \"2024\"\n\n{deps}"
+            ),
+        );
+    };
+    manifest(
+        "beamer-core",
+        "[dependencies]\nbeamer-types = { path = \"../beamer-types\" }\n",
+    );
+    manifest(
+        "beamer-sim",
+        "[dependencies]\nbeamer-core = { path = \"../beamer-core\" }\n",
+    );
+    manifest(
+        "beamer-viewmodel",
+        "[dev-dependencies]\nbeamer-sim = { path = \"../beamer-sim\" }\n",
+    );
+    ws.commit("the dependencies");
+    ws.git(&["switch", "--quiet", "-c", "task"]);
+    ws.write(
+        "crates/beamer-types/src/lib.rs",
+        "pub fn one() -> u32 {\n    1\n}\n",
+    );
+    ws.commit("a change in beamer-types");
+    let run = mutants_gate(&ws);
+    assert!(
+        run.text.contains(
+            "running the spec tests of beamer-core, beamer-sim, beamer-types, beamer-viewmodel\n"
+        ),
+        "expected every crate but beamer-input to run its tests:\n{}",
+        run.text
+    );
+}
