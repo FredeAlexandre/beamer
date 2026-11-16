@@ -4,8 +4,5 @@
 # whichever machine the edit was made on.
 * text=auto eol=lf
 
-# Vendored as they came: a third party's licence file is not ours to reflow.
-win_app/assets/** -text
-
 # Reporter attachments retain their original bytes, including Windows line endings.
 docs/ceo-17-10-2026/gh15-evidence/W*.log.log -text

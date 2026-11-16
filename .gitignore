@@ -10,12 +10,7 @@ venv/
 
 # Build output. Never committed and never left behind either: a .app under dist/ is indexed by
 # Spotlight and turns up in Launchpad beside the real /Applications install.
-win_app/Output/
-win_app/build/
-win_app/dist/
-mac_app/build/
-native/audio/build/
-mac_app/dist/
+native/build/
 
 
 # Rendered documents, never committed
