@@ -106,6 +106,7 @@ harness has a kebab-case name, and every rule its harness checks carries that na
 | `cargo xtask spec validate` | Checks this format, then runs `tracey query validate`: unknown or malformed ids, duplicates, `impl` in tests, stale references |
 | `cargo xtask spec stale` | Runs `tracey query stale` and fails on any stale reference |
 | `cargo xtask spec parity` | Prints every parity change as a Markdown list |
+| `cargo xtask spec digest --since <rev>` | Prints every rule added, bumped or removed since `<rev>`, parity and `human`-tier changes first: the daily digest on #118 (`dev/routines/spec-digest.md`) |
 
 Each command takes `--root <dir>` to check another tree, such as the example. tracey's config is
 `.config/tracey/config.styx`. Its version is pinned in `xtask/src/tracey.rs`, and `xtask` says how

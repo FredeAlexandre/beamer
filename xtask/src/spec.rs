@@ -114,6 +114,8 @@ pub struct Rule {
     /// The rule's text on one line, markers left out.
     pub text: String,
     pub parity: Option<Parity>,
+    /// `machine` or `human`, with its reason. `None` is the default tier, `ci`.
+    pub tier: Option<Tier>,
 }
 
 impl Rule {
@@ -129,6 +131,12 @@ impl Rule {
 pub struct Parity {
     pub python: String,
     pub why: String,
+}
+
+pub struct Tier {
+    /// `machine` or `human`.
+    pub name: String,
+    pub reason: String,
 }
 
 struct Problem {
@@ -163,22 +171,33 @@ fn read_spec(root: &Path) -> Result<Vec<Rule>, Vec<Problem>> {
     let mut rules = Vec::new();
     let mut problems = Vec::new();
     for path in files {
-        let domain = path.file_stem().unwrap().to_string_lossy().into_owned();
-        let file = format!("spec/{domain}.md");
+        let domain = path.file_stem().unwrap().to_string_lossy();
         let text = fs::read_to_string(&path).unwrap_or_default();
-        let mut parser = Parser {
-            file,
-            domain,
-            rules: &mut rules,
-            problems: &mut problems,
-        };
-        parser.parse(&text);
+        parse(&domain, &text, &mut rules, &mut problems);
     }
     if problems.is_empty() {
         Ok(rules)
     } else {
         Err(problems)
     }
+}
+
+/// The rules of one domain file, `spec/<domain>.md`, read from its text. Rules come back even when
+/// the file has format problems: `validate` is what reports those.
+pub fn rules_in(domain: &str, text: &str) -> Vec<Rule> {
+    let mut rules = Vec::new();
+    parse(domain, text, &mut rules, &mut Vec::new());
+    rules
+}
+
+fn parse(domain: &str, text: &str, rules: &mut Vec<Rule>, problems: &mut Vec<Problem>) {
+    let mut parser = Parser {
+        file: format!("spec/{domain}.md"),
+        domain: domain.to_owned(),
+        rules,
+        problems,
+    };
+    parser.parse(text);
 }
 
 struct Parser<'a> {
@@ -402,7 +421,7 @@ impl Parser<'_> {
         let value = value.trim();
         match key {
             "tier" => {
-                if markers.tier {
+                if markers.tier.is_some() {
                     self.problem(number, Some(id), "a second `tier:` marker".into());
                     return;
                 }
@@ -425,7 +444,12 @@ impl Parser<'_> {
                             "a `{tier}` tier needs a one-line reason: `- tier: {tier} (<reason>)`"
                         ));
                     }
-                    ("machine" | "human", Some(_)) => markers.tier = true,
+                    ("machine" | "human", Some(reason)) => {
+                        markers.tier = Some(Tier {
+                            name: tier.into(),
+                            reason: reason.into(),
+                        });
+                    }
                     (other, _) => {
                         self.problem(
                             number,
@@ -502,6 +526,7 @@ impl Parser<'_> {
             line,
             text,
             parity: markers.parity,
+            tier: markers.tier,
         });
     }
 
@@ -515,10 +540,11 @@ impl Parser<'_> {
     }
 }
 
-/// The markers met so far in one rule. Only parity is kept: nothing reads the others yet.
+/// The markers met so far in one rule. Parity and tier are kept, for `parity` and `digest`;
+/// nothing reads the others yet.
 #[derive(Default)]
 struct Markers {
-    tier: bool,
+    tier: Option<Tier>,
     parity: Option<Parity>,
 }
 
