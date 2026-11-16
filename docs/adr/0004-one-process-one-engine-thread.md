@@ -3,8 +3,8 @@
 The Rust app is a single process. It holds the UI, the core, the link, the platform code and the
 media engine. Steps that need elevation (firewall repair, the admin-mode relaunch, and later the
 GameInput recovery task) run as `--elevated` subcommands of the same binary. The only code outside
-that process is what the OS loads itself: the Mac HAL driver inside coreaudiod and the Windows
-camera source inside Frame Server.
+that process is what the OS loads itself: the virtual microphone (a HAL plug-in) inside coreaudiod
+and the virtual camera inside Frame Server.
 
 None of our crates uses an async runtime. Every piece of logic is a sans-I/O state machine
 (`handle(event, now)`, `poll() -> Option<command>`, `next_deadline()`), driven by a few dedicated
