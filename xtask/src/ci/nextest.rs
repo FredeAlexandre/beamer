@@ -25,6 +25,8 @@ pub fn run(root: &Path, runner: Runner, args: &[String]) -> Result {
     let selection = crates::select(root, runner, Job::Test)?;
     let report = workspace::target_dir(root).join("nextest/ci/junit.xml");
     let _ = fs::remove_file(&report);
+    #[cfg(windows)]
+    step_aside();
     let status = Command::new(std::env::var_os("CARGO").unwrap_or("cargo".into()))
         .args(["nextest", "run", "--profile", "ci"])
         .args(selection.args())
@@ -63,6 +65,17 @@ pub fn run(root: &Path, runner: Runner, args: &[String]) -> Result {
         pending.len()
     );
     Ok(())
+}
+
+/// Moves this running `xtask.exe` aside. The workspace's test build rebuilds xtask, and Windows
+/// refuses to replace a running program's file, though it lets one be renamed.
+#[cfg(windows)]
+fn step_aside() {
+    if let Ok(exe) = std::env::current_exe() {
+        let aside = exe.with_extension("exe.old");
+        let _ = fs::remove_file(&aside);
+        let _ = fs::rename(&exe, &aside);
+    }
 }
 
 /// The failed tests of a nextest JUnit report.
