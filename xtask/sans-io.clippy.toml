@@ -1,0 +1,85 @@
+# The clippy lists of every sans-I/O crate (rules 1, 2 and 5 of #16, ADR 0004): beamer-types,
+# beamer-wire, the domain crates, beamer-core, beamer-platform, beamer-viewmodel and beamer-sim.
+# Each of them carries this file, byte for byte, as its own clippy.toml, and `cargo xtask deps`
+# fails while a copy is missing or differs. Edit it here, then copy it over every crate's.
+#
+# Clippy can't ban a whole module, so each clock read and each item of std::thread, std::net and
+# std::fs that does I/O is named. Time values (Instant, Duration) and addresses (SocketAddr) stay
+# allowed: time comes in as an argument, and quinn-proto takes both. Only std paths that exist on
+# every OS are named: clippy skips a path it can't resolve with a warning that `-D warnings` doesn't
+# make an error, and xtask's sans_io_lints test fails on that warning.
+
+disallowed-methods = [
+    # Clocks: time comes in as `now`.
+    { path = "std::time::Instant::now", reason = "time comes in as an argument (ADR 0004)" },
+    { path = "std::time::Instant::elapsed", reason = "time comes in as an argument (ADR 0004)" },
+    { path = "std::time::SystemTime::now", reason = "time comes in as an argument (ADR 0004)" },
+    { path = "std::time::SystemTime::elapsed", reason = "time comes in as an argument (ADR 0004)" },
+
+    # std::thread: the engine drives this crate from its own thread.
+    { path = "std::thread::spawn", reason = "only beamer-runtime, the adapters and beamer spawn threads (ADR 0004)" },
+    { path = "std::thread::scope", reason = "only beamer-runtime, the adapters and beamer spawn threads (ADR 0004)" },
+    { path = "std::thread::Builder::spawn", reason = "only beamer-runtime, the adapters and beamer spawn threads (ADR 0004)" },
+    { path = "std::thread::Builder::spawn_scoped", reason = "only beamer-runtime, the adapters and beamer spawn threads (ADR 0004)" },
+    { path = "std::thread::sleep", reason = "a sans-I/O crate returns its next deadline instead of waiting (ADR 0004)" },
+    { path = "std::thread::park", reason = "a sans-I/O crate never blocks (ADR 0004)" },
+    { path = "std::thread::park_timeout", reason = "a sans-I/O crate never blocks (ADR 0004)" },
+    { path = "std::thread::yield_now", reason = "a sans-I/O crate never touches std::thread (ADR 0004)" },
+    { path = "std::thread::current", reason = "a sans-I/O crate never touches std::thread (ADR 0004)" },
+    { path = "std::thread::available_parallelism", reason = "a sans-I/O crate never touches std::thread (ADR 0004)" },
+
+    # std::net: the engine thread owns the one socket.
+    { path = "std::net::ToSocketAddrs::to_socket_addrs", reason = "name lookups are I/O; only the engine thread touches the network (ADR 0004)" },
+
+    # std::fs, and the Path methods that read the file system.
+    { path = "std::fs::canonicalize", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::copy", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::create_dir", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::create_dir_all", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::exists", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::hard_link", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::metadata", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::read", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::read_dir", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::read_link", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::read_to_string", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::remove_dir", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::remove_dir_all", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::remove_file", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::rename", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::set_permissions", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::symlink_metadata", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::write", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::path::Path::exists", reason = "it reads the file system (ADR 0004)" },
+    { path = "std::path::Path::try_exists", reason = "it reads the file system (ADR 0004)" },
+    { path = "std::path::Path::is_file", reason = "it reads the file system (ADR 0004)" },
+    { path = "std::path::Path::is_dir", reason = "it reads the file system (ADR 0004)" },
+    { path = "std::path::Path::is_symlink", reason = "it reads the file system (ADR 0004)" },
+    { path = "std::path::Path::metadata", reason = "it reads the file system (ADR 0004)" },
+    { path = "std::path::Path::symlink_metadata", reason = "it reads the file system (ADR 0004)" },
+    { path = "std::path::Path::canonicalize", reason = "it reads the file system (ADR 0004)" },
+    { path = "std::path::Path::read_link", reason = "it reads the file system (ADR 0004)" },
+    { path = "std::path::Path::read_dir", reason = "it reads the file system (ADR 0004)" },
+]
+
+disallowed-types = [
+    { path = "std::thread::Builder", reason = "only beamer-runtime, the adapters and beamer spawn threads (ADR 0004)" },
+    { path = "std::thread::JoinHandle", reason = "only beamer-runtime, the adapters and beamer spawn threads (ADR 0004)" },
+    { path = "std::thread::Scope", reason = "only beamer-runtime, the adapters and beamer spawn threads (ADR 0004)" },
+    { path = "std::thread::ScopedJoinHandle", reason = "only beamer-runtime, the adapters and beamer spawn threads (ADR 0004)" },
+    { path = "std::thread::Thread", reason = "a sans-I/O crate never touches std::thread (ADR 0004)" },
+
+    { path = "std::net::UdpSocket", reason = "the engine thread owns the one UDP socket (ADR 0004)" },
+    { path = "std::net::TcpStream", reason = "only the engine thread touches the network (ADR 0004)" },
+    { path = "std::net::TcpListener", reason = "only the engine thread touches the network (ADR 0004)" },
+
+    { path = "std::fs::File", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::OpenOptions", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::DirBuilder", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::ReadDir", reason = "a worker writes files from Persist commands (ADR 0004)" },
+    { path = "std::fs::DirEntry", reason = "a worker writes files from Persist commands (ADR 0004)" },
+]
+
+disallowed-macros = [
+    { path = "std::thread_local", reason = "a sans-I/O crate never touches std::thread (ADR 0004)" },
+]
