@@ -3,6 +3,7 @@
 mod blind;
 mod copy_tests;
 mod deps;
+mod digest;
 mod red_first;
 mod spec;
 mod tracey;
@@ -62,6 +63,26 @@ enum SpecCommand {
     Stale(Root),
     /// List every parity change, for Alex to approve in one sitting.
     Parity(Root),
+    /// Print the spec digest: every rule added, bumped or removed between two commits, with the
+    /// pull request that changed it, parity and human-tier changes first (#45). Prints nothing
+    /// when no rule changed.
+    Digest(Digest),
+}
+
+#[derive(Args)]
+struct Digest {
+    /// The commit the last digest ran through.
+    #[arg(long, value_name = "REV")]
+    since: String,
+    /// The commit to run through.
+    #[arg(long, value_name = "REV", default_value = "HEAD")]
+    until: String,
+    /// The GitHub repository, as owner/name, to look each commit's pull request up in with `gh`,
+    /// and to link rules into. Without it, changes name their commits.
+    #[arg(long, value_name = "OWNER/NAME")]
+    repo: Option<String>,
+    #[command(flatten)]
+    root: Root,
 }
 
 #[derive(Args)]
@@ -87,6 +108,12 @@ fn main() -> ExitCode {
         Command::Spec(SpecCommand::Validate(root)) => exit(spec::validate(&root.dir())),
         Command::Spec(SpecCommand::Stale(root)) => exit(spec::stale(&root.dir())),
         Command::Spec(SpecCommand::Parity(root)) => exit(spec::parity(&root.dir())),
+        Command::Spec(SpecCommand::Digest(args)) => report(digest::run(
+            &args.root.dir(),
+            &args.since,
+            &args.until,
+            args.repo.as_deref(),
+        )),
         Command::Deps { manifest_path } => {
             let manifest = manifest_path
                 .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../Cargo.toml"));
