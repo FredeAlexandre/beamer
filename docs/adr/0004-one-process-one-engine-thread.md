@@ -3,8 +3,9 @@
 The Rust app is a single process. It holds the UI, the core, the link, the platform code and the
 media engine. Steps that need elevation (firewall repair, the admin-mode relaunch, and later the
 GameInput recovery task) run as `--elevated` subcommands of the same binary. The only code outside
-that process is what the OS loads itself: the virtual microphone (a HAL plug-in) inside coreaudiod
-and the virtual camera inside Frame Server.
+that process is what the OS loads itself (the virtual microphone, a HAL plug-in inside coreaudiod,
+and the virtual camera inside Frame Server) and a **watchdog**: a second copy of the same binary,
+`beamer --watchdog`, that runs no Beamer logic and only restarts the app (see below).
 
 None of our crates uses an async runtime. Every piece of logic is a sans-I/O state machine
 (`handle(event, now)`, `poll() -> Option<command>`, `next_deadline()`), driven by a few dedicated
@@ -23,9 +24,18 @@ threads that each block on their own source:
   the engine through lock-free SPSC rings.
 - **The platform workers** take the blocking OS calls (DDC/CI, file writes, permission probes).
 
-Release builds use `panic = "abort"`. A panic hook writes the crash log, and the OS restarts the
-app. When the process dies, its hooks die with it, so local input is never stranded, and a peer
+Release builds use `panic = "abort"`. A panic hook writes the crash log, and the watchdog restarts
+the app. When the process dies, its hooks die with it, so local input is never stranded, and a peer
 that held our input gets it back through the link's idle timeout.
+
+**The watchdog** (amended 2026-11-16; this ADR first said the OS restarts the app). At startup the
+app spawns `beamer --watchdog` with a pipe to it. On Quit the app writes "bye" and exits 0. Any
+other end of the pipe (a crash, a kill) makes the watchdog relaunch the app the ordinary way
+(through LaunchServices on the Mac, with its own token on Windows) and exit. The engine thread also
+sends a heartbeat every second; ten seconds without one (system sleep excluded) and the watchdog
+kills and relaunches the app, because a frozen engine with a stale capture word would swallow the
+local keyboard and mouse. Relaunches back off from 1 to 30 s and stop after five crashes in ten
+minutes. The detail lives in the packaging ticket and its spec rules.
 
 ## Considered options
 
@@ -51,8 +61,12 @@ that held our input gets it back through the link's idle timeout.
   This is what lets `beamer-sim` run N machines on a virtual clock.
 - No platform adapter may block the engine thread. A call that can take more than microseconds
   goes to the adapter's own worker, and its outcome comes back as an event.
-- A UI or codec crash takes the whole app down, and the OS restart brings it back. Surviving a panic
+- A UI or codec crash takes the whole app down, and the watchdog brings it back. Surviving a panic
   in process is not attempted.
+- Don't hand crash restart back to the OS. Task Scheduler's restart-on-failure ignores a process
+  that started and then aborted (tested on the PC: an exit with `0xC0000409` is never retried), and
+  a launchd `KeepAlive` agent would have to be the app itself, so "Start at login" could no longer
+  be a toggle and a launch from Finder would not be covered.
 
-Source: the wayfinder ticket "Architecture and crate layout of the Rust app" (#16) on
-FredeAlexandre/beamer.
+Source: the wayfinder tickets "Architecture and crate layout of the Rust app" (#16) and
+"Packaging, signing, install and restart on macOS and Windows" (#21) on FredeAlexandre/beamer.
