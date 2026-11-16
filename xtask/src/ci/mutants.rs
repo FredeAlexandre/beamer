@@ -9,6 +9,9 @@
 //!   killing mutants it never tested.
 //! - **`todo!()` bodies are not mutated.** A skeleton's bodies have no tests to kill their
 //!   mutants yet; once a body is written, its mutants count.
+//! - **The tests of every crate that reaches a mutant run against it** (#135). A rule's spec tests
+//!   sit behind the highest seam that reaches it, often `beamer-sim`'s or `beamer-core`'s `tests/`,
+//!   not the mutated crate's own; cargo-mutants alone runs only the latter. See [`test_packages`].
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -20,7 +23,7 @@ use syn::visit::Visit;
 
 use super::crates::{self, Job, Runner, Selection};
 use super::nextest;
-use crate::deps::workspace::Workspace;
+use crate::deps::workspace::{DepKind, Workspace};
 use crate::{Result, workspace};
 
 /// What to mutate, from the command line.
@@ -82,6 +85,13 @@ pub fn run(root: &Path, options: &Options) -> Result<u8> {
         .iter()
         .flat_map(|(name, _)| ["-p".to_owned(), name.clone()])
         .collect();
+    let mutated: Vec<&str> = packages.iter().map(|(name, _)| name.as_str()).collect();
+    let tested = test_packages(
+        &workspace,
+        &mutated,
+        &crates::select(root, options.runner, Job::Test)?,
+    );
+    println!("mutants: running the spec tests of {}", tested.join(", "));
 
     let config_path = root.join(".cargo/mutants.toml");
     let mut config: toml::Table = fs::read_to_string(&config_path)
@@ -90,11 +100,15 @@ pub fn run(root: &Path, options: &Options) -> Result<u8> {
         .map_err(|e| format!("{} doesn't parse: {e}", config_path.display()))?;
     let filter = test_filter(&config)?;
 
-    let red = red_tests(root, &package_args, &filter)?;
-    for (binary, name) in &red {
+    let baseline = baseline(root, &tested, &filter)?;
+    for (binary, name) in &baseline.red {
         println!("mutants: leaving out {binary} {name}, red at a todo!()");
     }
-    set_test_filter(&mut config, &filter, &red);
+    set_test_filter(&mut config, &filter, &baseline.red);
+    config.insert(
+        "test_package".into(),
+        toml::Value::Array(tested.into_iter().map(toml::Value::String).collect()),
+    );
 
     let mut todo_bodies = Vec::new();
     for (_, dir) in &packages {
@@ -124,6 +138,12 @@ pub fn run(root: &Path, options: &Options) -> Result<u8> {
 
     let mut command = Command::new(cargo());
     command.arg("mutants").arg("--config").arg(&derived);
+    // cargo-mutants' own baseline runs only the mutated crates' tests, whatever `test_package`
+    // says (27.1.0): the baseline above, over every crate that reaches them, stands in for it.
+    command.args([
+        "--baseline=skip".to_owned(),
+        format!("--timeout={}", test_timeout(baseline.seconds)),
+    ]);
     if let Some(diff) = &diff_file {
         command.arg("--in-diff").arg(diff);
     }
@@ -146,6 +166,66 @@ pub fn run(root: &Path, options: &Options) -> Result<u8> {
         _ => {}
     }
     Ok(u8::try_from(code).unwrap_or(1))
+}
+
+/// The packages whose tests run against every mutant of the `mutated` crates: each crate, among
+/// those the runner `tested_here` tests, whose `tests/` can reach one of them. Sorted.
+///
+/// A crate's tests reach the crates its dependencies reach, transitively, and its
+/// dev-dependencies; a dev-dependency of a dependency is not linked into them. One cargo-mutants
+/// run takes one test list, so a mutant of one crate in the run also meets the tests reaching the
+/// others: harmless, since a test that can't reach a mutant can't kill it.
+///
+/// A crate the runner doesn't test isn't run: Linux tests only the OS-independent crates, so a
+/// rule of a Linux-mutated crate is caught only by sans-I/O seams (`beamer-sim`, `beamer-core`).
+pub fn test_packages(
+    workspace: &Workspace,
+    mutated: &[&str],
+    tested_here: &Selection,
+) -> Vec<String> {
+    let reaches = |from: &str| -> BTreeSet<String> {
+        let mut reached = BTreeSet::new();
+        let mut frontier: Vec<String> = vec![from.to_owned()];
+        if let Some(krate) = workspace.crates.iter().find(|c| c.name == from) {
+            frontier.extend(
+                krate
+                    .deps
+                    .iter()
+                    .filter(|d| d.kind == DepKind::Dev)
+                    .map(|d| d.name.clone()),
+            );
+        }
+        while let Some(name) = frontier.pop() {
+            if !reached.insert(name.clone()) {
+                continue;
+            }
+            if let Some(krate) = workspace.crates.iter().find(|c| c.name == name) {
+                frontier.extend(
+                    krate
+                        .deps
+                        .iter()
+                        .filter(|d| d.kind == DepKind::Normal)
+                        .map(|d| d.name.clone()),
+                );
+            }
+        }
+        reached
+    };
+    let mut tested: Vec<String> = workspace
+        .crates
+        .iter()
+        .filter(|c| match tested_here {
+            Selection::Workspace => true,
+            Selection::Packages(names) => names.contains(&c.name),
+        })
+        .filter(|c| {
+            let reached = reaches(&c.name);
+            mutated.iter().any(|m| reached.contains(*m))
+        })
+        .map(|c| c.name.clone())
+        .collect();
+    tested.sort();
+    tested
 }
 
 fn cargo() -> std::ffi::OsString {
@@ -188,27 +268,37 @@ fn set_test_filter(config: &mut toml::Table, filter: &str, red: &BTreeSet<(Strin
     }
 }
 
-/// The tests under `filter` that panic at a `todo!()` on the unmutated tree, as (binary, name).
-/// Fails when a test fails any other way: cargo-mutants' baseline would fail too.
-fn red_tests(
-    root: &Path,
-    package_args: &[String],
-    filter: &str,
-) -> Result<BTreeSet<(String, String)>> {
+/// What the unmutated tree's tests say, run as cargo-mutants would run them.
+struct Baseline {
+    /// The tests that panic at a `todo!()`, as (binary, name).
+    red: BTreeSet<(String, String)>,
+    /// How long the tests took to run, in seconds.
+    seconds: f64,
+}
+
+/// Runs the tests under `filter` in the `tested` packages on the unmutated tree: the baseline.
+/// Fails when a test fails other than at a `todo!()`: every mutant would look caught.
+fn baseline(root: &Path, tested: &[String], filter: &str) -> Result<Baseline> {
     let report = workspace::target_dir(root).join("nextest/ci/junit.xml");
     let _ = fs::remove_file(&report);
     let status = Command::new(cargo())
         .args(["nextest", "run", "--profile", "ci", "--no-tests=pass"])
-        .args(package_args)
+        .args(tested.iter().flat_map(|name| ["-p", name]))
         .args(["-E", filter])
         .current_dir(root)
         .status()
         .map_err(|e| format!("cannot run cargo nextest: {e}"))?;
-    if status.success() {
-        return Ok(BTreeSet::new());
-    }
-    let xml = fs::read_to_string(&report)
-        .map_err(|_| format!("nextest failed ({status}) before it ran the tests"))?;
+    let xml = match fs::read_to_string(&report) {
+        Ok(xml) => xml,
+        // No test binary under the filter: nothing ran, and nothing can be red.
+        Err(_) if status.success() => {
+            return Ok(Baseline {
+                red: BTreeSet::new(),
+                seconds: 0.0,
+            });
+        }
+        Err(_) => return Err(format!("nextest failed ({status}) before it ran the tests")),
+    };
     let mut red = BTreeSet::new();
     let mut failed = Vec::new();
     for test in nextest::failures(&xml)? {
@@ -224,7 +314,17 @@ fn red_tests(
             failed.join(", ")
         ));
     }
-    Ok(red)
+    Ok(Baseline {
+        red,
+        seconds: nextest::run_time(&xml)?,
+    })
+}
+
+/// The test timeout of each mutant, by cargo-mutants' own rule for a baseline it ran: five
+/// times the baseline's test time, and at least 20 seconds.
+fn test_timeout(baseline_seconds: f64) -> u64 {
+    let scaled = (baseline_seconds * 5.0).ceil();
+    if scaled > 20.0 { scaled as u64 } else { 20 }
 }
 
 /// Every `.rs` file under `dir`, sorted.

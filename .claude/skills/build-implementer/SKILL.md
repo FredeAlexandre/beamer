@@ -71,7 +71,9 @@ Run the CI workflow's mutants gate locally, against your diff from `origin/rust`
 your crate is mutated on (`linux` for the OS-independent crates, `macos` or `windows` for the
 platform crates, `beamer-runtime` and `beamer`; `cargo xtask crates --runner <os> --for mutants`
 lists them). It runs cargo-mutants with `.cargo/mutants.toml`, leaving out the tests still red at a
-`todo!()` and the `todo!()` bodies, exactly as the gate does:
+`todo!()` and the `todo!()` bodies, exactly as the gate does. Each mutant meets the spec tests of
+every crate whose `tests/` reach your crate, so a rule tested from `beamer-sim` or `beamer-core`
+counts:
 
 ```sh
 cargo xtask mutants --runner macos --in-diff origin/rust

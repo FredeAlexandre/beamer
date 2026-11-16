@@ -7,4 +7,9 @@ test_tool = "nextest"
 # the integration-test binaries. An implementer's #[cfg(test)] unit tests never kill a mutant.
 # `cargo xtask mutants` also leaves out the spec tests merged red, which panic at a todo!(), and
 # the todo!() bodies themselves (#33).
-additional_cargo_test_args = ["-E", "kind(test)"]
+#
+# The tests run against a mutant are those of every crate whose tests/ reach it, not only the
+# mutated crate's: `cargo xtask mutants` writes them as `test_package` (#135). A mutant no spec
+# test reaches runs no test at all; --no-tests=pass makes that a missed mutant, where nextest's
+# "no tests to run" would count as caught.
+additional_cargo_test_args = ["--no-tests=pass", "-E", "kind(test)"]
