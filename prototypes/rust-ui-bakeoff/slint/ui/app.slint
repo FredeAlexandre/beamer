@@ -1,0 +1,833 @@
+// PROTOTYPE: Rust UI toolkit bake-off, Slint slice (throwaway, never merged).
+// The whole UI: settings window, edge-glow overlay, tray. Rust (src/main.rs) owns the glow state
+// machine and drives frames; everything here is declarative.
+
+import { ScrollView, ComboBox, Palette } from "std-widgets.slint";
+import "../assets/HankenGrotesk-Variable.ttf";
+import "../assets/B612Mono-Regular.ttf";
+import "../assets/B612Mono-Bold.ttf";
+
+// tokens.py, copied: PALETTE (dark) / PALETTE_LIGHT, chosen live by the system appearance.
+export global Tok {
+    out property <bool> dark: Palette.color-scheme != ColorScheme.light;
+    out property <color> ground: dark ? #0e0f0d : #f1f0ea;
+    out property <color> panel: dark ? #161714 : #fbfaf6;
+    out property <color> well: dark ? #1f201c : #e5e4dc;
+    out property <color> rule: dark ? #2a2b26 : #dcdbd3;
+    out property <color> edge: dark ? #6e6f66 : #7f7e74;
+    out property <color> ink: dark ? #efeee6 : #1b1c18;
+    out property <color> ink-2: dark ? #b3b2a7 : #46463f;
+    out property <color> ink-3: dark ? #8f8e84 : #66655c;
+    out property <color> signal: dark ? #5fd4f4 : #006a88;
+    out property <color> signal-dim: dark ? #1f4a55 : #bfe0ea;
+    out property <color> amber: dark ? #f2b544 : #8f5c00;
+    out property <color> flash: dark ? #b77a00 : #b55f00;
+    out property <color> off: dark ? #4a4b44 : #aeada3;
+    // TYPE (points on the Mac, logical px on Windows; Slint px are logical either way)
+    out property <length> eyebrow: 10.5px;
+    out property <length> readout-key: 9.5px;
+    out property <length> small: 11.5px;
+    out property <length> note: 12.5px;
+    out property <length> body: 13px;
+    out property <length> status-word: 38px;
+    out property <length> readout: 34px;
+    out property <length> keycap: 20px;
+    out property <string> ui: "Hanken Grotesk";
+    out property <string> mono: "B612 Mono";
+}
+
+component FocusRing inherits Rectangle {
+    in property <bool> on;
+    border-width: on ? 2px : 0px;
+    border-color: Tok.signal;
+    border-radius: 6px;
+}
+
+component Eyebrow inherits Text {
+    font-size: Tok.eyebrow;
+    letter-spacing: Tok.eyebrow * 0.14;
+    color: Tok.ink-3;
+    font-weight: 600;
+}
+
+component Module inherits Rectangle {
+    in property <string> heading;
+    background: Tok.panel;
+    border-radius: 2px;
+    VerticalLayout {
+        padding-left: 16px;
+        padding-right: 16px;
+        padding-top: 14px;
+        padding-bottom: 16px;
+        spacing: 12px;
+        Eyebrow { text: root.heading; }
+        @children
+    }
+}
+
+// The ruler slider: ticks every `tick`, a major tick every 5, a thumb line in signal.
+component Ruler {
+    in property <float> minimum: 0;
+    in property <float> maximum: 500;
+    in property <float> step: 1;
+    in property <float> tick: 10;
+    in property <bool> enabled: true;
+    in property <string> label;
+    in-out property <float> value;
+    out property <bool> dragging: ta.pressed;
+    callback edited(float);
+    callback drag-changed(bool);
+    min-height: 40px;
+    min-width: 160px;
+    horizontal-stretch: 1;
+    accessible-role: slider;
+    accessible-label: label;
+    accessible-value: round(value);
+    accessible-value-minimum: minimum;
+    accessible-value-maximum: maximum;
+    accessible-value-step: step;
+    accessible-enabled: enabled;
+    accessible-action-increment => { set-value(value + step); }
+    accessible-action-decrement => { set-value(value - step); }
+
+    property <length> inset: 8px;
+    property <length> span: root.width - 2 * inset;
+    property <float> frac: (value - minimum) / (maximum - minimum);
+
+    function set-value(v: float) {
+        let nv = clamp(round(v / step) * step, minimum, maximum);
+        if nv != value {
+            value = nv;
+            edited(nv);
+        }
+    }
+
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if e.text == Key.RightArrow || e.text == Key.UpArrow {
+                root.set-value(root.value + (e.modifiers.shift ? 10 * root.step : root.step));
+                return accept;
+            }
+            if e.text == Key.LeftArrow || e.text == Key.DownArrow {
+                root.set-value(root.value - (e.modifiers.shift ? 10 * root.step : root.step));
+                return accept;
+            }
+            if e.text == Key.Home { root.set-value(root.minimum); return accept; }
+            if e.text == Key.End { root.set-value(root.maximum); return accept; }
+            reject
+        }
+    }
+
+    // track
+    Rectangle {
+        x: inset;
+        y: parent.height - 10px;
+        width: span;
+        height: 2px;
+        background: Tok.rule;
+    }
+    Rectangle {
+        x: inset;
+        y: parent.height - 10px;
+        width: span * frac;
+        height: 2px;
+        background: root.enabled ? Tok.signal : Tok.off;
+    }
+    // ticks
+    for i in floor((maximum - minimum) / tick) + 1: Rectangle {
+        x: inset + span * (i * tick / (maximum - minimum)) - 0.5px;
+        y: parent.height - 12px - self.height;
+        width: 1px;
+        height: mod(i, 5) == 0 ? 12px : 6px;
+        background: mod(i, 5) == 0 ? Tok.edge : Tok.rule;
+    }
+    // thumb
+    Rectangle {
+        x: inset + span * frac - 1.5px;
+        y: 2px;
+        width: 3px;
+        height: parent.height - 4px;
+        border-radius: 1.5px;
+        background: !root.enabled ? Tok.off : (ta.pressed || fs.has-focus ? Tok.ink : Tok.signal);
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: ew-resize;
+        changed pressed => {
+            if self.pressed {
+                fs.focus();
+                root.set-value(root.minimum + (self.mouse-x - inset) / span * (root.maximum - root.minimum));
+            }
+            root.drag-changed(self.pressed);
+        }
+        moved => {
+            if self.pressed {
+                root.set-value(root.minimum + (self.mouse-x - inset) / span * (root.maximum - root.minimum));
+            }
+        }
+    }
+    FocusRing { on: fs.has-focus; }
+}
+
+component Toggle {
+    in property <string> label;
+    in-out property <bool> checked;
+    callback toggled(bool);
+    accessible-role: switch;
+    accessible-label: label;
+    accessible-checkable: true;
+    accessible-checked: checked;
+    accessible-action-default => { flip(); }
+    function flip() {
+        checked = !checked;
+        toggled(checked);
+    }
+    min-height: 26px;
+    HorizontalLayout {
+        spacing: 12px;
+        alignment: start;
+        Rectangle {
+            width: 38px;
+            height: 22px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 11px;
+            background: root.checked ? Tok.signal-dim : Tok.well;
+            border-width: 1px;
+            border-color: root.checked ? Tok.signal : Tok.edge;
+            Rectangle {
+                width: 16px;
+                height: 16px;
+                border-radius: 8px;
+                y: 3px;
+                x: root.checked ? parent.width - 19px : 3px;
+                background: root.checked ? Tok.signal : Tok.ink-3;
+                animate x { duration: 120ms; easing: ease-out; }
+            }
+            FocusRing { on: fs.has-focus; border-radius: 14px; }
+        }
+        Text {
+            text: root.label;
+            color: Tok.ink;
+            font-size: Tok.body;
+            vertical-alignment: center;
+        }
+    }
+    fs := FocusScope {
+        key-pressed(e) => {
+            if e.text == " " || e.text == Key.Return {
+                if !e.repeat { root.flip(); }
+                return accept;
+            }
+            reject
+        }
+    }
+    TouchArea {
+        clicked => {
+            fs.focus();
+            root.flip();
+        }
+    }
+}
+
+component Segmented {
+    in property <[string]> options;
+    in-out property <int> current;
+    in property <string> label;
+    callback picked(int);
+    accessible-role: tab-list;
+    accessible-label: label;
+    height: 30px;
+    function pick(i: int) {
+        if i >= 0 && i < options.length && i != current {
+            current = i;
+            picked(i);
+        }
+    }
+    fs := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.RightArrow { root.pick(root.current + 1); return accept; }
+            if e.text == Key.LeftArrow { root.pick(root.current - 1); return accept; }
+            reject
+        }
+    }
+    Rectangle {
+        background: Tok.well;
+        border-radius: 5px;
+        border-width: 1px;
+        border-color: Tok.edge;
+        HorizontalLayout {
+            padding: 2px;
+            spacing: 2px;
+            for opt[i] in root.options: Rectangle {
+                min-width: 96px;
+                border-radius: 4px;
+                background: i == root.current ? Tok.signal : transparent;
+                accessible-role: tab;
+                accessible-label: opt;
+                accessible-item-selected: i == root.current;
+                accessible-action-default => { root.pick(i); }
+                Text {
+                    text: opt;
+                    font-size: Tok.body;
+                    color: i == root.current ? Tok.ground : Tok.ink-2;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+                TouchArea {
+                    clicked => {
+                        fs.focus();
+                        root.pick(i);
+                    }
+                }
+            }
+        }
+    }
+    FocusRing { on: fs.has-focus; }
+}
+
+component HoldButton {
+    in property <string> text;
+    out property <bool> down: ta.pressed || key-down;
+    property <bool> key-down;
+    callback push(bool);
+    accessible-role: button;
+    accessible-label: text;
+    height: 34px;
+    min-width: 140px;
+    changed down => { push(down); }
+    fs := FocusScope {
+        key-pressed(e) => {
+            if e.text == " " { if !e.repeat { root.key-down = true; } return accept; }
+            reject
+        }
+        key-released(e) => {
+            if e.text == " " { root.key-down = false; return accept; }
+            reject
+        }
+        focus-lost => { root.key-down = false; }
+    }
+    Rectangle {
+        border-radius: 5px;
+        background: root.down ? Tok.signal : Tok.well;
+        border-width: 1px;
+        border-color: root.down ? Tok.signal : Tok.edge;
+        Text {
+            text: root.text;
+            font-size: Tok.body;
+            font-weight: 600;
+            color: root.down ? Tok.ground : Tok.ink;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+    ta := TouchArea {
+        changed pressed => { if self.pressed { fs.focus(); } }
+    }
+    FocusRing { on: fs.has-focus; }
+}
+
+component NavRow {
+    in property <string> text;
+    in property <bool> selected;
+    callback activate();
+    height: 36px;
+    accessible-role: tab;
+    accessible-label: text;
+    accessible-item-selected: selected;
+    accessible-action-default => { activate(); }
+    Rectangle {
+        background: root.selected ? Tok.well : (ta.has-hover ? Tok.panel : transparent);
+    }
+    Rectangle {
+        x: 0;
+        width: 3px;
+        background: root.selected ? Tok.signal : transparent;
+    }
+    Text {
+        x: 20px;
+        text: root.text;
+        font-size: 15px;
+        font-weight: root.selected ? 700 : 500;
+        color: root.selected ? Tok.ink : Tok.ink-2;
+        vertical-alignment: center;
+        height: parent.height;
+    }
+    fs := FocusScope {
+        key-pressed(e) => {
+            if e.text == " " || e.text == Key.Return { root.activate(); return accept; }
+            reject
+        }
+    }
+    ta := TouchArea { clicked => { root.activate(); } }
+    FocusRing { on: fs.has-focus; x: 2px; width: parent.width - 4px; y: 1px; height: parent.height - 2px; border-radius: 3px; }
+}
+
+export component SettingsWindow inherits Window {
+    title: "Beamer";
+    preferred-width: 900px;
+    preferred-height: 640px;
+    min-width: 640px;
+    min-height: 540px;
+    background: Tok.ground;
+    default-font-family: Tok.ui;
+    default-font-size: Tok.body;
+
+    // Identity (set from Rust per platform)
+    in property <string> here: "On Mac";
+    in property <string> peer: "Desk PC";
+    in property <string> toolkit: "Slint";
+    in property <string> footer: "Changes apply as you make them. Closing this window keeps Beamer running in the menu bar.";
+
+    // Settings
+    in-out property <float> resistance: 120;
+    in-out property <bool> dont-cross-dragging: true;
+    in-out property <bool> paused: false;
+    in-out property <int> shortcut-mode: 0;
+    in-out property <float> tap-ms: 300;
+    in-out property <int> goes-to: 0;
+
+    // Live state pushed by Rust
+    in property <float> pressure;
+    in property <bool> strip-flash;
+    in property <string> send-to: "This Mac";
+    in property <string> overlay-info: "(not placed yet)";
+    in property <string> click-through: "(not set yet)";
+    in property <string> fps-info: "(no animation yet)";
+    in property <string> startup-info: "(measuring)";
+    in property <string> renderer-info: "skia";
+
+    property <int> page: 1;
+
+    callback resistance-edited(float);
+    callback resistance-drag(bool);
+    callback push(bool);
+    callback paused-edited(bool);
+    callback settings-changed();
+
+    HorizontalLayout {
+        // Sidebar
+        Rectangle {
+            width: 170px;
+            background: Tok.ground;
+            Rectangle {
+                x: parent.width - 1px;
+                width: 1px;
+                background: Tok.rule;
+            }
+            VerticalLayout {
+                padding-top: 22px;
+                spacing: 0px;
+                // link block
+                HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 12px;
+                    padding-bottom: 18px;
+                    spacing: 10px;
+                    Rectangle {
+                        width: 9px;
+                        height: 9px;
+                        y: 10px;
+                        border-radius: 4.5px;
+                        background: Tok.signal;
+                    }
+                    VerticalLayout {
+                        spacing: 4px;
+                        Text {
+                            text: root.here;
+                            font-size: 22px;
+                            font-weight: 700;
+                            color: Tok.ink;
+                        }
+                        Text {
+                            text: root.peer;
+                            font-family: Tok.mono;
+                            font-size: Tok.note;
+                            color: Tok.ink-2;
+                        }
+                        Text {
+                            text: "Response time: 3 ms";
+                            font-size: Tok.small;
+                            color: Tok.ink-3;
+                        }
+                    }
+                }
+                Rectangle { height: 1px; background: Tok.rule; }
+                Rectangle { height: 14px; }
+                for name[i] in ["Overview", "Crossing", "Keyboard", "Design"]: NavRow {
+                    text: name;
+                    selected: root.page == i;
+                    activate => { root.page = i; }
+                }
+                Rectangle { vertical-stretch: 1; }
+                Text {
+                    x: 16px;
+                    text: "Beamer bake-off · " + root.toolkit;
+                    font-size: Tok.small;
+                    color: Tok.ink-3;
+                    wrap: word-wrap;
+                    width: parent.width - 28px;
+                }
+                Rectangle { height: 16px; }
+            }
+        }
+        // Page + footer
+        VerticalLayout {
+            horizontal-stretch: 1;
+            ScrollView {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    padding-left: 36px;
+                    padding-right: 36px;
+                    padding-top: 28px;
+                    padding-bottom: 28px;
+                    spacing: 1px;
+                    VerticalLayout {
+                        spacing: 8px;
+                        padding-bottom: 22px;
+                        Text {
+                            text: ["Overview", "Crossing", "Keyboard", "Design"][root.page];
+                            font-size: Tok.status-word * 0.85;
+                            font-weight: 700;
+                            color: Tok.ink;
+                        }
+                        Text {
+                            text: root.page == 1
+                                ? "How hard the pointer pushes before it crosses, and what this machine's pointer and shortcut do."
+                                : "Not in this prototype.";
+                            font-size: 15px;
+                            color: Tok.ink-2;
+                            wrap: word-wrap;
+                        }
+                    }
+                    if root.page == 1: VerticalLayout {
+                        spacing: 1px;
+                        // 1. Resistance
+                        Module {
+                            heading: "RESISTANCE";
+                            Text {
+                                text: "How far the pointer pushes into the edge before it crosses.";
+                                color: Tok.ink-2;
+                                font-size: Tok.note;
+                                wrap: word-wrap;
+                            }
+                            HorizontalLayout {
+                                spacing: 20px;
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    alignment: start;
+                                    Text {
+                                        text: round(root.resistance);
+                                        font-family: Tok.mono;
+                                        font-size: Tok.readout;
+                                        color: Tok.ink;
+                                        min-width: 80px;
+                                        horizontal-alignment: right;
+                                    }
+                                    Text {
+                                        text: "px";
+                                        font-family: Tok.mono;
+                                        font-size: Tok.body;
+                                        color: Tok.ink-3;
+                                        vertical-alignment: bottom;
+                                    }
+                                }
+                                Ruler {
+                                    label: "Resistance";
+                                    minimum: 0;
+                                    maximum: 500;
+                                    tick: 10;
+                                    value <=> root.resistance;
+                                    edited(v) => { root.resistance-edited(v); root.settings-changed(); }
+                                    drag-changed(d) => { root.resistance-drag(d); }
+                                }
+                            }
+                            // PushStrip: 0..500 scale, fill = pressure, tick at the resistance
+                            VerticalLayout {
+                                spacing: 4px;
+                                Rectangle {
+                                    height: 16px;
+                                    background: Tok.well;
+                                    border-radius: 2px;
+                                    accessible-role: progress-indicator;
+                                    accessible-label: "Pressure";
+                                    accessible-value: round(root.pressure);
+                                    Rectangle {
+                                        x: 0;
+                                        width: parent.width * min(1, root.pressure / 500);
+                                        background: root.strip-flash ? Tok.flash : Tok.signal;
+                                        border-radius: 2px;
+                                    }
+                                    if root.strip-flash: Rectangle {
+                                        background: Tok.flash;
+                                        border-radius: 2px;
+                                    }
+                                    Rectangle {
+                                        x: parent.width * root.resistance / 500 - 1px;
+                                        y: -4px;
+                                        width: 2px;
+                                        height: parent.height + 8px;
+                                        background: Tok.amber;
+                                    }
+                                }
+                                HorizontalLayout {
+                                    Text {
+                                        text: "PRESSURE " + round(root.pressure) + " / " + round(root.resistance) + " PX";
+                                        font-family: Tok.mono;
+                                        font-size: Tok.readout-key;
+                                        letter-spacing: Tok.readout-key * 0.14;
+                                        color: Tok.ink-3;
+                                    }
+                                }
+                            }
+                            HorizontalLayout {
+                                alignment: start;
+                                spacing: 12px;
+                                HoldButton {
+                                    text: "Hold to push";
+                                    push(d) => { root.push(d); }
+                                }
+                                Text {
+                                    text: "Rises at 400 px/s; crosses at the resistance.";
+                                    color: Tok.ink-3;
+                                    font-size: Tok.small;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                        // 2. This machine's pointer
+                        Module {
+                            heading: "THIS MACHINE'S POINTER";
+                            Toggle {
+                                label: "Don't cross while dragging";
+                                checked <=> root.dont-cross-dragging;
+                                toggled => { root.settings-changed(); }
+                            }
+                            Toggle {
+                                label: "Pause crossing";
+                                checked <=> root.paused;
+                                toggled(v) => { root.paused-edited(v); root.settings-changed(); }
+                            }
+                        }
+                        // 3. Shortcut
+                        Module {
+                            heading: "SHORTCUT";
+                            HorizontalLayout {
+                                spacing: 16px;
+                                alignment: start;
+                                Rectangle {
+                                    width: 130px;
+                                    height: 44px;
+                                    background: Tok.well;
+                                    border-radius: 6px;
+                                    border-width: 1px;
+                                    border-color: Tok.edge;
+                                    accessible-role: text;
+                                    accessible-label: "Shortcut key: Control";
+                                    Text {
+                                        text: "⌃ Control";
+                                        font-family: Tok.mono;
+                                        font-size: Tok.keycap * 0.8;
+                                        color: Tok.ink;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                                Segmented {
+                                    y: 7px;
+                                    label: "Shortcut gesture";
+                                    options: ["Double-tap", "Hold"];
+                                    current <=> root.shortcut-mode;
+                                    picked => { root.settings-changed(); }
+                                }
+                            }
+                            HorizontalLayout {
+                                spacing: 16px;
+                                Text {
+                                    text: "Time between taps";
+                                    color: root.shortcut-mode == 0 ? Tok.ink : Tok.off;
+                                    vertical-alignment: center;
+                                    min-width: 130px;
+                                }
+                                Ruler {
+                                    label: "Time between taps";
+                                    enabled: root.shortcut-mode == 0;
+                                    minimum: 150;
+                                    maximum: 600;
+                                    step: 10;
+                                    tick: 10;
+                                    value <=> root.tap-ms;
+                                    edited => { root.settings-changed(); }
+                                }
+                                Text {
+                                    text: round(root.tap-ms) + " ms";
+                                    font-family: Tok.mono;
+                                    color: root.shortcut-mode == 0 ? Tok.ink-2 : Tok.off;
+                                    vertical-alignment: center;
+                                    min-width: 60px;
+                                }
+                            }
+                            HorizontalLayout {
+                                spacing: 16px;
+                                Text {
+                                    text: "Shortcut goes to";
+                                    color: Tok.ink;
+                                    vertical-alignment: center;
+                                    min-width: 130px;
+                                }
+                                ComboBox {
+                                    model: ["Last machine", "Next in order", "Next among ticked"];
+                                    current-index <=> root.goes-to;
+                                    selected => { root.settings-changed(); }
+                                }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+                        }
+                        // 4. State
+                        Module {
+                            heading: "STATE";
+                            Text {
+                                font-family: Tok.mono;
+                                font-size: Tok.small;
+                                color: Tok.ink-2;
+                                wrap: word-wrap;
+                                text:
+                                    "resistance         " + round(root.resistance) + " px\n" +
+                                    "pressure           " + round(root.pressure) + " px\n" +
+                                    "dont-cross-drag    " + (root.dont-cross-dragging ? "on" : "off") + "\n" +
+                                    "paused             " + (root.paused ? "on" : "off") + "\n" +
+                                    "shortcut           Control, " + (root.shortcut-mode == 0 ? "double-tap, " + round(root.tap-ms) + " ms" : "hold") + "\n" +
+                                    "shortcut goes to   " + ["last machine", "next in order", "next among ticked"][root.goes-to] + "\n" +
+                                    "send input to      " + root.send-to + "\n" +
+                                    "overlay            " + root.overlay-info + "\n" +
+                                    "click-through      " + root.click-through + "\n" +
+                                    "overlay fps        " + root.fps-info + "\n" +
+                                    "startup            " + root.startup-info + "\n" +
+                                    "renderer           " + root.renderer-info;
+                            }
+                        }
+                    }
+                }
+            }
+            // Footer
+            Rectangle { height: 1px; background: Tok.rule; }
+            Rectangle {
+                height: 44px;
+                background: Tok.ground;
+                Text {
+                    x: 32px;
+                    width: parent.width - 48px;
+                    text: root.footer;
+                    color: Tok.ink-2;
+                    font-size: Tok.note;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+}
+
+// The edge-glow overlay: full display, transparent, glow on the right edge.
+export component Overlay inherits Window {
+    title: "Beamer overlay";
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+    default-font-family: "Hanken Grotesk";
+    in property <float> intensity;   // 0..1
+    in property <bool> flash;        // resistance_flash instead of signal
+    in property <string> label: "OVERLAY · Slint";
+    property <color> c: flash ? #b77a00 : #5fd4f4;
+    property <float> a: clamp(intensity, 0, 1);
+
+    if a > 0: Rectangle {
+        x: parent.width - 64px;
+        width: 64px;
+        height: parent.height;
+        background: @linear-gradient(90deg,
+            c.with-alpha(0) 0%,
+            c.with-alpha(0.08 * a) 35%,
+            c.with-alpha(0.30 * a) 65%,
+            c.with-alpha(0.65 * a) 88%,
+            c.with-alpha(a) 100%);
+    }
+    if a > 0: Text {
+        text: root.label;
+        font-size: 64px;
+        font-weight: 700;
+        letter-spacing: 8px;
+        color: #efeee6.with-alpha(0.08);
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        width: parent.width;
+        height: parent.height;
+    }
+}
+
+export struct MenuChoice {
+    title: string,
+    checked: bool,
+}
+
+export component Tray inherits SystemTrayIcon {
+    in property <image> glyph-for-dark;
+    in property <image> glyph-for-light;
+    icon: Palette.color-scheme == ColorScheme.dark ? glyph-for-dark : glyph-for-light;
+    tooltip: "Beamer bake-off (Slint)";
+
+    in property <[MenuChoice]> machines;
+    in property <[MenuChoice]> displays;
+    in-out property <bool> paused;
+
+    callback open-settings();
+    callback pick-machine(int);
+    callback pick-display(int);
+    callback paused-edited(bool);
+    callback test-glow();
+    callback quit();
+
+    // Windows: left-click on the icon (macOS opens the menu instead).
+    clicked => { open-settings(); }
+
+    Menu {
+        Menu {
+            title: "Send input to";
+            for m[i] in root.machines: MenuItem {
+                title: m.title;
+                checkable: true;
+                checked: m.checked;
+                activated => { root.pick-machine(i); }
+            }
+        }
+        MenuItem {
+            title: "Pause crossing";
+            checkable: true;
+            checked <=> root.paused;
+            activated => { root.paused-edited(root.paused); }
+        }
+        MenuSeparator { }
+        Menu {
+            title: "Glow on";
+            for d[i] in root.displays: MenuItem {
+                title: d.title;
+                checkable: true;
+                checked: d.checked;
+                activated => { root.pick-display(i); }
+            }
+        }
+        MenuItem {
+            title: "Test glow";
+            activated => { root.test-glow(); }
+        }
+        MenuSeparator { }
+        MenuItem {
+            title: "Settings…";
+            activated => { root.open-settings(); }
+        }
+        MenuItem {
+            title: "Quit";
+            activated => { root.quit(); }
+        }
+    }
+}

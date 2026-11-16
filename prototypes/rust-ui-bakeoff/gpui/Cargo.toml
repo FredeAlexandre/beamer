@@ -1,0 +1,31 @@
+# PROTOTYPE: Rust UI bake-off, GPUI slice (throwaway, never merged). See ../SPEC.md and NOTES.md.
+[package]
+name = "bakeoff-gpui"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "bakeoff-gpui"
+path = "src/main.rs"
+
+[dependencies]
+# GPUI from the weekly `gpui-pre` snapshot of Zed's crates (the same pin gpui-kit uses), see NOTES.md.
+gpui = { package = "gpui-pre", version = "=0.3.12" }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.12", features = ["font-kit", "runtime_shaders"] }
+tray-icon = "=0.26.1"
+futures = "=0.3.34"
+log = "=0.4.35"
+raw-window-handle = "=0.6.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "=0.6.5"
+libc = "=0.2.191"
+objc2-app-kit = { version = "=0.3.2", features = ["NSWindow", "NSView", "NSApplication", "NSRunningApplication", "NSResponder", "NSPanel", "NSScreen", "NSGraphics"] }
+objc2-foundation = { version = "=0.3.2", features = ["NSGeometry", "NSString", "NSArray", "NSDictionary", "NSValue"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "=0.62.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi", "Win32_UI_HiDpi", "Win32_System_Threading", "Win32_System_ProcessStatus", "Win32_Devices_Display"] }
+
+[profile.release]
+debug = false

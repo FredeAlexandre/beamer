@@ -1,0 +1,35 @@
+# PROTOTYPE: Rune slice of the Rust UI bake-off (FredeAlexandre/beamer#12). Throwaway, never merged.
+[package]
+name = "bakeoff-rune"
+version = "0.0.1"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "bakeoff-rune"
+path = "src/main.rs"
+
+[dependencies]
+# Rune is git-only and pre-release: pin a `dev` rev, and patch the same crates it patches (below).
+rune = { git = "https://github.com/anomalyco/rune", rev = "0796df5fa269b85d4fc04786bbd37f7349eb6606", default-features = false, features = ["accessibility", "metal-backend"] }
+# Rune has no macOS tray and its Windows tray is a flat menu (no submenus, no checks): tray-icon on both.
+tray-icon = "=0.26.1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "=0.6.5"
+objc2-foundation = { version = "=0.3.2", features = ["NSString", "NSDictionary", "NSValue", "NSGeometry"] }
+objc2-app-kit = { version = "=0.3.2", features = ["NSScreen", "NSGraphics", "NSApplication", "NSResponder", "NSWindow"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Devices_Display", "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging"] }
+
+# Cargo doesn't inherit a dependency's [patch]; Rune's README says to copy its table at the same rev.
+[patch.crates-io]
+winit = { git = "https://github.com/anomalyco/rune", rev = "0796df5fa269b85d4fc04786bbd37f7349eb6606" }
+parley_engine = { git = "https://github.com/anomalyco/rune", rev = "0796df5fa269b85d4fc04786bbd37f7349eb6606" }
+wgpu-hal = { git = "https://github.com/anomalyco/rune", rev = "0796df5fa269b85d4fc04786bbd37f7349eb6606" }
+accesskit_windows = { git = "https://github.com/anomalyco/rune", rev = "0796df5fa269b85d4fc04786bbd37f7349eb6606" }
+accesskit_macos = { git = "https://github.com/anomalyco/rune", rev = "0796df5fa269b85d4fc04786bbd37f7349eb6606" }
+
+[profile.release]
+codegen-units = 16
