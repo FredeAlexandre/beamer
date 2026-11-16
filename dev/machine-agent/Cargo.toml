@@ -1,0 +1,13 @@
+# The machine agent (#47, ADR 0005): a dev tool that posts real OS input for the `machine` test
+# tier. Its own workspace, so it never joins the app's: no row in the dependency table, no blind
+# export, no part of any bundle or install.
+[workspace]
+
+[package]
+name = "machine-agent"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+serde_json = "1"
