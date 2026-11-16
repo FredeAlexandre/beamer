@@ -11,7 +11,8 @@ everything else.
 
 ```
 Build task #<n> of FredeAlexandre/beamer. You are on <the Mac | lebig>, in the worktree <path>,
-on branch build/<n>-<slug>, cut from origin/rust. Work only in that worktree.
+on branch build/<n>-<slug>, cut from origin/rust. Work only in that worktree<, and for a
+build:test task in the blind export your skill makes beside it>.
 
 1. Read CLAUDE.md there, then the issue: gh issue view <n> -R FredeAlexandre/beamer
 2. <Mac: Claim the issue as CLAUDE.md says, naming the branch and the Mac. | lebig: The
