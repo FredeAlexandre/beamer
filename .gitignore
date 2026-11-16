@@ -1,5 +1,7 @@
 config.json
 *.log
+# Except test fixtures: the nightly's model-failures artifact holds `<package>.log` files.
+!xtask/tests/fixtures/**/*.log
 __pycache__/
 *.pyc
 .venv/

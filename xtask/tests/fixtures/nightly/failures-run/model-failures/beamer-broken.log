@@ -1,0 +1,9 @@
+   Compiling beamer-broken v0.1.0 (/home/runner/work/beamer/beamer/crates/beamer-broken)
+error[E0425]: cannot find value `owner` in this scope
+  --> crates/beamer-broken/tests/model.rs:23:17
+   |
+23 |         assert!(owner.is_some());
+   |                 ^^^^^ not found in this scope
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `beamer-broken` (test "model") due to 1 previous error

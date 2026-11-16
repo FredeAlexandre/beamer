@@ -1,0 +1,34 @@
+   Compiling beamer-model v0.1.0 (/home/runner/work/beamer/beamer/crates/beamer-model)
+    Finished `release` profile [optimized] target(s) in 41.27s
+     Running unittests src/lib.rs (target/release/deps/beamer_model-6b1d0c9e2f4a7531)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/handover.rs (target/release/deps/handover-3f9c1a2b4d5e6f70)
+
+running 2 tests
+test handover_completes ... ok
+test one_owner_at_a_time ... FAILED
+
+failures:
+
+---- one_owner_at_a_time stdout ----
+Checking. states=1843, unique=612, depth=4
+Discovered "one owner at a time" counterexample. states=1843, unique=612, depth=4
+Path:
+  Deliver { src: 0, dst: 1, msg: Claim }
+  Deliver { src: 2, dst: 1, msg: Claim }
+
+thread 'one_owner_at_a_time' panicked at crates/beamer-model/tests/handover.rs:58:5:
+property "one owner at a time" has a counterexample
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    one_owner_at_a_time
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.12s
+
+error: test failed, to rerun pass `-p beamer-model --test handover`
