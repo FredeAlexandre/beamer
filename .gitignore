@@ -25,3 +25,6 @@ docs/pdf/
 
 # Cargo build output.
 /target/
+
+# cargo-mutants' output (the CI gate, the nightly and local runs).
+/mutants.out*/
