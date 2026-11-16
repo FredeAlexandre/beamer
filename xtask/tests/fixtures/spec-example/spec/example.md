@@ -32,6 +32,8 @@ not before.
 > machine's display.
 >
 > - tier: human (whether the pointer appears where the eye expects is judged at the desk)
+> - do: Move the pointer across the edge to the other machine, at the top and then at the bottom
+> - see: The pointer appears on the other screen at the same height it left, both times
 
 ## Frames
 

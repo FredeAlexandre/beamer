@@ -230,9 +230,50 @@ fn a_marker_in_the_middle_of_a_rule_fails() {
 fn a_rule_may_end_in_a_list_of_its_own_before_its_markers() {
     Example::new()
         .validate_with(
-            "> r[example.zone.extra]\n> A zone is one of:\n>\n> - a whole edge\n> - a corner\n>\n> - tier: human (seen)",
+            "> r[example.zone.extra]\n> A zone is one of:\n>\n> - a whole edge\n> - a corner\n>\n> - tier: human (seen)\n> - do: Cross to the PC\n> - see: The pointer lands on the zone",
         )
         .passes();
+}
+
+#[test]
+fn a_human_tier_rule_says_what_to_do_and_what_to_see() {
+    let run = Example::new()
+        .validate_with("> r[example.zone.extra]\n> Text.\n>\n> - tier: human (seen at the desk)");
+    run.fails_saying("example.zone.extra");
+    run.fails_saying("`- do:");
+    run.fails_saying("`- see:");
+}
+
+#[test]
+fn a_human_tier_rule_with_what_to_do_and_see_passes() {
+    Example::new()
+        .validate_with(
+            "> r[example.zone.extra]\n> Text.\n>\n> - tier: human (seen at the desk)\n\
+             > - do: Push the pointer against the zone\n> - see: The pointer stops at the edge",
+        )
+        .passes();
+}
+
+#[test]
+fn only_a_human_tier_rule_says_what_to_do_and_see() {
+    for (marker, rule) in [
+        ("do", "> - tier: machine (real input)\n> - do: Push"),
+        ("see", "> - see: The pointer stops"),
+    ] {
+        Example::new()
+            .validate_with(&format!("> r[example.zone.extra]\n> Text.\n>\n{rule}"))
+            .fails_saying(&format!("a `{marker}:` marker on a rule that is not `human` tier"));
+    }
+}
+
+#[test]
+fn what_to_do_and_see_is_said_once() {
+    Example::new()
+        .validate_with(
+            "> r[example.zone.extra]\n> Text.\n>\n> - tier: human (seen)\n> - do: Push\n\
+             > - do: Push again\n> - see: It stops",
+        )
+        .fails_saying("a second `do:` marker");
 }
 
 #[test]
