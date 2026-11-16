@@ -120,6 +120,8 @@ current.
 |---|---|
 | `- tier: machine (<reason>)` | Verified on the Mac and `lebig` by `cargo xtask machine` (ADR 0005). |
 | `- tier: human (<reason>)` | Felt, heard or seen, so Alex checks it in the milestone checklist. |
+| `- do: <what Alex does>` | A `human`-tier rule's check: what Alex does at the desk. |
+| `- see: <what he sees, hears or feels>` | A `human`-tier rule's check: what he sees, hears or feels when the rule holds. |
 | `- parity: <what Python did> (<why the rule differs>)` | The rule changes a behaviour mined from the Python app. |
 | `- model: <state machine>` | A model test of that state machine covers the rule. |
 | `- fuzz: <harness>` | The rule is about a parser, which gets a bolero harness with a committed corpus. |
@@ -127,6 +129,20 @@ current.
 **Tier.** Every rule is `ci` unless it says otherwise: automated, on hosted runners. A rule leaves
 `ci` only with a one-line reason in parentheses, and `ci` itself is never written. Behaviour on
 three or more machines stays `ci`, through `beamer-sim` and the stateright model (#15).
+
+**Do and see.** A `human`-tier rule carries a `do:` and a `see:`, and no other rule does. They are
+its box in the milestone checklist, `cargo xtask checklist` (#49): Alex does the one and ticks the
+box once he has seen the other. Like every marker they are part of the rule's text, so a change to
+what Alex checks bumps the rule, and its box comes back unticked.
+
+```markdown
+> r[crossing.landing.same-height]
+> After a crossing, the pointer lands at the height it left, scaled to the driven display.
+>
+> - tier: human (where the pointer appears is judged by eye)
+> - do: Move the pointer across the edge to the other machine, near the top and then the bottom
+> - see: The pointer appears on the other screen at the height it left, both times
+```
 
 **Parity.** Every behaviour change from the Python app carries a `parity:` marker, which states
 what Python did and, in the final parentheses, why the rule differs. `cargo xtask spec parity`
@@ -162,6 +178,7 @@ harness has a kebab-case name, and every rule its harness checks carries that na
 | `cargo xtask spec parity` | Prints every parity change as a Markdown list |
 | `cargo xtask spec digest --since <rev>` | Prints every rule added, bumped or removed since `<rev>`, parity and `human`-tier changes first: the daily digest on #118 (`dev/routines/spec-digest.md`) |
 | `cargo xtask test-audit` | Checks the spec tests, the skips, the commits and the ledger as above. `--since <rev>` checks only the commits after `<rev>`; `--complete` requires the whole ledger |
+| `cargo xtask checklist <milestone>` | Opens the milestone's issue for Alex, labelled `needs:alex`: a box per `human`-tier rule with its `do:` and `see:`, and a link to the newest machine-tier report in `dev/.reports/`, uploaded as a secret gist (`--report` names another, or a URL). `--only <prefix>` keeps the milestone's rule groups. Run again, it updates the issue and keeps Alex's ticks on rules that kept their version. `--dry-run` prints it and writes nothing |
 | `cargo xtask kill-matrix <mutants.out>…` | Prints, as Markdown, which spec test kills which mutant and which spec tests kill none, from the `mutants.out` of each shard of a run made with nextest's `--no-fail-fast`, as the nightly's is |
 
 Each command but `kill-matrix` takes `--root <dir>` to check another tree, such as the example.

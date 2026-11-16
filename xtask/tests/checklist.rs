@@ -383,3 +383,102 @@ fn an_update_uploads_a_report_only_when_a_newer_one_is_there() {
     );
     assert!(!body.contains("run-1.json"), "{body}");
 }
+
+#[test]
+fn a_milestone_is_m_and_its_number() {
+    let desk = Desk::with_report();
+    for bad in ["1", "m1", "M", "M1a", "first"] {
+        let out = desk.run(&[bad]);
+        assert!(!out.status.success(), "{bad} was taken");
+        assert!(stderr(&out).contains("M1"), "{}", stderr(&out));
+    }
+    assert_eq!(desk.calls(), "", "no call to gh");
+}
+
+#[test]
+fn each_rule_id_links_to_the_rule() {
+    let desk = Desk::with_report();
+    desk.checklist(&["M1"]);
+    let body = desk.issue();
+    let head = desk.ws.git(&["rev-parse", "HEAD"]);
+    let link = format!("https://github.com/{REPO}/blob/{}/{SPEC}#L", head.trim());
+    assert!(line(&body, HUMAN).contains(&link), "{body}");
+}
+
+#[test]
+fn only_scopes_the_checklist_to_the_milestone_s_rule_groups() {
+    let desk = Desk::with_report();
+    desk.add_rule(&human_rule("other").replace("example.driving.", "example.zone."));
+    desk.checklist(&["M1", "--only", "example.zone"]);
+    let body = desk.issue();
+    line(&body, "example.zone.other");
+    assert!(!body.contains(HUMAN), "{body}");
+    desk.checklist(&["M1", "--only", "example.zone", "--only", HUMAN]);
+    let body = desk.issue();
+    line(&body, "example.zone.other");
+    line(&body, HUMAN);
+}
+
+#[test]
+fn only_matches_whole_id_parts() {
+    let desk = Desk::with_report();
+    desk.checklist(&["M1", "--only", "example.driv"]);
+    assert!(!desk.issue().contains(HUMAN), "{}", desk.issue());
+}
+
+#[test]
+fn a_dry_run_prints_the_issue_and_writes_nothing() {
+    let desk = Desk::with_report();
+    let out = desk.checklist(&["M1", "--dry-run"]);
+    assert!(desk.issues().is_empty());
+    let calls = desk.calls();
+    assert!(
+        !calls.contains("create") && !calls.contains("edit"),
+        "{calls}"
+    );
+    let printed = stdout(&out);
+    line(&printed, HUMAN);
+    assert!(
+        printed.contains("run-1.json"),
+        "names the report:\n{printed}"
+    );
+    assert!(stderr(&out).contains("would open"), "{}", stderr(&out));
+}
+
+#[test]
+fn a_dry_run_shows_the_update_it_would_make() {
+    let desk = Desk::with_report();
+    desk.checklist(&["M1"]);
+    desk.tick(1, HUMAN);
+    let before = desk.issue();
+    let out = desk.checklist(&["M1", "--dry-run"]);
+    assert_eq!(desk.issue(), before);
+    assert!(stderr(&out).contains("would update #1"), "{}", stderr(&out));
+    assert!(line(&stdout(&out), HUMAN).starts_with("- [x] "));
+}
+
+#[test]
+fn with_no_human_tier_rule_the_issue_says_so() {
+    let desk = Desk::with_report();
+    desk.checklist(&["M1", "--only", "example.frame"]);
+    let body = desk.issue();
+    assert!(!body.contains("- [ ]"), "{body}");
+    assert!(body.contains("No `human`-tier rule"), "{body}");
+}
+
+#[test]
+fn a_checklist_too_long_for_one_issue_fails_before_writing() {
+    let desk = Desk::with_report();
+    let rules: Vec<String> = (0..400)
+        .map(|n| human_rule(&format!("many-{n:03}")).replace("Do many", &"Do many ".repeat(20)))
+        .collect();
+    desk.add_rule(&rules.join("\n\n"));
+    let out = desk.run(&["M1"]);
+    assert!(!out.status.success());
+    assert!(
+        stderr(&out).contains("--only"),
+        "says how to split it: {}",
+        stderr(&out)
+    );
+    assert!(desk.issues().is_empty());
+}
