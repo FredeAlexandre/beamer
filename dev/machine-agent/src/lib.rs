@@ -1,9 +1,11 @@
-//! The machine agent (#47, ADR 0005): serves the protocol in `PROTOCOL.md` on a loopback port and
+//! The machine agent (#47, #48, ADR 0005): serves the protocol in `PROTOCOL.md` on a loopback port and
 //! posts real OS input through a [`Desktop`].
 
+pub mod cli;
 pub mod keys;
 #[cfg(target_os = "macos")]
 pub mod mac;
+pub mod pc;
 mod server;
 
 pub use keys::Key;

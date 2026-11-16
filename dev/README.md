@@ -87,9 +87,11 @@ Treat anything else as a real failure.
 ## Machine agents
 
 The `machine` test tier posts real input on both machines through a dev-only machine agent, never
-through a hook inside Beamer (ADR 0005). The Mac's is in [`machine-agent/`](machine-agent/README.md),
-with the protocol both agents speak in [`machine-agent/PROTOCOL.md`](machine-agent/PROTOCOL.md).
-`dev/machine-agent/check.sh` proves it works on the Mac.
+through a hook inside Beamer (ADR 0005). Both are in [`machine-agent/`](machine-agent/README.md),
+with the protocol they speak in [`machine-agent/PROTOCOL.md`](machine-agent/PROTOCOL.md).
+`dev/machine-agent/check.sh` proves the Mac's works. `dev/machine-agent/check-pc.sh`, run on the
+Mac, proves the PC's: it installs the agent in `%LOCALAPPDATA%\BeamerDev\`, outside Beamer's
+install, and starts it in the desktop session through the `BeamerDev-MachineAgent` scheduled task.
 
 ## Testing limits
 
