@@ -69,6 +69,20 @@ Running the suite on the PC (`--test`) gives 1 failure and 6 errors, all environ
 
 Treat anything else as a real failure.
 
+## Frozen for Beamer 2.0
+
+`main` is feature-frozen from the tag `archive/python` (2026-11-16, #50) until Beamer 2.0, the
+Rust rewrite built on the branch `rust`, lands. Only bug fixes for daily use go into `main`; no
+new features.
+
+The 2.0 spec (`spec/` on `rust`) is mined once, from `archive/python`, and that tag never moves.
+A fix on `main` that changes behaviour is therefore not mined again: it gets an issue on
+FredeAlexandre/beamer, labelled `build:spec`, that amends the spec to match. A fix that changes no
+behaviour needs no issue.
+
+On the Mac, spec miners read the Python from a locked, read-only worktree of the tag at
+`~/Repositories/github.com/FredeAlexandre/beamer-python`. Don't edit, build or run anything there.
+
 ## Branches
 
 - `main` is the fork's own line: upstream (kalkman-code/beamer) plus this setup's fixes, the dev
@@ -77,10 +91,10 @@ Treat anything else as a real failure.
   `git merge upstream/main`. Feature branches start from `main` and come back to it once Alex
   calls them done; the branch is then deleted (Mac, PC and `origin`) and its tip tagged
   `archive/<branch>`.
-- `main` is the only branch. Finished branches live on as tags: `archive/feat-audio`,
-  `archive/feat-camera`, `archive/feat-shared-display`, and `archive/dev-local-build` (the fixes
-  this setup needs: python.org 3.13.17 compileall, self-signed signing identity, plus the dev
-  tools). Recreate one with `git branch <name> archive/<name>` if ever needed.
+- `main` is the Python app's only branch (`rust` is Beamer 2.0's). Finished branches live on as
+  tags: `archive/feat-audio`, `archive/feat-camera`, `archive/feat-shared-display`, and
+  `archive/dev-local-build` (the fixes this setup needs: python.org 3.13.17 compileall,
+  self-signed signing identity, plus the dev tools). Recreate one with `git branch <name> archive/<name>` if ever needed.
 - To offer a change upstream, cherry-pick it onto a branch from `upstream/main`, sign off every
   commit (`git commit -s`), and open an issue first for anything non-trivial (see CONTRIBUTING.md).
 
