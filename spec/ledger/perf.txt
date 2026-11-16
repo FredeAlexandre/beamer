@@ -1,0 +1,3 @@
+# The perf domain's slice of the Python ledger, laid out by #51.
+# Owner domains and the ambiguous assignments: spec/ledger/README.md.
+# No Python test is assigned to this domain.
