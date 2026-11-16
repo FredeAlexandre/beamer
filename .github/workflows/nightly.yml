@@ -166,6 +166,9 @@ jobs:
       PROPTEST_CASES: "256"
       BOLERO_RANDOM_SEED: "20261116"
       BOLERO_RANDOM_ITERATIONS: "1000"
+      # Plain test lines in each mutant's log: `cargo xtask kill-matrix` reads them, and colour
+      # codes hide every test from it.
+      CARGO_TERM_COLOR: never
     steps:
       - uses: actions/checkout@v4
         with:
