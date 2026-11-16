@@ -1,0 +1,19 @@
+@schema {id crate:tracey-config@1, cli tracey}
+
+// tracey reads the rules in spec/ and the references to them in the crates (#29, spec/README.md).
+// Spec tests in crates/*/tests/ may hold only `verify` references. Run it through
+// `cargo xtask spec validate` and `cargo xtask spec stale`, which pin its version.
+specs (
+    {
+        name beamer
+        include (spec/*.md)
+        impls (
+            {
+                name rust
+                // tracey 1.4.0 matches no `*` in the middle of an `include` pattern: keep it `**`.
+                include (crates/**/*.rs)
+                test_include (crates/*/tests/**/*.rs)
+            }
+        )
+    }
+)
