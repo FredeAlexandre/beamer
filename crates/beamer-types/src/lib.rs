@@ -1,0 +1,7 @@
+//! Throwaway crate for #33's weak-test proof. Never merged.
+
+/// Whether a display of this size is landscape.
+// r[impl types.display.landscape]
+pub fn is_landscape(width: u32, height: u32) -> bool {
+    width > height
+}

@@ -1,0 +1,5 @@
+[package]
+name = "beamer-types"
+version = "0.0.0"
+edition.workspace = true
+publish.workspace = true
