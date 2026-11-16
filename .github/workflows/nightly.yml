@@ -1,7 +1,7 @@
 # Nightly checks of the Rust build. None of these jobs gates a merge (#22, #15, ADR 0002).
 #
 #   mutants      full `cargo mutants`, sharded, each crate on a runner of its own OS
-#   kill-matrix  which tests kill which mutants (waits for a tool; see the job)
+#   kill-matrix  which spec test kills which mutant, from the mutants jobs' mutants.out
 #   fuzz         `cargo bolero test` on every bolero harness, on a separately pinned nightly
 #   model        the 3-machine stateright model of ownership and handover
 #   bench        `divan` microbenchmarks, for trends only
@@ -84,6 +84,10 @@ jobs:
           ref: ${{ steps.branch.outputs.sha }}
           persist-credentials: false
 
+      - name: Install the pinned toolchain
+        if: steps.branch.outputs.sha != '' && hashFiles('Cargo.toml') != ''
+        run: rustup toolchain install # reads rust-toolchain.toml
+
       - name: Scan the workspace
         id: scan
         if: steps.branch.outputs.sha != ''
@@ -102,34 +106,28 @@ jobs:
           fi
           echo "workspace=true" >> "$GITHUB_OUTPUT"
 
-          # Crates live flat in crates/, directory name = crate name (#28).
-          crates=$(for f in crates/*/Cargo.toml; do
-                     if [ -e "$f" ]; then basename "$(dirname "$f")"; fi
-                   done | sort)
-
-          # Mutants, per OS (#22, #33). The platform crates are mutated on their own OS, because
-          # cargo-mutants doesn't understand #[cfg(target_os)]. The -ffi shims and beamer-ui are
-          # never mutated (one crate-level justification each), nor are the vendored -sys bindings.
-          # Everything else is OS-independent and runs on Linux. If a crate turns out not to build
-          # on Linux, move it to the mac and win lists.
-          linux=$(echo "$crates" | grep -Ev '^(beamer-(mac|win)(-ffi)?|beamer-ui|.*-sys)$' || true)
-          mac=$(echo "$crates" | grep -Ex 'beamer-mac' || true)
-          win=$(echo "$crates" | grep -Ex 'beamer-win' || true)
-          entries() { # name runner shards crates...
-            local name=$1 runner=$2 shards=$3; shift 3
-            [ $# -gt 0 ] || return 0
-            local pkgs; pkgs=$(printf -- '-p %s ' "$@")
+          # Mutants, per OS (#22, #33): `cargo xtask crates` reads each crate's runner from the
+          # dependency table, as the CI workflow's mutants gate does, so both mutate a crate on the
+          # same runner. The platform crates run on their own OS, because cargo-mutants doesn't
+          # understand #[cfg(target_os)]; the -ffi shims, beamer-ui and the -sys bindings are
+          # never mutated (one justification each, in xtask/src/ci/crates.rs).
+          linux=$(cargo xtask crates --runner linux --for mutants)
+          mac=$(cargo xtask crates --runner macos --for mutants)
+          win=$(cargo xtask crates --runner windows --for mutants)
+          entries() { # name runner os shards packages
+            local name=$1 runner=$2 os=$3 shards=$4 pkgs=$5
+            [ -n "$pkgs" ] || return 0
             for ((k = 0; k < shards; k++)); do
-              jq -nc --arg n "$name" --arg r "$runner" --arg p "$pkgs" --argjson k "$k" --argjson s "$shards" \
-                '{name: $n, runner: $r, packages: $p, shard: $k, shards: $s}'
+              jq -nc --arg n "$name" --arg r "$runner" --arg o "$os" --arg p "$pkgs" \
+                --argjson k "$k" --argjson s "$shards" \
+                '{name: $n, runner: $r, os: $o, packages: $p, shard: $k, shards: $s}'
             done
           }
-          # shellcheck disable=SC2086 # word splitting of the crate lists is intended
-          matrix=$( { entries linux ubuntu-latest "$SHARDS_LINUX" $linux
-                      entries mac macos-latest "$SHARDS_MAC" $mac
-                      entries win windows-latest "$SHARDS_WIN" $win; } | jq -sc .)
+          matrix=$( { entries linux linux ubuntu-latest "$SHARDS_LINUX" "$linux"
+                      entries mac macos macos-latest "$SHARDS_MAC" "$mac"
+                      entries win windows windows-latest "$SHARDS_WIN" "$win"; } | jq -sc .)
           echo "mutants_matrix=$matrix" >> "$GITHUB_OUTPUT"
-          say "Mutants on Linux: $(echo "${linux:-none}" | paste -sd ' ' -)"
+          say "Mutants on Linux: ${linux:-none}"
           say "Mutants on macOS: ${mac:-none}"
           say "Mutants on Windows: ${win:-none}"
 
@@ -155,18 +153,22 @@ jobs:
     name: Mutants ${{ matrix.name }} ${{ matrix.shard }}/${{ matrix.shards }}
     needs: probe
     if: needs.probe.outputs.workspace == 'true' && needs.probe.outputs.mutants_matrix != '[]'
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 300
     strategy:
       fail-fast: false
       matrix:
         include: ${{ fromJSON(needs.probe.outputs.mutants_matrix || '[]') }}
     env:
-      # Fixed seeds, so a random test gives the same verdict on every mutant (#15).
+      # Fixed seeds, so a random test gives the same verdict on every mutant (#15). The CI
+      # workflow's mutants gate sets the same.
       PROPTEST_RNG_SEED: "20261116"
       PROPTEST_CASES: "256"
       BOLERO_RANDOM_SEED: "20261116"
       BOLERO_RANDOM_ITERATIONS: "1000"
+      # Plain test lines in each mutant's log: `cargo xtask kill-matrix` reads them, and colour
+      # codes hide every test from it.
+      CARGO_TERM_COLOR: never
     steps:
       - uses: actions/checkout@v4
         with:
@@ -180,20 +182,20 @@ jobs:
           save-if: ${{ matrix.shard == 0 }}
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-mutants@27,cargo-nextest
+          tool: cargo-mutants@27.1.0,cargo-nextest@0.9.152
       - name: cargo mutants
-        # Only the black-box spec tests in each crate's tests/ count (ADR 0002): nextest's
-        # kind(test) is the integration-test binaries. When #33 writes .cargo/mutants.toml, move
-        # this filter there so the merge gate and the nightly count the same tests.
+        # `cargo xtask mutants` runs cargo-mutants with .cargo/mutants.toml, whose test filter
+        # counts only the black-box spec tests in each crate's tests/ (ADR 0002), the same as the
+        # CI workflow's mutants gate. It leaves out the spec tests merged red at a todo!() and the
+        # todo!() bodies themselves (#33).
         # Exit 2 (missed mutants) and 3 (timeouts) are findings for triage, not a failed job.
-        env:
-          PACKAGES: ${{ matrix.packages }}
+        # --no-fail-fast runs every test against each mutant, so its log names every test that
+        # kills it: the kill matrix reads that (`cargo xtask kill-matrix`). It stays here, not in
+        # .cargo/mutants.toml: the merge gate needs only one killer and stops at the first.
         run: |
           set +e
-          # shellcheck disable=SC2086 # PACKAGES is a list of -p flags
-          cargo mutants --no-shuffle --test-tool=nextest \
-            --shard "${{ matrix.shard }}/${{ matrix.shards }}" $PACKAGES \
-            -- -E 'kind(test)'
+          cargo xtask mutants --runner "${{ matrix.runner }}" \
+            --shard "${{ matrix.shard }}/${{ matrix.shards }}" -- --no-fail-fast
           code=$?
           case $code in
             0) echo "All mutants caught." ;;
@@ -210,22 +212,48 @@ jobs:
 
   kill-matrix:
     name: Kill matrix
-    needs: probe
-    if: needs.probe.outputs.workspace == 'true'
+    needs: [probe, mutants]
+    # Also after a failed shard: the other shards' matrix is still worth reading.
+    if: ${{ !cancelled() && needs.probe.outputs.workspace == 'true' && needs.probe.outputs.mutants_matrix != '[]' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
-      # The kill matrix lists which tests kill which mutants, so a test that kills none is
-      # deleted or justified (#15). cargo-mutants stops at the first failing test, so it needs a
-      # tool on top: apply each mutant's diff, run the crate's tests without fail-fast, record
-      # which fail (docs/research/rust-testing-toolkit.md, section 10, on research/rust-testing-toolkit).
-      # The research puts it in `xtask test-audit`, but no ticket defines it yet: #31 (test-audit)
-      # doesn't list it. Replace this step with that command when a ticket adds it, sharded and
-      # per OS like `mutants`, and upload its matrix as an artifact.
-      - name: Not built yet
+      # The kill matrix lists which spec tests kill which mutants, so a test that kills none is
+      # deleted or justified (#15). cargo-mutants knows one killer per mutant at most; the mutants
+      # job's --no-fail-fast makes each mutant's log name all of them, and `cargo xtask
+      # kill-matrix` reads those logs from every shard's mutants.out (#31).
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.probe.outputs.sha }}
+          persist-credentials: false
+      - name: Install the pinned toolchain
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: nightly-kill-matrix
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mutants-*
+          path: mutants
+      - name: cargo xtask kill-matrix
         run: |
-          echo "::notice::No kill-matrix tool exists yet; no ticket defines one."
-          echo "Kill matrix: no tool yet, nothing run." >> "$GITHUB_STEP_SUMMARY"
+          runs=()
+          for dir in mutants/*/; do
+            if [ -f "$dir/outcomes.json" ]; then runs+=("$dir"); fi
+          done
+          if [ ${#runs[@]} -eq 0 ]; then
+            echo "::warning::No shard left a mutants.out; no kill matrix."
+            exit 0
+          fi
+          cargo xtask kill-matrix "${runs[@]}" > kill-matrix.md
+          # The summary takes the counts, the idle tests and the survivors; the artifact has all.
+          sed '/^## Mutants each spec test kills/,$d' kill-matrix.md | head -c 900000 >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kill-matrix
+          path: kill-matrix.md
+          if-no-files-found: ignore
+          retention-days: 30
 
   fuzz:
     name: Fuzz (bolero)
