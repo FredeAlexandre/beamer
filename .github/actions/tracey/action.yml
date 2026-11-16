@@ -1,0 +1,73 @@
+# Puts the tracey that xtask pins (`VERSION` in xtask/src/tracey.rs) on PATH.
+#
+# macOS arm64 and Linux x86_64 take the release binary, checked against its sha256. Windows has no
+# release, so it builds tracey from source once (its dashboard needs node and pnpm) and caches the
+# binary under the version.
+name: tracey
+description: Install the tracey version xtask pins
+runs:
+  using: composite
+  steps:
+    - name: Read the pinned version
+      id: pin
+      shell: bash
+      run: |
+        version=$(sed -n 's/^pub const VERSION: &str = "\(.*\)";$/\1/p' xtask/src/tracey.rs)
+        if [ -z "$version" ]; then
+          echo "::error::No tracey VERSION in xtask/src/tracey.rs"; exit 1
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "dir=$RUNNER_TEMP/tracey-$version" >> "$GITHUB_OUTPUT"
+
+    - name: Download the release
+      if: runner.os != 'Windows'
+      shell: bash
+      env:
+        VERSION: ${{ steps.pin.outputs.version }}
+        DIR: ${{ steps.pin.outputs.dir }}
+      run: |
+        case "$RUNNER_OS-$RUNNER_ARCH" in
+          Linux-X64) target=x86_64-unknown-linux-gnu ;;
+          Linux-ARM64) target=aarch64-unknown-linux-gnu ;;
+          macOS-ARM64) target=aarch64-apple-darwin ;;
+          *) echo "::error::tracey has no release for $RUNNER_OS $RUNNER_ARCH"; exit 1 ;;
+        esac
+        url="https://github.com/bearcove/tracey/releases/download/v$VERSION/tracey-$target.tar.xz"
+        mkdir -p "$DIR" && cd "$DIR"
+        curl -fsSL --retry 3 -o tracey.tar.xz "$url"
+        curl -fsSL --retry 3 -o tracey.tar.xz.sha256 "$url.sha256"
+        expected=$(cut -d' ' -f1 tracey.tar.xz.sha256)
+        actual=$(shasum -a 256 tracey.tar.xz | cut -d' ' -f1)
+        if [ "$expected" != "$actual" ]; then
+          echo "::error::tracey.tar.xz sha256 is $actual, the release says $expected"; exit 1
+        fi
+        tar -xJf tracey.tar.xz --strip-components=1
+        echo "$DIR" >> "$GITHUB_PATH"
+
+    - name: Restore the Windows build
+      if: runner.os == 'Windows'
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.pin.outputs.dir }}
+        key: tracey-${{ steps.pin.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+
+    - name: Build from source
+      if: runner.os == 'Windows' && steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        VERSION: ${{ steps.pin.outputs.version }}
+        DIR: ${{ steps.pin.outputs.dir }}
+      run: |
+        corepack enable
+        cargo install --locked --git https://github.com/bearcove/tracey --tag "v$VERSION" \
+          --root "$DIR" tracey
+
+    - name: Put it on PATH
+      shell: bash
+      env:
+        DIR: ${{ steps.pin.outputs.dir }}
+      run: |
+        if [ "$RUNNER_OS" = Windows ]; then echo "$DIR/bin" >> "$GITHUB_PATH"; fi
+        export PATH="$DIR:$DIR/bin:$PATH"
+        tracey --version

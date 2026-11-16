@@ -1,0 +1,123 @@
+# The merge gates of the Rust build (#22, #33, ADR 0002): every task PR into `rust` passes them.
+#
+#   fmt       rustfmt, once
+#   checks    xtask deps, test-audit, tracey validate and stale, red-first
+#   test      clippy -D warnings and nextest, on each runner
+#   mutants   cargo mutants --in-diff, each crate on the runner of its OS
+#
+# Which crates each runner covers is `cargo xtask crates`, read from the dependency table: Linux
+# takes the OS-independent crates, macOS and Windows the whole workspace. The nightly
+# (nightly.yml) asks the same command, so both mutate each crate on the same runner.
+#
+# CI publishes no app artifacts: it can't sign as "Beamer Dev" (#22).
+
+name: CI
+
+on:
+  pull_request:
+    branches: [rust]
+  # Runs on `rust` save the caches every PR restores; PR runs only read them.
+  push:
+    branches: [rust]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # A PR is tested at its head, not at GitHub's merge commit: test-audit reads each commit, and a
+  # merge commit touching tests and code together would fail it.
+  HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          persist-credentials: false
+      - name: Install the pinned toolchain
+        run: rustup toolchain install # reads rust-toolchain.toml
+      - run: cargo fmt --all --check
+
+  checks:
+    name: xtask checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          # test-audit and red-first read the history since the base.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fetch the base and the Python tag
+        # test-audit checks the Python ledger against archive/python (#31).
+        run: |
+          git fetch --no-tags origin +refs/heads/rust:refs/remotes/origin/rust
+          git fetch --no-tags origin +refs/tags/archive/python:refs/tags/archive/python
+      - name: Install the pinned toolchain
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: checks
+          save-if: ${{ github.ref == 'refs/heads/rust' }}
+      - uses: ./.github/actions/tracey
+      - name: cargo xtask deps
+        run: cargo xtask deps
+      - name: cargo xtask test-audit
+        run: cargo xtask test-audit --since "$(git merge-base origin/rust HEAD)"
+      - name: tracey query validate
+        run: cargo xtask spec validate
+      - name: tracey query stale
+        run: cargo xtask spec stale
+      - name: cargo xtask red-first
+        run: cargo xtask red-first --base origin/rust
+
+  test:
+    name: test (${{ matrix.runner }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: linux, os: ubuntu-latest }
+          - { runner: macos, os: macos-latest }
+          - { runner: windows, os: windows-latest }
+    steps:
+      - name: Keep line endings as committed
+        # Windows runners default to core.autocrlf=true, and xtask's tests compare files byte for byte.
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          persist-credentials: false
+      - name: Install the pinned toolchain
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test-${{ matrix.runner }}
+          save-if: ${{ github.ref == 'refs/heads/rust' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.152
+      # xtask's own tests run tracey.
+      - uses: ./.github/actions/tracey
+      - name: clippy -D warnings
+        # Each crate's clippy.toml holds its disallowed-* lists; clippy reads it by itself.
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: nextest
+        run: cargo nextest run --workspace --locked
