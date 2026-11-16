@@ -1,7 +1,7 @@
 # Nightly checks of the Rust build. None of these jobs gates a merge (#22, #15, ADR 0002).
 #
 #   mutants      full `cargo mutants`, sharded, each crate on a runner of its own OS
-#   kill-matrix  which tests kill which mutants (waits for a tool; see the job)
+#   kill-matrix  which spec test kills which mutant, from the mutants jobs' mutants.out
 #   fuzz         `cargo bolero test` on every bolero harness, on a separately pinned nightly
 #   model        the 3-machine stateright model of ownership and handover
 #   bench        `divan` microbenchmarks, for trends only
@@ -186,6 +186,9 @@ jobs:
         # kind(test) is the integration-test binaries. When #33 writes .cargo/mutants.toml, move
         # this filter there so the merge gate and the nightly count the same tests.
         # Exit 2 (missed mutants) and 3 (timeouts) are findings for triage, not a failed job.
+        # --no-fail-fast runs every test against each mutant, so its log names every test that
+        # kills it: the kill matrix reads that (`cargo xtask kill-matrix`). It stays here, not in
+        # .cargo/mutants.toml: the merge gate needs only one killer and stops at the first.
         env:
           PACKAGES: ${{ matrix.packages }}
         run: |
@@ -193,7 +196,7 @@ jobs:
           # shellcheck disable=SC2086 # PACKAGES is a list of -p flags
           cargo mutants --no-shuffle --test-tool=nextest \
             --shard "${{ matrix.shard }}/${{ matrix.shards }}" $PACKAGES \
-            -- -E 'kind(test)'
+            -- -E 'kind(test)' --no-fail-fast
           code=$?
           case $code in
             0) echo "All mutants caught." ;;
@@ -210,22 +213,48 @@ jobs:
 
   kill-matrix:
     name: Kill matrix
-    needs: probe
-    if: needs.probe.outputs.workspace == 'true'
+    needs: [probe, mutants]
+    # Also after a failed shard: the other shards' matrix is still worth reading.
+    if: ${{ !cancelled() && needs.probe.outputs.workspace == 'true' && needs.probe.outputs.mutants_matrix != '[]' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
-      # The kill matrix lists which tests kill which mutants, so a test that kills none is
-      # deleted or justified (#15). cargo-mutants stops at the first failing test, so it needs a
-      # tool on top: apply each mutant's diff, run the crate's tests without fail-fast, record
-      # which fail (docs/research/rust-testing-toolkit.md, section 10, on research/rust-testing-toolkit).
-      # The research puts it in `xtask test-audit`, but no ticket defines it yet: #31 (test-audit)
-      # doesn't list it. Replace this step with that command when a ticket adds it, sharded and
-      # per OS like `mutants`, and upload its matrix as an artifact.
-      - name: Not built yet
+      # The kill matrix lists which spec tests kill which mutants, so a test that kills none is
+      # deleted or justified (#15). cargo-mutants knows one killer per mutant at most; the mutants
+      # job's --no-fail-fast makes each mutant's log name all of them, and `cargo xtask
+      # kill-matrix` reads those logs from every shard's mutants.out (#31).
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.probe.outputs.sha }}
+          persist-credentials: false
+      - name: Install the pinned toolchain
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: nightly-kill-matrix
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mutants-*
+          path: mutants
+      - name: cargo xtask kill-matrix
         run: |
-          echo "::notice::No kill-matrix tool exists yet; no ticket defines one."
-          echo "Kill matrix: no tool yet, nothing run." >> "$GITHUB_STEP_SUMMARY"
+          runs=()
+          for dir in mutants/*/; do
+            if [ -f "$dir/outcomes.json" ]; then runs+=("$dir"); fi
+          done
+          if [ ${#runs[@]} -eq 0 ]; then
+            echo "::warning::No shard left a mutants.out; no kill matrix."
+            exit 0
+          fi
+          cargo xtask kill-matrix "${runs[@]}" > kill-matrix.md
+          # The summary takes the counts, the idle tests and the survivors; the artifact has all.
+          sed '/^## Mutants each spec test kills/,$d' kill-matrix.md | head -c 900000 >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kill-matrix
+          path: kill-matrix.md
+          if-no-files-found: ignore
+          retention-days: 30
 
   fuzz:
     name: Fuzz (bolero)
