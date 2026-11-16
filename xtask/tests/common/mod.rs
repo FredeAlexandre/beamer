@@ -86,7 +86,7 @@ pub struct Run {
 }
 
 impl Run {
-    fn of(command: &mut Command) -> Self {
+    pub fn of(command: &mut Command) -> Self {
         let Output {
             status,
             stdout,

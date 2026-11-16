@@ -1,0 +1,95 @@
+
+*** crates/beamer-k/src/lib.rs:6:7: replace > with < in is_big
+
+*** mutation diff:
+--- crates/beamer-k/src/lib.rs
++++ replace > with < in is_big
+@@ -1,14 +1,14 @@
+ pub fn double(x: u32) -> u32 {
+     x * 2
+ }
+ 
+ pub fn is_big(x: u32) -> bool {
+-    x > 10
++    x < /* ~ changed by cargo-mutants ~ */ 10
+ }
+ 
+ pub fn unused(x: u32) -> u32 {
+     x + 1
+ }
+ 
+ #[cfg(test)]
+ mod tests {
+
+
+*** cargo nextest run --no-run --verbose --package=beamer-k@0.0.0
+   Compiling beamer-k v0.0.0 (/private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-Z2ngI0.tmp/crates/beamer-k)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
+
+*** result: Success
+
+*** cargo nextest run --verbose --package=beamer-k@0.0.0 --no-fail-fast
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+────────────
+ Nextest run ID c9b46895-2d12-46ac-ac42-749488ee6dc9 with nextest profile: default
+    Starting 5 tests across 2 binaries
+       START [         ] (1/5) beamer-k::k doubles_again
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-Z2ngI0.tmp/target/debug/build/beamer-k/2280ee06e91eb4ee/out/k-2280ee06e91eb4ee --exact doubles_again --nocapture
+       START [         ] (1/5) beamer-k::k big
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-Z2ngI0.tmp/target/debug/build/beamer-k/2280ee06e91eb4ee/out/k-2280ee06e91eb4ee --exact big --nocapture
+       START [         ] (1/5) beamer-k tests::unit
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-Z2ngI0.tmp/target/debug/build/beamer-k/a49f0daec1e8b387/out/beamer_k-a49f0daec1e8b387 --exact tests::unit --nocapture
+       START [         ] (1/5) beamer-k::k doubles
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-Z2ngI0.tmp/target/debug/build/beamer-k/2280ee06e91eb4ee/out/k-2280ee06e91eb4ee --exact doubles --nocapture
+       START [         ] (1/5) beamer-k::k guards_nothing
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-Z2ngI0.tmp/target/debug/build/beamer-k/2280ee06e91eb4ee/out/k-2280ee06e91eb4ee --exact guards_nothing --nocapture
+        PASS [   0.006s] (1/5) beamer-k::k guards_nothing
+        PASS [   0.006s] (2/5) beamer-k::k doubles_again
+  TRY 1 FAIL [   0.006s] (───) beamer-k::k big
+  stdout ───
+
+    running 1 test
+    test big ... FAILED
+
+    failures:
+
+    failures:
+        big
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'big' (12015345) panicked at crates/beamer-k/tests/k.rs:13:5:
+    assertion failed: beamer_k::is_big(11)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.006s] (3/5) beamer-k tests::unit
+ TRY 2 START [         ] (───) beamer-k::k big
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-Z2ngI0.tmp/target/debug/build/beamer-k/2280ee06e91eb4ee/out/k-2280ee06e91eb4ee --exact big --nocapture
+        PASS [   0.007s] (4/5) beamer-k::k doubles
+  TRY 2 FAIL [   0.005s] (5/5) beamer-k::k big
+  stdout ───
+
+    running 1 test
+    test big ... FAILED
+
+    failures:
+
+    failures:
+        big
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'big' (12015359) panicked at crates/beamer-k/tests/k.rs:13:5:
+    assertion failed: beamer_k::is_big(11)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+────────────
+     Summary [   0.012s] 5 tests run: 4 passed, 1 failed, 0 skipped
+  TRY 2 FAIL [   0.005s] (5/5) beamer-k::k big
+error: test run failed
+
+*** result: Failure(100)

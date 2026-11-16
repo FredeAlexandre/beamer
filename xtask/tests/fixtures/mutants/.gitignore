@@ -1,0 +1,2 @@
+# The kill matrix reads these nextest logs: keep them, against the root .gitignore's *.log.
+!*.log
