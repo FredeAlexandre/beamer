@@ -88,3 +88,38 @@ Treat anything else as a real failure.
 
 Pointer crossing, key feel and anything heard or spoken need a person at the machines. Agents can
 build, run unit tests, deploy, start the apps and read both logs.
+
+## Shared sccache on the Mac
+
+The Beamer 2.0 build (#35) gives every worktree on the Mac one sccache disk cache. The rules
+agents follow are in `CLAUDE.md` on `rust`, under "Building on the Mac". It was set up on
+2026-11-16 as follows. Neither config file existed before. If one does, add the keys to it
+instead of overwriting it:
+
+```sh
+brew install sccache                     # 0.19.0 at setup
+mkdir -p "$HOME/Library/Application Support/Mozilla.sccache"
+cat > "$HOME/Library/Application Support/Mozilla.sccache/config" <<TOML
+[cache.disk]
+dir = "$HOME/Library/Caches/Mozilla.sccache"
+size = 53687091200  # 50 GiB
+TOML
+cat > "$HOME/.cargo/config.toml" <<'TOML'
+[build]
+rustc-wrapper = "/opt/homebrew/bin/sccache"
+TOML
+sccache --stop-server; sccache --start-server   # restart to read the config; not mid-build
+sccache --show-stats                            # "Max cache size 50 GiB", the cache dir above
+```
+
+`~/.cargo/config.toml` applies to every cargo project on the Mac, not only Beamer. To undo the
+setup, delete that file and the sccache config, run `sccache --stop-server` and delete the cache
+dir.
+
+Measured at setup with the workspace of the time (`xtask` and its dependencies), by running
+`cargo build --workspace --all-targets` in a fresh worktree after the same build in another:
+38 cache hits and 6 misses. `serde_core` and `serde_json` missed because they `include!` a
+file from their `OUT_DIR`, and `serde_spanned`, `toml` and `toml_datetime` missed because they're
+downstream of `serde_core`. `clap` missed because it uses the `clap_derive` proc-macro, which is
+built in each worktree. After `cargo clean`, a rebuild in the *same* worktree got 44 hits and
+0 misses.

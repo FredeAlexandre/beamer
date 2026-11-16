@@ -59,3 +59,28 @@ The Mac and the Windows PC `lebig` (`ssh lebig`, the `pc` git remote) are docume
 remote sections hold; its Python build, venv and `dev/deploy.sh` sections describe `main` until
 `xtask deploy` (#103) rewrites it. `gh` is not logged in on `lebig` (2026-11-16), so GitHub steps
 for work done there run from the Mac.
+
+## Building on the Mac
+
+Up to three agents build on the Mac at once (#23). Each worktree keeps its own `target/`: never
+set `CARGO_TARGET_DIR`, and never clean or delete another worktree's `target/`. What they share is
+one **sccache** disk cache (#35):
+
+- `~/.cargo/config.toml` sets `build.rustc-wrapper` to `/opt/homebrew/bin/sccache`, so every cargo
+  build on the Mac, in any worktree, compiles through it. Don't override `RUSTC_WRAPPER`.
+- The cache is `~/Library/Caches/Mozilla.sccache`, limited to **50 GiB** by
+  `~/Library/Application Support/Mozilla.sccache/config`. Past that limit, sccache evicts the least
+  recently used entries.
+- One sccache server serves every worktree, so `sccache --show-stats` counts all agents' builds.
+  To measure your own build, diff `--stats-format json` taken before and after it. Don't run
+  `--stop-server` or `--zero-stats` on the shared server: other agents rely on it and its stats.
+  For an isolated measurement, start a private server on the same cache with
+  `SCCACHE_SERVER_PORT=<free port>`, and stop that server when you're done.
+- A worktree's clean build hits the cache for dependencies that never see a path inside its own
+  worktree. It misses for crates that `include!` a file their build script wrote to `OUT_DIR`
+  (inside `target/`), for crates downstream of those, and for crates that use a proc-macro. It
+  never caches proc-macros, bins or incremental workspace crates. sccache's `basedirs` doesn't
+  change this for Rust.
+
+`dev/README.md` ("Shared sccache on the Mac") holds the setup recipe and the measured hit rate.
+`lebig` and CI don't use sccache: CI caches with `Swatinem/rust-cache` (#22).
