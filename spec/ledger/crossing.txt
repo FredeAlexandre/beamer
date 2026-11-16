@@ -172,6 +172,7 @@ core/tests/test_idle_pointer.py::IdlePointerTests::test_an_unreadable_pointer_is
 core/tests/test_idle_pointer.py::IdlePointerTests::test_hidden_until_the_pointer_moves
 core/tests/test_idle_pointer.py::IdlePointerTests::test_hide_again_after_a_cancel_is_watched_afresh
 core/tests/test_idle_pointer.py::IdlePointerTests::test_leaving_twice_hides_once
+core/tests/test_link.py::LinkLiveTests::test_a_shortcut_arrival_without_an_edge_is_logged
 core/tests/test_motion_paths.py::MotionPathTests::test_a_path_past_its_limit_collapses_to_the_latest_position
 core/tests/test_motion_paths.py::MotionPathTests::test_coalescing_keeps_original_mixed_axis_segments
 core/tests/test_motion_paths.py::MotionPathTests::test_legacy_coalescing_does_not_erase_diagonal_path

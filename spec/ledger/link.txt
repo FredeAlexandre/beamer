@@ -27,7 +27,6 @@ core/tests/test_link.py::LinkHandshakeTests::test_send_off_is_not_dialled  mined
 core/tests/test_link.py::LinkHeldTests::test_held_us_is_taken_off_the_sample_and_never_goes_below_zero  mined: link.input.round-trip
 core/tests/test_link.py::LinkLiveTests::test_a_clipboard_is_dropped_when_the_peer_lacks_the_capability  wire-v6: the v6 capability words in hello and welcome, which exact version match and capabilities in the store replace (#14)
 core/tests/test_link.py::LinkLiveTests::test_a_full_queue_reports_failure  mined: link.send.full
-core/tests/test_link.py::LinkLiveTests::test_a_shortcut_arrival_without_an_edge_is_logged
 core/tests/test_link.py::LinkLiveTests::test_a_slow_injection_logs_the_input_type_and_injection_call  mined: link.log.slow-injection
 core/tests/test_link.py::LinkLiveTests::test_acks_give_round_trip_samples_that_are_never_negative  mined: link.input.round-trip
 core/tests/test_link.py::LinkLiveTests::test_fast_overlapping_typing_survives_the_outbound_queue  mined: link.input.once-in-order
@@ -188,12 +187,10 @@ core/tests/test_responder_handshake.py::TheLookup::test_a_typed_token_is_never_m
 core/tests/test_responder_handshake.py::TheLookup::test_an_absent_hw_keeps_the_saved_one  wire-v6: hello's hw field, which each machine's record in the store replaces (#14)
 core/tests/test_responder_handshake.py::TheLookup::test_an_unknown_key_id_is_closed_with_nothing_sent  mined: link.auth.stranger
 core/tests/test_responder_handshake.py::TheLookup::test_an_unknown_platform_of_the_allowed_shape_is_accepted  wire-v6: hello's platform field, which each machine's record in the store replaces (#14)
-core/tests/test_responder_handshake.py::TheLookup::test_authenticated_reverse_link_preserves_the_selected_address
 core/tests/test_responder_handshake.py::TheLookup::test_in_use_off_refuses_the_handshake_and_on_accepts_it  mined: link.auth.not-in-use
 core/tests/test_responder_handshake.py::TheLookup::test_low_order_shares_are_closed_with_nothing_sent_not_even_a_preamble  wire-v6: the v6 X25519 shares in the preamble, which the QUIC handshake replaces
 core/tests/test_responder_handshake.py::TheLookup::test_the_hello_updates_the_entry_and_is_saved  wire-v6: hello's name, platform and port fields, which each machine's record in the store replaces (#14)
 core/tests/test_responder_handshake.py::TheLookup::test_welcome_accepts_is_false_without_allow_drive  wire-v6: welcome's `accepts` field; whether a peer may be driven by this machine is in the store (#14)
-core/tests/test_responder_handshake.py::TheLookup::test_which_addresses_teach_a_host
 core/tests/test_responder_handshake.py::TheMigratedEntry::test_its_token_is_never_matched_however_it_is_spelled  dropped: the 1.4.x migration (F19 ships without it, #11)
 core/tests/test_responder_handshake.py::TheMigratedEntry::test_nor_once_an_earlier_beta_linked_it  dropped: the 1.4.x migration (F19 ships without it, #11)
 core/tests/test_responder_handshake.py::TheSlots::test_a_fifth_address_replaces_the_oldest  wire-v6: the v6 handshake slots over TCP
@@ -281,7 +278,6 @@ core/tests/test_wire_vectors.py::NoCryptographyTests::test_neither_requirements_
 core/tests/test_wire_vectors.py::NoCryptographyTests::test_no_module_imports_cryptography  python-detail: which Python packages the app imported and required
 core/tests/test_wire_vectors.py::PairingShareVectorTests::test_low_order_and_all_zero_shares_are_refused  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
 mac_app/tests/test_mac_links.py::AckStallRecoveryTests::test_a_heartbeat_only_peer_stall_ends_the_visit_and_releases_the_cursor  mined: link.input.stall, link.log.stall
-mac_app/tests/test_mac_links.py::AckStallRecoveryTests::test_a_peer_switch_is_logged_as_the_move_source
 mac_app/tests/test_mac_links.py::LinkSetTests::test_a_learnt_address_is_handed_to_the_app  mined: link.report.up
 mac_app/tests/test_mac_links.py::LinkSetTests::test_a_locked_peer_is_called_unlocking  dropped: Windows lock-screen unlock, which the locked acknowledgement served (F21, #11 Drop)
 mac_app/tests/test_mac_links.py::LinkSetTests::test_a_new_token_makes_a_new_link_and_ends_the_old  mined: link.peer.rekeyed

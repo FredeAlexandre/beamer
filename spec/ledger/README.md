@@ -10,12 +10,12 @@ no Python test is its own:
 
 | Domain | Task | Tests |
 |---|---|---|
-| `link` | #52 | 321 |
+| `link` | #52 | 317 |
 | `pairing` | #53 | 286 |
 | `store` | #54 | 0 |
-| `discovery` | #55 | 116 |
-| `driving` | #56 | 327 |
-| `crossing` | #57 | 1115 |
+| `discovery` | #55 | 118 |
+| `driving` | #56 | 328 |
+| `crossing` | #57 | 1116 |
 | `input` | #58 | 793 |
 | `clipboard` | #59 | 213 |
 | `settings` | #60 | 461 |
@@ -77,9 +77,14 @@ flooded its own messages, and those tests went to the feature), the media engine
 ## Ambiguous assignments
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
-There are 90, covering 1,195 tests. Each row names the other candidates and why the owner won.
+There are 93, covering 1,199 tests. Each row names the other candidates and why the owner won.
 A miner who finds such a test's assertions are all another domain's settles it as
 `.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
+
+Three rows record lines that did move, after #51: the link miner (#52) found their assertions all
+another domain's, and the coordinator moved them to that domain's slice with no fate. Each splits
+its class, an exception to rule 2's "no assignment finer than a class": the class's other tests
+stay link's.
 
 | Tests | Count | Owner | Also a candidate | Why the owner |
 |---|---|---|---|---|
@@ -95,6 +100,7 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `core/tests/test_length_size_sliders.py` | 13 | ui | settings, viewmodel | the effect length and size sliders, their values, presets and sync; effects are F30 (Later) |
 | `core/tests/test_link.py`, class `LinkFollowTests` | 7 | discovery | link | a link following a peer to a new address is discovery's address list |
 | `core/tests/test_link.py`, class `LinkHardwareTests` | 5 | discovery | link | the hardware address carried in the handshake serves Wake-on-LAN (F20) |
+| `core/tests/test_link.py`, class `LinkLiveTests`: `test_a_shortcut_arrival_without_an_edge_is_logged` | 1 | crossing | link | moved from link (#52): a take by the shortcut, with no edge, logs on the driven machine that input arrived by its shortcut and that the pointer stays where it is |
 | `core/tests/test_link_endpoint_follow.py` | 6 | discovery | link, pairing | discovered addresses are hints until the peer authenticates |
 | `core/tests/test_motion_flow.py` | 7 | link | input | bounded unacknowledged input, acks and the outbox are the link's input class |
 | `core/tests/test_pairing_paths.py`, class `BroadcastTargetTests` | 3 | discovery | pairing | where the beacon is broadcast on a machine with several networks |
@@ -111,6 +117,7 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `core/tests/test_protocol_v6.py`, class `InputMethodKeyFrames` | 1 | input | link | the v6 input-method key frames |
 | `core/tests/test_protocol_v6.py`, class `Keys` | 9 | input | link | the v6 key frames |
 | `core/tests/test_receiver_backlog.py` | 12 | link | input | receiver backpressure and input order over the link |
+| `core/tests/test_responder_handshake.py`, class `TheLookup`: `test_which_addresses_teach_a_host`, `test_authenticated_reverse_link_preserves_the_selected_address` | 2 | discovery | link | moved from link (#52): which address a link coming in from a peer teaches, and that an address chosen by hand is never replaced by it |
 | `core/tests/test_responder_ownership.py`, class `WrapWayBack` | 2 | crossing | driving | the way back from a driven machine |
 | `core/tests/test_responder_ownership.py`, class `ZoneModels` | 5 | crossing | driving | the zones a driven machine arms for its driver |
 | `core/tests/test_responder_ownership.py`, class `Zones` | 8 | crossing | driving | the zones a driven machine arms for its driver |
@@ -131,6 +138,7 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `mac_app/tests/test_idle_refresh.py` | 6 | viewmodel | runtime, ui | how often the window and menu re-read settings and redraw |
 | `mac_app/tests/test_ignored_titles.py` | 16 | viewmodel | input | the names shown for stays-here inputs |
 | `mac_app/tests/test_link_state.py` | 14 | viewmodel | link | the words each link state shows |
+| `mac_app/tests/test_mac_links.py`, class `AckStallRecoveryTests`: `test_a_peer_switch_is_logged_as_the_move_source` | 1 | driving | link | moved from link (#52): a move the driver makes because a driven machine asked it to pass on is logged as started by the peer's request |
 | `mac_app/tests/test_mac_listener_port.py` | 4 | discovery | link | the port the listener and the beacon use |
 | `mac_app/tests/test_mac_loopback.py` | 12 | driving | input, clipboard | the Mac driving a PC and driven by it over loopback, end to end |
 | `mac_app/tests/test_mac_three.py` (its other classes) | 18 | crossing | driving | a push through a zone takes the machine the zone leads to, with three machines |
