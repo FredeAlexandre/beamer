@@ -1,8 +1,8 @@
 //! `cargo xtask deps`: the dependency and seam rules of #16 and ADR 0004.
 
 mod source;
-mod table;
-mod workspace;
+pub mod table;
+pub mod workspace;
 
 use source::SourceFile;
 use std::path::Path;

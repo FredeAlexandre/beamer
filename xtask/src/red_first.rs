@@ -12,7 +12,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::ops::Range;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
@@ -20,7 +20,7 @@ use proc_macro2::{Delimiter, TokenStream, TokenTree};
 use crate::{Result, blind, workspace};
 
 /// The message `todo!()` panics with.
-const TODO_PANIC: &str = "not yet implemented";
+pub const TODO_PANIC: &str = "not yet implemented";
 
 pub fn run(base: &str) -> Result {
     let root = workspace::root()?;
@@ -31,7 +31,7 @@ pub fn run(base: &str) -> Result {
         return Ok(());
     }
 
-    let scratch = target_dir(&root).join("red-first");
+    let scratch = workspace::target_dir(&root).join("red-first");
     let export = scratch.join("export");
     if export.exists() {
         fs::remove_dir_all(&export)
@@ -57,11 +57,6 @@ pub fn run(base: &str) -> Result {
             "{n} new test(s) are not red against the blind export. Each must panic on a todo!()."
         )),
     }
-}
-
-/// The build output directory: `CARGO_TARGET_DIR`, or the workspace's `target/`.
-fn target_dir(root: &Path) -> PathBuf {
-    std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| root.join("target"), |dir| root.join(dir))
 }
 
 /// One new test: the file it is in and its path inside its test binary.
