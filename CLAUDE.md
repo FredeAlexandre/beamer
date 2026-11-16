@@ -26,7 +26,7 @@ Every task issue carries exactly one `build:*` label. Work it with the skill on 
 | `build:epic` (the queue as a whole) | `build-coordinator`: the session Alex starts to cut tasks, dispatch the frontier and land PRs. Task agents are started by it |
 | `build:infra`, `build:docs` | No role skill. The coordinator briefs a fresh agent from the issue's acceptance criteria, test-first where the task writes `xtask` code |
 | `build:spec` | `build-spec-miner`, not written yet (#37) |
-| `build:skeleton`, `build:api` | `build-skeleton-writer`, not written yet (#38) |
+| `build:skeleton`, `build:api` | `build-skeleton-writer`: writes one crate's public API with `todo!()` bodies, every item citing its rules, or one change to that API after the skeleton |
 | `build:test` | `build-test-agent`, not written yet (#39) |
 | `build:impl` | `build-implementer`: makes one rule group's merged, red tests pass and kills every in-diff mutant, never touching the tests |
 | `build:triage`, `triage:*` | `build-mutant-triage`, not written yet (#41) |

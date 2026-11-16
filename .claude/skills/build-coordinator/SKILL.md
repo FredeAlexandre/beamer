@@ -90,7 +90,8 @@ green, and every acceptance criterion holds in the diff. Then:
   Fast-forward your `rust` worktree, run `git push pc origin/rust:rust`, and remove the task's
   worktree and branch.
 - **A `build:api` merge** reopens every closed `build:test` task whose rule group uses an item
-  the PR changed, each with a comment naming the PR and the items.
+  the PR changed, each with a comment naming the PR and the items. For each old item the PR kept
+  beside its replacement, cut a `build:api` task that removes it, blocked by those test tasks.
 - **A session that ends without a mergeable PR** gets the comment `Session failed: <why>`. On a
   task's second failed session, split it, turn it into a `build:triage` spec question, or label it
   `needs:alex`. It never gets a third session as it stands.
