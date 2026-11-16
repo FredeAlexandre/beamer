@@ -1,8 +1,9 @@
 //! `cargo xtask blind <dir>`: the workspace as a test agent may see it (#32, ADR 0002).
 //!
-//! The export holds the spec, the glossary, the role skills and every crate, with each function
-//! body replaced by `todo!()`. It has no `.git`, so no history leads back to the implementation.
-//! Tests in a package's `tests/` and its `build.rs` are copied as they are.
+//! The export holds the spec, the glossary, the role skills and every crate under `crates/`, with
+//! each function body replaced by `todo!()`. It has no `.git`, so no history leads back to the
+//! implementation. Tests in a package's `tests/` and its `build.rs` are copied as they are, and so
+//! is `xtask/`: it is build tooling, not app code, and a test agent runs it in the export (#113).
 
 use std::fs;
 use std::ops::Range;
@@ -57,7 +58,7 @@ pub fn export(root: &Path, dest: &Path) -> Result<Vec<String>> {
         let to = dest.join(rel);
         fs::create_dir_all(to.parent().expect("a file has a parent"))
             .map_err(|e| format!("cannot create the directory of {}: {e}", to.display()))?;
-        if rel.ends_with(".rs") && !verbatim(root, rel) {
+        if blinded(root, rel) {
             let source =
                 fs::read_to_string(&from).map_err(|e| format!("cannot read {rel}: {e}"))?;
             let (blinded, notes) = blind_source(&source).map_err(|e| format!("{rel}: {e}"))?;
@@ -126,6 +127,12 @@ fn exported(rel: &str) -> bool {
         "Cargo.lock" | "GLOSSARY.md" | "CLAUDE.md" => true,
         _ => rest.is_empty() && first.ends_with(".toml"),
     }
+}
+
+/// Whether a file's function bodies become `todo!()`: a Rust file of a crate under `crates/`,
+/// except that crate's `tests/` and `build.rs`. `xtask/` and the rest are copied as they are.
+fn blinded(root: &Path, rel: &str) -> bool {
+    rel.starts_with("crates/") && rel.ends_with(".rs") && !verbatim(root, rel)
 }
 
 /// Whether a Rust file is copied as it is: a package's `tests/` and its `build.rs`.

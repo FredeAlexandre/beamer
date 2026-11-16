@@ -34,8 +34,8 @@ enum Command {
         #[arg(long, value_name = "PATH")]
         manifest_path: Option<PathBuf>,
     },
-    /// Export the workspace for a test agent: every function body replaced by `todo!()`, no
-    /// `.git`, the spec and the glossary included (#32, ADR 0002).
+    /// Export the workspace for a test agent: every function body under `crates/` replaced by
+    /// `todo!()`, `xtask/` as it is, no `.git`, the spec and the glossary included (#32, ADR 0002).
     Blind {
         /// Where to write the export. It must not exist yet, or be an empty directory.
         dir: PathBuf,
