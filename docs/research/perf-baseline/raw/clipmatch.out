@@ -1,0 +1,23 @@
+PC->Mac (PC crossing, Mac pasteboard change), ms:
+  crossing 13:51:34.317 -> no change
+  crossing 13:52:10.907 -> 8
+  crossing 13:52:22.064 -> 36
+  crossing 13:52:24.890 -> no change
+  crossing 13:52:35.260 -> no change
+  crossing 13:52:47.106 -> 12
+  crossing 13:53:09.356 -> no change
+  crossing 13:53:13.835 -> no change
+  crossing 13:53:21.744 -> 345
+  crossing 13:53:44.793 -> 283
+Mac->PC (Mac crossing, PC clipboard sequence change), ms:
+  crossing 13:51:33.371 -> no change
+  crossing 13:51:53.565 -> 20 (last of burst 20)
+  crossing 13:52:17.254 -> no change
+  crossing 13:52:24.226 -> no change
+  crossing 13:52:30.368 -> no change
+  crossing 13:52:38.444 -> 16 (last of burst 16)
+  crossing 13:52:57.939 -> no change
+  crossing 13:53:13.090 -> no change
+  crossing 13:53:17.356 -> no change
+  crossing 13:53:38.524 -> 113 (last of burst 113)
+PC 'image invalid or too large' warnings: ['13:53:12']

@@ -1,0 +1,48 @@
+=== pc (link timing 2026-11-14 23:03:47,588 .. 2026-11-16 13:56:24,729)
+input ACK RTT minus receiver hold, 181 one-minute windows, 138954 samples, 2026-11-16 08:24:43,476 .. 2026-11-16 13:54:53,030, peer 
+  per-minute medians (sample-weighted): p50=6.3 p95=7.6
+  per-minute p95s: p50=10.5 p95=39.8 p99=77.0
+  per-minute largest: n=181 p50=38.4 p95=135.3 p99=221.1 max=409.1
+  mean held_us: 3908
+ping RTT ms, outbound link, one per 30 s window: n=4652 p50=6.0 p95=9.0 p99=24.0 max=38.0
+ping RTT ms, inbound link, one per 30 s window: n=4657 p50=6.0 p95=10.0 p99=26.0 max=41.0
+  stage inbound  ack_due_lag          count=  344749 mean=6.086 ms  p95-of-window-max=16.261  max=139.261
+  stage inbound  decode               count= 6169087 mean=0.057 ms  p95-of-window-max=0.355  max=26.440
+  stage inbound  dispatch             count= 6169087 mean=0.030 ms  p95-of-window-max=0.476  max=62.211
+  stage inbound  inject               count=     161 mean=0.222 ms  p95-of-window-max=4.804  max=4.804
+  stage inbound  input_callbacks      count=     161 mean=0.002 ms  p95-of-window-max=0.013  max=0.013
+  stage inbound  input_lock           count=     161 mean=0.000 ms  p95-of-window-max=0.001  max=0.001
+  stage inbound  mouse_inject         count=     157 mean=0.148 ms  p95-of-window-max=0.336  max=0.336
+  stage inbound  receive_queue        count= 6169087 mean=0.042 ms  p95-of-window-max=0.403  max=20.221
+  stage inbound  return_seam          count=     157 mean=0.023 ms  p95-of-window-max=0.280  max=0.280
+  stage inbound  write                count=  621730 mean=0.185 ms  p95-of-window-max=0.692  max=2.540
+  stage inbound  writer_wait_lag      count= 8211953 mean=0.349 ms  p95-of-window-max=16.251  max=139.256
+  stage inbound  zones                count=     161 mean=0.066 ms  p95-of-window-max=0.152  max=0.152
+  stage outbound input_queue          count=  383515 mean=0.030 ms  p95-of-window-max=2.019  max=178.139
+  stage outbound read_dispatch        count=  749675 mean=0.064 ms  p95-of-window-max=0.300  max=110.292
+  stage outbound write                count=  710733 mean=0.066 ms  p95-of-window-max=0.567  max=92.110
+  stage outbound writer_wait_lag      count= 3103051 mean=7.494 ms  p95-of-window-max=15.548  max=358.432
+=== mac (link timing 2026-11-14 10:55:18,008 .. 2026-11-16 13:56:06,510)
+input ACK RTT minus receiver hold, 1 one-minute windows, 102 samples, 2026-11-16 13:54:57,996 .. 2026-11-16 13:54:57,996, peer 
+  per-minute medians (sample-weighted): p50=6.1 p95=6.1
+  per-minute p95s: p50=9.1 p95=9.1 p99=9.1
+  per-minute largest: n=1 p50=14.6 p95=14.6 p99=14.6 max=14.6
+  mean held_us: 5560
+ping RTT ms, inbound link, one per 30 s window: n=6084 p50=6.0 p95=10.0 p99=32.0 max=880.0
+ping RTT ms, outbound link, one per 30 s window: n=6111 p50=7.0 p95=10.0 p99=26.0 max=101.0
+  stage inbound  ack_due_lag          count=  582666 mean=3.760 ms  p95-of-window-max=10.843  max=76.192
+  stage inbound  decode               count=  796709 mean=0.088 ms  p95-of-window-max=1.141  max=46.172
+  stage inbound  dispatch             count=  794815 mean=0.225 ms  p95-of-window-max=1.188  max=92.269
+  stage inbound  inject               count=  490344 mean=0.181 ms  p95-of-window-max=3.599  max=69.767
+  stage inbound  input_callbacks      count=  381620 mean=0.005 ms  p95-of-window-max=1.071  max=6.735
+  stage inbound  input_lock           count=  381620 mean=0.001 ms  p95-of-window-max=0.643  max=2.409
+  stage inbound  mouse_inject         count=  466344 mean=0.108 ms  p95-of-window-max=2.971  max=69.713
+  stage inbound  receive_queue        count=  794815 mean=0.050 ms  p95-of-window-max=0.769  max=91.288
+  stage inbound  return_seam          count=  466344 mean=0.066 ms  p95-of-window-max=2.012  max=27.288
+  stage inbound  write                count=  943589 mean=0.151 ms  p95-of-window-max=2.897  max=142.571
+  stage inbound  writer_wait_lag      count= 1973674 mean=1.553 ms  p95-of-window-max=11.069  max=76.186
+  stage inbound  zones                count=  442914 mean=0.098 ms  p95-of-window-max=6.117  max=16.644
+  stage outbound input_queue          count=     161 mean=0.061 ms  p95-of-window-max=0.192  max=0.192
+  stage outbound read_dispatch        count=  815793 mean=0.123 ms  p95-of-window-max=1.650  max=47.014
+  stage outbound write                count= 8328802 mean=0.123 ms  p95-of-window-max=3.364  max=74.349
+  stage outbound writer_wait_lag      count= 8945870 mean=0.106 ms  p95-of-window-max=5.819  max=100.564

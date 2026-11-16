@@ -1,0 +1,9 @@
+raw d1 PC->Mac (mac - pc): n=61 p50=-22 p95=-6 p99=6 min=-52 max=6
+raw d2 Mac->PC (pc - mac): n=59 p50=32 p95=59 p99=62 min=19 max=62
+with offset o=35.1 ms: PC->Mac g = d1 + o: n=61 p50=13 p95=29 p99=41 min=-17 max=41
+with offset o=35.1 ms: Mac->PC r = d2 - o: n=59 p50=-3 p95=24 p99=27 min=-16 max=27
+offset-free: median(d1)+median(d2) = g + r = 10 ms
+first/last crossing: 2026-11-16 08:23:47.639000 2026-11-16 13:53:44.829000
+per-pair g + r (offset-free, two crossings): n=52 p50=9 p95=37 p99=40 min=6 max=40
+so one crossing ~ (g + r) / 2: n=52 p50=4 p95=18 p99=20 min=3 max=20
+seconds between the pair's two crossings: median 11.398
