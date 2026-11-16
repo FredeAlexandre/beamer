@@ -89,6 +89,9 @@ green, and every acceptance criterion holds in the diff. Then:
 - **A session that ends without a mergeable PR** gets the comment `Session failed: <why>`. On a
   task's second failed session, split it, turn it into a `build:triage` spec question, or label it
   `needs:alex`. It never gets a third session as it stands.
+- **A session that ends blocked** has opened a blocker its role skill names, marked its task
+  blocked by it, and left a draft PR. It is not a failed session: the task waits on its blocker,
+  and the next session continues on its branch.
 
 Then run `queue.sh frontier` again and go back to step 3.
 
