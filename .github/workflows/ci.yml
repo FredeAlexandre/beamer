@@ -101,7 +101,10 @@ jobs:
         include:
           - { runner: linux, os: ubuntu-latest }
           - { runner: macos, os: macos-latest }
-          - { runner: windows, os: windows-latest }
+          # tracey has no Windows release, and its source build needs a node its build script
+          # doesn't find on the runner. The spec tests that run it (xtask's `spec` binary) run on
+          # Linux and macOS; tracey's own gates run in `checks`.
+          - { runner: windows, os: windows-latest, nextest: "-E 'not binary_id(xtask::spec)'" }
     steps:
       - name: Keep line endings as committed
         # Windows runners default to core.autocrlf=true; xtask's tests compare files byte for byte.
@@ -121,6 +124,7 @@ jobs:
           # xtask's own tests run both, and tracey below.
           tool: cargo-nextest@0.9.152,cargo-mutants@27.1.0
       - uses: ./.github/actions/tracey
+        if: runner.os != 'Windows'
       - name: Which crates
         id: crates
         run: echo "args=$(cargo xtask crates --runner ${{ matrix.runner }} --for test)" >> "$GITHUB_OUTPUT"
@@ -129,7 +133,7 @@ jobs:
         run: cargo clippy ${{ steps.crates.outputs.args }} --all-targets --locked -- -D warnings
       - name: nextest
         # A spec test merged red, panicking at a todo!(), is pending, not failed (#23).
-        run: cargo xtask nextest --runner ${{ matrix.runner }} -- --locked
+        run: cargo xtask nextest --runner ${{ matrix.runner }} -- --locked ${{ matrix.nextest }}
 
   mutants:
     name: mutants (${{ matrix.runner }})
