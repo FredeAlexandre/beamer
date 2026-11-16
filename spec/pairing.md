@@ -7,7 +7,7 @@ that pairing writes, and dormant peers paired again. Feature F2, as #11 keeps it
 
 What stays elsewhere: the link itself is `spec/link.md`; the beacon, the address lists and the
 dormant repair's address probing are `spec/discovery.md`; the store that carries each machine's
-paired list is `spec/store.md`; what each screen says is `spec/viewmodel.md`.
+paired list is `spec/store.md`; what each page shows is `spec/viewmodel.md`.
 
 Dropped, so no rule here (#11): pair nearby (F3), the pairing version 2 exchange and any
 compatibility with the Python apps, the 1.4.x migration of the settings file (F19), phone peers,
@@ -314,7 +314,7 @@ The published vectors the CPace rules name are copied as data in
 >
 > - model: pairing
 
-## One guess a side
+## One guess against each machine
 
 The rules that hold whoever takes part without the code to one guess against each machine.
 
@@ -566,7 +566,7 @@ The rules that hold whoever takes part without the code to one guess against eac
 ## Pairing by address
 
 > r[pairing.by-address.dial]
-> The user can pair by typing another machine's address, an IPv4 address or a host name, with the
+> The user can pair by typing another machine's address, an IPv4 address or a DNS name, with the
 > code it shows. The entering machine resolves the address and opens the pairing connection to it
 > at port 24820, then runs the same exchange as from a beacon.
 >
