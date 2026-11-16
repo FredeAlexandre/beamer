@@ -6,3 +6,6 @@
 
 # Reporter attachments retain their original bytes, including Windows line endings.
 docs/ceo-17-10-2026/gh15-evidence/W*.log.log -text
+
+# Fuzz inputs in the nightly triage fixtures are raw bytes.
+xtask/tests/fixtures/nightly/*/fuzz-*/** binary

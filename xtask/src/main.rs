@@ -11,6 +11,7 @@ mod kill_matrix;
 mod red_first;
 mod spec;
 mod tracey;
+mod triage;
 mod workspace;
 
 use std::path::PathBuf;
@@ -142,6 +143,55 @@ enum Command {
         #[arg(last = true)]
         args: Vec<String>,
     },
+    /// The nightly triage routine's deterministic half (#44, dev/routines/nightly-triage.md):
+    /// what to file from a nightly run's artifacts, and which fuzz corpus entries are new.
+    #[command(subcommand)]
+    Triage(TriageCommand),
+}
+
+#[derive(Subcommand)]
+enum TriageCommand {
+    /// Print, as JSON, the issues a nightly run's findings call for: one `triage:mutant` issue
+    /// per function with surviving mutants, one `triage:fuzz` per crashed harness, one
+    /// `triage:model` per failing model test, and one `needs:alex` for jobs that failed leaving
+    /// nothing to triage. A group whose issue is open in `--open` is not opened again.
+    Issues {
+        /// Where `gh run download <run>` put the run's artifacts, one directory per artifact.
+        dir: PathBuf,
+        /// The nightly run's id.
+        #[arg(long, value_name = "ID")]
+        run: String,
+        /// The GitHub repository, as owner/name, of the run and the issues.
+        #[arg(
+            long,
+            value_name = "OWNER/NAME",
+            default_value = "FredeAlexandre/beamer"
+        )]
+        repo: String,
+        /// The `rust` commit the run tested, to link the source at. Empty when unknown.
+        #[arg(long, value_name = "SHA")]
+        sha: Option<String>,
+        /// `gh api repos/<repo>/actions/runs/<run>/artifacts`, saved: links each artifact.
+        #[arg(long, value_name = "FILE")]
+        artifacts: Option<PathBuf>,
+        /// `gh run view <run> --json jobs`, saved: finds the jobs that failed.
+        #[arg(long, value_name = "FILE")]
+        jobs: Option<PathBuf>,
+        /// `gh issue list --state open --json number,body`, saved: the issues already open.
+        #[arg(long, value_name = "FILE")]
+        open: Option<PathBuf>,
+    },
+    /// List the fuzz corpus entries in a nightly's `fuzz-corpus` artifact that the checkout
+    /// lacks, one path per line, and with `--write` copy them in.
+    Corpus {
+        /// Where `gh run download <run> -n fuzz-corpus` put the artifact.
+        dir: PathBuf,
+        /// Copy the new entries into the checkout.
+        #[arg(long)]
+        write: bool,
+        #[command(flatten)]
+        root: Root,
+    },
 }
 
 #[derive(Subcommand)]
@@ -262,6 +312,26 @@ fn main() -> ExitCode {
                     ExitCode::FAILURE
                 }
             }
+        }
+        Command::Triage(TriageCommand::Issues {
+            dir,
+            run,
+            repo,
+            sha,
+            artifacts,
+            jobs,
+            open,
+        }) => report(triage::issues(&triage::Options {
+            dir: &dir,
+            run: &run,
+            repo: &repo,
+            sha: sha.as_deref().filter(|sha| !sha.is_empty()),
+            artifacts: artifacts.as_deref(),
+            jobs: jobs.as_deref(),
+            open: open.as_deref(),
+        })),
+        Command::Triage(TriageCommand::Corpus { dir, write, root }) => {
+            report(triage::corpus(&dir, &root.dir(), write))
         }
         Command::Nextest { runner, args } => {
             report(workspace::root().and_then(|root| ci::nextest::run(&root, runner, &args)))

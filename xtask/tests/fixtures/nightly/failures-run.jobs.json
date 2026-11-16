@@ -1,0 +1,9 @@
+{"jobs":[
+{"name":"What exists on the branch","conclusion":"success","url":"https://github.com/FredeAlexandre/beamer/actions/runs/1/job/10"},
+{"name":"Mutants linux 0/8","conclusion":"success","url":"https://github.com/FredeAlexandre/beamer/actions/runs/1/job/11"},
+{"name":"Mutants linux 2/8","conclusion":"failure","url":"https://github.com/FredeAlexandre/beamer/actions/runs/1/job/12"},
+{"name":"Kill matrix","conclusion":"success","url":"https://github.com/FredeAlexandre/beamer/actions/runs/1/job/13"},
+{"name":"Fuzz (bolero)","conclusion":"failure","url":"https://github.com/FredeAlexandre/beamer/actions/runs/1/job/14"},
+{"name":"Model (stateright, 3 machines)","conclusion":"failure","url":"https://github.com/FredeAlexandre/beamer/actions/runs/1/job/15"},
+{"name":"Bench (divan trends)","conclusion":"cancelled","url":"https://github.com/FredeAlexandre/beamer/actions/runs/1/job/16"}
+]}
