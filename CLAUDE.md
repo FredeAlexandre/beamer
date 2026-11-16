@@ -28,7 +28,7 @@ Every task issue carries exactly one `build:*` label. Work it with the skill on 
 | `build:spec` | `build-spec-miner`, not written yet (#37) |
 | `build:skeleton`, `build:api` | `build-skeleton-writer`, not written yet (#38) |
 | `build:test` | `build-test-agent`, not written yet (#39) |
-| `build:impl` | `build-implementer`, not written yet (#40) |
+| `build:impl` | `build-implementer`: makes one rule group's merged, red tests pass and kills every in-diff mutant, never touching the tests |
 | `build:triage`, `triage:*` | `build-mutant-triage`, not written yet (#41) |
 | Review of new rules and skeleton PRs | `build-spec-reviewer`, not written yet (#42) |
 
