@@ -27,7 +27,7 @@ Every task issue carries exactly one `build:*` label. Work it with the skill on 
 | `build:infra`, `build:docs` | No role skill. The coordinator briefs a fresh agent from the issue's acceptance criteria, test-first where the task writes `xtask` code |
 | `build:spec` | `build-spec-miner`: mines one domain of the Python app at `archive/python` into rules in `spec/<domain>.md`, and gives every Python test in the domain's ledger slice its fate |
 | `build:skeleton`, `build:api` | `build-skeleton-writer`: writes one crate's public API with `todo!()` bodies, every item citing its rules, or one change to that API after the skeleton |
-| `build:test` | `build-test-agent`, not written yet (#39) |
+| `build:test` | `build-test-agent`: writes one rule group's spec tests blind, in a `cargo xtask blind` export, each red against the `todo!()` skeleton |
 | `build:impl` | `build-implementer`: makes one rule group's merged, red tests pass and kills every in-diff mutant, never touching the tests |
 | `build:triage`, `triage:*` | `build-mutant-triage`, not written yet (#41) |
 | Review of PRs that add or change rules, and of `build:skeleton` and `build:api` PRs | `build-spec-reviewer`: approves observable, traceable rules in glossary words and skeletons outside Alex's three contracts, or requests changes, or sends the PR to Alex (`needs:alex`) |
