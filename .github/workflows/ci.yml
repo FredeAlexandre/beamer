@@ -112,6 +112,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.HEAD_SHA }}
+          # xtask's test of this repo's own test-audit reads every commit; a shallow clone's one
+          # grafted commit would touch tests and code together.
+          fetch-depth: 0
           persist-credentials: false
       - name: Install the pinned toolchain
         run: rustup toolchain install
