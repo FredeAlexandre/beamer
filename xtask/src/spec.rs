@@ -21,7 +21,7 @@ pub const MODELS: [&str; 8] = [
     "camera",
 ];
 
-const MARKER_KEYS: [&str; 4] = ["tier", "parity", "model", "fuzz"];
+const MARKER_KEYS: [&str; 6] = ["tier", "do", "see", "parity", "model", "fuzz"];
 
 /// Checks the format, then runs `tracey query validate`. Fails if either finds a problem.
 pub fn validate(root: &Path) -> bool {
@@ -127,6 +127,8 @@ pub struct Rule {
     pub parity: Option<Parity>,
     /// `machine` or `human`, with its reason. `None` is the default tier, `ci`.
     pub tier: Option<Tier>,
+    /// What Alex does and sees to check a `human`-tier rule. Only those rules have it.
+    pub check: Option<Check>,
 }
 
 impl Rule {
@@ -142,6 +144,14 @@ impl Rule {
 pub struct Parity {
     pub python: String,
     pub why: String,
+}
+
+/// A `human`-tier rule's checklist item: its `do:` and `see:` markers.
+pub struct Check {
+    /// What Alex does.
+    pub act: String,
+    /// What he sees, hears or feels when the rule holds.
+    pub see: String,
 }
 
 pub struct Tier {
@@ -365,6 +375,7 @@ impl Parser<'_> {
         for (number, item) in &items[first_marker..] {
             self.marker(*number, &id, item, &mut markers);
         }
+        self.check(number, &id, &mut markers);
         let text = join(body[..text_end].iter().map(|l| l.text));
         self.push(number, id, version, text, markers);
     }
@@ -473,6 +484,20 @@ impl Parser<'_> {
                     }
                 }
             }
+            "do" | "see" => {
+                let slot = if key == "do" {
+                    &mut markers.act
+                } else {
+                    &mut markers.see
+                };
+                if slot.is_some() {
+                    self.problem(number, Some(id), format!("a second `{key}:` marker"));
+                } else if value.is_empty() {
+                    self.problem(number, Some(id), format!("a `{key}:` marker says nothing"));
+                } else {
+                    *slot = Some((number, value.to_owned()));
+                }
+            }
             "parity" => {
                 if markers.parity.is_some() {
                     self.problem(number, Some(id), "a second `parity:` marker".into());
@@ -529,6 +554,41 @@ impl Parser<'_> {
         }
     }
 
+    /// A `human`-tier rule says what Alex does and what he sees, for the milestone checklist
+    /// (`cargo xtask checklist`). No other rule does.
+    fn check(&mut self, number: usize, id: &str, markers: &mut Markers) {
+        let human = markers.tier.as_ref().is_some_and(|t| t.name == "human");
+        let (act, see) = (markers.act.take(), markers.see.take());
+        if human {
+            match (act, see) {
+                (Some((_, act)), Some((_, see))) => markers.check = Some(Check { act, see }),
+                (act, see) => {
+                    let missing: Vec<&str> = [
+                        act.is_none().then_some("`- do: <what Alex does>`"),
+                        see.is_none().then_some("`- see: <what he sees, hears or feels>`"),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .collect();
+                    self.problem(number, Some(id), format!(
+                        "a `human`-tier rule is checked by Alex from the milestone checklist, \
+                         so it says what he does and what he sees: add {}",
+                        missing.join(" and ")
+                    ));
+                }
+            }
+            return;
+        }
+        for (key, marker) in [("do", act), ("see", see)] {
+            if let Some((line, _)) = marker {
+                self.problem(line, Some(id), format!(
+                    "a `{key}:` marker on a rule that is not `human` tier: only Alex's checks say \
+                     what to do and see"
+                ));
+            }
+        }
+    }
+
     fn push(&mut self, line: usize, id: String, version: u32, text: String, markers: Markers) {
         self.rules.push(Rule {
             id,
@@ -538,6 +598,7 @@ impl Parser<'_> {
             text,
             parity: markers.parity,
             tier: markers.tier,
+            check: markers.check,
         });
     }
 
@@ -551,12 +612,16 @@ impl Parser<'_> {
     }
 }
 
-/// The markers met so far in one rule. Parity and tier are kept, for `parity` and `digest`;
-/// nothing reads the others yet.
+/// The markers met so far in one rule. Parity and tier are kept, for `parity` and `digest`, and
+/// `do:` and `see:` for `checklist`; nothing reads the others yet.
 #[derive(Default)]
 struct Markers {
     tier: Option<Tier>,
     parity: Option<Parity>,
+    /// `do:` and `see:`, with their lines, until [`Parser::check`] turns them into `check`.
+    act: Option<(usize, String)>,
+    see: Option<(usize, String)>,
+    check: Option<Check>,
 }
 
 /// The line without its blockquote `>` and the one space after it.
