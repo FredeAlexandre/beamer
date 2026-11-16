@@ -184,3 +184,33 @@ pub fn count(mut n: u32) -> usize {
         "the workspace's own config is lost:\n{config}"
     );
 }
+
+#[test]
+fn the_xtask_crate_is_copied_as_it_is_and_only_crates_are_blinded() {
+    let xtask_main = "fn main() {\n    println!(\"the build tooling runs\");\n}\n";
+    let xtask_lib = "pub fn tool() -> u32 {\n    7\n}\n";
+    let ws = Fixture::new(&[
+        (
+            "Cargo.toml",
+            "[workspace]\nresolver = \"3\"\nmembers = [\"crates/*\", \"xtask\"]\n",
+        ),
+        (
+            "xtask/Cargo.toml",
+            "[package]\nname = \"xtask\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        ),
+        ("xtask/src/main.rs", xtask_main),
+        ("xtask/src/lib.rs", xtask_lib),
+        ("crates/beamer-demo/src/lib.rs", LIB),
+    ]);
+    let export = ws.path("export");
+
+    assert_ok(&ws.xtask(&["blind", export.to_str().unwrap()]));
+
+    assert_eq!(read(&export.join("xtask/src/main.rs")), xtask_main);
+    assert_eq!(read(&export.join("xtask/src/lib.rs")), xtask_lib);
+    let lib = read(&export.join("crates/beamer-demo/src/lib.rs"));
+    assert!(!lib.contains("a + b"), "a crate body leaked:\n{lib}");
+    let run = cargo(&export, &["run", "--quiet", "-p", "xtask"]);
+    assert_ok(&run);
+    assert_eq!(fixture::stdout(&run), "the build tooling runs\n");
+}
