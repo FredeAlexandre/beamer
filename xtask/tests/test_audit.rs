@@ -256,6 +256,217 @@ fn tests_inside_a_macro_such_as_proptest_are_audited() {
     assert!(!run.text.contains("pushes"), "{}", run.text);
 }
 
+// State-machine tests: one per state machine (#15), audited like any other spec test.
+
+/// The reference model and the system under test of a state machine, with `{model}` in the
+/// model's `apply` and `{sut}` in the system under test's `apply` and `check_invariants`.
+fn state_machine(model: &str, sut: &str) -> String {
+    format!(
+        "use proptest_state_machine::{{ReferenceStateMachine, StateMachineTest}};
+
+pub struct ZoneModel;
+
+impl ReferenceStateMachine for ZoneModel {{
+    type State = bool;
+    type Transition = ();
+    fn init_state() -> BoxedStrategy<bool> {{
+        Just(false).boxed()
+    }}
+    fn transitions(_: &bool) -> BoxedStrategy<()> {{
+        Just(()).boxed()
+    }}
+    fn apply(state: bool, _: &()) -> bool {{
+        {model}
+        !state
+    }}
+}}
+
+pub struct ZoneTest;
+
+impl StateMachineTest for ZoneTest {{
+    type SystemUnderTest = bool;
+    type Reference = ZoneModel;
+    fn init_test(_: &bool) -> bool {{
+        false
+    }}
+    fn apply(sut: bool, reference: &bool, _: ()) -> bool {{
+        {sut}
+        !sut
+    }}
+    fn check_invariants(sut: &bool, reference: &bool) {{
+        {sut}
+    }}
+}}
+"
+    )
+}
+
+/// A `prop_state_machine!` test of [`state_machine`], with `cites` above its `#[test]`.
+fn macro_test(cites: &str) -> String {
+    format!(
+        "prop_state_machine! {{
+    {cites}
+    #[test]
+    fn zone_holds(sequential 1..20 => ZoneTest);
+}}
+"
+    )
+}
+
+const SUT_ASSERTS: &str = "assert_eq!(sut, *reference, \"example.zone.push\");";
+
+#[test]
+fn a_state_machine_test_citing_its_rules_passes() {
+    let repo = Repo::new("state_machine");
+    repo.file(
+        "crates/beamer-example/tests/model_zone.rs",
+        &(state_machine("", SUT_ASSERTS)
+            + &macro_test("// r[verify example.zone.push]\n    // r[verify example.zone.held+2]")),
+    );
+    repo.audit(&[]).passes();
+}
+
+#[test]
+fn a_state_machine_test_without_a_verify_line_fails() {
+    let repo = Repo::new("state_machine_no_verify");
+    repo.file(
+        "crates/beamer-example/tests/model_zone.rs",
+        &(state_machine("", SUT_ASSERTS) + &macro_test("")),
+    );
+    repo.audit(&[]).fails_naming(&[
+        "crates/beamer-example/tests/model_zone.rs",
+        "zone_holds",
+        "r[verify",
+    ]);
+}
+
+#[test]
+fn a_state_machine_test_citing_an_unknown_rule_fails() {
+    let repo = Repo::new("state_machine_unknown_rule");
+    repo.file(
+        "crates/beamer-example/tests/model_zone.rs",
+        &(state_machine("", SUT_ASSERTS) + &macro_test("// r[verify example.zone.pull]")),
+    );
+    repo.audit(&[])
+        .fails_naming(&["zone_holds", "example.zone.pull"]);
+}
+
+#[test]
+fn a_state_machine_test_citing_an_older_version_of_its_rule_fails() {
+    let repo = Repo::new("state_machine_older_version");
+    repo.file(
+        "crates/beamer-example/tests/model_zone.rs",
+        &(state_machine("", SUT_ASSERTS) + &macro_test("// r[verify example.zone.held]")),
+    );
+    repo.audit(&[])
+        .fails_naming(&["zone_holds", "example.zone.held", "+2"]);
+}
+
+#[test]
+fn a_state_machine_test_asserting_in_its_model_passes() {
+    let repo = Repo::new("state_machine_model_asserts");
+    repo.file(
+        "crates/beamer-example/tests/model_zone.rs",
+        &(state_machine("assert!(!state || state);", "")
+            + &macro_test("// r[verify example.zone.push]")),
+    );
+    repo.audit(&[]).passes();
+}
+
+#[test]
+fn a_state_machine_test_asserting_in_a_helper_of_its_invariant_check_passes() {
+    let repo = Repo::new("state_machine_helper_asserts");
+    repo.file(
+        "crates/beamer-example/tests/model_zone.rs",
+        &(state_machine("", "same(sut, reference);")
+            + "fn same(a: &bool, b: &bool) {\n    assert_eq!(a, b);\n}\n"
+            + &macro_test("// r[verify example.zone.push]")),
+    );
+    repo.audit(&[]).passes();
+}
+
+#[test]
+fn a_state_machine_s_types_may_be_paths_with_generics() {
+    let repo = Repo::new("state_machine_paths");
+    repo.file(
+        "crates/beamer-example/tests/model_zone.rs",
+        &(state_machine("assert!(!state || state);", "")
+            .replace("ZoneModel;", "ZoneModel<T>(T);")
+            .replace("for ZoneModel", "for self::ZoneModel<u8>")
+            .replace("= ZoneModel;", "= self::ZoneModel<u8>;")
+            .replace("for ZoneTest", "for crate::ZoneTest")
+            + &macro_test("// r[verify example.zone.push]")),
+    );
+    repo.audit(&[]).passes();
+}
+
+#[test]
+fn a_state_machine_test_with_no_assertion_anywhere_fails() {
+    let repo = Repo::new("state_machine_no_assertion");
+    repo.file(
+        "crates/beamer-example/tests/model_zone.rs",
+        &(state_machine("", "") + &macro_test("// r[verify example.zone.push]")),
+    );
+    repo.audit(&[])
+        .fails_naming(&["zone_holds", "asserts nothing"]);
+}
+
+#[test]
+fn a_state_machine_test_is_credited_only_with_its_own_state_machine_s_assertions() {
+    let repo = Repo::new("state_machine_other_asserts");
+    repo.file(
+        "crates/beamer-example/tests/model_zone.rs",
+        &(state_machine("", "") + &macro_test("// r[verify example.zone.push]")),
+    );
+    repo.file(
+        "crates/beamer-example/tests/model_edge.rs",
+        &state_machine("", SUT_ASSERTS)
+            .replace("ZoneModel", "EdgeModel")
+            .replace("ZoneTest", "EdgeTest"),
+    );
+    repo.audit(&[])
+        .fails_naming(&["zone_holds", "asserts nothing"]);
+}
+
+#[test]
+fn an_impl_in_type_position_keeps_the_next_test() {
+    let repo = Repo::new("impl_in_type_position");
+    repo.test(&format!("type Pushes = impl Fn() -> bool;\n\n#[test]\nfn uncited() {{\n    assert!(beamer_example::push());\n}}\n\n{GOOD_TEST}"));
+    repo.audit(&[]).fails_naming(&["uncited", "r[verify"]);
+}
+
+/// A test that runs [`state_machine`] by hand, in `proptest!`, rather than with
+/// `prop_state_machine!`.
+const BY_HAND: &str = "proptest! {
+    // r[verify example.zone.push]
+    #[test]
+    fn zone_holds((initial, transitions, seen) in ZoneModel::sequential_strategy(1..20)) {
+        ZoneTest::test_sequential(Default::default(), initial, transitions, seen)
+    }
+}
+";
+
+#[test]
+fn a_state_machine_test_run_by_hand_asserting_in_its_invariant_check_passes() {
+    let repo = Repo::new("state_machine_by_hand");
+    repo.file(
+        "crates/beamer-example/tests/model_zone.rs",
+        &(state_machine("", SUT_ASSERTS) + BY_HAND),
+    );
+    repo.audit(&[]).passes();
+}
+
+#[test]
+fn a_state_machine_test_run_by_hand_with_no_assertion_anywhere_fails() {
+    let repo = Repo::new("state_machine_by_hand_no_assertion");
+    repo.file(
+        "crates/beamer-example/tests/model_zone.rs",
+        &(state_machine("", "") + BY_HAND),
+    );
+    repo.audit(&[])
+        .fails_naming(&["zone_holds", "asserts nothing"]);
+}
+
 #[test]
 fn every_problem_is_reported_with_its_line() {
     let repo = Repo::new("lines");

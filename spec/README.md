@@ -48,12 +48,15 @@ rule it verifies. Each line cites the rule's current version. Elsewhere in a cra
 `cargo xtask test-audit` holds the spec tests to what ADR 0002 needs of them:
 
 - **A spec test** is a function with a `#[test]` attribute (or `#[<path>::test]`) in any file under
-  a crate's `tests/`, including inside a macro such as `proptest!`.
+  a crate's `tests/`, including inside a macro such as `proptest!`, and a `prop_state_machine!`
+  test, which has no body.
 - **It cites.** Its `r[verify]` lines sit in the comment lines directly above it or among its
   attributes, with no blank line between. Each names a rule in `spec/` at its current version.
 - **It asserts.** Its body calls an `assert*!`, `prop_assert*!` or `panic!`, or calls a helper
-  function in the crate's `tests/` that does, or it is `#[should_panic]`. `debug_assert*!` doesn't
-  count.
+  function in the crate's `tests/` that does, or it is `#[should_panic]`. A state-machine test, run
+  by `prop_state_machine!` or by `<test>::test_sequential`, also asserts through the
+  `ReferenceStateMachine` and `StateMachineTest` impls in the crate's `tests/` of the state machine
+  it runs. `debug_assert*!` doesn't count.
 - **A skip has a reason.** An ignored spec test is `#[ignore = "<why>"]`. A `mutants::skip`
   anywhere in a crate has a `// mutants-justified: <reason> (<rule id>)` comment directly above
   it.

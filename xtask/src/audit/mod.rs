@@ -107,8 +107,9 @@ fn spec_tests(root: &Path, rules: &HashMap<String, u32>, problems: &mut Vec<Prob
         }
         if !test.asserts {
             problems.push(at(
-                "asserts nothing: no `assert*!`, `prop_assert*!` or `panic!`, in it or in a helper \
-                 of the crate's tests/ it calls, and no #[should_panic]"
+                "asserts nothing: no `assert*!`, `prop_assert*!` or `panic!`, in it, in a helper \
+                 of the crate's tests/ it calls or in the reference model and system under test \
+                 of the state machine it runs, and no #[should_panic]"
                     .into(),
             ));
         }
