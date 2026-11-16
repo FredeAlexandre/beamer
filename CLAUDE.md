@@ -30,7 +30,7 @@ Every task issue carries exactly one `build:*` label. Work it with the skill on 
 | `build:test` | `build-test-agent`, not written yet (#39) |
 | `build:impl` | `build-implementer`: makes one rule group's merged, red tests pass and kills every in-diff mutant, never touching the tests |
 | `build:triage`, `triage:*` | `build-mutant-triage`, not written yet (#41) |
-| Review of new rules and skeleton PRs | `build-spec-reviewer`, not written yet (#42) |
+| Review of PRs that add or change rules, and of `build:skeleton` and `build:api` PRs | `build-spec-reviewer`: approves observable, traceable rules in glossary words and skeletons outside Alex's three contracts, or requests changes, or sends the PR to Alex (`needs:alex`) |
 
 ## Working a task
 
