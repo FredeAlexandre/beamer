@@ -82,13 +82,18 @@ green, and every acceptance criterion holds in the diff. Then:
   `Reviewed at` names the PR's head. Dispatch a reviewer on it ([dispatch.md](dispatch.md)).
   "Changes requested" sends the task back to its role skill on the same branch, with the verdict
   in the brief. "Waits for Alex" leaves it to Alex, and step 1 applies his answer.
-- **Merge.** Until the ruleset (#34) is closed, you merge `build:infra` PRs yourself:
-  `gh pr merge <pr> -R FredeAlexandre/beamer --rebase --delete-branch`. Once #34 is closed, the
-  ruleset merges every task PR when its required checks pass, and you merge nothing.
+- **Merge.** You merge nothing: the ruleset on `rust` (#34) merges a PR with auto-merge on once
+  every CI check passes on its head, by rebase. It also requires the PR to be up to date with
+  `rust`, since CI tests the head and not a merge commit. A PR left behind by another merge
+  waits: run `gh pr update-branch <pr> -R FredeAlexandre/beamer --rebase` (never the merge
+  update: test-audit fails a merge commit that touches tests and code), and it merges once CI
+  passes again. Task agents turn auto-merge on as their skill says, and the spec reviewer does
+  on approval; a PR ready to land with it off, you turn on:
+  `gh pr merge <pr> -R FredeAlexandre/beamer --auto --rebase`.
 - **Close.** `Closes #n` never fires on `rust`, so after the merge: tick the issue's criteria in
   its body, comment with the PR and anything a later task must know, and close it as completed.
   Fast-forward your `rust` worktree, run `git push pc origin/rust:rust`, and remove the task's
-  worktree and branch.
+  worktree and branch, on GitHub too (`git push origin --delete build/<n>-<slug>`).
 - **A `build:api` merge** reopens every closed `build:test` task whose rule group uses an item
   the PR changed, each with a comment naming the PR and the items. For each old item the PR kept
   beside its replacement, cut a `build:api` task that removes it, blocked by those test tasks.

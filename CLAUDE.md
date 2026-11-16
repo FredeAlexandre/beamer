@@ -42,7 +42,9 @@ Every task issue carries exactly one `build:*` label. Work it with the skill on 
    `rust/` while `rust` exists, hence `build/`.
 3. **Land through a PR into `rust`**, merged by rebase so history stays linear. Name the issue in
    the PR body. `Closes #n` never fires on `rust` (it isn't the default branch), so the issue is
-   ticked and closed by hand once the PR merges.
+   ticked and closed by hand once the PR merges. The ruleset on `rust` (#34) refuses direct
+   pushes, and merges a PR with auto-merge on once it is up to date with `rust` and every CI
+   check passes.
 4. **Escalate** with the `needs:alex` label and one comment saying exactly what Alex must decide or
    do, then stop. A task that has failed its gates in two sessions goes back to the coordinator.
 
