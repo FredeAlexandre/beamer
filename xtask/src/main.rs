@@ -1,5 +1,6 @@
 //! `cargo xtask`: the workspace's own commands (#22). Later tickets add them to [`Command`].
 
+mod deps;
 mod spec;
 mod tracey;
 
@@ -21,6 +22,13 @@ enum Command {
     /// Check the spec in spec/ and the tests that cite it (spec/README.md).
     #[command(subcommand)]
     Spec(SpecCommand),
+    /// Check the dependency and seam rules of #16 and ADR 0004: the allowed-dependency table, the
+    /// `-ffi` fence, the sans-I/O crates' clippy lists and the `-ffi` branching lint.
+    Deps {
+        /// The workspace to check. Defaults to this one.
+        #[arg(long, value_name = "PATH")]
+        manifest_path: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -49,11 +57,19 @@ impl Root {
 }
 
 fn main() -> ExitCode {
-    let ok = match Cli::parse().command {
-        Command::Spec(SpecCommand::Validate(root)) => spec::validate(&root.dir()),
-        Command::Spec(SpecCommand::Stale(root)) => spec::stale(&root.dir()),
-        Command::Spec(SpecCommand::Parity(root)) => spec::parity(&root.dir()),
-    };
+    match Cli::parse().command {
+        Command::Spec(SpecCommand::Validate(root)) => exit(spec::validate(&root.dir())),
+        Command::Spec(SpecCommand::Stale(root)) => exit(spec::stale(&root.dir())),
+        Command::Spec(SpecCommand::Parity(root)) => exit(spec::parity(&root.dir())),
+        Command::Deps { manifest_path } => {
+            let manifest = manifest_path
+                .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../Cargo.toml"));
+            deps::run(&manifest)
+        }
+    }
+}
+
+fn exit(ok: bool) -> ExitCode {
     if ok {
         ExitCode::SUCCESS
     } else {
