@@ -19,10 +19,10 @@ core/tests/test_link.py::LinkHandshakeTests::test_a_different_id_than_the_entry_
 core/tests/test_link.py::LinkHandshakeTests::test_a_migrated_entry_is_never_dialled_whatever_its_token  dropped: the 1.4.x migration (F19 ships without it, #11)
 core/tests/test_link.py::LinkHandshakeTests::test_a_peer_that_does_not_know_the_key_id_closes_and_the_text_follows_linked  mined: link.auth.forgotten
 core/tests/test_link.py::LinkHandshakeTests::test_a_typed_token_is_never_dialled  wire-v6: typed tokens and their key ids, which a key pair per machine replaces (#14)
-core/tests/test_link.py::LinkHandshakeTests::test_accepts_is_false_when_the_peer_does_not_let_this_machine_drive  wire-v6: welcome's accepts field; whether a peer may be driven by this machine is in the store (#14)
+core/tests/test_link.py::LinkHandshakeTests::test_accepts_is_false_when_the_peer_does_not_let_this_machine_drive  wire-v6: welcome's `accepts` field; whether a peer may be driven by this machine is in the store (#14)
 core/tests/test_link.py::LinkHandshakeTests::test_an_entry_removed_stops_the_link  mined: link.peer.gone
 core/tests/test_link.py::LinkHandshakeTests::test_links_and_saves_what_the_welcome_taught  wire-v6: welcome's name, platform and capability fields, which each machine's record in the store replaces (#14)
-core/tests/test_link.py::LinkHandshakeTests::test_one_failed_read_of_the_settings_does_not_end_the_link  python-detail: Python's link thread re-read settings.json on its own, which a read error could interrupt
+core/tests/test_link.py::LinkHandshakeTests::test_one_failed_read_of_the_settings_does_not_end_the_link  python-detail: Python's link thread re-read the settings file on its own, which a read error could interrupt
 core/tests/test_link.py::LinkHandshakeTests::test_send_off_is_not_dialled  mined: link.dial.every-peer
 core/tests/test_link.py::LinkHeldTests::test_held_us_is_taken_off_the_sample_and_never_goes_below_zero  mined: link.input.round-trip
 core/tests/test_link.py::LinkLiveTests::test_a_clipboard_is_dropped_when_the_peer_lacks_the_capability  wire-v6: the v6 capability words in hello and welcome, which exact version match and capabilities in the store replace (#14)
@@ -49,25 +49,25 @@ core/tests/test_link.py::LinkRefusalTests::test_a_peer_that_answers_with_somethi
 core/tests/test_link.py::LinkRefusalTests::test_a_peer_that_is_not_a_beamer_is_said_to_be_one_from_before_version_4  mined: link.dial.deadline
 core/tests/test_link.py::LinkRefusalTests::test_a_peer_that_is_slow_to_answer_for_under_a_minute_is_never_said_to_have_removed_this_one  mined: link.auth.forgotten
 core/tests/test_link.py::LinkRefusalTests::test_a_responder_that_names_another_key_id_is_a_different_beamer  mined: link.auth.not-the-peer
-core/tests/test_link.py::LinkRefusalTests::test_a_version_5_peer_is_named_as_older  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
+core/tests/test_link.py::LinkRefusalTests::test_a_version_5_peer_is_named_as_older  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
 core/tests/test_link.py::LinkRefusalTests::test_a_welcome_naming_this_machine_is_closed_with_nothing_taught  mined: link.auth.not-the-peer
 core/tests/test_link.py::LinkRefusalTests::test_any_other_result_starts_the_minute_again  mined: link.auth.forgotten
 core/tests/test_link.py::LinkRefusalTests::test_invalid_hello_says_this_app_sent_something_unreadable  wire-v6: the invalid_hello answer to a first frame the peer could not read
 core/tests/test_link.py::LinkRefusalTests::test_two_machines_of_one_name_are_told_apart_in_what_the_link_says  mined: link.report.down
-core/tests/test_link.py::LinkRefusalTests::test_wrong_id_stops_dialling_until_the_entry_changes  wire-v6: the wrong_id answer, for a token held under another machine's id, which pinned keys make impossible (#14)
+core/tests/test_link.py::LinkRefusalTests::test_wrong_id_stops_dialling_until_the_entry_changes  wire-v6: the wrong_id answer, for a token kept under another machine's id, which pinned keys make impossible (#14)
 core/tests/test_link.py::LinkReviewFindingsTests::test_a_failed_try_at_a_beacons_address_shows_nothing_and_blocks_nothing  mined: link.report.probe-silent
 core/tests/test_link.py::LinkReviewFindingsTests::test_a_peer_that_stops_reading_ends_the_link  mined: link.alive.not-reading
 core/tests/test_link.py::LinkReviewFindingsTests::test_a_try_never_dials_a_peer_with_send_off  mined: link.dial.every-peer
 core/tests/test_link.py::LinkReviewFindingsTests::test_an_ack_that_beats_the_writers_bookkeeping_does_not_end_the_link  mined: link.input.ack-ahead
 core/tests/test_link.py::LinkReviewFindingsTests::test_flush_waits_for_the_queue_to_be_written  mined: link.send.quit
 core/tests/test_link.py::LinkReviewFindingsTests::test_nothing_is_reported_after_stop_returns  mined: link.peer.gone
-core/tests/test_link.py::LinkReviewFindingsTests::test_only_one_ping_waits_in_the_queue  python-detail: Python's outbound queue kept at most one ping waiting
+core/tests/test_link.py::LinkReviewFindingsTests::test_only_one_ping_waits_in_the_queue  python-detail: Python's outbound queue kept at most one keep-alive message waiting
 core/tests/test_link.py::LinkReviewFindingsTests::test_peer_locked_is_forgotten_on_a_new_link  dropped: Windows lock-screen unlock, which the locked acknowledgement served (F21, #11 Drop)
 core/tests/test_link.py::LinkReviewFindingsTests::test_send_input_takes_only_input_and_filters_media_keys  wire-v6: the media_keys capability word in hello and welcome, which exact version match replaces (#14)
 core/tests/test_link.py::LinkReviewFindingsTests::test_stop_during_a_handshake_ends_the_thread_and_start_runs_it_again  mined: link.peer.gone, link.dial.in-use-again
 core/tests/test_link.py::LinkReviewFindingsTests::test_stop_without_waiting_returns_at_once_reports_nothing_after_and_start_runs_it_again  mined: link.peer.gone, link.dial.in-use-again
 core/tests/test_link.py::LinkTunnelTests::test_an_unreachable_host_falls_back_to_the_tunnel  dropped: the macOS 27 SSH-tunnel fallback (F42, #11 Drop)
-core/tests/test_link.py::ResponseTimeLinkTests::test_capable_initiator_keeps_legacy_peer_pings_empty  wire-v6: the ping_rtt capability word and empty pings to peers without it
+core/tests/test_link.py::ResponseTimeLinkTests::test_capable_initiator_keeps_legacy_peer_pings_empty  wire-v6: the ping_rtt capability word and the empty keep-alive messages sent to peers without it
 core/tests/test_link.py::ResponseTimeLinkTests::test_negotiated_probes_measure_both_link_directions_and_clear_on_close  mined: link.rtt.reported
 core/tests/test_link.py::ResponseTimeLinkTests::test_ping_responses_do_not_credit_or_acknowledge_stalled_input  mined: link.input.stall
 core/tests/test_link.py::RoundTripLogTests::test_a_minute_with_input_but_no_advancing_ack_logs_the_pending_input  mined: link.log.unacknowledged
@@ -98,11 +98,11 @@ core/tests/test_protocol_v6.py::FirstFrames::test_a_bad_tag_or_counter_is_not_an
 core/tests/test_protocol_v6.py::FirstFrames::test_a_good_first_frame  wire-v6: the v6 first frames, hello and welcome, which the QUIC handshake replaces
 core/tests/test_protocol_v6.py::FirstFrames::test_not_an_object_is_its_own_error  wire-v6: the v6 first frames, hello and welcome, which the QUIC handshake replaces
 core/tests/test_protocol_v6.py::FirstFrames::test_the_length_bounds_are_refused_before_reading  wire-v6: the v6 first frames, hello and welcome, which the QUIC handshake replaces
-core/tests/test_protocol_v6.py::HelloAndWelcome::test_builders_read_back  wire-v6: hello, welcome and ping fields, which the QUIC handshake and the store replace
-core/tests/test_protocol_v6.py::HelloAndWelcome::test_invalid_hellos  wire-v6: hello, welcome and ping fields, which the QUIC handshake and the store replace
-core/tests/test_protocol_v6.py::HelloAndWelcome::test_invalid_welcomes  wire-v6: hello, welcome and ping fields, which the QUIC handshake and the store replace
-core/tests/test_protocol_v6.py::HelloAndWelcome::test_ping_metadata_is_optional_bounded_and_one_way  wire-v6: hello, welcome and ping fields, which the QUIC handshake and the store replace
-core/tests/test_protocol_v6.py::HelloAndWelcome::test_the_error_answers  wire-v6: hello, welcome and ping fields, which the QUIC handshake and the store replace
+core/tests/test_protocol_v6.py::HelloAndWelcome::test_builders_read_back  wire-v6: the fields of v6 first frames and keep-alive messages, which the QUIC handshake and the store replace
+core/tests/test_protocol_v6.py::HelloAndWelcome::test_invalid_hellos  wire-v6: the fields of v6 first frames and keep-alive messages, which the QUIC handshake and the store replace
+core/tests/test_protocol_v6.py::HelloAndWelcome::test_invalid_welcomes  wire-v6: the fields of v6 first frames and keep-alive messages, which the QUIC handshake and the store replace
+core/tests/test_protocol_v6.py::HelloAndWelcome::test_ping_metadata_is_optional_bounded_and_one_way  wire-v6: the fields of v6 first frames and keep-alive messages, which the QUIC handshake and the store replace
+core/tests/test_protocol_v6.py::HelloAndWelcome::test_the_error_answers  wire-v6: the fields of v6 first frames and keep-alive messages, which the QUIC handshake and the store replace
 core/tests/test_protocol_v6.py::HostileInput::test_a_refuse_without_a_why_is_still_a_refusal  wire-v6: hostile v6 JSON, which postcard decoding replaces
 core/tests/test_protocol_v6.py::HostileInput::test_a_refused_session_stays_refused  wire-v6: hostile v6 JSON, which postcard decoding replaces
 core/tests/test_protocol_v6.py::HostileInput::test_plain_dicts_with_what_a_parser_would_flag  wire-v6: hostile v6 JSON, which postcard decoding replaces
@@ -110,12 +110,12 @@ core/tests/test_protocol_v6.py::HostileInput::test_repeated_byte_order_marks_are
 core/tests/test_protocol_v6.py::HostileInput::test_unhashable_values_where_a_name_is_due  wire-v6: hostile v6 JSON, which postcard decoding replaces
 core/tests/test_protocol_v6.py::Ids::test_refused  wire-v6: the b64 spelling of a v6 machine id
 core/tests/test_protocol_v6.py::Ids::test_round_trip  wire-v6: the b64 spelling of a v6 machine id
-core/tests/test_protocol_v6.py::Others::test_arrangement  wire-v6: the v6 JSON of arrangement, clipboard, paired and platform names, which the store replaces
-core/tests/test_protocol_v6.py::Others::test_arrangement_way_back  wire-v6: the v6 JSON of arrangement, clipboard, paired and platform names, which the store replaces
-core/tests/test_protocol_v6.py::Others::test_arrangement_way_back_by_names_the_machine_holding_the_side_only_with_way_back_false  wire-v6: the v6 JSON of arrangement, clipboard, paired and platform names, which the store replaces
-core/tests/test_protocol_v6.py::Others::test_clipboard  wire-v6: the v6 JSON of arrangement, clipboard, paired and platform names, which the store replaces
-core/tests/test_protocol_v6.py::Others::test_paired  wire-v6: the v6 JSON of arrangement, clipboard, paired and platform names, which the store replaces
-core/tests/test_protocol_v6.py::Others::test_platforms_and_names  wire-v6: the v6 JSON of arrangement, clipboard, paired and platform names, which the store replaces
+core/tests/test_protocol_v6.py::Others::test_arrangement  wire-v6: the v6 JSON of messages whose meaning other domains own, which the store and postcard replace
+core/tests/test_protocol_v6.py::Others::test_arrangement_way_back  wire-v6: the v6 JSON of messages whose meaning other domains own, which the store and postcard replace
+core/tests/test_protocol_v6.py::Others::test_arrangement_way_back_by_names_the_machine_holding_the_side_only_with_way_back_false  wire-v6: the v6 JSON of messages whose meaning other domains own, which the store and postcard replace
+core/tests/test_protocol_v6.py::Others::test_clipboard  wire-v6: the v6 JSON of messages whose meaning other domains own, which the store and postcard replace
+core/tests/test_protocol_v6.py::Others::test_paired  wire-v6: the v6 JSON of messages whose meaning other domains own, which the store and postcard replace
+core/tests/test_protocol_v6.py::Others::test_platforms_and_names  wire-v6: the v6 JSON of messages whose meaning other domains own, which the store and postcard replace
 core/tests/test_protocol_v6.py::OverASocket::test_a_whole_handshake  wire-v6: the v6 handshake over TCP, which QUIC replaces
 core/tests/test_protocol_v6.py::Preamble::test_fresh_prefix_and_share_per_session  wire-v6: the v6 cleartext preamble, which QUIC replaces
 core/tests/test_protocol_v6.py::Preamble::test_layout  wire-v6: the v6 cleartext preamble, which QUIC replaces
@@ -164,9 +164,9 @@ core/tests/test_responder_accessors.py::AccessorTests::test_the_book_gives_the_z
 core/tests/test_responder_accessors.py::AccessorTests::test_the_book_stores_a_peers_paired_list_with_its_entry_and_only_when_it_changed  wire-v6: the paired message, which machine records in the store replace (#14)
 core/tests/test_responder_accessors.py::AccessorTests::test_the_responder_gives_a_linked_peers_capabilities  wire-v6: the v6 capability words in hello and welcome, which exact version match and capabilities in the store replace (#14)
 core/tests/test_responder_handshake.py::ASecondLinkFromOnePeer::test_it_replaces_the_first_and_releases_the_owners_keys_before_serving  mined: link.pair.redial-replaces
-core/tests/test_responder_handshake.py::OlderPeers::test_a_beamer_from_before_version_4_gets_the_legacy_welcome  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
+core/tests/test_responder_handshake.py::OlderPeers::test_a_beamer_from_before_version_4_gets_the_legacy_welcome  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
 core/tests/test_responder_handshake.py::OlderPeers::test_a_newer_version_gets_the_short_reply  wire-v6: the v6 short reply to other versions and its drain over TCP, which the protocol name in QUIC replaces
-core/tests/test_responder_handshake.py::OlderPeers::test_a_version_5_initiator_gets_the_short_reply_and_is_named  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
+core/tests/test_responder_handshake.py::OlderPeers::test_a_version_5_initiator_gets_the_short_reply_and_is_named  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
 core/tests/test_responder_handshake.py::OlderPeers::test_past_the_drain_cap_the_reply_still_survives_what_was_already_sent  wire-v6: the v6 short reply to other versions and its drain over TCP, which the protocol name in QUIC replaces
 core/tests/test_responder_handshake.py::OlderPeers::test_the_drain_does_not_hold_a_slot  wire-v6: the v6 short reply to other versions and its drain over TCP, which the protocol name in QUIC replaces
 core/tests/test_responder_handshake.py::OlderPeers::test_the_reply_survives_bytes_the_peer_sent_after_its_preamble  wire-v6: the v6 short reply to other versions and its drain over TCP, which the protocol name in QUIC replaces
@@ -192,7 +192,7 @@ core/tests/test_responder_handshake.py::TheLookup::test_authenticated_reverse_li
 core/tests/test_responder_handshake.py::TheLookup::test_in_use_off_refuses_the_handshake_and_on_accepts_it  mined: link.auth.not-in-use
 core/tests/test_responder_handshake.py::TheLookup::test_low_order_shares_are_closed_with_nothing_sent_not_even_a_preamble  wire-v6: the v6 X25519 shares in the preamble, which the QUIC handshake replaces
 core/tests/test_responder_handshake.py::TheLookup::test_the_hello_updates_the_entry_and_is_saved  wire-v6: hello's name, platform and port fields, which each machine's record in the store replaces (#14)
-core/tests/test_responder_handshake.py::TheLookup::test_welcome_accepts_is_false_without_allow_drive  wire-v6: welcome's accepts field; whether a peer may be driven by this machine is in the store (#14)
+core/tests/test_responder_handshake.py::TheLookup::test_welcome_accepts_is_false_without_allow_drive  wire-v6: welcome's `accepts` field; whether a peer may be driven by this machine is in the store (#14)
 core/tests/test_responder_handshake.py::TheLookup::test_which_addresses_teach_a_host
 core/tests/test_responder_handshake.py::TheMigratedEntry::test_its_token_is_never_matched_however_it_is_spelled  dropped: the 1.4.x migration (F19 ships without it, #11)
 core/tests/test_responder_handshake.py::TheMigratedEntry::test_nor_once_an_earlier_beta_linked_it  dropped: the 1.4.x migration (F19 ships without it, #11)
@@ -222,8 +222,8 @@ core/tests/test_responder_races.py::AFrameThatNeverFinishes::test_a_frame_still_
 core/tests/test_responder_races.py::ALargeFrameToASlowReader::test_a_slow_but_working_reader_keeps_the_link  mined: link.alive.not-reading, link.alive.anything-received
 core/tests/test_responder_races.py::AnAppCallbackThatRaises::test_a_zones_callback_that_raises_leaves_the_link_working  python-detail: a Python exception raised in an app callback
 core/tests/test_responder_races.py::TheLinkReplaced::test_a_take_on_a_replaced_link_is_never_accepted  mined: link.pair.closed-is-silent
-core/tests/test_response_time.py::ResponseTimeTests::test_late_echo_and_reset_do_not_restore_a_sample  wire-v6: the v6 probe and echo pings, which QUIC's RTT replaces (#14)
-core/tests/test_response_time.py::ResponseTimeTests::test_only_a_live_matching_echo_produces_a_fresh_sample  wire-v6: the v6 probe and echo pings, which QUIC's RTT replaces (#14)
+core/tests/test_response_time.py::ResponseTimeTests::test_late_echo_and_reset_do_not_restore_a_sample  wire-v6: the v6 probe and echo messages, which QUIC's RTT replaces (#14)
+core/tests/test_response_time.py::ResponseTimeTests::test_only_a_live_matching_echo_produces_a_fresh_sample  wire-v6: the v6 probe and echo messages, which QUIC's RTT replaces (#14)
 core/tests/test_response_time.py::ResponseTimeTests::test_responder_probe_is_not_starved_by_queued_traffic  mined: link.class.never-behind
 core/tests/test_v6_vectors.py::AckTests::test_every_case_is_the_formula_and_the_module_s_message  wire-v6: the v6 test vectors
 core/tests/test_v6_vectors.py::BadFrameTests::test_each_bad_frame_ends_the_link  wire-v6: the v6 test vectors
@@ -263,23 +263,23 @@ core/tests/test_v6_vectors.py::PreambleTests::test_the_layout_is_magic_version_p
 core/tests/test_v6_vectors.py::PreambleTests::test_the_preamble_is_the_committed_62_bytes  wire-v6: the v6 test vectors
 core/tests/test_v6_vectors.py::PreambleTests::test_the_share_is_x25519_of_the_secret_and_the_base_point  wire-v6: the v6 test vectors
 core/tests/test_v6_vectors.py::PreambleTests::test_the_short_reply_is_14_bytes  wire-v6: the v6 test vectors
-core/tests/test_wire_vectors.py::DeriveKeyVectorTests::test_hmac_by_hand_derives_the_committed_key  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
-core/tests/test_wire_vectors.py::DeriveKeyVectorTests::test_the_module_derives_the_committed_key  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
-core/tests/test_wire_vectors.py::DeriveKeyVectorTests::test_the_preamble_is_the_committed_one  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
-core/tests/test_wire_vectors.py::DeriveKeyVectorTests::test_the_salt_and_info_are_the_ones_in_the_file  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
-core/tests/test_wire_vectors.py::DeriveKeyVectorTests::test_the_two_directions_have_different_keys  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
-core/tests/test_wire_vectors.py::FrameVectorTests::test_a_body_that_is_not_bytes_like_is_a_type_error_not_a_tag_failure  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
-core/tests/test_wire_vectors.py::FrameVectorTests::test_a_connection_recorded_under_other_prefixes_is_refused  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
-core/tests/test_wire_vectors.py::FrameVectorTests::test_a_flipped_bit_anywhere_after_the_counter_is_refused_and_spends_nothing  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
-core/tests/test_wire_vectors.py::FrameVectorTests::test_a_frame_sealed_under_another_token_is_refused  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
-core/tests/test_wire_vectors.py::FrameVectorTests::test_a_frame_shorter_than_its_tag_is_refused_as_a_tag_failure  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
-core/tests/test_wire_vectors.py::FrameVectorTests::test_a_side_s_own_frame_reflected_back_is_refused  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
-core/tests/test_wire_vectors.py::FrameVectorTests::test_libsodium_by_hand_seals_and_opens_every_committed_frame  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
-core/tests/test_wire_vectors.py::FrameVectorTests::test_the_module_opens_every_committed_frame  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
-core/tests/test_wire_vectors.py::FrameVectorTests::test_the_module_seals_every_frame_to_the_committed_bytes  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
+core/tests/test_wire_vectors.py::DeriveKeyVectorTests::test_hmac_by_hand_derives_the_committed_key  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
+core/tests/test_wire_vectors.py::DeriveKeyVectorTests::test_the_module_derives_the_committed_key  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
+core/tests/test_wire_vectors.py::DeriveKeyVectorTests::test_the_preamble_is_the_committed_one  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
+core/tests/test_wire_vectors.py::DeriveKeyVectorTests::test_the_salt_and_info_are_the_ones_in_the_file  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
+core/tests/test_wire_vectors.py::DeriveKeyVectorTests::test_the_two_directions_have_different_keys  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
+core/tests/test_wire_vectors.py::FrameVectorTests::test_a_body_that_is_not_bytes_like_is_a_type_error_not_a_tag_failure  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
+core/tests/test_wire_vectors.py::FrameVectorTests::test_a_connection_recorded_under_other_prefixes_is_refused  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
+core/tests/test_wire_vectors.py::FrameVectorTests::test_a_flipped_bit_anywhere_after_the_counter_is_refused_and_spends_nothing  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
+core/tests/test_wire_vectors.py::FrameVectorTests::test_a_frame_sealed_under_another_token_is_refused  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
+core/tests/test_wire_vectors.py::FrameVectorTests::test_a_frame_shorter_than_its_tag_is_refused_as_a_tag_failure  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
+core/tests/test_wire_vectors.py::FrameVectorTests::test_a_side_s_own_frame_reflected_back_is_refused  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
+core/tests/test_wire_vectors.py::FrameVectorTests::test_libsodium_by_hand_seals_and_opens_every_committed_frame  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
+core/tests/test_wire_vectors.py::FrameVectorTests::test_the_module_opens_every_committed_frame  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
+core/tests/test_wire_vectors.py::FrameVectorTests::test_the_module_seals_every_frame_to_the_committed_bytes  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
 core/tests/test_wire_vectors.py::NoCryptographyTests::test_neither_requirements_file_asks_for_it  python-detail: which Python packages the app imported and required
 core/tests/test_wire_vectors.py::NoCryptographyTests::test_no_module_imports_cryptography  python-detail: which Python packages the app imported and required
-core/tests/test_wire_vectors.py::PairingShareVectorTests::test_low_order_and_all_zero_shares_are_refused  dropped: the v5 wire format and refusal path, no compatibility with the Python apps (#11 Drop)
+core/tests/test_wire_vectors.py::PairingShareVectorTests::test_low_order_and_all_zero_shares_are_refused  dropped: the v5 wire format and its refusal, no compatibility with the Python apps (#11 Drop)
 mac_app/tests/test_mac_links.py::AckStallRecoveryTests::test_a_heartbeat_only_peer_stall_ends_the_visit_and_releases_the_cursor  mined: link.input.stall, link.log.stall
 mac_app/tests/test_mac_links.py::AckStallRecoveryTests::test_a_peer_switch_is_logged_as_the_move_source
 mac_app/tests/test_mac_links.py::LinkSetTests::test_a_learnt_address_is_handed_to_the_app  mined: link.report.up
@@ -287,14 +287,14 @@ mac_app/tests/test_mac_links.py::LinkSetTests::test_a_locked_peer_is_called_unlo
 mac_app/tests/test_mac_links.py::LinkSetTests::test_a_new_token_makes_a_new_link_and_ends_the_old  mined: link.peer.rekeyed
 mac_app/tests/test_mac_links.py::LinkSetTests::test_one_link_per_peer_with_send_on  mined: link.dial.every-peer
 mac_app/tests/test_mac_links.py::LinkSetTests::test_removing_the_peer_ends_its_link_and_brings_input_home  mined: link.peer.gone
-mac_app/tests/test_mac_links.py::LinkSetTests::test_the_beacons_are_offered_to_every_link  python-detail: the Mac controller handing what discovery heard to each of its link objects
+mac_app/tests/test_mac_links.py::LinkSetTests::test_the_beacons_are_offered_to_every_link  python-detail: the Mac app handing what discovery heard to each of its link objects
 mac_app/tests/test_mac_links.py::LinkSetTests::test_the_connection_status_follows_the_primary_link  mined: link.report.down
 mac_app/tests/test_mac_links.py::LinkSetTests::test_the_round_trip_is_the_upper_median_of_the_last_trips_on_the_machine_input_is_on  mined: link.input.round-trip-recent
 mac_app/tests/test_mac_links.py::RemovedLinksTests::test_a_link_for_a_machine_that_went_is_stopped_without_waiting_for_it  mined: link.peer.gone
 mac_app/tests/test_mac_links.py::RemovedLinksTests::test_a_link_that_goes_down_after_its_machine_went_cannot_bring_input_back_or_report_up  mined: link.peer.gone
 mac_app/tests/test_mac_links.py::RemovedLinksTests::test_a_link_whose_machine_goes_as_it_comes_up_is_not_left_registered  mined: link.peer.gone
 mac_app/tests/test_mac_links.py::RemovedLinksTests::test_stopping_the_controller_still_waits_for_its_links  mined: link.send.quit
-mac_app/tests/test_mac_links.py::RemovedLinksTests::test_the_primary_link_moves_to_the_first_machine_still_in_use  python-detail: the Mac controller's one primary link, whose state it showed, a one-peer structure the links of N machines replace
+mac_app/tests/test_mac_links.py::RemovedLinksTests::test_the_primary_link_moves_to_the_first_machine_still_in_use  python-detail: the Mac app's one primary link, whose state it showed, a one-peer structure the links of N machines replace
 mac_app/tests/test_replay.py::SessionKeyTests::test_a_frame_from_another_connection_fails_the_tag  mined: link.auth.replay
 mac_app/tests/test_replay.py::SessionKeyTests::test_a_second_preamble_is_refused  wire-v6: a second v6 preamble on one TCP link
 mac_app/tests/test_replay.py::SessionKeyTests::test_a_sides_own_frames_reflected_back_fail_the_tag  mined: link.auth.replay
