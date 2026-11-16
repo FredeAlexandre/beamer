@@ -1,8 +1,7 @@
 # Puts the tracey that xtask pins (`VERSION` in xtask/src/tracey.rs) on PATH.
 #
-# macOS arm64 and Linux x86_64 take the release binary, checked against its sha256. Windows has no
-# release, so it builds tracey from source once (its dashboard needs node and pnpm) and caches the
-# binary under the version.
+# It takes the release binary, checked against its sha256: macOS arm64 and Linux only. Windows has
+# no release, and the CI workflow doesn't install tracey there.
 name: tracey
 description: Install the tracey version xtask pins
 runs:
@@ -20,7 +19,6 @@ runs:
         echo "dir=$RUNNER_TEMP/tracey-$version" >> "$GITHUB_OUTPUT"
 
     - name: Download the release
-      if: runner.os != 'Windows'
       shell: bash
       env:
         VERSION: ${{ steps.pin.outputs.version }}
@@ -44,36 +42,10 @@ runs:
         tar -xJf tracey.tar.xz --strip-components=1
         echo "$DIR" >> "$GITHUB_PATH"
 
-    - name: Restore the Windows build
-      if: runner.os == 'Windows'
-      id: cache
-      uses: actions/cache@v4
-      with:
-        path: ${{ steps.pin.outputs.dir }}
-        key: tracey-${{ steps.pin.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
-
-    - name: Install node for the dashboard
-      if: runner.os == 'Windows' && steps.cache.outputs.cache-hit != 'true'
-      uses: actions/setup-node@v4
-      with:
-        node-version: 22
-
-    - name: Build from source
-      if: runner.os == 'Windows' && steps.cache.outputs.cache-hit != 'true'
-      shell: bash
-      env:
-        VERSION: ${{ steps.pin.outputs.version }}
-        DIR: ${{ steps.pin.outputs.dir }}
-      run: |
-        corepack enable
-        cargo install --locked --git https://github.com/bearcove/tracey --tag "v$VERSION" \
-          --root "$DIR" tracey
-
     - name: Put it on PATH
       shell: bash
       env:
         DIR: ${{ steps.pin.outputs.dir }}
       run: |
-        if [ "$RUNNER_OS" = Windows ]; then echo "$DIR/bin" >> "$GITHUB_PATH"; fi
-        export PATH="$DIR:$DIR/bin:$PATH"
+        export PATH="$DIR:$PATH"
         tracey --version
