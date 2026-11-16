@@ -26,6 +26,27 @@ on branch build/<n>-<slug>, cut from origin/rust. Work only in that worktree.
    criterion. Leave merging and closing the issue to the coordinator.
 ```
 
+## A review
+
+The `build-spec-reviewer` runs on the Mac, in a worktree detached at the PR's head. It claims
+nothing: the task stays its author's.
+
+```sh
+git -C <your rust worktree> fetch origin pull/<pr>/head
+git -C <your rust worktree> worktree add --detach ../beamer-review-<pr> FETCH_HEAD
+```
+
+```
+Review PR #<pr> of FredeAlexandre/beamer, for task #<n>. You are on the Mac, in the worktree
+<path>, detached at the PR's head. Work only there, and change no file in it.
+
+1. Read CLAUDE.md there, then the task: gh issue view <n> -R FredeAlexandre/beamer
+2. Run the build-spec-reviewer skill.
+3. Report as the skill says. Leave merging and closing the issue to the coordinator.
+```
+
+Remove the review worktree once the verdict is in.
+
 ## On the Mac
 
 ```sh

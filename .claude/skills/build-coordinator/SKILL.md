@@ -77,6 +77,11 @@ waits on Alex, or waits for a cap.
 When an agent reports, check its PR: it targets `rust` from `build/<n>-<slug>`, its checks are
 green, and every acceptance criterion holds in the diff. Then:
 
+- **Review first.** A PR that adds, changes or deletes rules in `spec/`, and every
+  `build:skeleton` and `build:api` PR, merges only on a `Spec review: approved` comment whose
+  `Reviewed at` names the PR's head. Dispatch a reviewer on it ([dispatch.md](dispatch.md)).
+  "Changes requested" sends the task back to its role skill on the same branch, with the verdict
+  in the brief. "Waits for Alex" leaves it to Alex, and step 1 applies his answer.
 - **Merge.** Until the ruleset (#34) is closed, you merge `build:infra` PRs yourself:
   `gh pr merge <pr> -R FredeAlexandre/beamer --rebase --delete-branch`. Once #34 is closed, the
   ruleset merges every task PR when its required checks pass, and you merge nothing.
