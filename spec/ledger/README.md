@@ -11,10 +11,10 @@ no Python test is its own:
 | Domain | Task | Tests |
 |---|---|---|
 | `link` | #52 | 321 |
-| `pairing` | #53 | 286 |
+| `pairing` | #53 | 281 |
 | `store` | #54 | 0 |
-| `discovery` | #55 | 116 |
-| `driving` | #56 | 327 |
+| `discovery` | #55 | 118 |
+| `driving` | #56 | 328 |
 | `crossing` | #57 | 1115 |
 | `input` | #58 | 793 |
 | `clipboard` | #59 | 213 |
@@ -26,7 +26,7 @@ no Python test is its own:
 | `platform` | #65 | 336 |
 | `runtime` | #66 | 3 |
 | `app` | #67 | 93 |
-| `viewmodel` | #68 | 1046 |
+| `viewmodel` | #68 | 1048 |
 | `ui` | #69 | 741 |
 | `perf` | #70 | 0 |
 | `observability` | #71 | 0 |
@@ -77,9 +77,14 @@ flooded its own messages, and those tests went to the feature), the media engine
 ## Ambiguous assignments
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
-There are 90, covering 1,195 tests. Each row names the other candidates and why the owner won.
+There are 113, covering 1,200 tests. Each row names the other candidates and why the owner won.
 A miner who finds such a test's assertions are all another domain's settles it as
 `.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
+
+Three rows record lines that did move, after #51: the pairing miner (#53) found their assertions
+all another domain's, and the coordinator moved them to that domain's slice with no fate. Two of
+them split `test_pairing_cpace.py`'s `VersionTests`, the one exception to rule 2's "no assignment
+finer than a class".
 
 | Tests | Count | Owner | Also a candidate | Why the owner |
 |---|---|---|---|---|
@@ -97,11 +102,14 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `core/tests/test_link.py`, class `LinkHardwareTests` | 5 | discovery | link | the hardware address carried in the handshake serves Wake-on-LAN (F20) |
 | `core/tests/test_link_endpoint_follow.py` | 6 | discovery | link, pairing | discovered addresses are hints until the peer authenticates |
 | `core/tests/test_motion_flow.py` | 7 | link | input | bounded unacknowledged input, acks and the outbox are the link's input class |
+| `core/tests/test_pair1_windows.py`, class `WindowsReceivingPermissionTests` | 1 | driving | pairing | moved from pairing (#53): a take from a peer this machine may not be driven by is refused, even over an authenticated link |
+| `core/tests/test_pairing_cpace.py`, class `VersionTests`: `test_a_beacon_whose_name_cannot_be_shown_is_dropped`, `test_forged_beacons_cannot_make_the_list_grow_without_end` | 2 | discovery | pairing | moved from pairing (#53): both check the list of machines heard: which beacons join it and how many it holds. The class's other tests stay pairing's |
 | `core/tests/test_pairing_paths.py`, class `BroadcastTargetTests` | 3 | discovery | pairing | where the beacon is broadcast on a machine with several networks |
 | `core/tests/test_pairing_paths.py`, class `HostileNearbyDatagramTests` | 2 | discovery | pairing | hostile datagrams on the discovery socket |
 | `core/tests/test_pairing_paths.py`, class `InterfaceTests` | 4 | discovery | pairing | which interfaces a machine announces on |
 | `core/tests/test_pairing_paths.py`, class `OversizedDatagramTests` | 1 | discovery | pairing | an oversized datagram on the discovery socket |
 | `core/tests/test_patch15_nearby.py` | 3 | pairing | viewmodel | the nearby list's refresh, for pair nearby (F3, dropped) |
+| `core/tests/test_peerlist.py`, class `SharingANameTests` | 2 | viewmodel | pairing | moved from pairing (#53): the list of machines to pair with shows a machine's address when another one shares its name |
 | `core/tests/test_portable_discovery.py` | 5 | platform | discovery | the portable build's discovery; the portable build (F23, dropped) is kept in one domain |
 | `core/tests/test_profiles_e2e.py` | 30 | crossing | settings, store | profiles synced over the links; profiles are crossing's (F7) |
 | `core/tests/test_profiles_migration.py` | 12 | settings | crossing | the settings-file migration to profiles; settings owns the settings file and its migrations |

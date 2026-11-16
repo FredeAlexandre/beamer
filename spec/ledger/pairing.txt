@@ -49,7 +49,6 @@ core/tests/test_pair1_windows.py::WindowsPairingTests::test_tcp_transport_failur
 core/tests/test_pair1_windows.py::WindowsPairingTests::test_two_windows_peers_pair_by_address  mined: pairing.by-address.dial
 core/tests/test_pair1_windows.py::WindowsPairingTests::test_two_windows_peers_pair_over_udp_with_receiving_enabled  mined: pairing.by-beacon.dial, pairing.peers.entry
 core/tests/test_pair1_windows.py::WindowsPairingTests::test_wrong_code_is_refused_and_cancelled  mined: pairing.exchange.entering-checks-first
-core/tests/test_pair1_windows.py::WindowsReceivingPermissionTests::test_receiving_off_refuses_input_after_a_successful_authenticated_link
 core/tests/test_pairing_cpace.py::ClientStateTests::test_a_reply_to_another_attempt_is_not_judged  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
 core/tests/test_pairing_cpace.py::ClientStateTests::test_malformed_answers_are_refused_without_an_exception  mined: pairing.exchange.fields, pairing.exchange.entering-checks-first
 core/tests/test_pairing_cpace.py::ClientStateTests::test_names_are_cut_before_they_are_sent_and_bound_as_sent  mined: pairing.exchange.name-cut
@@ -97,13 +96,11 @@ core/tests/test_pairing_cpace.py::PublishedVectorTests::test_hkdf_matches_rfc_58
 core/tests/test_pairing_cpace.py::PublishedVectorTests::test_length_prefixes_match_the_draft  mined: pairing.cpace.lv-cat
 core/tests/test_pairing_cpace.py::PublishedVectorTests::test_low_order_shares_are_refused  mined: pairing.cpace.low-order
 core/tests/test_pairing_cpace.py::PublishedVectorTests::test_the_draft_exchange_is_reproduced_step_by_step  mined: pairing.cpace.suite
-core/tests/test_pairing_cpace.py::VersionTests::test_a_beacon_whose_name_cannot_be_shown_is_dropped
 core/tests/test_pairing_cpace.py::VersionTests::test_a_beacon_without_a_version_is_the_old_exchange  dropped: compatibility with older Python pairing versions (#11 drops pairing v2, the old refusal paths and any compatibility with the Python apps)
 core/tests/test_pairing_cpace.py::VersionTests::test_a_datagram_of_nothing_but_brackets_is_just_ignored  mined: pairing.connection.malformed
 core/tests/test_pairing_cpace.py::VersionTests::test_a_host_on_another_version_is_never_sent_anything  mined: pairing.connection.version
 core/tests/test_pairing_cpace.py::VersionTests::test_a_pairing_id_that_could_not_be_hashed_is_not_offered  wire-v6: the beacon's pairing id; #14's beacon carries only a flag while a code is shown
 core/tests/test_pairing_cpace.py::VersionTests::test_every_beacon_says_which_exchange_the_host_speaks  wire-v6: the beacon's pairing version; #14 settles the version by an exact ALPN match
-core/tests/test_pairing_cpace.py::VersionTests::test_forged_beacons_cannot_make_the_list_grow_without_end
 core/tests/test_pairing_cpace.py::VersionTests::test_only_one_attempt_runs_at_a_time  mined: pairing.exchange.one-attempt
 core/tests/test_pairing_cpace.py::VersionTests::test_the_ration_is_not_wiped_by_a_burst_of_made_up_addresses  wire-v6: refusals rationed per source address on the UDP pairing socket; #14 runs pairing in a QUIC pairing connection
 core/tests/test_pairing_paths.py::AnswerSourceTests::test_a_requester_on_no_network_of_this_machine_s_is_routed_as_ever  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
@@ -220,8 +217,6 @@ core/tests/test_peerlist.py::RemovePeerTests::test_an_unknown_token_removes_noth
 core/tests/test_peerlist.py::RemovePeerTests::test_forgetting_the_peer_that_lists_a_third_party_prunes_its_tile  mined: pairing.remove.peer
 core/tests/test_peerlist.py::RemovePeerTests::test_the_entry_and_its_zones_go  mined: pairing.remove.peer
 core/tests/test_peerlist.py::RemovePeerTests::test_the_entry_migrated_from_1_4_goes_with_the_zones_that_name_no_one  dropped: the 1.4.x migration of the settings file, which F19 ships without (#11)
-core/tests/test_peerlist.py::SharingANameTests::test_a_lone_machine_shares_with_nobody
-core/tests/test_peerlist.py::SharingANameTests::test_names_are_compared_as_labels_compares_them
 core/tests/test_v6_vectors.py::PairingV3ConstantsTests::test_the_constants_are_the_modules  wire-v6: pairing version 3's labels, inputs, messages and token, which pairing.cpace.inputs and pairing.exchange.messages replace
 core/tests/test_v6_vectors.py::PairingV3ExchangeTests::test_one_exchange_needs_a_two_byte_length_in_its_associated_data  wire-v6: pairing version 3's labels, inputs, messages and token, which pairing.cpace.inputs and pairing.exchange.messages replace
 core/tests/test_v6_vectors.py::PairingV3ExchangeTests::test_the_formulae_by_hand  wire-v6: pairing version 3's labels, inputs, messages and token, which pairing.cpace.inputs and pairing.exchange.messages replace
