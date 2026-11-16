@@ -1,5 +1,4 @@
 # Two-machine development (fork only)
-<!-- Throwaway line from #34: proves auto-merge; the next PR reverts it. -->
 
 This fork is developed on two machines at once, so features that cross the network (audio and
 microphone following input, next) can be built and tested end to end.
