@@ -22,6 +22,29 @@ The one-time exchange, proved by a six-digit code, after which two machines each
 public key.
 _Avoid_: bonding, trusting, linking
 
+**Code**:
+The six random digits a machine shows for 60 seconds, which the user enters on the other machine
+to prove a pairing. It pairs at most once.
+_Avoid_: PIN, password, passcode
+
+**Showing machine**:
+The machine in a pairing that shows the code.
+_Avoid_: host, responder
+
+**Entering machine**:
+The machine in a pairing on which the user enters the other machine's code.
+_Avoid_: requester, initiator
+
+**Pairing connection**:
+The QUIC connection, under the ALPN `beamer-pair/1`, that carries one pairing's exchange. It is
+never a link.
+_Avoid_: pairing link, pairing channel
+
+**Dormant peer**:
+A peer whose link shows it no longer holds this machine's key. It keeps its zones and its place on
+the crossing map until it is paired again or removed.
+_Avoid_: stale peer, broken pairing
+
 **Link**:
 The one encrypted connection between two peers. It carries everything between them, in both
 directions.

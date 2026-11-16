@@ -1,0 +1,110 @@
+{
+  "$comment": "Published test vectors for spec/pairing.md, copied as data from archive/python's core/tests/pairing_vectors.json, where they were checked against the Python app. Every value here is someone else's: each section names its source. Hex is bytes in wire order, except elligator2, whose two fields are integers printed big-endian as RFC 9380 prints them.",
+  "lv_cat": {
+    "source": "draft-irtf-cfrg-cpace-21, section 7.1: prepend_len and lv_cat, with the draft's own examples for b\"1234\" and lv_cat(b\"1234\", b\"5\", b\"\", b\"678\"). The 128- and 300-byte prefixes are the draft's LEB128 length worked for two longer strings",
+    "prepend_len": [
+      {
+        "data_hex": "",
+        "result_hex": "00"
+      },
+      {
+        "data_ascii": "1234",
+        "result_hex": "0431323334"
+      },
+      {
+        "data_zero_bytes": 128,
+        "result_prefix_hex": "8001"
+      },
+      {
+        "data_zero_bytes": 300,
+        "result_prefix_hex": "ac02"
+      }
+    ],
+    "lv_cat": [
+      {
+        "parts_ascii": [
+          "1234",
+          "5",
+          "",
+          "678"
+        ],
+        "result_hex": "043132333401350003363738"
+      }
+    ]
+  },
+  "cpace_draft": {
+    "source": "draft-irtf-cfrg-cpace-21, appendix B.1 (CPace-X25519-SHA512 test vectors, initiator-responder ISK)",
+    "prs_ascii": "Password",
+    "ci_hex": "0b415f696e69746961746f720b425f726573706f6e646572",
+    "sid_hex": "7e4b4791d6a8ef019b936c79fb7f2c57",
+    "generator_hex": "d04bf6d41f6a289632a2e929fa29bebd51092512a7829fdde7d314b62f05a73f",
+    "ada_ascii": "ADa",
+    "ya_scalar_hex": "21b4f4bd9e64ed355c3eb676a28ebedaf6d8f17bdc365995b319097153044080",
+    "ya_hex": "1d13c89278cdadd826f6d8d7f887701430f8380ddc17611cdd6dc989ce0c9f32",
+    "adb_ascii": "ADb",
+    "yb_scalar_hex": "848b0779ff415f0af4ea14df9dd1d3c29ac41d836c7808896c4eba19c51ac40a",
+    "yb_hex": "248cccf6d5cdc3646f0ad593f9e6cef4e69d4945f8372e623512ecea32185623",
+    "k_hex": "5b067effbdc0b2a0e1d907b21ebb25cfedb96a852179a847c37e43ee71322c6b",
+    "isk_hex": "6e19b875f7a561d6b3ca3dbb9ef42ac55de3e717881018204b8922b4d5e53bb2aa82c300bea7b65d2b671da71922ddf6472301b79bc270adfa8bf413285f2263"
+  },
+  "elligator2": {
+    "source": "RFC 9380, appendix J.4.2: the field elements u that map_to_curve takes and the Montgomery u coordinates Elligator 2 (section 6.7.1, Z = 2) maps them to",
+    "vectors": [
+      {
+        "field_element_hex_be": "608d892b641f0328523802a6603427c26e55e6f27e71a91a478148d45b5093cd",
+        "u_hex_be": "51125222da5e763d97f3c10fcc92ea6860b9ccbbd2eb1285728f566721c1e65b"
+      },
+      {
+        "field_element_hex_be": "46f5b22494bfeaa7f232cc8d054be68561af50230234d7d1d63d1d9abeca8da5",
+        "u_hex_be": "7d56d1e08cb0ccb92baf069c18c49bb5a0dcd927eff8dcf75ca921ef7f3e6eeb"
+      },
+      {
+        "field_element_hex_be": "235fe40c443766ce7e18111c33862d66c3b33267efa50d50f9e8e5d252a40aaa",
+        "u_hex_be": "3fbe66b9c9883d79e8407150e7c2a1c8680bee496c62fabe4619a72b3cabe90f"
+      },
+      {
+        "field_element_hex_be": "001e92a544463bda9bd04ddbe3d6eed248f82de32f522669efc5ddce95f46f5b",
+        "u_hex_be": "227e0bb89de700385d19ec40e857db6e6a3e634b1c32962f370d26f84ff19683"
+      },
+      {
+        "field_element_hex_be": "1a68a1af9f663592291af987203393f707305c7bac9c8d63d6a729bdc553dc19",
+        "u_hex_be": "3bcd651ee54d5f7b6013898aab251ee8ecc0688166fce6e9548d38472f6bd196"
+      }
+    ]
+  },
+  "low_order_shares": {
+    "source": "draft-irtf-cfrg-cpace-21, appendix B.1.10 (X25519 low-order points, which scalar_mult_vfy must refuse, and points that must not be refused)",
+    "scalar_hex": "af46e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449aff",
+    "must_refuse": [
+      "0000000000000000000000000000000000000000000000000000000000000000",
+      "0100000000000000000000000000000000000000000000000000000000000000",
+      "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+      "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800",
+      "5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157",
+      "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+      "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f"
+    ],
+    "must_give": [
+      {
+        "share_hex": "daffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "product_hex": "d8e2c776bbacd510d09fd9278b7edcd25fc5ae9adfba3b6e040e8d3b71b21806"
+      },
+      {
+        "share_hex": "dbffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "product_hex": "c85c655ebe8be44ba9c0ffde69f2fe10194458d137f09bbff725ce58803cdb38"
+      },
+      {
+        "share_hex": "d9ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "product_hex": "db64dafa9b8fdd136914e61461935fe92aa372cb056314e1231bc4ec12417456"
+      },
+      {
+        "share_hex": "cdeb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b880",
+        "product_hex": "e062dcd5376d58297be2618c7498f55baa07d7e03184e8aada20bca28888bf7a"
+      },
+      {
+        "share_hex": "4c9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f11d7",
+        "product_hex": "993c6ad11c4c29da9a56f7691fd0ff8d732e49de6250b6c2e80003ff4629a175"
+      }
+    ]
+  }
+}
