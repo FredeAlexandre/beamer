@@ -96,6 +96,14 @@ enum Command {
         /// writes them.
         #[arg(long, value_name = "FILE|URL")]
         report: Option<String>,
+        /// Give a box only to the rules under this rule-id prefix, such as `crossing.zone`: the
+        /// milestone's rule groups. Repeat it for several.
+        #[arg(long, value_name = "PREFIX")]
+        only: Vec<String>,
+        /// Print the issue's body and say whether it would be opened or updated, without writing
+        /// to GitHub.
+        #[arg(long)]
+        dry_run: bool,
         #[command(flatten)]
         root: Root,
     },
@@ -184,12 +192,16 @@ fn main() -> ExitCode {
             milestone,
             repo,
             report: given,
+            only,
+            dry_run,
             root,
         } => report(checklist::run(&checklist::Options {
             root: &root.dir(),
             milestone: &milestone,
             repo: &repo,
             report: given.as_deref(),
+            only: &only,
+            dry_run,
         })),
     }
 }

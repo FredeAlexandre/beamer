@@ -8,8 +8,10 @@ from `xtask machine` (#104), `xtask checklist` (#49) and `xtask bundle` and `xta
    milestone's perf gate: input budgets at M1, media budgets at M3. Each failure becomes a
    `build:triage` issue under #24 with the failing log lines, or `needs:alex` if only Alex can
    judge it.
-2. **Checklist.** Run `cargo xtask checklist` for the milestone and open its issue for Alex,
-   labelled `needs:alex`. His ticks verify the `human`-tier rules.
+2. **Checklist.** Run `cargo xtask checklist M<n>`, with an `--only <rule-id prefix>` per rule
+   group in the milestone's slice. It opens the milestone's issue for Alex, labelled `needs:alex`,
+   linking the newest report from step 1. His ticks verify the `human`-tier rules. Run it again
+   after a fix: it updates the same issue and keeps his ticks.
 3. **Build.** Build `2.0.0-m<n>` and deploy it to both machines. From M2 on, Alex uses it daily.
 4. **Record.** Tick the milestone in the epic's Milestones section, and name the build, the
    machine run and the checklist issue in the session summary.
