@@ -1,0 +1,10 @@
+   Compiling beamer-sim v0.1.0 (/home/runner/work/beamer/beamer/crates/beamer-sim)
+    Finished `release` profile [optimized] target(s) in 18.04s
+     Running unittests src/lib.rs (target/release/deps/beamer_sim-0a7e5c3d9b1f2468)
+
+running 3 tests
+test tests::a_lost_message_is_resent ... ok
+test tests::three_machines_converge ... ok
+test tests::an_idle_machine_stays_idle ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
