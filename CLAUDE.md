@@ -29,7 +29,7 @@ Every task issue carries exactly one `build:*` label. Work it with the skill on 
 | `build:skeleton`, `build:api` | `build-skeleton-writer`: writes one crate's public API with `todo!()` bodies, every item citing its rules, or one change to that API after the skeleton |
 | `build:test` | `build-test-agent`: writes one rule group's spec tests blind, in a `cargo xtask blind` export, each red against the `todo!()` skeleton |
 | `build:impl` | `build-implementer`: makes one rule group's merged, red tests pass and kills every in-diff mutant, never touching the tests |
-| `build:triage`, `triage:*` | `build-mutant-triage`, not written yet (#41) |
+| `build:triage`, `triage:*` | `build-mutant-triage`: settles each surviving mutant as a rule (then a blind `build:test` task), deleted code or a `mutants-justified:` skip, each disputed test or spec question as a spec amendment or confirmation, and each fuzz crash or model failure as a fix task carrying its failing input. It never writes a test |
 | Review of PRs that add or change rules, and of `build:skeleton` and `build:api` PRs | `build-spec-reviewer`: approves observable, traceable rules in glossary words and skeletons outside Alex's three contracts, or requests changes, or sends the PR to Alex (`needs:alex`) |
 
 ## Working a task
