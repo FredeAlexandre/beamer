@@ -84,6 +84,13 @@ Treat anything else as a real failure.
 - To offer a change upstream, cherry-pick it onto a branch from `upstream/main`, sign off every
   commit (`git commit -s`), and open an issue first for anything non-trivial (see CONTRIBUTING.md).
 
+## Machine agents
+
+The `machine` test tier posts real input on both machines through a dev-only machine agent, never
+through a hook inside Beamer (ADR 0005). The Mac's is in [`machine-agent/`](machine-agent/README.md),
+with the protocol both agents speak in [`machine-agent/PROTOCOL.md`](machine-agent/PROTOCOL.md).
+`dev/machine-agent/check.sh` proves it works on the Mac.
+
 ## Testing limits
 
 Pointer crossing, key feel and anything heard or spoken need a person at the machines. Agents can

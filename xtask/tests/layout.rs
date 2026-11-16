@@ -40,3 +40,37 @@ fn every_crate_lives_flat_in_crates_under_its_own_name() {
         problems.join("\n")
     );
 }
+
+/// The machine agents post real input for the `machine` tier and never ship (#47, ADR 0005): they
+/// stay out of the app's workspace, so no crate of the app, no blind export and no bundle sees
+/// them.
+#[test]
+fn no_crate_of_the_workspace_lives_in_dev() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let out = std::process::Command::new(env!("CARGO"))
+        .args([
+            "metadata",
+            "--format-version",
+            "1",
+            "--no-deps",
+            "--manifest-path",
+        ])
+        .arg(root.join("Cargo.toml"))
+        .output()
+        .expect("cargo metadata runs");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let metadata: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let dev = fs::canonicalize(root.join("dev")).unwrap();
+    let in_dev: Vec<_> = metadata["packages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|p| Path::new(p["manifest_path"].as_str().unwrap()).starts_with(&dev))
+        .map(|p| p["name"].as_str().unwrap().to_owned())
+        .collect();
+    assert!(in_dev.is_empty(), "workspace crates in dev/: {in_dev:?}");
+}
