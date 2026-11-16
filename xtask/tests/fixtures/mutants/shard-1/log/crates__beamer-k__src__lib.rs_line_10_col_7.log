@@ -1,0 +1,54 @@
+
+*** crates/beamer-k/src/lib.rs:10:7: replace + with - in unused
+
+*** mutation diff:
+--- crates/beamer-k/src/lib.rs
++++ replace + with - in unused
+@@ -2,17 +2,17 @@
+     x * 2
+ }
+ 
+ pub fn is_big(x: u32) -> bool {
+     x > 10
+ }
+ 
+ pub fn unused(x: u32) -> u32 {
+-    x + 1
++    x - /* ~ changed by cargo-mutants ~ */ 1
+ }
+ 
+ #[cfg(test)]
+ mod tests {
+     #[test]
+     fn unit() {
+         assert_eq!(super::unused(1), 2);
+     }
+
+
+*** cargo nextest run --no-run --verbose --package=beamer-k@0.0.0
+   Compiling beamer-k v0.0.0 (/private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-I51eZ6.tmp/crates/beamer-k)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
+
+*** result: Success
+
+*** cargo nextest run --verbose --package=beamer-k@0.0.0 -E kind(test) --no-fail-fast
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+────────────
+ Nextest run ID 71fd5e42-ebf3-40b9-a410-164cfaa7cbaf with nextest profile: default
+    Starting 4 tests across 1 binary (1 binary skipped)
+       START [         ] (1/4) beamer-k::k guards_nothing
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-I51eZ6.tmp/target/debug/build/beamer-k/2280ee06e91eb4ee/out/k-2280ee06e91eb4ee --exact guards_nothing --nocapture
+       START [         ] (1/4) beamer-k::k doubles
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-I51eZ6.tmp/target/debug/build/beamer-k/2280ee06e91eb4ee/out/k-2280ee06e91eb4ee --exact doubles --nocapture
+       START [         ] (1/4) beamer-k::k big
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-I51eZ6.tmp/target/debug/build/beamer-k/2280ee06e91eb4ee/out/k-2280ee06e91eb4ee --exact big --nocapture
+       START [         ] (1/4) beamer-k::k doubles_again
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-I51eZ6.tmp/target/debug/build/beamer-k/2280ee06e91eb4ee/out/k-2280ee06e91eb4ee --exact doubles_again --nocapture
+        PASS [   0.005s] (1/4) beamer-k::k doubles_again
+        PASS [   0.005s] (2/4) beamer-k::k doubles
+        PASS [   0.005s] (3/4) beamer-k::k big
+        PASS [   0.005s] (4/4) beamer-k::k guards_nothing
+────────────
+     Summary [   0.005s] 4 tests run: 4 passed, 0 skipped
+
+*** result: Success

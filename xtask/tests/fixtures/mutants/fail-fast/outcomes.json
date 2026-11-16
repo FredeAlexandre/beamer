@@ -1,0 +1,937 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.593080792,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--verbose",
+            "--package=beamer-k@0.0.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.160639834,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--verbose",
+            "--package=beamer-k@0.0.0",
+            "-E",
+            "kind(test)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/beamer-k/src/lib.rs:2:5: replace double -> u32 with 0",
+          "package": "beamer-k",
+          "file": "crates/beamer-k/src/lib.rs",
+          "function": {
+            "function_name": "double",
+            "return_type": "-> u32",
+            "span": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 3,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 2,
+              "column": 5
+            },
+            "end": {
+              "line": 2,
+              "column": 10
+            }
+          },
+          "replacement": "0",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__beamer-k__src__lib.rs_line_2_col_5.log",
+      "diff_path": "diff/crates__beamer-k__src__lib.rs_line_2_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.43542425,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--verbose",
+            "--package=beamer-k@0.0.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.157885042,
+          "process_status": {
+            "Failure": 100
+          },
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--verbose",
+            "--package=beamer-k@0.0.0",
+            "-E",
+            "kind(test)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/beamer-k/src/lib.rs:2:5: replace double -> u32 with 1",
+          "package": "beamer-k",
+          "file": "crates/beamer-k/src/lib.rs",
+          "function": {
+            "function_name": "double",
+            "return_type": "-> u32",
+            "span": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 3,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 2,
+              "column": 5
+            },
+            "end": {
+              "line": 2,
+              "column": 10
+            }
+          },
+          "replacement": "1",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__beamer-k__src__lib.rs_line_2_col_5_001.log",
+      "diff_path": "diff/crates__beamer-k__src__lib.rs_line_2_col_5_001.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.426152709,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--verbose",
+            "--package=beamer-k@0.0.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.161694042,
+          "process_status": {
+            "Failure": 100
+          },
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--verbose",
+            "--package=beamer-k@0.0.0",
+            "-E",
+            "kind(test)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/beamer-k/src/lib.rs:2:7: replace * with + in double",
+          "package": "beamer-k",
+          "file": "crates/beamer-k/src/lib.rs",
+          "function": {
+            "function_name": "double",
+            "return_type": "-> u32",
+            "span": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 3,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 2,
+              "column": 7
+            },
+            "end": {
+              "line": 2,
+              "column": 8
+            }
+          },
+          "replacement": "+",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__beamer-k__src__lib.rs_line_2_col_7.log",
+      "diff_path": "diff/crates__beamer-k__src__lib.rs_line_2_col_7.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.432680375,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--verbose",
+            "--package=beamer-k@0.0.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.162326833,
+          "process_status": {
+            "Failure": 100
+          },
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--verbose",
+            "--package=beamer-k@0.0.0",
+            "-E",
+            "kind(test)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/beamer-k/src/lib.rs:2:7: replace * with / in double",
+          "package": "beamer-k",
+          "file": "crates/beamer-k/src/lib.rs",
+          "function": {
+            "function_name": "double",
+            "return_type": "-> u32",
+            "span": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 3,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 2,
+              "column": 7
+            },
+            "end": {
+              "line": 2,
+              "column": 8
+            }
+          },
+          "replacement": "/",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__beamer-k__src__lib.rs_line_2_col_7_001.log",
+      "diff_path": "diff/crates__beamer-k__src__lib.rs_line_2_col_7_001.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.482189625,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--verbose",
+            "--package=beamer-k@0.0.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.164114791,
+          "process_status": {
+            "Failure": 100
+          },
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--verbose",
+            "--package=beamer-k@0.0.0",
+            "-E",
+            "kind(test)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/beamer-k/src/lib.rs:6:5: replace is_big -> bool with true",
+          "package": "beamer-k",
+          "file": "crates/beamer-k/src/lib.rs",
+          "function": {
+            "function_name": "is_big",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 5,
+                "column": 1
+              },
+              "end": {
+                "line": 7,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 6,
+              "column": 5
+            },
+            "end": {
+              "line": 6,
+              "column": 11
+            }
+          },
+          "replacement": "true",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__beamer-k__src__lib.rs_line_6_col_5.log",
+      "diff_path": "diff/crates__beamer-k__src__lib.rs_line_6_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.439841375,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--verbose",
+            "--package=beamer-k@0.0.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.162394834,
+          "process_status": {
+            "Failure": 100
+          },
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--verbose",
+            "--package=beamer-k@0.0.0",
+            "-E",
+            "kind(test)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/beamer-k/src/lib.rs:6:5: replace is_big -> bool with false",
+          "package": "beamer-k",
+          "file": "crates/beamer-k/src/lib.rs",
+          "function": {
+            "function_name": "is_big",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 5,
+                "column": 1
+              },
+              "end": {
+                "line": 7,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 6,
+              "column": 5
+            },
+            "end": {
+              "line": 6,
+              "column": 11
+            }
+          },
+          "replacement": "false",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__beamer-k__src__lib.rs_line_6_col_5_001.log",
+      "diff_path": "diff/crates__beamer-k__src__lib.rs_line_6_col_5_001.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.429494833,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--verbose",
+            "--package=beamer-k@0.0.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.166331458,
+          "process_status": {
+            "Failure": 100
+          },
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--verbose",
+            "--package=beamer-k@0.0.0",
+            "-E",
+            "kind(test)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/beamer-k/src/lib.rs:6:7: replace > with == in is_big",
+          "package": "beamer-k",
+          "file": "crates/beamer-k/src/lib.rs",
+          "function": {
+            "function_name": "is_big",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 5,
+                "column": 1
+              },
+              "end": {
+                "line": 7,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 6,
+              "column": 7
+            },
+            "end": {
+              "line": 6,
+              "column": 8
+            }
+          },
+          "replacement": "==",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__beamer-k__src__lib.rs_line_6_col_7.log",
+      "diff_path": "diff/crates__beamer-k__src__lib.rs_line_6_col_7.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.430668,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--verbose",
+            "--package=beamer-k@0.0.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.1638265,
+          "process_status": {
+            "Failure": 100
+          },
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--verbose",
+            "--package=beamer-k@0.0.0",
+            "-E",
+            "kind(test)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/beamer-k/src/lib.rs:6:7: replace > with < in is_big",
+          "package": "beamer-k",
+          "file": "crates/beamer-k/src/lib.rs",
+          "function": {
+            "function_name": "is_big",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 5,
+                "column": 1
+              },
+              "end": {
+                "line": 7,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 6,
+              "column": 7
+            },
+            "end": {
+              "line": 6,
+              "column": 8
+            }
+          },
+          "replacement": "<",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__beamer-k__src__lib.rs_line_6_col_7_001.log",
+      "diff_path": "diff/crates__beamer-k__src__lib.rs_line_6_col_7_001.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.431632209,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--verbose",
+            "--package=beamer-k@0.0.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.161500042,
+          "process_status": {
+            "Failure": 100
+          },
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--verbose",
+            "--package=beamer-k@0.0.0",
+            "-E",
+            "kind(test)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/beamer-k/src/lib.rs:6:7: replace > with >= in is_big",
+          "package": "beamer-k",
+          "file": "crates/beamer-k/src/lib.rs",
+          "function": {
+            "function_name": "is_big",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 5,
+                "column": 1
+              },
+              "end": {
+                "line": 7,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 6,
+              "column": 7
+            },
+            "end": {
+              "line": 6,
+              "column": 8
+            }
+          },
+          "replacement": ">=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__beamer-k__src__lib.rs_line_6_col_7_002.log",
+      "diff_path": "diff/crates__beamer-k__src__lib.rs_line_6_col_7_002.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.426117916,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--verbose",
+            "--package=beamer-k@0.0.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.1113545,
+          "process_status": {
+            "Failure": 100
+          },
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--verbose",
+            "--package=beamer-k@0.0.0",
+            "-E",
+            "kind(test)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/beamer-k/src/lib.rs:10:5: replace unused -> u32 with 0",
+          "package": "beamer-k",
+          "file": "crates/beamer-k/src/lib.rs",
+          "function": {
+            "function_name": "unused",
+            "return_type": "-> u32",
+            "span": {
+              "start": {
+                "line": 9,
+                "column": 1
+              },
+              "end": {
+                "line": 11,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 10,
+              "column": 5
+            },
+            "end": {
+              "line": 10,
+              "column": 10
+            }
+          },
+          "replacement": "0",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "MissedMutant",
+      "log_path": "log/crates__beamer-k__src__lib.rs_line_10_col_5.log",
+      "diff_path": "diff/crates__beamer-k__src__lib.rs_line_10_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.428166791,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--verbose",
+            "--package=beamer-k@0.0.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.161240542,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--verbose",
+            "--package=beamer-k@0.0.0",
+            "-E",
+            "kind(test)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/beamer-k/src/lib.rs:10:5: replace unused -> u32 with 1",
+          "package": "beamer-k",
+          "file": "crates/beamer-k/src/lib.rs",
+          "function": {
+            "function_name": "unused",
+            "return_type": "-> u32",
+            "span": {
+              "start": {
+                "line": 9,
+                "column": 1
+              },
+              "end": {
+                "line": 11,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 10,
+              "column": 5
+            },
+            "end": {
+              "line": 10,
+              "column": 10
+            }
+          },
+          "replacement": "1",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "MissedMutant",
+      "log_path": "log/crates__beamer-k__src__lib.rs_line_10_col_5_001.log",
+      "diff_path": "diff/crates__beamer-k__src__lib.rs_line_10_col_5_001.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.431181542,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--verbose",
+            "--package=beamer-k@0.0.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.160153042,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--verbose",
+            "--package=beamer-k@0.0.0",
+            "-E",
+            "kind(test)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/beamer-k/src/lib.rs:10:7: replace + with - in unused",
+          "package": "beamer-k",
+          "file": "crates/beamer-k/src/lib.rs",
+          "function": {
+            "function_name": "unused",
+            "return_type": "-> u32",
+            "span": {
+              "start": {
+                "line": 9,
+                "column": 1
+              },
+              "end": {
+                "line": 11,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 10,
+              "column": 7
+            },
+            "end": {
+              "line": 10,
+              "column": 8
+            }
+          },
+          "replacement": "-",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "MissedMutant",
+      "log_path": "log/crates__beamer-k__src__lib.rs_line_10_col_7.log",
+      "diff_path": "diff/crates__beamer-k__src__lib.rs_line_10_col_7.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.430347583,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--verbose",
+            "--package=beamer-k@0.0.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.1115185,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--verbose",
+            "--package=beamer-k@0.0.0",
+            "-E",
+            "kind(test)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/beamer-k/src/lib.rs:10:7: replace + with * in unused",
+          "package": "beamer-k",
+          "file": "crates/beamer-k/src/lib.rs",
+          "function": {
+            "function_name": "unused",
+            "return_type": "-> u32",
+            "span": {
+              "start": {
+                "line": 9,
+                "column": 1
+              },
+              "end": {
+                "line": 11,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 10,
+              "column": 7
+            },
+            "end": {
+              "line": 10,
+              "column": 8
+            }
+          },
+          "replacement": "*",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "MissedMutant",
+      "log_path": "log/crates__beamer-k__src__lib.rs_line_10_col_7_001.log",
+      "diff_path": "diff/crates__beamer-k__src__lib.rs_line_10_col_7_001.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.437275833,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--verbose",
+            "--package=beamer-k@0.0.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.167493208,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--verbose",
+            "--package=beamer-k@0.0.0",
+            "-E",
+            "kind(test)"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 13,
+  "missed": 4,
+  "caught": 9,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0,
+  "start_time": "2026-11-16T19:25:23.740848Z",
+  "end_time": "2026-11-16T19:25:32.214097Z",
+  "cargo_mutants_version": "27.1.0"
+}

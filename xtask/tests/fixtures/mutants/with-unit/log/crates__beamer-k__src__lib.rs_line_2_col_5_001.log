@@ -1,0 +1,159 @@
+
+*** crates/beamer-k/src/lib.rs:2:5: replace double -> u32 with 1
+
+*** mutation diff:
+--- crates/beamer-k/src/lib.rs
++++ replace double -> u32 with 1
+@@ -1,10 +1,10 @@
+ pub fn double(x: u32) -> u32 {
+-    x * 2
++    1 /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ pub fn is_big(x: u32) -> bool {
+     x > 10
+ }
+ 
+ pub fn unused(x: u32) -> u32 {
+     x + 1
+
+
+*** cargo nextest run --no-run --verbose --package=beamer-k@0.0.0
+   Compiling beamer-k v0.0.0 (/private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-Z2ngI0.tmp/crates/beamer-k)
+warning: unused variable: `x`
+ --> crates/beamer-k/src/lib.rs:1:15
+  |
+1 | pub fn double(x: u32) -> u32 {
+  |               ^ help: if this is intentional, prefix it with an underscore: `_x`
+  |
+  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `beamer-k` (lib) generated 1 warning (run `cargo fix --lib -p beamer-k` to apply 1 suggestion)
+warning: `beamer-k` (lib test) generated 1 warning (1 duplicate)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
+
+*** result: Success
+
+*** cargo nextest run --verbose --package=beamer-k@0.0.0 --no-fail-fast
+warning: unused variable: `x`
+ --> crates/beamer-k/src/lib.rs:1:15
+  |
+1 | pub fn double(x: u32) -> u32 {
+  |               ^ help: if this is intentional, prefix it with an underscore: `_x`
+  |
+  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `beamer-k` (lib) generated 1 warning (run `cargo fix --lib -p beamer-k` to apply 1 suggestion)
+warning: `beamer-k` (lib test) generated 1 warning (1 duplicate)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+────────────
+ Nextest run ID 467e7647-3898-4935-b021-696e04ac7c8b with nextest profile: default
+    Starting 5 tests across 2 binaries
+       START [         ] (1/5) beamer-k::k doubles_again
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-Z2ngI0.tmp/target/debug/build/beamer-k/2280ee06e91eb4ee/out/k-2280ee06e91eb4ee --exact doubles_again --nocapture
+       START [         ] (1/5) beamer-k::k big
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-Z2ngI0.tmp/target/debug/build/beamer-k/2280ee06e91eb4ee/out/k-2280ee06e91eb4ee --exact big --nocapture
+       START [         ] (1/5) beamer-k tests::unit
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-Z2ngI0.tmp/target/debug/build/beamer-k/a49f0daec1e8b387/out/beamer_k-a49f0daec1e8b387 --exact tests::unit --nocapture
+       START [         ] (1/5) beamer-k::k doubles
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-Z2ngI0.tmp/target/debug/build/beamer-k/2280ee06e91eb4ee/out/k-2280ee06e91eb4ee --exact doubles --nocapture
+       START [         ] (1/5) beamer-k::k guards_nothing
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-Z2ngI0.tmp/target/debug/build/beamer-k/2280ee06e91eb4ee/out/k-2280ee06e91eb4ee --exact guards_nothing --nocapture
+        PASS [   0.005s] (1/5) beamer-k::k guards_nothing
+        PASS [   0.005s] (2/5) beamer-k tests::unit
+  TRY 1 FAIL [   0.005s] (───) beamer-k::k doubles
+  stdout ───
+
+    running 1 test
+    test doubles ... FAILED
+
+    failures:
+
+    failures:
+        doubles
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'doubles' (12013258) panicked at crates/beamer-k/tests/k.rs:3:5:
+    assertion `left == right` failed
+      left: 1
+     right: 6
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.005s] (3/5) beamer-k::k big
+ TRY 2 START [         ] (───) beamer-k::k doubles
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-Z2ngI0.tmp/target/debug/build/beamer-k/2280ee06e91eb4ee/out/k-2280ee06e91eb4ee --exact doubles --nocapture
+  TRY 1 FAIL [   0.006s] (───) beamer-k::k doubles_again
+  stdout ───
+
+    running 1 test
+    test doubles_again ... FAILED
+
+    failures:
+
+    failures:
+        doubles_again
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'doubles_again' (12013261) panicked at crates/beamer-k/tests/k.rs:8:5:
+    assertion `left == right` failed
+      left: 1
+     right: 8
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+ TRY 2 START [         ] (───) beamer-k::k doubles_again
+             command: /private/var/folders/w6/x4tgtyq93px_x9pvyry9_m5c0000gn/T/cargo-mutants-mfix-Z2ngI0.tmp/target/debug/build/beamer-k/2280ee06e91eb4ee/out/k-2280ee06e91eb4ee --exact doubles_again --nocapture
+  TRY 2 FAIL [   0.005s] (4/5) beamer-k::k doubles
+  stdout ───
+
+    running 1 test
+    test doubles ... FAILED
+
+    failures:
+
+    failures:
+        doubles
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'doubles' (12013266) panicked at crates/beamer-k/tests/k.rs:3:5:
+    assertion `left == right` failed
+      left: 1
+     right: 6
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+  TRY 2 FAIL [   0.004s] (5/5) beamer-k::k doubles_again
+  stdout ───
+
+    running 1 test
+    test doubles_again ... FAILED
+
+    failures:
+
+    failures:
+        doubles_again
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'doubles_again' (12013267) panicked at crates/beamer-k/tests/k.rs:8:5:
+    assertion `left == right` failed
+      left: 1
+     right: 8
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+────────────
+     Summary [   0.012s] 5 tests run: 3 passed, 2 failed, 0 skipped
+  TRY 2 FAIL [   0.005s] (4/5) beamer-k::k doubles
+  TRY 2 FAIL [   0.004s] (5/5) beamer-k::k doubles_again
+error: test run failed
+
+*** result: Failure(100)

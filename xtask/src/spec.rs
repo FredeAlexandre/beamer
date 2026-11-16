@@ -95,6 +95,17 @@ fn tracey_query(root: &Path, query: &str, has_rules: bool, clean: impl Fn(&str) 
     }
 }
 
+/// The spec's rules, for the checks that cite them. Format problems are left to `spec validate`:
+/// this fails with one line pointing there.
+pub fn rules(root: &Path) -> Result<Vec<Rule>, String> {
+    read_spec(root).map_err(|problems| {
+        format!(
+            "spec/ has {} format problem(s): run `cargo xtask spec validate`",
+            problems.len()
+        )
+    })
+}
+
 fn report(problems: &[Problem]) {
     for problem in problems {
         eprintln!("{problem}");
@@ -601,7 +612,7 @@ fn split_reason(value: &str) -> Option<(&str, &str)> {
     None
 }
 
-fn is_kebab(s: &str) -> bool {
+pub fn is_kebab(s: &str) -> bool {
     !s.is_empty()
         && !s.starts_with('-')
         && !s.ends_with('-')

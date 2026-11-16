@@ -1,9 +1,11 @@
 //! `cargo xtask`: the workspace's own commands (#22). Later tickets add them to [`Command`].
 
+mod audit;
 mod blind;
 mod copy_tests;
 mod deps;
 mod digest;
+mod kill_matrix;
 mod red_first;
 mod spec;
 mod tracey;
@@ -52,6 +54,29 @@ enum Command {
         /// The branch the new tests are counted from, through its merge base with HEAD.
         #[arg(long, default_value = "origin/rust")]
         base: String,
+    },
+    /// Check that spec tests are honest (spec/README.md): a current `r[verify]` and an assertion
+    /// per test, a reason per skip, test and implementation commits apart, and the Python ledger.
+    TestAudit {
+        #[command(flatten)]
+        root: Root,
+        /// Check only the commits after this one, such as `origin/rust` on a task branch.
+        /// Defaults to every commit of HEAD.
+        #[arg(long, value_name = "REV")]
+        since: Option<String>,
+        /// The git ref holding the Python tests the ledger accounts for.
+        #[arg(long, value_name = "REF", default_value = "archive/python")]
+        python_ref: String,
+        /// Require the ledger to give every Python test its fate, as before the build lands.
+        #[arg(long)]
+        complete: bool,
+    },
+    /// Print which spec test kills which mutant, as Markdown, from the mutants.out directories of
+    /// a nightly run (each shard's). The run must pass nextest `--no-fail-fast`.
+    KillMatrix {
+        /// The mutants.out directories, one per shard.
+        #[arg(required = true, value_name = "MUTANTS_OUT")]
+        runs: Vec<PathBuf>,
     },
 }
 
@@ -122,6 +147,18 @@ fn main() -> ExitCode {
         Command::Blind { dir } => report(blind::run(&dir)),
         Command::CopyTests { export } => report(copy_tests::run(&export)),
         Command::RedFirst { base } => report(red_first::run(&base)),
+        Command::TestAudit {
+            root,
+            since,
+            python_ref,
+            complete,
+        } => exit(audit::run(&audit::Options {
+            root: &root.dir(),
+            since: since.as_deref(),
+            python_ref: &python_ref,
+            complete,
+        })),
+        Command::KillMatrix { runs } => exit(kill_matrix::run(&runs)),
     }
 }
 

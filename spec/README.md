@@ -45,6 +45,60 @@ Every spec test in a crate's `tests/` has a `// r[verify <id>]` line directly ab
 rule it verifies. Each line cites the rule's current version. Elsewhere in a crate,
 `// r[impl <id>]` marks the code that serves a rule. tracey refuses `impl` references in `tests/`.
 
+`cargo xtask test-audit` holds the spec tests to what ADR 0002 needs of them:
+
+- **A spec test** is a function with a `#[test]` attribute (or `#[<path>::test]`) in any file under
+  a crate's `tests/`, including inside a macro such as `proptest!`.
+- **It cites.** Its `r[verify]` lines sit in the comment lines directly above it or among its
+  attributes, with no blank line between. Each names a rule in `spec/` at its current version.
+- **It asserts.** Its body calls an `assert*!`, `prop_assert*!` or `panic!`, or calls a helper
+  function in the crate's `tests/` that does, or it is `#[should_panic]`. `debug_assert*!` doesn't
+  count.
+- **A skip has a reason.** An ignored spec test is `#[ignore = "<why>"]`. A `mutants::skip`
+  anywhere in a crate has a `// mutants-justified: <reason> (<rule id>)` comment directly above
+  it.
+- **Unit tests don't count.** An implementer's `#[cfg(test)]` unit tests in `src/` need neither,
+  and an `r[verify]` line outside `tests/` fails, so a unit test never stands in for a spec test.
+  The mutants runs count only the `tests/` binaries, and so does the kill matrix.
+- **Test commits and implementation commits are apart.** In a crate, a test file is anything
+  under `tests/`, `proptest-regressions/`, `__fuzz__/` (bolero corpora) or `snapshots/` (insta).
+  Any other file of the crate is an implementation file, apart from its `Cargo.toml`, which a test
+  commit may need for a dev-dependency. Files outside `crates/` are neither. No commit touches
+  both a test file and an implementation file, so an implementation commit never touches a test.
+  Rebase-merging keeps commits whole on `rust`, so the check holds over its whole history. On a
+  task branch, `--since origin/rust` checks only the branch's own commits.
+
+## The Python ledger
+
+The ledger accounts for every Python test at the tag `archive/python` (#15): which domain owns it,
+and what became of it. Each domain's tests are in `spec/ledger/<domain>.txt`, one per line:
+
+```text
+# Comments and blank lines are ignored.
+core/tests/test_crossing.py::ZoneTests::test_push_crosses  mined: crossing.zone.push, crossing.zone.held-at-edge
+core/tests/test_crossing.py::ZoneTests::test_old_menu  dropped: <the feature, as #11 dropped it>
+win_app/tests/test_tray.py::test_icon_refresh  python-detail: Qt's tray icon repaint
+core/tests/test_wire.py::test_v6_hello  wire-v6: the v6 hello frame, replaced by spec/link.md
+core/tests/test_store.py::test_merge_order
+```
+
+- **The test** is named as pytest names it: its path at `archive/python`, any classes it sits in,
+  then the function, joined by `::`. Every `def test_*` and `async def test_*` at module level or
+  in a class counts, in every `.py` file. A function nested in a function doesn't.
+- **The owner domain** is the file the test is in. Each test is in the ledger once.
+- **The fate** follows the test, after blanks, and is one of four:
+  - `mined: <rule id>, …`: mined into these rules, named without their version;
+  - `dropped: <reason>`: the feature is dropped, per #11;
+  - `python-detail: <reason>`: a Python or Qt implementation detail;
+  - `wire-v6: <reason>`: a wire-v6 detail, superseded by the new protocol.
+- **No fate yet** is a test alone on its line, as #51 first lays the ledger out.
+
+`cargo xtask test-audit` checks the ledger on every PR and accepts a partial one: tests missing or
+without a fate pass. It fails a test that is in the ledger twice, an id that is not a Python test
+at `archive/python`, a rule id that is not in the spec, and a malformed fate. `--complete`, run
+before the build lands, also requires every Python test exactly once, each with a fate. The tag
+must be in the clone (`git fetch origin tag archive/python`); `--python-ref` names another ref.
+
 ## Markers
 
 A rule's markers are the list that ends its blockquote, one `- key: value` per line:
@@ -107,8 +161,10 @@ harness has a kebab-case name, and every rule its harness checks carries that na
 | `cargo xtask spec stale` | Runs `tracey query stale` and fails on any stale reference |
 | `cargo xtask spec parity` | Prints every parity change as a Markdown list |
 | `cargo xtask spec digest --since <rev>` | Prints every rule added, bumped or removed since `<rev>`, parity and `human`-tier changes first: the daily digest on #118 (`dev/routines/spec-digest.md`) |
+| `cargo xtask test-audit` | Checks the spec tests, the skips, the commits and the ledger as above. `--since <rev>` checks only the commits after `<rev>`; `--complete` requires the whole ledger |
+| `cargo xtask kill-matrix <mutants.out>…` | Prints, as Markdown, which spec test kills which mutant and which spec tests kill none, from the `mutants.out` of each shard of a run made with nextest's `--no-fail-fast`, as the nightly's is |
 
-Each command takes `--root <dir>` to check another tree, such as the example. tracey's config is
-`.config/tracey/config.styx`. Its version is pinned in `xtask/src/tracey.rs`, and `xtask` says how
-to install it when it is missing. For browsing, `tracey query untested`, `tracey query rule <id>`
-and `tracey web` work at the repo root.
+Each command but `kill-matrix` takes `--root <dir>` to check another tree, such as the example.
+tracey's config is `.config/tracey/config.styx`. Its version is pinned in `xtask/src/tracey.rs`, and
+`xtask` says how to install it when it is missing. For browsing, `tracey query untested`, `tracey
+query rule <id>` and `tracey web` work at the repo root.
