@@ -3,8 +3,10 @@
 //! `mutants::skip` attributes with their justification.
 //!
 //! Files are read as token streams, not parsed as items, so tests written inside a macro such as
-//! `proptest!` are found too. Comments aren't tokens: `r[verify]` lines and justifications are read
-//! from the text, at the lines the tokens give.
+//! `proptest!` are found too, and so is the bodiless test of `prop_state_machine!`, which asserts
+//! through the `ReferenceStateMachine` and `StateMachineTest` impls of the state machine it runs.
+//! Comments aren't tokens: `r[verify]` lines and justifications are read from the text, at the
+//! lines the tokens give.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -221,21 +223,37 @@ fn functions_in(tokens: TokenStream, attributes: &mut Vec<Attribute>, found: &mu
                 let Some(TokenTree::Ident(name)) = trees.next() else {
                     continue;
                 };
-                // The body is the first brace group, unless a `;` ends a declaration first.
+                // The parameters are the first parenthesized group. The body is the first brace
+                // group, unless a `;` ends a declaration first.
+                let mut parameters = None;
                 let body = trees.by_ref().find_map(|t| match t {
                     TokenTree::Group(g) if g.delimiter() == Delimiter::Brace => {
                         Some(Some(g.stream()))
                     }
+                    TokenTree::Group(g)
+                        if g.delimiter() == Delimiter::Parenthesis && parameters.is_none() =>
+                    {
+                        parameters = Some(g.stream());
+                        None
+                    }
                     TokenTree::Punct(p) if p.as_char() == ';' => Some(None),
                     _ => None,
                 });
-                let Some(Some(body)) = body else {
-                    continue;
-                };
-                let line = keyword.span().start().line;
                 let mut asserts = false;
                 let mut calls = HashSet::new();
-                scan_body(body.clone(), &mut asserts, &mut calls);
+                match body {
+                    Some(Some(ref body)) => scan_body(body.clone(), &mut asserts, &mut calls),
+                    // A test of `prop_state_machine!` has no body: it runs the state machine its
+                    // parameters name.
+                    Some(None) => match parameters.and_then(state_machine_run) {
+                        Some(test) => {
+                            calls.insert(test);
+                        }
+                        None => continue,
+                    },
+                    None => continue,
+                }
+                let line = keyword.span().start().line;
                 found.push(Function {
                     name: name.to_string(),
                     line,
@@ -248,7 +266,34 @@ fn functions_in(tokens: TokenStream, attributes: &mut Vec<Attribute>, found: &mu
                     asserts,
                     calls,
                 });
-                functions_in(body, &mut Vec::new(), found);
+                if let Some(Some(body)) = body {
+                    functions_in(body, &mut Vec::new(), found);
+                }
+            }
+            TokenTree::Ident(keyword) if keyword == "impl" => {
+                attributes.clear();
+                let mut header = Vec::new();
+                // The block is the first brace group, unless a `;` ends the item first, as in
+                // `type Zone = impl Iterator;`.
+                let body = trees.by_ref().find_map(|t| match t {
+                    TokenTree::Group(g) if g.delimiter() == Delimiter::Brace => {
+                        Some(Some(g.stream()))
+                    }
+                    TokenTree::Punct(p) if p.as_char() == ';' => Some(None),
+                    other => {
+                        header.push(other);
+                        None
+                    }
+                });
+                let Some(Some(body)) = body else {
+                    continue;
+                };
+                let mut methods = Vec::new();
+                functions_in(body.clone(), &mut Vec::new(), &mut methods);
+                if let Some(machine) = state_machine_impl(&header, body, &methods) {
+                    found.push(machine);
+                }
+                found.append(&mut methods);
             }
             TokenTree::Group(g) => {
                 attributes.clear();
@@ -308,12 +353,95 @@ fn scan_body(body: TokenStream, asserts: &mut bool, calls: &mut HashSet<String>)
                 Some(TokenTree::Group(g)) if g.delimiter() == Delimiter::Parenthesis => {
                     calls.insert(ident.to_string());
                 }
+                // `ZoneTest::test_sequential(…)` runs the state machine `ZoneTest` by hand.
+                Some(TokenTree::Punct(colon)) if colon.as_char() == ':' => {
+                    if let (Some(TokenTree::Punct(second)), Some(TokenTree::Ident(run))) =
+                        (trees.get(i + 2), trees.get(i + 3))
+                        && second.as_char() == ':'
+                        && run == "test_sequential"
+                    {
+                        calls.insert(ident.to_string());
+                    }
+                }
                 _ => {}
             },
             TokenTree::Group(g) => scan_body(g.stream(), asserts, calls),
             _ => {}
         }
     }
+}
+
+/// The system under test that a `prop_state_machine!` test runs, from its parameters:
+/// `sequential 1..20 => ZoneTest`.
+fn state_machine_run(parameters: TokenStream) -> Option<String> {
+    let trees: Vec<TokenTree> = parameters.into_iter().collect();
+    match trees.first() {
+        Some(TokenTree::Ident(mode)) if mode == "sequential" => {}
+        _ => return None,
+    }
+    let arrow = trees.windows(2).position(|pair| {
+        matches!(pair, [TokenTree::Punct(a), TokenTree::Punct(b)]
+            if a.as_char() == '=' && b.as_char() == '>')
+    })?;
+    match trees.get(arrow + 2) {
+        Some(TokenTree::Ident(test)) => Some(test.to_string()),
+        _ => None,
+    }
+}
+
+/// An `impl` of proptest-state-machine's `ReferenceStateMachine` or `StateMachineTest`, as a
+/// function named after the type it is for: it asserts when one of its `methods` does, and calls
+/// what they call. A system under test also calls its `type Reference`, so a state-machine test
+/// that runs it is credited with the assertions of its reference model and of its invariant check.
+fn state_machine_impl(
+    header: &[TokenTree],
+    body: TokenStream,
+    methods: &[Function],
+) -> Option<Function> {
+    let is = |t: &TokenTree, name: &str| matches!(t, TokenTree::Ident(i) if i == name);
+    let for_at = header.iter().position(|t| is(t, "for"))?;
+    if !header[..for_at]
+        .iter()
+        .any(|t| is(t, "ReferenceStateMachine") || is(t, "StateMachineTest"))
+    {
+        return None;
+    }
+    let ty = type_name(&header[for_at + 1..])?;
+    let mut calls: HashSet<String> = methods.iter().flat_map(|m| m.calls.clone()).collect();
+    // `type Reference = <type>;`
+    let trees: Vec<TokenTree> = body.into_iter().collect();
+    for (i, tree) in trees.iter().enumerate() {
+        if is(tree, "type") && trees.get(i + 1).is_some_and(|t| is(t, "Reference")) {
+            calls.extend(trees.get(i + 3..).and_then(type_name));
+        }
+    }
+    let line = header.first().map_or(0, |t| t.span().start().line);
+    Some(Function {
+        name: ty,
+        line,
+        first_line: line,
+        is_test: false,
+        should_panic: false,
+        ignored_without_reason: false,
+        asserts: methods.iter().any(|m| m.asserts),
+        calls,
+    })
+}
+
+/// The name of the type `trees` start with: the last segment of its path, without generics.
+fn type_name(trees: &[TokenTree]) -> Option<String> {
+    trees
+        .iter()
+        .take_while(|t| match t {
+            TokenTree::Ident(_) => true,
+            TokenTree::Punct(p) => p.as_char() == ':',
+            _ => false,
+        })
+        .filter_map(|t| match t {
+            TokenTree::Ident(i) => Some(i.to_string()),
+            _ => None,
+        })
+        .last()
 }
 
 /// `assert!`, `assert_eq!` and the rest of the family, proptest's `prop_assert*!`, and `panic!`.

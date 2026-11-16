@@ -21,9 +21,9 @@ wrote it, extend it, and add your rules' `r[verify]` lines to the ones it carrie
   mutants runs fix the seed and the case count through `PROPTEST_RNG_SEED` and `PROPTEST_CASES`,
   and a config in the test would override them.
 
-`test-audit` counts only test functions with a body, so it skips this test and checks neither its
-citations nor its assertions: check them yourself. tracey still sees its `r[verify]` lines, and
-`red-first` runs it.
+`test-audit` checks this test like any other: its citations, and its assertions, which it finds in
+the methods of the two impls in the crate's `tests/` (`apply`, `check_invariants`) and in the
+helpers they call. `red-first` runs it.
 
 ## A `fuzz:` rule
 
