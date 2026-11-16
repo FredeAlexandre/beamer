@@ -1,0 +1,10 @@
+# cargo-mutants' settings, shared by the merge gate and the nightly, both run through
+# `cargo xtask mutants` (#33). Edit them here only.
+
+test_tool = "nextest"
+
+# Only the black-box spec tests in each crate's tests/ count (ADR 0002): nextest's kind(test) is
+# the integration-test binaries. An implementer's #[cfg(test)] unit tests never kill a mutant.
+# `cargo xtask mutants` also leaves out the spec tests merged red, which panic at a todo!(), and
+# the todo!() bodies themselves (#33).
+additional_cargo_test_args = ["-E", "kind(test)"]

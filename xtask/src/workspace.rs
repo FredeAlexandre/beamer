@@ -19,6 +19,11 @@ pub fn root() -> Result<PathBuf> {
         .ok_or_else(|| format!("{} is not inside a Cargo workspace", cwd.display()))
 }
 
+/// The build output directory: `CARGO_TARGET_DIR`, or the workspace's `target/`.
+pub fn target_dir(root: &Path) -> PathBuf {
+    std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| root.join("target"), |dir| root.join(dir))
+}
+
 /// `git <args>` in `dir`, its stdout on success.
 pub fn git(dir: &Path, args: &[&str]) -> Result<String> {
     let out = Command::new("git")

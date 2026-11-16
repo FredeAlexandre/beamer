@@ -64,10 +64,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Fetch the base and the Python tag
-        # test-audit checks the Python ledger against archive/python (#31).
+        # test-audit checks the Python ledger against archive/python (#31). Until #50 tags it,
+        # there is no ledger to check either.
         run: |
           git fetch --no-tags origin +refs/heads/rust:refs/remotes/origin/rust
-          git fetch --no-tags origin +refs/tags/archive/python:refs/tags/archive/python
+          if git ls-remote --exit-code --tags origin refs/tags/archive/python > /dev/null; then
+            git fetch --no-tags origin +refs/tags/archive/python:refs/tags/archive/python
+          else
+            echo "::notice::No archive/python tag yet (#50); test-audit has no ledger to check against it."
+          fi
       - name: Install the pinned toolchain
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
@@ -99,7 +104,7 @@ jobs:
           - { runner: windows, os: windows-latest }
     steps:
       - name: Keep line endings as committed
-        # Windows runners default to core.autocrlf=true, and xtask's tests compare files byte for byte.
+        # Windows runners default to core.autocrlf=true; xtask's tests compare files byte for byte.
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
         with:
@@ -113,11 +118,66 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/rust' }}
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest@0.9.152
-      # xtask's own tests run tracey.
+          # xtask's own tests run both, and tracey below.
+          tool: cargo-nextest@0.9.152,cargo-mutants@27.1.0
       - uses: ./.github/actions/tracey
+      - name: Which crates
+        id: crates
+        run: echo "args=$(cargo xtask crates --runner ${{ matrix.runner }} --for test)" >> "$GITHUB_OUTPUT"
       - name: clippy -D warnings
-        # Each crate's clippy.toml holds its disallowed-* lists; clippy reads it by itself.
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+        # Each sans-I/O crate's clippy.toml holds its disallowed-* lists; clippy reads it itself.
+        run: cargo clippy ${{ steps.crates.outputs.args }} --all-targets --locked -- -D warnings
       - name: nextest
-        run: cargo nextest run --workspace --locked
+        # A spec test merged red, panicking at a todo!(), is pending, not failed (#23).
+        run: cargo xtask nextest --runner ${{ matrix.runner }} -- --locked
+
+  mutants:
+    name: mutants (${{ matrix.runner }})
+    # The diff of a PR; a push to rust has none.
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: linux, os: ubuntu-latest }
+          - { runner: macos, os: macos-latest }
+          - { runner: windows, os: windows-latest }
+    env:
+      # Fixed seeds, so a random test gives the same verdict on every mutant (#15). The nightly
+      # sets the same.
+      PROPTEST_RNG_SEED: "20261116"
+      PROPTEST_CASES: "256"
+      BOLERO_RANDOM_SEED: "20261116"
+      BOLERO_RANDOM_ITERATIONS: "1000"
+    steps:
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fetch the base
+        run: git fetch --no-tags origin +refs/heads/rust:refs/remotes/origin/rust
+      - name: Install the pinned toolchain
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: mutants-${{ matrix.runner }}
+          save-if: ${{ github.ref == 'refs/heads/rust' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.152,cargo-mutants@27.1.0
+      - name: cargo mutants --in-diff
+        # Only the code this PR changes, in the crates this runner mutates, against tests/ only
+        # (.cargo/mutants.toml). Any missed or timed-out mutant fails the gate.
+        run: cargo xtask mutants --runner ${{ matrix.runner }} --in-diff origin/rust
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: mutants-${{ matrix.runner }}
+          path: mutants.out
+          if-no-files-found: ignore
+          retention-days: 14

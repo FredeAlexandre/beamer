@@ -67,12 +67,14 @@ test that passed on `origin/rust` still passes.
 
 ### 3. Kill the in-diff mutants
 
-Run the CI workflow's mutants gate locally, against your diff from `origin/rust`. Its test filter
-lives in `.cargo/mutants.toml`, so the gate and your run count the same tests:
+Run the CI workflow's mutants gate locally, against your diff from `origin/rust`, on the runner
+your crate is mutated on (`linux` for the OS-independent crates, `macos` or `windows` for the
+platform crates, `beamer-runtime` and `beamer`; `cargo xtask crates --runner <os> --for mutants`
+lists them). It runs cargo-mutants with `.cargo/mutants.toml`, leaving out the tests still red at a
+`todo!()` and the `todo!()` bodies, exactly as the gate does:
 
 ```sh
-git diff origin/rust... > ../mutants.diff
-cargo mutants --in-diff ../mutants.diff --test-tool=nextest
+cargo xtask mutants --runner macos --in-diff origin/rust
 ```
 
 Each survivor (missed or timed out) is one of two things:

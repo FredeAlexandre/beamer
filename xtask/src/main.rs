@@ -3,6 +3,7 @@
 mod audit;
 mod blind;
 mod checklist;
+mod ci;
 mod copy_tests;
 mod deps;
 mod digest;
@@ -107,6 +108,39 @@ enum Command {
         #[command(flatten)]
         root: Root,
     },
+    /// Print the cargo arguments that select the crates a CI runner covers for a job:
+    /// `--workspace`, `-p` flags, or nothing (#33). The CI workflow and the nightly read it.
+    Crates {
+        #[arg(long, value_enum)]
+        runner: ci::crates::Runner,
+        #[arg(long = "for", value_name = "JOB", value_enum)]
+        job: ci::crates::Job,
+    },
+    /// Run nextest as the merge gate does, on the crates a runner tests (#33). A spec test that
+    /// panics at a `todo!()` is pending and passes; any other failure fails.
+    Nextest {
+        #[arg(long, value_enum)]
+        runner: ci::crates::Runner,
+        /// More arguments for `cargo nextest run`.
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+    /// Run cargo-mutants on the crates a runner mutates, as the merge gate (`--in-diff`) and the
+    /// nightly do (#33): `.cargo/mutants.toml`'s test filter, less the spec tests merged red, and
+    /// no mutants of `todo!()` bodies. Exits with cargo-mutants' code: 2 missed, 3 timed out.
+    Mutants {
+        #[arg(long, value_enum)]
+        runner: ci::crates::Runner,
+        /// Mutate only the code changed since the merge base of HEAD and this rev.
+        #[arg(long, value_name = "REV")]
+        in_diff: Option<String>,
+        /// Run one shard of the mutants, as `k/n`.
+        #[arg(long, value_name = "K/N")]
+        shard: Option<String>,
+        /// More arguments for the test tool, after cargo-mutants' `--`.
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -203,6 +237,34 @@ fn main() -> ExitCode {
             only: &only,
             dry_run,
         })),
+        Command::Crates { runner, job } => report(
+            workspace::root()
+                .and_then(|root| ci::crates::select(&root, runner, job))
+                .map(|selection| println!("{selection}")),
+        ),
+        Command::Mutants {
+            runner,
+            in_diff,
+            shard,
+            args,
+        } => {
+            let options = ci::mutants::Options {
+                runner,
+                in_diff: in_diff.as_deref(),
+                shard: shard.as_deref(),
+                args: &args,
+            };
+            match workspace::root().and_then(|root| ci::mutants::run(&root, &options)) {
+                Ok(code) => ExitCode::from(code),
+                Err(message) => {
+                    eprintln!("error: {message}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
+        Command::Nextest { runner, args } => {
+            report(workspace::root().and_then(|root| ci::nextest::run(&root, runner, &args)))
+        }
     }
 }
 

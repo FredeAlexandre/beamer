@@ -7,3 +7,11 @@ nextest-version = { required = "0.9.131" }
 [profile.default]
 retries = 1
 flaky-result = "fail"
+
+# The merge gate's profile, run through `cargo xtask nextest` (#33). Every test runs, and the JUnit
+# report lets the gate tell a spec test merged red, panicking at a `todo!()`, from a failure.
+[profile.ci]
+fail-fast = false
+
+[profile.ci.junit]
+path = "junit.xml"
