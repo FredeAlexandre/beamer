@@ -185,8 +185,10 @@ harness has a kebab-case name, and every rule its harness checks carries that na
 | `cargo xtask test-audit` | Checks the spec tests, the skips, the commits and the ledger as above. `--since <rev>` checks only the commits after `<rev>`; `--complete` requires the whole ledger |
 | `cargo xtask checklist <milestone>` | Opens the milestone's issue for Alex, labelled `needs:alex`: a box per `human`-tier rule with its `do:` and `see:`, and a link to the newest machine-tier report in `dev/.reports/`, uploaded as a secret gist (`--report` names another, or a URL). `--only <prefix>` keeps the milestone's rule groups. Run again, it updates the issue and keeps Alex's ticks on rules that kept their version. `--dry-run` prints it and writes nothing |
 | `cargo xtask kill-matrix <mutants.out>…` | Prints, as Markdown, which spec test kills which mutant and which spec tests kill none, from the `mutants.out` of each shard of a run made with nextest's `--no-fail-fast`, as the nightly's is |
+| `cargo xtask triage issues <dir> --run <id>` | Prints, as JSON, the issues a nightly run's downloaded artifacts call for: one `triage:mutant` per function with surviving mutants, one `triage:fuzz` per crashed harness, one `triage:model` per failing model test, and a `needs:alex` for jobs that failed leaving nothing to triage. A group whose issue is open in `--open` is not filed again. The nightly triage routine posts it (`dev/routines/nightly-triage.md`) |
+| `cargo xtask triage corpus <dir>` | Lists the entries of a nightly's `fuzz-corpus` artifact that the checkout lacks; `--write` copies them in, for the routine's corpus pull request |
 
-Each command but `kill-matrix` takes `--root <dir>` to check another tree, such as the example.
+Each command but `kill-matrix` and `triage issues` takes `--root <dir>` to check another tree, such as the example.
 tracey's config is `.config/tracey/config.styx`. Its version is pinned in `xtask/src/tracey.rs`, and
 `xtask` says how to install it when it is missing. For browsing, `tracey query untested`, `tracey
 query rule <id>` and `tracey web` work at the repo root.

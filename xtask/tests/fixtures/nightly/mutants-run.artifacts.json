@@ -1,0 +1,40 @@
+{
+  "artifacts": [
+    {
+      "id": 14268820141,
+      "name": "kill-matrix"
+    },
+    {
+      "id": 14268730026,
+      "name": "mutants-linux-shard-1"
+    },
+    {
+      "id": 14268275532,
+      "name": "mutants-linux-shard-7"
+    },
+    {
+      "id": 14267778196,
+      "name": "mutants-linux-shard-5"
+    },
+    {
+      "id": 14267748158,
+      "name": "mutants-linux-shard-0"
+    },
+    {
+      "id": 14267168185,
+      "name": "mutants-linux-shard-6"
+    },
+    {
+      "id": 14266643352,
+      "name": "mutants-linux-shard-2"
+    },
+    {
+      "id": 14266373514,
+      "name": "mutants-linux-shard-4"
+    },
+    {
+      "id": 14266353457,
+      "name": "mutants-linux-shard-3"
+    }
+  ]
+}
