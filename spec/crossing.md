@@ -320,20 +320,33 @@ map. Several such peers sit in a row centred there, touching each other, in the 
 Each then moves to the nearest free snap point (`crossing.map.snap.choice`, with no radius), so that
 it touches this machine's footprint.
 
-r[crossing.map.place.first-peer]
-On a Mac whose crossing map is empty, the first peer paired gets its footprint flush against the
-right edge of the Mac's footprint, centred on it.
+> r[crossing.map.place.first-peer]
+> On a Mac whose crossing map has no footprint but its own, the first peer paired gets its footprint
+> flush against the right edge of the Mac's footprint, centred on it, in place of the footprint
+> `crossing.map.place.facing` or `crossing.map.place.unplaced` would give it.
+>
+> - parity: Python placed it so only while the Mac's saved crossing map held no footprint at all and the peer was its only peer (`core/crossing_state.py:328`) (#14: the Mac's own footprint is a default placement written to the crossing map, `crossing.map.place.default-written`, so a Mac's crossing map is never empty once the Mac is on it)
 
 > r[crossing.map.place.default-written]
 > A footprint placed by default, this machine's own (`crossing.map.members.this`) or a peer's
 > (`crossing.map.place.first-peer`, `crossing.map.place.facing`, `crossing.map.place.unplaced`), is
 > a change to the crossing map that reaches every machine, so two machines that pair end with one
 > map, each facing the other's facing edge. A machine is placed by default only while the crossing
-> map has no footprint for it. The placement is newer than the crossing map it was placed on and
-> older than every other change made to that map since, on any machine: such a change wins over it,
-> and a machine it then leaves with no footprint is placed by default again on the map that won. A
-> crossing map never changed is older than every change, so a machine new to the cluster takes the
-> cluster's crossing map over its own.
+> map has no footprint for it. Of two crossing maps, the newer, which `crossing.map.shared.newest`
+> keeps, is first the one whose newest change that is not a default placement is newer; a crossing
+> map changed only by default placements is older than every map with such a change. With the same
+> such change, or none, it is then the one on which a Mac placed a peer by
+> `crossing.map.place.first-peer` since that change, if any, and then the one whose newest default
+> placement is newer. Changes are newer in the order the store's stamps give them, the greater machine id
+> breaking a tie. So a default placement is newer than the crossing map it was placed on, and older
+> than every change that is not a default placement made since, on any machine: such a change wins
+> over it, and a machine the winning map leaves with no footprint is placed by default again on that
+> map. A machine new to the cluster, whose crossing map is changed only by default placements, takes
+> over its own a cluster's crossing map that has any other change. When a Mac whose crossing map has
+> no footprint but its own pairs its first peer, a machine that is not a Mac and whose crossing map
+> is changed only by default placements, the Mac's crossing map wins over the peer's whatever their
+> stamps: the peer ends flush right of the Mac on both machines' maps, and its zone to the Mac is on
+> its left edge.
 >
 > - model: store
 > - parity: Python wrote no default placement but a Mac's first peer on an empty crossing map, written with the Mac's own displays: each machine kept its own default until a footprint for that machine came from elsewhere, so two paired machines that are not Macs each placed the other below itself, and each one's zone to the other was on its own bottom edge (#14: the crossing map is one shared entry and converges)
@@ -780,7 +793,7 @@ and every peer while the crossing map is refused, every edge and every corner is
 
 r[crossing.derive.offer.unplaced]
 A peer with no footprint on the crossing map is answered at the footprint it would be given
-(`crossing.map.place.facing`, `crossing.map.place.unplaced`).
+(`crossing.map.place.first-peer`, `crossing.map.place.facing`, `crossing.map.place.unplaced`).
 
 ## Armed zones
 
