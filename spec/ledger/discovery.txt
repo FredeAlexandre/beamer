@@ -14,7 +14,7 @@ core/tests/test_link.py::LinkHardwareTests::test_a_hook_that_raises_sends_no_hw_
 core/tests/test_link.py::LinkHardwareTests::test_the_hook_is_asked_with_the_host_this_link_dials  mined: discovery.hardware.record, discovery.hardware.of-peer
 core/tests/test_link.py::LinkHardwareTests::test_the_hook_wins_over_the_identitys_own_hw  mined: discovery.hardware.record
 core/tests/test_link.py::LinkHardwareTests::test_without_a_hook_the_identitys_hw_is_sent_as_before  python-detail: the one hardware address Python sent when a link was built without its lookup towards the peer
-core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_missing_beacon_port_uses_saved_port_after_authentication  mined: discovery.beacon.layout, discovery.address.learnt-on-auth
+core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_missing_beacon_port_uses_saved_port_after_authentication  mined: discovery.beacon.bytes, discovery.address.learnt-on-auth
 core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_pinned_choices_and_invalid_beacon_ports_are_never_followed  mined: discovery.address.chosen-only, discovery.beacon.ignored
 core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_receive_only_peer_restarts_at_new_port_while_old_port_is_occupied  mined: discovery.probe.when, discovery.probe.found
 core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_repaired_pin_reconnects_after_outage_without_following_wifi  mined: discovery.address.chosen-only
@@ -31,9 +31,9 @@ core/tests/test_pairing_paths.py::InterfaceTests::test_qr_address_keeps_default_
 core/tests/test_pairing_paths.py::InterfaceTests::test_this_machine_s_interfaces_are_read_with_real_netmasks  mined: discovery.beacon.networks
 core/tests/test_pairing_paths.py::OversizedDatagramTests::test_a_datagram_too_large_for_the_buffer_does_not_stop_the_service  mined: discovery.beacon.ignored
 core/tests/test_pairing_service.py::BeaconTests::test_a_pairing_2_beacon_is_reported_older_and_sent_nothing  dropped: compatibility with older Python pairing versions (#11 drops pairing v2 and any compatibility with the Python apps)
-core/tests/test_pairing_service.py::BeaconTests::test_id_and_pair_only_while_a_code_is_up  mined: discovery.beacon.layout
+core/tests/test_pairing_service.py::BeaconTests::test_id_and_pair_only_while_a_code_is_up  mined: discovery.beacon.bytes
 core/tests/test_pairing_service.py::OwnBeaconTests::test_a_machine_that_hears_its_own_beacons_does_not_list_itself  mined: discovery.heard.own
-core/tests/test_pairing_v3.py::BeaconTests::test_the_id_and_pairing_id_travel_only_while_a_code_is_up  mined: discovery.beacon.layout
+core/tests/test_pairing_v3.py::BeaconTests::test_the_id_and_pairing_id_travel_only_while_a_code_is_up  mined: discovery.beacon.bytes
 core/tests/test_peer_address.py::ChosenAddressTests::test_an_empty_address_can_be_learnt_and_followed  mined: discovery.address.learnt-incoming, discovery.probe.when, discovery.probe.found
 core/tests/test_peer_address.py::ChosenAddressTests::test_choice_made_after_a_beacon_was_queued_is_used_for_dialling  mined: discovery.address.chosen-only
 core/tests/test_peer_address.py::ChosenAddressTests::test_choice_made_during_handshake_wins_over_learned_address  mined: discovery.address.chosen-only
@@ -101,8 +101,8 @@ win_app/tests/test_hardware_win.py::RealAdapterTest::test_result_is_unknown_or_w
 win_app/tests/test_links.py::WakeTests::test_a_peer_that_answered_and_refused_is_not_woken  mined: discovery.wake.refused
 win_app/tests/test_links.py::WakeTests::test_a_peer_without_a_hardware_address_is_not_woken  mined: discovery.wake.no-address
 win_app/tests/test_links.py::WakeTests::test_switching_with_the_peer_asleep_wakes_it  mined: discovery.wake.crossing, discovery.wake.packet
-win_app/tests/test_pairing.py::BeaconTests::test_beacon_carries_only_name_port_version_and_pairing_id  mined: discovery.beacon.layout
-win_app/tests/test_pairing.py::BeaconTests::test_beacon_without_a_code_has_no_pairing_id  mined: discovery.beacon.layout
+win_app/tests/test_pairing.py::BeaconTests::test_beacon_carries_only_name_port_version_and_pairing_id  mined: discovery.beacon.bytes
+win_app/tests/test_pairing.py::BeaconTests::test_beacon_without_a_code_has_no_pairing_id  mined: discovery.beacon.bytes
 win_app/tests/test_pairing.py::BeaconTests::test_decode_ignores_foreign_datagrams  mined: discovery.beacon.ignored
 win_app/tests/test_parity.py::AlertAndWakeTests::test_a_mac_that_refused_the_token_is_not_woken  mined: discovery.wake.refused
 win_app/tests/test_parity.py::AlertAndWakeTests::test_a_switch_with_no_link_and_no_address_says_why  mined: discovery.wake.no-address

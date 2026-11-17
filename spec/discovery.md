@@ -7,7 +7,7 @@ and Wake-on-LAN (F20). LAN discovery and dormant repair are kept with F2 by #11,
 beacon, the address lists and the probes are #14's.
 
 The rules come from #14 and ADR 0003, and from the Python app at `archive/python` (`core/pairing.py`'s
-beacons and discovery, `core/link.py`'s endpoint follow, `core/receiver.py`, `core/wol.py`,
+beacons and discovery, `core/link.py`, `core/receiver.py`, `core/wol.py`,
 `mac_app/wake.py`, `mac_app/hardware_mac.py`, `win_app/hardware_win.py`, `win_app/sender.py`), mined
 through its tests in `spec/ledger/discovery.txt`.
 
@@ -40,7 +40,7 @@ r[discovery.beacon.no-interfaces]
 When a machine cannot list its interfaces, it sends each beacon to 255.255.255.255 and to the /24
 broadcast address of each of its IPv4 addresses.
 
-> r[discovery.beacon.layout]
+> r[discovery.beacon.bytes]
 > A beacon is one UDP datagram of exactly 11 bytes: the byte 0x00, so QUIC's fixed bit is clear and
 > no beacon is taken for a QUIC packet; the six ASCII bytes `beamer`; the beacon version, 1; the port
 > this machine takes links on, as two bytes, most significant first, from 1 to 65535; and a flags
@@ -56,7 +56,7 @@ The port a beacon names is the one this machine takes links on (`spec/link.md`),
 saved for one of its peers.
 
 > r[discovery.beacon.ignored]
-> A datagram with QUIC's fixed bit clear that is not a beacon as `discovery.beacon.layout` sets it
+> A datagram with QUIC's fixed bit clear that is not a beacon as `discovery.beacon.bytes` sets it
 > out (another length, another first byte, other bytes than `beamer`, another version, port 0, or a
 > flag bit other than the lowest), and a datagram of any size up to 65,535 bytes, is ignored: it is
 > not listed, nothing is sent in answer, nothing is logged for it, and the machine goes on sending
@@ -165,11 +165,11 @@ Choosing or removing an address for one peer changes no other peer's addresses.
 > A peer keeps at most four learnt addresses. When a fifth is learnt, the one at which a link last
 > authenticated longest ago is forgotten.
 >
-> - parity: Python kept one learnt address, which the newest replaced (#14 keeps an address list per peer; four hold a cable, Wi-Fi and two older addresses)
+> - parity: Python kept one learnt address, which the newest replaced (#14 keeps an address list per peer; four keep a cable, Wi-Fi and two older addresses)
 > - model: link
 
 r[discovery.address.saved]
-A peer's chosen and learnt addresses are saved, and hold after a restart.
+A peer's chosen and learnt addresses are saved, and kept after a restart.
 
 r[discovery.address.concurrent-save]
 Saving a learnt address or a hardware address never undoes a change to this machine's settings
@@ -192,7 +192,7 @@ is dialled as one of the peer's addresses.
 
 > r[discovery.dial.one-report]
 > A dial at one of a peer's addresses that fails reports nothing while a dial at another of its
-> addresses is under way. The link reports the peer unreachable only once every one of its dials has
+> addresses is in progress. The link reports the peer unreachable only once every one of its dials has
 > failed.
 >
 > - model: link
@@ -229,7 +229,7 @@ hexadecimal numbers joined by colons, such as `02:1a:2b:3c:0d:4e`.
 > - parity: Python sent, in each link's handshake, the hardware address of the adapter that carried that link (#14: each machine's facts go in its own machine record)
 
 r[discovery.hardware.unknown]
-An adapter whose hardware address is not six bytes, is all zeros or cannot be read is left out of
+An adapter whose hardware address is not six bytes, is all zeros or cannot be read is not listed in
 the machine record. When the adapters cannot be read at all, the record lists none, and links come
 up as they would otherwise.
 
@@ -274,12 +274,12 @@ and that crossing again moves input there; input does not move by itself. With n
 the packet, the app reports that the peer did not wake.
 
 > r[discovery.wake.once]
-> While a wake of a peer is under way, another crossing to that peer sends no second packet.
+> While a wake of a peer is in progress, another crossing to that peer sends no second packet.
 >
 > - parity: Python's Mac app ran one wake at a time across all its peers (N machines: each peer has its own wake, as the Windows app had)
 
 r[discovery.wake.status]
-While a wake of a peer is under way, the peer's status is waking, whatever its link reports
+While a wake of a peer is in progress, the peer's status is waking, whatever its link reports
 meanwhile. Once the wake ends, it is the wake's outcome.
 
 r[discovery.wake.lost-link]
@@ -292,6 +292,6 @@ hardware address and did not refuse.
 > r[discovery.wake.wakes]
 > A sleeping peer that is set to wake from Wake-on-LAN wakes when a crossing to it sends the packet.
 >
-> - tier: human (whether a real machine wakes from sleep is seen at the desk)
+> - tier: human (whether a real machine wakes from sleep is seen at the machine)
 > - do: Put `lebig` to sleep, wait until its display is dark, then push the pointer through the Mac's zone that leads to it
 > - see: The Mac says it is waking `lebig`, `lebig` wakes, and within a minute the Mac says it is awake; pushing through the zone again moves the pointer onto it
