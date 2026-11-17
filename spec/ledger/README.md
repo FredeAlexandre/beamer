@@ -15,7 +15,7 @@ no Python test is its own:
 | `store` | #54 | 2 |
 | `discovery` | #55 | 117 |
 | `driving` | #56 | 331 |
-| `crossing` | #57 | 1039 |
+| `crossing` | #57 | 1033 |
 | `input` | #58 | 803 |
 | `clipboard` | #59 | 213 |
 | `settings` | #60 | 467 |
@@ -27,7 +27,7 @@ no Python test is its own:
 | `runtime` | #66 | 3 |
 | `app` | #67 | 93 |
 | `viewmodel` | #68 | 1070 |
-| `ui` | #69 | 765 |
+| `ui` | #69 | 771 |
 | `perf` | #70 | 0 |
 | `observability` | #71 | 0 |
 
@@ -77,7 +77,7 @@ flooded its own messages, and those tests went to the feature), the media engine
 ## Ambiguous assignments
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
-There are 126, covering 1,238 tests. Each row names the other candidates and why the owner won.
+There are 127, covering 1,238 tests. Each row names the other candidates and why the owner won.
 A miner who finds such a test's assertions are all another domain's settles it as
 `.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
 
@@ -174,8 +174,9 @@ the class's other tests stay crossing's.
 | `win_app/tests/test_admin_mode_ui.py` | 10 | viewmodel | platform | the admin mode controls and their diagnostics on the Input page |
 | `win_app/tests/test_app_config.py`, class `AppearanceConfigTests` | 3 | ui | settings | the saved appearance choice |
 | `win_app/tests/test_app_config.py`, class `EdgeGlowConfigTests` | 2 | ui | settings | the saved edge glow choice |
-| `win_app/tests/test_app_config.py`, class `OverlappingZonesTests` (its other tests) | 9 | crossing | settings | overlapping zones in the saved settings |
+| `win_app/tests/test_app_config.py`, class `OverlappingZonesTests` (its other tests) | 3 | crossing | settings | overlapping zones in the saved settings |
 | `win_app/tests/test_app_config.py`, class `OverlappingZonesTests`: `test_a_colour_resolves_to_todays_palette_else_its_pack`, `test_all_original_saved_colours_keep_their_id_and_stops` | 2 | ui | crossing | moved from crossing (#57): the edge glow colours |
+| `win_app/tests/test_app_config.py`, class `OverlappingZonesTests`: `test_any_colour_goes_with_any_style`, `test_effect_size_defaults_to_medium_and_round_trips`, `test_every_crossing_effect_and_pack_is_accepted_and_round_trips`, `test_frame_rate_defaults_to_display_and_round_trips`, `test_the_length_defaults_to_normal_and_round_trips`, `test_what_a_switch_plays_defaults_to_the_crossing_and_round_trips` | 6 | ui | crossing | moved from crossing (#57): the saved crossing effect choices, F30 (Later), whose room `ui` names (rule 6) |
 | `win_app/tests/test_app_config.py`, class `OverlappingZonesTests`: `test_colour_choices_are_the_shared_palettes_then_the_effect_packs`, `test_rejects_an_unknown_style_or_colour`, `test_showing_where_the_pointer_lands_is_on_for_an_old_config_and_round_trips_off`, `test_style_and_colour_default_to_the_original_look_and_round_trip` | 4 | settings | crossing | moved from crossing (#57): the edge glow style and colour settings, and showing where the pointer lands |
 | `win_app/tests/test_app_config.py`, class `ReadFallbackPeerBookTests` | 4 | pairing | settings | reading the peers from the settings file |
 | `win_app/tests/test_arrangement.py`, class `LearnedTests`: `test_the_stamps_author_for_same_on_all_machines_is_kept` | 1 | settings | crossing | moved from crossing (#57): the author of the Same on all machines stamp |
