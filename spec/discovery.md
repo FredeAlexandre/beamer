@@ -58,8 +58,8 @@ saved for one of its peers.
 > r[discovery.beacon.ignored]
 > A datagram with QUIC's fixed bit clear that is not a beacon as `discovery.beacon.bytes` sets it
 > out (another length, another first byte, other bytes than `beamer`, another version, port 0, or a
-> flag bit other than the lowest), and a datagram of any size up to 65,535 bytes, is ignored: it is
-> not listed, nothing is sent in answer, nothing is logged for it, and the machine goes on sending
+> flag bit other than the lowest), whatever its size up to 65,535 bytes, is ignored: it is not
+> listed, nothing is sent in answer, nothing is logged for it, and the machine goes on sending
 > beacons and hearing others.
 >
 > - fuzz: discovery-packet
