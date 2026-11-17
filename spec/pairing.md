@@ -508,10 +508,11 @@ The rules that hold whoever takes part without the code to one guess against eac
 > other peer.
 
 > r[pairing.peers.replace-keeps]
-> A pairing that replaces a peer with the same public key keeps the old peer's label, the edge
-> chosen to face it with when and by which machine that edge was chosen, whether it was kept off
-> the crossing map, its zones and its place on the crossing map.
+> A pairing that replaces a peer with the same public key keeps the old peer's label, the edge it
+> faces (`crossing.map.facing`), whether it was kept off the crossing map, its zones and its place
+> on the crossing map.
 >
+> - parity: Python also kept when, and by which machine, the edge the peer faced was chosen (#14: the edge a peer faces is read off the shared crossing map, `crossing.map.place.chosen-edge`)
 > - model: pairing
 
 > r[pairing.peers.replace-address]
@@ -524,11 +525,9 @@ The rules that hold whoever takes part without the code to one guess against eac
 > is accepted, with nothing restarted.
 
 > r[pairing.peers.first-zone]
-> A peer just paired, toward which this machine has no zone, gets one zone on an edge of this
-> machine's display, so input can cross to it before its zones are chosen. The zone runs the whole
-> edge when no other peer's zone is on it, and otherwise shares the edge with theirs as the
-> crossing map lays them out. Which edge it is, and how it is shared, are the crossing map's
-> choice (`spec/crossing.md`).
+> A peer just paired, toward which this machine has no zone, gets a zone so input can cross to it
+> before its zones are chosen: on an edge of this machine's displays, or at a corner, as
+> `crossing.derive.first-zone` derives it from the peer's first place on the crossing map.
 
 > r[pairing.peers.other-zones]
 > A pairing leaves every other peer's zones as they were, apart from sharing an edge with the new
