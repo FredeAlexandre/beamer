@@ -174,7 +174,11 @@ through `beamer-sim`.
 > leaves the input and the move number as they were, and Core reports that it cannot cross to
 > that peer, with the reason: it has no link, with the reason its link last reported down
 > (`discovery.wake.crossing` decides first whether it is woken instead); it does not let this
-> machine drive it; or this machine may not drive it.
+> machine drive it; or this machine may not drive it. A link this driver closed
+> (`driving.home.send-refused`, `driving.pass-on.given-up`) is no link from the moment the driver
+> closes it, and until it reports down its reason is the one the driver closed it with. This rule
+> decides what picking a peer reports even while the peer is out of reach
+> (`driving.take.out-of-reach`).
 >
 > - model: driving
 
@@ -207,8 +211,9 @@ through `beamer-sim`.
 > r[driving.take.out-of-reach]
 > A peer that refuses a take, or does not take a pass on (`driving.pass-on.not-taken`), is out of
 > reach for 3 s, and for 5 s when it refused because it sent this driver home. While it is out of
-> reach, picking it sends nothing, reports nothing, and leaves the input and the move number as
-> they were. Other peers are not affected.
+> reach this way, picking a peer this machine may take (`driving.permission.reach-only`) sends
+> nothing, reports nothing, and leaves the input and the move number as they were. Other peers are
+> not affected.
 >
 > - model: driving
 
@@ -410,10 +415,11 @@ through `beamer-sim`.
 > refused the message because it is full (`link.send.full`), the driver closes it
 > (`link.send.app-close`), with the app's reason that the link had too much waiting to send, as it
 > does too when the link refuses as full the releases or let go that `driving.home.how` sends it.
-> Until a link the driver closed this way is up again, that machine is out of reach, and nothing
-> that arrived on the closed link is acted on, a take or a send home included. When the link
-> refused the message because it is down (`link.send.down`), the driver closes nothing. A refused
-> message is not sent again, and refused input does not act here.
+> Until a link the driver closed this way is up again, that machine is out of reach, picking it
+> reports that this machine cannot cross to it (`driving.take.no-link`), and nothing that arrived
+> on the closed link is acted on, a take or a send home included. When the link refused the
+> message because it is down (`link.send.down`), the driver closes nothing. A refused message is
+> not sent again, and refused input does not act here.
 >
 > - parity: Python's Windows app let a key or button act here when it saw, as it captured it, that the link was down, and the Mac app let one act here when its own queue toward the link was full (ADR 0004: capture passes or swallows input from the capture word alone, so the link refuses input only after it was swallowed)
 > - model: driving
@@ -572,7 +578,8 @@ through `beamer-sim`.
 > When a pass on's wait ends without an answer from the peer, by its 1 s or by anything else that
 > moves the input, the driver closes the peer's link (`link.send.app-close`), with the reason that
 > a pass on to it was given up, before it sends anything else. Until that link is up again the
-> peer is out of reach, and nothing that arrived on the closed link is acted on, an accept
+> peer is out of reach, picking it reports that this machine cannot cross to it
+> (`driving.take.no-link`), and nothing that arrived on the closed link is acted on, an accept
 > included.
 >
 > - model: driving
