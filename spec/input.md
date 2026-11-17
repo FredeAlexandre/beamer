@@ -28,8 +28,8 @@ OS events to input messages and back) is `ci` on a hosted runner of its own OS (
 > A machine's capture decides whether each key, button, pointer move and scroll acts here or is
 > swallowed as the OS reports it, from where the input is as of the latest move, this machine's
 > stays-here input, keyboard stays here and crossing methods, and nothing else: never from the state
-> of a link, and never waiting on the rest of Beamer. While the rest of Beamer is busy for 1 s, input
-> at home goes on acting here at once, and input while away goes on being swallowed.
+> of a link, and never waiting on the rest of Beamer. While the rest of Beamer is held busy for 1 s,
+> each input at home acts here, and each input while away is swallowed, before that 1 s ends.
 >
 > - parity: Python's PC let a key or button act here when it saw, as it captured it, that the link was down, and the Mac waited on its own queue toward the link (ADR 0004: capture passes or swallows from the capture word alone, which the engine republishes at each move)
 
@@ -41,9 +41,15 @@ driver released on a machine it left (`driving.keys.swallowed-after`).
 r[input.capture.away]
 While a driver's input is on a driven machine, the driver's capture swallows every key, button,
 pointer move and scroll from its own keyboard and pointer, so none of them acts on the driver, and
-sends each to the driven machine as an input message, in the order the OS reported them. Stays-here
-input, the crossing methods, `input.capture.unnamed-button`, and a key or button pressed while the
-input was home (`driving.keys.pressed-at-home`), are the exceptions.
+sends each to the driven machine as an input message, in the order the OS reported them. A rule
+that names an input which acts on the driver while input is away, or which is swallowed and not
+sent, wins over this one for that input. Among them: stays-here input, keyboard stays here, the
+crossing methods, `input.capture.marked-passes`, `input.capture.injected-moves-pass`,
+`input.capture.unnamed-button`, `input.capture.error-passes`, `input.key-name.pc-no-character`,
+`input.modifier.pc-altgr-control` and `driving.keys.pressed-at-home` act on the driver; and
+`input.key-name.mac-fn`, `input.special-key.media-capability`,
+`input.special-key.windows-key-held-back`, `input.dead-key.swallowed` and
+`driving.keys.swallowed-after` swallow without sending.
 
 r[input.capture.pointer-stays]
 While a driver's input is on a driven machine, the driver's own pointer stays at the point where it
@@ -141,7 +147,8 @@ from then on.
 
 r[input.capture.retry]
 While a Mac's capture is not running and both macOS permissions it needs, Accessibility and Input
-Monitoring, are granted, the Mac tries to start it again, at most once every 5 s.
+Monitoring, are granted, the Mac tries to start it again, each try no sooner than 5 s and no later
+than 5.4 s after the try before it.
 
 ## Key names
 
@@ -150,16 +157,16 @@ A key down or a key up input message names one key by one key name. Beside a cha
 carries that key's US place, or none when the key has no US place.
 
 r[input.key-name.names]
-A key that is not a character is named by one of these key names: the modifiers `shift`,
-`shift_r`, `ctrl`, `ctrl_r`, `alt`, `alt_r`, `cmd`, `cmd_r` and `caps_lock`; the input-method keys
-`hangul` and `hanja`; `backspace`, `tab`, `enter`, `esc`, `space`, `delete`, `insert`, `home`,
-`end`, `page_up`, `page_down`, `left`, `right`, `up` and `down`; `f1` to `f24`; `menu`,
-`print_screen`, `pause`, `num_lock`, `scroll_lock`, `browser_back`, `browser_forward`,
-`browser_refresh`, `browser_stop`, `browser_search`, `browser_favourites`, `browser_home`,
-`mail`, `media_select`, `launch_app1` and `launch_app2`; the media keys `volume_mute`,
-`volume_down`, `volume_up`, `media_next`, `media_prev`, `media_stop`, `media_play_pause`,
-`brightness_up`, `brightness_down` and `mic_mute`; the system actions `search`, `spotlight` and
-`dictation`; and the keypad names of `input.keypad.names`.
+A key that is not a character is named by one of these key names: the modifiers `shift`, `shift_r`,
+`ctrl`, `ctrl_r`, `alt`, `alt_r`, `cmd`, `cmd_r` and `caps_lock`; the input-method keys `hangul` and
+`hanja`; `backspace`, `tab`, `enter`, `esc`, `space`, `delete`, `insert`, `home`, `end`, `page_up`,
+`page_down`, `left`, `right`, `up` and `down`; `f1` to `f24`; `menu`, `print_screen`, `pause`,
+`num_lock`, `scroll_lock`, `browser_back`, `browser_forward`, `browser_refresh`, `browser_stop`,
+`browser_search`, `browser_favourites`, `browser_home`, `mail`, `media_select`, `launch_app1` and
+`launch_app2`; the media keys `volume_mute`, `volume_down`, `volume_up`, `media_next`, `media_prev`,
+`media_stop`, `media_play_pause` and `mic_mute`; the brightness keys `brightness_up` and
+`brightness_down`; the system actions `search`, `spotlight` and `dictation`; and the keypad names of
+`input.keypad.names`.
 
 r[input.key-name.character]
 A character key the driver captures sends, as its key name, the character the driver's keyboard
@@ -170,12 +177,16 @@ r[input.key-name.mac-chord-unshifted]
 On a Mac, while Command, Control or Option (left or right) is held, a character key sends the
 character its key types unshifted on the Mac's layout, not the character the chord composes:
 Option-V sends `v`, not `√`, and a German layout's Command-Z sends `z`. Shift alone does not count
-as such a modifier: Shift-V sends `V`.
+as such a modifier: Shift-V sends `V`. With Option held and neither Command nor Control, the
+dead-key rules come first: Option-E, a dead key on a US layout, sends nothing and its accent waits
+(`input.dead-key.swallowed`), and a key pressed while an accent waits goes as
+`input.dead-key.mac-composed-text` says.
 
 r[input.key-name.mac-unprintable]
-On a Mac, when the text a character key types is not exactly one printable character (Control-A
-types U+0001), the key sends the character its key types unshifted on the Mac's layout instead.
-A key for which the layout has no such character either sends nothing.
+On a Mac, when the text macOS reports for a character key pressed with no Command, Control or
+Option held is not exactly one printable character (no text, or two characters), the key sends the
+character it types unshifted on the Mac's layout instead: Mac key code 0x00 reported with no text
+sends `a` on a US layout. A key for which the layout has no such character either sends nothing.
 
 r[input.key-name.pc-chord-character]
 On a PC, a character key sends the character the layout types for it with Shift and Caps Lock
@@ -303,8 +314,8 @@ modifier style and whatever a hand-written key map says: a Mac's Command reaches
 
 r[input.modifier.only-six]
 A modifier style renames only Control, Command or the Windows key, and Option or Alt, each side.
-Every other key, Shift and Caps Lock included, goes to a peer of the other family as itself in
-every style.
+It renames no other key, Shift and Caps Lock included: the name such a key goes to a peer of the
+other family under is the same in every style.
 
 r[input.modifier.default-semantic]
 A driver with no saved modifier style sends in the Semantic style.
@@ -360,8 +371,9 @@ key up for that name.
 
 r[input.modifier.pc-altgr-control]
 The left Ctrl that Windows adds to right Alt on an AltGr layout (virtual-key 0xA2 with scan code
-0x21D) is never sent to a peer, does not count as a held Ctrl, and its key up does not release a
-left Ctrl the user is holding: that Ctrl's one key up goes when the user lets it up.
+0x21D) is never sent to a peer and acts on the PC, also while input is on a peer. It does not count
+as a held Ctrl, and its key up does not release a left Ctrl the user is holding: that Ctrl's one key
+up goes when the user lets it up.
 
 ## Special keys
 
@@ -377,8 +389,8 @@ A PC's browser search key goes to a Mac as `spotlight`, and to a PC as `browser_
 r[input.special-key.media-capability]
 A key down or key up of `volume_mute`, `volume_down`, `volume_up`, `media_next`, `media_prev`,
 `media_stop`, `media_play_pause`, `brightness_up` or `brightness_down` goes only to a peer that
-reports it acts on media keys. Toward a peer that does not, it is not sent, and it does not act
-on the driver either.
+reports it acts on media and brightness keys. Toward a peer that does not, it is not sent, and it
+does not act on the driver either.
 
 r[input.special-key.windows-key-held-back]
 A PC driving a Mac does not send a key down for either Windows key when it is pressed. It sends
@@ -438,7 +450,7 @@ from a Mac to a PC as the style names Command, then `c`.
 
 r[input.special-key.switcher-two-alts]
 With both Alt keys held when Tab goes down toward a Mac, Command stays down until the second Alt
-comes up, and the PC sends Command up once, after everything else.
+comes up: the first Alt's release sends no key up of `cmd`, and the second's sends one.
 
 ## Keypad
 
@@ -498,7 +510,8 @@ the PC reports with the extended flag, or with any other scan code, has none.
 
 r[input.layout.pc-capture-foreground]
 The PC's capture reads a key's character from the keyboard layout of the app in front, so that a
-switch of input language in that app changes the names its keys are sent with.
+switch of input language in that app changes the names its keys are sent with. With no app in
+front, it reads Beamer's own keyboard layout.
 
 r[input.layout.mac-unshifted]
 The Mac takes each character key to type what its current layout types for that key with no
@@ -580,8 +593,9 @@ A character with no US place that the driven machine's layout cannot type is typ
 while `cmd`, `ctrl` or `alt` is held.
 
 r[input.layout.mac-korean]
-The Mac reads the 2-Set Hangul keyboard layout as a key table of 48 keys in which Mac key code
-0x00 types `ㅁ`, and the 2-Set Korean input method as having no key table.
+On the Mac's 2-Set Hangul keyboard layout, the Mac takes key code 0x00 to type `ㅁ` unshifted
+(`input.layout.mac-unshifted`), for naming the key and for placing a received `ㅁ`. The 2-Set Korean
+input method has no key layout of its own (`input.layout.mac-read-fails`).
 
 ## Key injection
 
@@ -608,8 +622,14 @@ The key up for a character whose key down a driven machine typed as text is type
 release of the same character.
 
 r[input.key-injection.mac-text-form]
-A Mac types a character as text by posting a key event at Mac key code 0 that carries the
-character as its string, down and then up.
+A Mac types a received character as text with one key event per input message: for its key down,
+one key down at Mac key code 0 that carries the character as its string, and for its key up, one
+key up at Mac key code 0 carrying the same string. Both carry no modifier flags.
+
+r[input.key-injection.pc-text-form]
+A PC types a received character as text with one Unicode input per input message: for its key
+down, one Unicode key down carrying the character, and for its key up, one Unicode key up carrying
+the same character. Neither carries a virtual key.
 
 r[input.key-injection.mac-character]
 A Mac posts a received character on the key its current layout types the character's lower case
@@ -838,15 +858,17 @@ On a driving PC, a key pressed while a physical Ctrl and right Alt are both held
 and key up of the key's own character, never as typed text.
 
 r[input.text.shortcut-while-held]
-While a key whose press went as typed text is held (a composed character on a driving Mac, a right
-Alt character on a driving PC), a press of Command or Control on the Mac, or of Ctrl on the PC,
+While a key whose press went as typed text is held (on a driving Mac, a composed character; on a
+driving PC, any key whose press went as typed text, such as a right Alt character, or an accent and
+a character that made no single character), a press of Command or Control on the Mac, or of Ctrl on
+the PC,
 turns the key's next auto-repeat into a key down of the key's own character with its US place,
 and its key up then goes as the matching key up.
 
 r[input.text.altgr-home]
 On a driving PC, a key that typed a right Alt character at home keeps acting on the PC until its
-key up: its auto-repeats and its key up after input has gone to a peer act on the PC, and nothing
-of it is sent.
+key up: unlike an ordinary key's (`driving.keys.pressed-at-home`), its auto-repeats after input has
+gone to a peer act on the PC, and so does its key up, and nothing of it is sent.
 
 r[input.text.altgr-fresh-press]
 Once a key that went as typed text with right Alt is released on a driving PC, its next press is a
@@ -861,7 +883,8 @@ home, the next character typed on the PC is not composed with it.
 
 r[input.dead-key.swallowed]
 While a driver's input is on a peer, a dead key's press, its auto-repeats and its key up act on
-neither machine and send nothing; its accent waits on the driver for the next key.
+neither machine and send nothing, unless the Mac's layout changes while it is held
+(`input.dead-key.mac-layout-change-held`); its accent waits on the driver for the next key.
 
 r[input.dead-key.pc-link-not-live]
 A dead key pressed on a driving PC whose link to the driven machine is not live acts on the PC,
@@ -899,7 +922,8 @@ followed by the character as one run of typed text: `´` then `x` is `´x`.
 r[input.dead-key.text-held]
 While the key whose press went as typed text after an accent is held (on a driving Mac, any such
 key; on a driving PC, one whose accent and character made no single character), each auto-repeat
-sends the key's own character as typed text, and its key up sends nothing.
+sends the key's own character as typed text, and its key up sends nothing, unless the Mac's layout
+changes while it is held (`input.dead-key.mac-layout-change-held`).
 
 r[input.dead-key.pc-composed-key]
 On a driving PC, a character key whose waiting accent composes with it into one character goes as
@@ -947,7 +971,9 @@ A change of the Mac's keyboard layout discards the waiting accent: the next char
 an ordinary key down.
 
 r[input.dead-key.mac-shortcut-key]
-Pressing the shortcut on a driving Mac discards the waiting accent.
+On a driving Mac whose shortcut is a key other than a modifier, pressing the shortcut discards the
+waiting accent. A shortcut that is a modifier, such as the default right Option, leaves the accent
+waiting, as any modifier does (`input.dead-key.cancel-non-character`).
 
 > r[input.dead-key.mac-home-drops]
 > When a driving Mac's input comes home, the accent waiting for the peer is discarded.
@@ -955,14 +981,21 @@ Pressing the shortcut on a driving Mac discards the waiting accent.
 > - model: driving
 
 r[input.dead-key.release-swallowed]
-The key up of a dead key whose press sent nothing also sends nothing and acts on neither machine,
-even when the keyboard layout changed in between so that the key is no longer dead or types
-nothing.
+On a driving PC, the key up of a dead key whose press sent nothing also sends nothing and acts on
+neither machine, even when the keyboard layout changed in between so that the key is no longer
+dead or types nothing.
+
+r[input.dead-key.mac-layout-change-held]
+On a driving Mac, a change of the keyboard layout while a dead key whose press sent nothing, or a
+key whose press went as typed text after an accent, is held makes that key's later auto-repeats
+and key up ordinary: they go as the key downs and the key up of the character the key types on the
+new layout, and send nothing when it types none there.
 
 r[input.dead-key.pc-home-press]
-On a driving PC, a dead key pressed at home keeps acting on the PC until its key up: its
-auto-repeats and key up after input has gone to a peer act on the PC, and nothing of it is sent,
-even when the keyboard layout changed in between.
+On a driving PC, a dead key pressed at home keeps acting on the PC until its key up: unlike an
+ordinary key's (`driving.keys.pressed-at-home`), its auto-repeats after input has gone to a peer
+act on the PC, and so does its key up, and nothing of it is sent, even when the keyboard layout
+changed in between.
 
 r[input.dead-key.fresh-press]
 Once a dead key whose press sent nothing is released on a driving PC, its next press is a new
@@ -999,14 +1032,14 @@ A Mac driven machine never injects a modifier as an auto-repeat, and the auto-re
 carry the flags of the modifiers held, as its first key down did.
 
 r[input.repeat.fresh-after-release]
-After a driven machine injects a key's key up, by the driver's key up or by releasing the driver's
-held keys, the next key down of that key is injected as a first press.
+After a driven Mac injects a key's key up, by the driver's key up or by releasing the driver's
+held keys, it injects the next key down of that key as a first press, not an auto-repeat.
 
 ## Caps Lock
 
 r[input.caps-lock.mac-tap]
 While a driving Mac's input is on a peer, each Caps Lock change macOS reports (Mac key code 0x39)
-sends the peer a key down and a key up of `caps_lock` together, and acts on neither machine. This
+sends the peer a key down and a key up of `caps_lock` together, and does not act on the Mac. This
 holds whatever modifier flags the change carries, with or without the Caps Lock flag, as when
 Caps Lock changes the keyboard layout.
 
@@ -1015,9 +1048,13 @@ While a driving Mac's input is at home, a Caps Lock change acts on the Mac and s
 whatever modifier flags it carries and after any change of keyboard layout.
 
 r[input.caps-lock.mac-key-down-up]
-A Caps Lock that macOS reports as a key down and a key up instead of a modifier change goes to the
-peer as a key down and a key up of `caps_lock`, each when it comes, while a driving Mac's input is on
-a peer, and acts on the Mac while input is at home.
+While a driving Mac's input is on a peer, a Caps Lock that macOS reports as a key down and a key up
+instead of a modifier change goes to the peer as a key down and a key up of `caps_lock`, each when
+it comes.
+
+r[input.caps-lock.mac-key-down-up-home]
+While a driving Mac's input is at home, a Caps Lock that macOS reports as a key down and a key up
+instead of a modifier change acts on the Mac and sends nothing.
 
 ## Lock keys
 
@@ -1026,8 +1063,9 @@ A Caps Lock, Num Lock or Scroll Lock press on a driving PC whose input is on a p
 peer, and the PC's own lock state does not change.
 
 r[input.lock-key.pc-peer-once]
-A PC driven machine's Caps Lock or Num Lock changes once per press it injects, however many key
-downs the driver's auto-repeat sends before the key up.
+A PC driven machine injects each key down of `caps_lock` or `num_lock` it receives, auto-repeats
+included, as a key down of that key, and the one key up as a key up, and injects nothing else for
+them.
 
 r[input.lock-key.pc-caps-own]
 A driving PC gives letters the case of its own Caps Lock. A Caps Lock press that acts on the PC
@@ -1056,9 +1094,11 @@ Lock gives them from the first key.
 > - model: driving
 
 > r[input.held-key.driven-release-all]
-> After releasing a driver's held keys and buttons, the driven machine also releases every key,
-> modifier and button its injection still holds down, so none stays down: a Ctrl, a Shift, an `a`
-> and the left button held for the driver are three key ups and one button up.
+> After releasing a driver's held keys and buttons (`input.held-key.driven-release`), the driven
+> machine also releases every key, modifier and button its injection still holds down, so none
+> stays down: when the injection holds a Ctrl, a Shift, an `a` and the left button and the driver's
+> held keys were only the `a`, releasing the `a` is followed by key ups of Ctrl and Shift and a
+> button up of left.
 >
 > - model: driving
 
@@ -1261,16 +1301,17 @@ its horizontal wheel: 120 wheel units a notch in line mode, and 3 a point in pix
 axes move it posts the wheel first, and it posts nothing on an axis with no whole wheel unit.
 
 r[input.scroll.direction]
-A scroll moves the driven machine's view the way the same movement would have moved the driver's
-own view, on both axes and in both modes, whether the driver and the driven machine are Macs or PCs
-and whichever scrolling direction the driver is set to.
+With reverse scrolling off on the driven machine (`input.speed.reverse`), a scroll moves the driven
+machine's view the way the same movement would have moved the driver's own view, on both axes and
+in both modes, whether the driver and the driven machine are Macs or PCs and whichever scrolling
+direction the driver is set to.
 
 > r[input.scroll.direction-felt]
-> Scrolling on the driver scrolls the driven machine's view the way it would scroll the driver's
-> own, on both axes.
+> With reverse scrolling off on the driven machine, scrolling on the driver scrolls the driven
+> machine's view the way it would scroll the driver's own, on both axes.
 >
 > - tier: human (which way a view moves is judged by eye, against the real OS's scroll handling)
-> - do: With input on the PC, scroll up, down, left and right on the Mac's trackpad; then with input on the Mac, turn the PC's mouse wheel both ways and tilt it left and right
+> - do: With Beamer's reverse scrolling off on both machines, a page open on each that scrolls both up and down and left and right, and a mouse with a tilt wheel on the PC: with input on the PC, scroll up, down, left and right on the Mac's trackpad; then with input on the Mac, turn the PC's mouse wheel both ways and tilt it left and right
 > - see: Each time the page on the driven machine moves the way the same movement moves a page on the driver
 
 r[input.scroll.remainder]
@@ -1284,8 +1325,8 @@ A scroll remainder keeps its sign, so a scroll back the other way cancels it rat
 it: 0.6 of a line and then −0.6 of a line post nothing.
 
 r[input.scroll.remainder-axes]
-Each axis keeps its own scroll remainder: three half-notch horizontal scrolls on a driven Mac post
-one line on the horizontal axis and nothing on the vertical.
+Each axis keeps its own scroll remainder: three half-notch horizontal scrolls from a Mac on a driven
+Mac post one line on the horizontal axis and nothing on the vertical.
 
 r[input.scroll.mac-remainder-modes]
 A driven Mac keeps its line-mode and pixel-mode remainders apart: a pixel-mode scroll never
@@ -1325,8 +1366,8 @@ r[input.speed.reverse]
 With reverse scrolling on, a driven machine turns both axes of each scroll from its driver round.
 
 r[input.speed.default]
-Pointer speed and scroll speed are 100 % and reverse scrolling is off until the user changes them;
-then a driven machine injects pointer moves and scrolls as they arrived.
+Pointer speed and scroll speed are 100 % and reverse scrolling is off until the user changes them.
+At those defaults a driven machine injects pointer moves and scrolls as they arrived.
 
 r[input.speed.range]
 Pointer speed and scroll speed run from 25 % to 400 %; a value outside that range counts as the
@@ -1348,8 +1389,7 @@ thumb and three fingers spreading apart; or `pinch`, the thumb and three fingers
 > - tier: machine (the panel and the gestures it receives need the real window server)
 
 > r[input.gesture.panel-gone]
-> Within 0.4 s of the Mac's input coming home, the gesture capture panel is gone, and a pinch or
-> page swipe acts on the Mac's own apps again.
+> Within 0.4 s of the Mac's input coming home, the gesture capture panel is gone.
 >
 > - tier: machine (the panel needs the real window server)
 
@@ -1367,22 +1407,27 @@ r[input.gesture.away-only]
 While the Mac's input is home, a pinch or page swipe sends nothing to any machine.
 
 > r[input.gesture.swallowed]
-> While the Mac's input is on another machine, a two-finger pinch or page swipe on the Mac's
-> trackpad acts on that machine and not on the Mac.
+> While the Mac's input is on another machine, a two-finger pinch, or a page swipe made with two
+> fingers, on the Mac's trackpad acts on that machine and not on the Mac.
 >
 > - tier: human (whether each machine's app zoomed or paged is judged by eye)
-> - do: With input on the PC and a browser in front on both machines, pinch to zoom in on the Mac's trackpad, then swipe two fingers to the right
+> - do: Set the Mac's Trackpad › More Gestures › Swipe between pages to "Swipe with two or three fingers". With input on the PC, and a browser in front on both machines that has a page to go back to, pinch to zoom in on the Mac's trackpad, then swipe two fingers to the right
 > - see: The PC's browser zooms in and then goes back a page; the Mac's browser does neither
 
 > r[input.gesture.system-stays]
 > Three- and four-finger system gestures on the Mac's trackpad (Mission Control, switching Spaces,
-> application windows, Show Desktop) act on the Mac even while its input is on another machine,
-> and the Mac sends no gesture input message for them.
+> application windows, Show Desktop) act on the Mac even while its input is on another machine.
 >
 > - tier: human (whether macOS switched Space is seen on the Mac)
-> - do: With input on the PC, swipe four fingers sideways on the Mac's trackpad
+> - do: With two Spaces on the Mac and input on the PC, swipe four fingers sideways on the Mac's trackpad
 > - see: The Mac switches Space; nothing changes on the PC
-> - parity: Python's event-tap path sent these as gesture input messages on macOS 26 (#11 drops the Mac tap-based gesture path, which never fires on macOS 27)
+> - parity: Python's event-tap path swallowed these while input was away and sent them as gesture input messages on macOS 26, so they acted on the PC and not on the Mac (#11 drops the Mac tap-based gesture path, which never fires on macOS 27)
+
+> r[input.gesture.mac-sends-none]
+> A Mac sends no gesture input message: no input from its trackpad becomes a system gesture toward
+> another machine.
+>
+> - parity: Python's event-tap path sent three- and four-finger swipes and the four-finger spread and pinch as gesture input messages on macOS 26 (#11 drops the Mac tap-based gesture path, which never fires on macOS 27)
 
 r[input.gesture.zoom-step]
 While the Mac's input is away, its capture adds up the magnification of a pinch's events and sends
@@ -1406,9 +1451,9 @@ and the capture carries on: the next event sends what it would have sent had the
 never come.
 
 r[input.gesture.page-swipe]
-While the Mac's input is away, each two-finger page swipe event sends one page swipe: back when its
-horizontal delta is positive, forward when it is negative, and nothing when it is 0, as for a swipe
-that is only vertical.
+While the Mac's input is away, each page swipe event the gesture capture panel receives sends one
+page swipe: back when its horizontal delta is positive, forward when it is negative, and nothing
+when it is 0, as for a swipe that is only vertical.
 
 r[input.gesture.smart-magnify]
 While the Mac's input is away, a smart magnify (a two-finger double tap) on the gesture capture
@@ -1421,9 +1466,9 @@ in the same run log no such line.
 
 > r[input.gesture.chord-when-sent]
 > A zoom step or page swipe becomes the chord of the machine it is sent to, chosen when it is sent.
-> One made while a crossing is under way waits as queued input, and reaches the machine that then
-> takes the input as that machine's chord, and nothing of it reaches the machine the crossing
-> left.
+> One made while a crossing is under way waits as queued input, and reaches the machine the input
+> is on once the crossing ends as that machine's chord, and nothing of it reaches the machine the
+> crossing left.
 >
 > - model: driving
 
@@ -1548,7 +1593,8 @@ subtype, or another NX key code such as the keyboard backlight's) acts on the Ma
 nothing, while input is away as at home.
 
 r[input.media-key.mac-home]
-While the Mac's input is home, its media keys act on the Mac, and its capture does not read them.
+While the Mac's input is home, its media keys and brightness keys act on the Mac, and its capture
+does not read them.
 
 r[input.media-key.mac-unreadable]
 A system-defined event the Mac's capture cannot read while input is away acts on the Mac and sends
@@ -1582,7 +1628,7 @@ A Mac injects nothing for `mic_mute`, and logs a warning the first time in a run
 > and not on the Mac.
 >
 > - tier: human (sound and volume are heard and seen on each machine)
-> - do: With input on the PC and music playing on both machines, press the Mac keyboard's volume up key, then its play/pause key
+> - do: With the PC's volume below full, input on the PC and music playing on both machines, press the Mac keyboard's volume up key, then its play/pause key
 > - see: The PC's volume rises and its music pauses; the Mac's volume and music do not change
 
 ## Brightness keys
@@ -1635,8 +1681,10 @@ brightness keys are still injected.
 > on that machine (a Mac key code or a PC virtual-key code, 0 to 99999); a mouse button, by its
 > name on the link (`left`, `right`, `middle`, `back`, `forward`) or, for a button the link has no
 > name for, by its number counting the left button as 1 (`6`), as 1 to 24 lower-case letters,
-> digits and underscores; or, on a Mac, a media or brightness key, by its key name, as 1 to 24
-> lower-case letters and underscores.
+> digits and underscores; or a media or brightness key, by its key name, as 1 to 24 lower-case
+> letters and underscores. A PC accepts such a media or brightness key entry, and it keeps nothing
+> there: on a PC those keys are on the list by their virtual-key codes
+> (`input.stays-here.pc-media-as-key`).
 
 r[input.stays-here.pc-media-as-key]
 On the PC, a media key is a key on the stays-here list, by its virtual-key code (0xAF for
@@ -1661,12 +1709,12 @@ A machine whose settings hold no stays-here list has an empty one, and nothing s
 r[input.stays-here.refused]
 Saving a stays-here list that is not a list, that holds more than 64 entries, or that holds an entry
 `input.stays-here.list` does not allow (a key with no code or a code that is not a number, an entry
-of a kind other than key, button or media key, an entry that is not text) is refused with an error,
-and nothing is saved.
+of a kind other than key, button, or media or brightness key, an entry that is not text) is refused
+with an error, and nothing is saved.
 
 r[input.stays-here.press]
-While a machine's input is on another machine, a press of a key, button or media key on its
-stays-here list acts on this machine and is not sent, and so does that press's release.
+While a machine's input is on another machine, a press of a key, button, media key or brightness
+key on its stays-here list acts on this machine and is not sent, and so does that press's release.
 
 r[input.stays-here.others-cross]
 While a machine's input is on another machine, every press and release the stays-here list and
@@ -1713,10 +1761,10 @@ is on, unless its key or button is on the stays-here list, when it acts on this 
 
 r[input.stays-here.taps]
 A key the capture reads as a whole press, its press and release together, follows the stays-here
-list as it stands at each press: Caps Lock, each toggle of which is one press, and the input method
-keys `hangul` and `hanja`, on the Mac and the PC; and on the PC a dead key, and composed text that
-no key press produced. Put on the list between two of its presses, such a key stays here from its
-next press.
+list as it stands at each press: on the Mac, Caps Lock, each toggle of which is one press; on the
+Mac and the PC, the input method keys `hangul` and `hanja`; and on the PC, a dead key, and composed
+text that no key press produced. Put on the list between two of its presses, such a key stays here
+from its next press.
 
 r[input.stays-here.composed-text]
 On the PC, composed text that a key press produced follows that key's press: it stays here when
@@ -1728,7 +1776,7 @@ text its repeats produce goes where its first text went, until the key's release
 r[input.keyboard-stays-here.keys]
 While keyboard stays here is on and the machine's input is on another machine, every key press and
 release the crossing methods do not use, every dead key, every composed text and every media key
-acts on this machine and is not sent.
+and brightness key acts on this machine and is not sent.
 
 r[input.keyboard-stays-here.pointer]
 While keyboard stays here is on, mouse buttons, pointer moves, scrolls and gestures are still sent

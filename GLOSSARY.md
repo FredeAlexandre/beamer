@@ -244,8 +244,34 @@ _Avoid_: dock swipe, dock control
 
 **Media key**:
 A key that controls sound or playback: volume up, volume down, mute, play/pause, next, previous,
-stop or microphone mute.
+stop or microphone mute. A brightness key is not one.
 _Avoid_: system key, aux key
+
+**Brightness key**:
+A key that turns the display's brightness up or down. It travels as a media key does, but is not
+one.
+_Avoid_: display key
+
+**Chord**:
+A key or scroll made while Command, Control, Option or Alt is held, such as Command-C. Shift alone
+makes no chord.
+_Avoid_: shortcut combo, hotkey
+
+**Gesture capture panel**:
+The near-invisible panel a Mac puts under its held pointer while its input is away, so that its
+trackpad's pinches and page swipes reach Beamer instead of the app in front.
+_Avoid_: overlay, gesture window
+
+**Zoom step**:
+One step of zoom in or zoom out that a pinch on the Mac's trackpad makes while its input is away,
+sent to the driven machine as that machine's zoom chord.
+_Avoid_: magnify event, zoom tick
+
+**Page swipe**:
+A two-finger sideways swipe on a Mac's trackpad that macOS reports as going back or forward a page,
+as it does when Trackpad's "Swipe between pages" lets two fingers swipe. Under "Scroll left or right
+with two fingers" the same swipe is a scroll instead.
+_Avoid_: navigation swipe, history swipe
 
 ## Displays
 

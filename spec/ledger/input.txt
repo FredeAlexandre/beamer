@@ -50,13 +50,13 @@ core/tests/test_linux_accent_holds.py::AccentHoldTests::test_x11_holds_remapped_
 core/tests/test_linux_accent_holds.py::AccentHoldTests::test_x11_without_spares_never_replaces_held_input_with_compose_taps  dropped: Linux-only, out of scope (#1)
 core/tests/test_linux_accent_keymaps.py::InstalledLayoutTests::test_plain_us_keeps_the_explicit_wayland_limit_and_x11_unicode_remap  dropped: Linux-only, out of scope (#1)
 core/tests/test_linux_accent_keymaps.py::InstalledLayoutTests::test_spanish_latin_american_and_international_layouts_type_accents  dropped: Linux-only, out of scope (#1)
-core/tests/test_linux_accents.py::AccentTests::test_altgr_dead_key_keeps_composition_until_the_next_character  dropped: Linux-only, out of scope (#1)
-core/tests/test_linux_accents.py::AccentTests::test_altgr_printable_uses_text_but_unchanged_shortcut_stays_a_key  dropped: Linux-only, out of scope (#1)
+core/tests/test_linux_accents.py::AccentTests::test_altgr_dead_key_keeps_composition_until_the_next_character  mined: input.dead-key.pc-altgr-text
+core/tests/test_linux_accents.py::AccentTests::test_altgr_printable_uses_text_but_unchanged_shortcut_stays_a_key  mined: input.text.altgr
 core/tests/test_linux_accents.py::AccentTests::test_altgr_text_from_sender_brackets_ctrl_alt_and_reaches_wayland  dropped: Linux-only, out of scope (#1)
-core/tests/test_linux_accents.py::AccentTests::test_capture_reads_foreground_layout_instead_of_hook_thread_layout  dropped: Linux-only, out of scope (#1)
+core/tests/test_linux_accents.py::AccentTests::test_capture_reads_foreground_layout_instead_of_hook_thread_layout  mined: input.layout.pc-capture-foreground
 core/tests/test_linux_accents.py::AccentTests::test_composition_does_not_release_another_held_character  dropped: Linux-only, out of scope (#1)
 core/tests/test_linux_accents.py::AccentTests::test_legacy_altgr_keysym_is_looked_up_by_its_unicode_text  dropped: Linux-only, out of scope (#1)
-core/tests/test_linux_accents.py::AccentTests::test_no_foreground_window_uses_hook_layout  dropped: Linux-only, out of scope (#1)
+core/tests/test_linux_accents.py::AccentTests::test_no_foreground_window_uses_hook_layout  mined: input.layout.pc-capture-foreground
 core/tests/test_linux_accents.py::AccentTests::test_repeated_composition_follows_lock_changes  dropped: Linux-only, out of scope (#1)
 core/tests/test_linux_accents.py::AccentTests::test_text_and_repeated_composed_keys_restore_modifiers_and_release_strokes  dropped: Linux-only, out of scope (#1)
 core/tests/test_linux_accents.py::AccentTests::test_unavailable_layout_character_and_chord_are_not_replaced_with_compose  dropped: Linux-only, out of scope (#1)
@@ -142,7 +142,7 @@ core/tests/test_wayland_scroll_wire.py::WaylandScrollWireTests::test_high_resolu
 core/tests/test_wayland_scroll_wire.py::WaylandScrollWireTests::test_stop_and_cancel_do_not_erase_wheel_before_frame  dropped: Linux-only, out of scope (#1)
 core/tests/test_wayland_scroll_wire.py::WaylandScrollWireTests::test_sub_wheel_unit_deltas_accumulate_across_frames  dropped: Linux-only, out of scope (#1)
 core/tests/test_wayland_scroll_wire.py::WaylandScrollWireTests::test_wheel_waits_for_its_frame  dropped: Linux-only, out of scope (#1)
-core/tests/test_wayland_scroll_wire.py::WaylandScrollWireTests::test_windows_wheel_reaches_the_same_wire_message  dropped: Linux-only, out of scope (#1)
+core/tests/test_wayland_scroll_wire.py::WaylandScrollWireTests::test_windows_wheel_reaches_the_same_wire_message  mined: input.scroll.pc-capture
 core/tests/test_wayland_scroll_wire.py::WaylandScrollWireTests::test_x11_button_wheel_reaches_the_same_wire_message  dropped: Linux-only, out of scope (#1)
 core/tests/test_wayland_scroll_wire.py::WaylandScrollWireTests::test_x11_smooth_wheel_reaches_the_same_wire_message  dropped: Linux-only, out of scope (#1)
 core/tests/test_windows_accent_releases.py::WindowsReleaseTests::test_altgr_synthetic_ctrl_release_cannot_release_a_physical_ctrl  mined: input.modifier.pc-altgr-control
@@ -187,9 +187,9 @@ mac_app/tests/test_bridge.py::TranslatorTests::test_continuous_scroll_wheel_is_p
 mac_app/tests/test_bridge.py::TranslatorTests::test_control_modifier_sends_the_windows_key  mined: input.modifier.mac-names, input.modifier.mac-semantic
 mac_app/tests/test_bridge.py::TranslatorTests::test_discrete_scroll_wheel_is_line_mode_with_horizontal_delta  mined: input.scroll.mac-capture
 mac_app/tests/test_bridge.py::TranslatorTests::test_missed_keyup_does_not_desync_the_next_keydown  mined: input.modifier.mac-state-from-flags
-mac_app/tests/test_bridge.py::TranslatorTests::test_mouse_delta_and_middle_button_match_wire_vocabulary  mined: input.pointer.mac-capture-fractions, input.button.mac-capture, input.capture.unnamed-button
-mac_app/tests/test_bridge.py::TranslatorTests::test_option_held_sends_the_key_not_the_composed_character  mined: input.key-name.mac-chord-unshifted, input.layout.mac-us-place, input.layout.pc-us-place
-mac_app/tests/test_bridge.py::TranslatorTests::test_printable_key_uses_unicode  mined: input.key-name.character, input.layout.mac-us-place, input.layout.pc-us-place
+mac_app/tests/test_bridge.py::TranslatorTests::test_mouse_delta_and_middle_button_match_wire_vocabulary  mined: input.pointer.mac-capture-fractions, input.button.mac-capture
+mac_app/tests/test_bridge.py::TranslatorTests::test_option_held_sends_the_key_not_the_composed_character  mined: input.key-name.mac-chord-unshifted, input.layout.mac-us-place
+mac_app/tests/test_bridge.py::TranslatorTests::test_printable_key_uses_unicode  mined: input.key-name.character, input.layout.mac-us-place
 mac_app/tests/test_bridge.py::TranslatorTests::test_printable_keyup_reuses_keydown_character  mined: input.key-name.release-same-name
 mac_app/tests/test_bridge.py::TranslatorTests::test_reset_mouse_accumulators_clears_carried_remainder  mined: input.pointer.mac-capture-fractions
 mac_app/tests/test_bridge.py::TranslatorTests::test_scroll_wheel_with_no_motion_on_either_axis_is_dropped  mined: input.scroll.mac-capture
@@ -197,7 +197,7 @@ mac_app/tests/test_bridge.py::TranslatorTests::test_shift_still_composes_its_cha
 mac_app/tests/test_bridge.py::TranslatorTests::test_subpixel_mouse_deltas_accumulate_and_carry_remainder  mined: input.pointer.mac-capture-fractions
 mac_app/tests/test_bridge.py::Type29GestureWiringTests::test_type29_scroll_subtype_passes_through_unchanged  dropped: the Mac tap-based gesture path (type-29 events at the event tap), which never fires on macOS 27 (#11)
 mac_app/tests/test_bridge.py::Type29GestureWiringTests::test_zoom_fields_are_translated_and_swallowed_while_redirecting  dropped: the Mac tap-based gesture path (type-29 events at the event tap), which never fires on macOS 27 (#11)
-mac_app/tests/test_caps_lock.py::CapsLockEventTapTests::test_caps_lock_as_keydown_and_keyup_never_raises  mined: input.caps-lock.mac-key-down-up
+mac_app/tests/test_caps_lock.py::CapsLockEventTapTests::test_caps_lock_as_keydown_and_keyup_never_raises  mined: input.caps-lock.mac-key-down-up, input.caps-lock.mac-key-down-up-home
 mac_app/tests/test_caps_lock.py::CapsLockEventTapTests::test_caps_lock_unexpected_flags_never_raises  mined: input.caps-lock.mac-tap, input.caps-lock.mac-home
 mac_app/tests/test_caps_lock.py::CapsLockEventTapTests::test_caps_lock_with_alphashift_flag_passes_through_locally  mined: input.caps-lock.mac-home
 mac_app/tests/test_caps_lock.py::CapsLockEventTapTests::test_caps_lock_without_alphashift_flag_passes_through_locally  mined: input.caps-lock.mac-home
@@ -303,7 +303,7 @@ mac_app/tests/test_ignored_inputs.py::TapTests::test_coming_home_forgets_what_we
 mac_app/tests/test_ignored_inputs.py::TapTests::test_ignored_key_kept_here_stays_local_after_return_and_setting_change  mined: input.stays-here.kept-through-home
 mac_app/tests/test_ignored_inputs.py::TapTests::test_local_release_after_return_clears_the_kept_key_for_its_next_press  mined: input.stays-here.kept-release-at-home
 mac_app/tests/test_ignored_inputs.py::TapTests::test_mouse_only_keeps_typing_and_media_here_but_sends_mouse_buttons  mined: input.keyboard-stays-here.keys, input.keyboard-stays-here.pointer
-mac_app/tests/test_ignored_inputs.py::TapTests::test_the_side_buttons_cross_as_back_and_forward  mined: input.button.mac-capture, input.button.pc-capture
+mac_app/tests/test_ignored_inputs.py::TapTests::test_the_side_buttons_cross_as_back_and_forward  mined: input.button.mac-capture
 mac_app/tests/test_input_injector_mac.py::ClampTests::test_a_point_in_the_gap_beside_a_shorter_display_lands_on_one  mined: input.pointer.clamp
 mac_app/tests/test_input_injector_mac.py::ClampTests::test_a_point_on_a_display_is_left_alone  mined: input.pointer.clamp
 mac_app/tests/test_input_injector_mac.py::ClampTests::test_a_point_past_the_edge_comes_back_to_it  mined: input.pointer.clamp
@@ -348,7 +348,7 @@ mac_app/tests/test_keyboard_layout.py::TwoScriptTests::test_a_shortcut_on_an_acc
 mac_app/tests/test_keyboard_layout.py::TwoScriptTests::test_an_accent_from_the_same_script_is_still_typed_as_text  mined: input.layout.place-same-script
 mac_app/tests/test_keyboard_layout.py::TwoScriptTests::test_ctrl_c_from_a_pc_on_russian_is_cmd_c_on_an_english_mac  mined: input.layout.place-chord
 mac_app/tests/test_keyboard_layout.py::TwoScriptTests::test_matching_layouts_still_place_by_character  mined: input.layout.typed-first
-mac_app/tests/test_keyboard_layout.py::TwoScriptTests::test_the_mac_sends_where_its_key_sits  mined: input.layout.mac-us-place, input.layout.us-place, input.key-name.character, input.key-name.mac-unprintable
+mac_app/tests/test_keyboard_layout.py::TwoScriptTests::test_the_mac_sends_where_its_key_sits  mined: input.layout.mac-us-place, input.layout.us-place, input.key-name.character
 mac_app/tests/test_keyboard_layout.py::TwoScriptTests::test_the_release_lets_go_of_the_key_the_press_went_down_on  mined: input.key-injection.release-same-key
 mac_app/tests/test_keyboard_layout.py::TypingOntoThisMacTests::test_a_character_the_layout_cannot_place_is_typed_as_text  mined: input.key-injection.mac-text, input.layout.mac-retyped
 mac_app/tests/test_keyboard_layout.py::TypingOntoThisMacTests::test_a_release_lets_go_of_the_key_its_press_went_down_on  mined: input.key-injection.release-same-key
@@ -591,20 +591,20 @@ win_app/tests/test_horizontal_scroll.py::MacDrivingAPc::test_x11_scrolls_the_way
 win_app/tests/test_horizontal_scroll.py::PcDrivingOthers::test_a_mac_scrolls_the_way_the_pc_would  mined: input.scroll.direction, input.scroll.pc-capture, input.scroll.convention
 win_app/tests/test_horizontal_scroll.py::PcDrivingOthers::test_another_pc_scrolls_the_way_the_pc_would  mined: input.scroll.direction, input.scroll.pc-capture, input.scroll.pc-inject
 win_app/tests/test_ignored_inputs.py::CaptureTests::test_a_windows_modifier_is_recorded_as_the_side_the_hook_reports  mined: input.stays-here.pc-sided-modifier
-win_app/tests/test_ignored_inputs.py::CaptureTests::test_x_buttons_are_named_from_the_high_word  mined: input.button.mac-capture, input.button.pc-capture, input.capture.unnamed-button
+win_app/tests/test_ignored_inputs.py::CaptureTests::test_x_buttons_are_named_from_the_high_word  mined: input.button.pc-capture, input.capture.unnamed-button
 win_app/tests/test_ignored_inputs.py::ConfigTests::test_an_older_config_has_nothing_ignored  mined: input.stays-here.saved-default
 win_app/tests/test_ignored_inputs.py::ConfigTests::test_an_unreadable_entry_is_refused  mined: input.stays-here.refused
 win_app/tests/test_ignored_inputs.py::ConfigTests::test_mouse_only_defaults_off_and_survives_save_reload  mined: input.keyboard-stays-here.default, input.keyboard-stays-here.saved
 win_app/tests/test_ignored_inputs.py::ConfigTests::test_the_list_survives_a_save_and_a_load  mined: input.stays-here.saved
 win_app/tests/test_ignored_inputs.py::SenderTests::test_a_key_ignored_while_held_on_the_peer_is_still_released_there  mined: input.stays-here.release-of-sent
-win_app/tests/test_ignored_inputs.py::SenderTests::test_an_ignored_button_stays_on_this_pc  mined: input.stays-here.press, input.stays-here.others-cross, input.button.mac-capture, input.button.pc-capture
+win_app/tests/test_ignored_inputs.py::SenderTests::test_an_ignored_button_stays_on_this_pc  mined: input.stays-here.press, input.stays-here.others-cross, input.button.pc-capture
 win_app/tests/test_ignored_inputs.py::SenderTests::test_an_ignored_key_reaches_this_pc_and_not_the_peer  mined: input.stays-here.press
 win_app/tests/test_ignored_inputs.py::SenderTests::test_any_other_key_still_goes_to_the_peer  mined: input.stays-here.others-cross
 win_app/tests/test_ignored_inputs.py::SenderTests::test_composed_text_repeats_follow_the_press_when_mouse_only_changes  mined: input.stays-here.composed-text, input.stays-here.release-of-sent
 win_app/tests/test_ignored_inputs.py::SenderTests::test_local_release_after_return_clears_the_kept_key_for_its_next_press  mined: input.stays-here.kept-release-at-home
 win_app/tests/test_ignored_inputs.py::SenderTests::test_mouse_only_composed_text_can_cross_again_after_switching_off  mined: input.stays-here.composed-text, input.stays-here.change-applies
 win_app/tests/test_ignored_inputs.py::SenderTests::test_mouse_only_keeps_keys_dead_keys_text_and_media_here  mined: input.keyboard-stays-here.keys, input.keyboard-stays-here.pointer, input.stays-here.pc-media-as-key
-win_app/tests/test_ignored_inputs.py::SenderTests::test_the_side_buttons_cross_as_back_and_forward  mined: input.button.mac-capture, input.button.pc-capture
+win_app/tests/test_ignored_inputs.py::SenderTests::test_the_side_buttons_cross_as_back_and_forward  mined: input.button.pc-capture
 win_app/tests/test_inject_portal.py::DesktopTest::test_a_point_off_every_display_is_brought_to_the_nearest  dropped: Linux-only, out of scope (#1)
 win_app/tests/test_inject_portal.py::RemoteTest::test_a_button_held_on_a_device_the_desktop_removes_is_forgotten_not_played  dropped: Linux-only, out of scope (#1)
 win_app/tests/test_inject_portal.py::RemoteTest::test_a_desktop_that_never_says_still_gets_the_letter  dropped: Linux-only, out of scope (#1)
@@ -697,13 +697,13 @@ win_app/tests/test_input_injector.py::InjectTextTests::test_empty_text_sends_not
 win_app/tests/test_input_injector.py::InjectTextTests::test_injecting_text_sends_one_batch_stamped_with_the_mark  mined: input.text.pc-one-injection
 win_app/tests/test_input_injector.py::InjectedMarkTests::test_a_key_input_is_stamped  mined: input.capture.mark
 win_app/tests/test_input_injector.py::InjectedMarkTests::test_a_mouse_input_is_stamped  mined: input.capture.mark
-win_app/tests/test_input_injector.py::PlanKeyInputsBareCharacterTests::test_altgr_character_without_any_chord_falls_back_to_unicode  mined: input.key-injection.pc-altgr, input.text.pc-units
+win_app/tests/test_input_injector.py::PlanKeyInputsBareCharacterTests::test_altgr_character_without_any_chord_falls_back_to_unicode  mined: input.key-injection.pc-altgr, input.key-injection.pc-text-form
 win_app/tests/test_input_injector.py::PlanKeyInputsBareCharacterTests::test_bare_character_keyup_mirrors_the_recorded_vk  mined: input.key-injection.release-same-key
 win_app/tests/test_input_injector.py::PlanKeyInputsBareCharacterTests::test_bare_character_uses_vk_path_with_scan_code  mined: input.key-injection.pc-character
 win_app/tests/test_input_injector.py::PlanKeyInputsBareCharacterTests::test_shift_r_also_satisfies_the_shift_only_requirement  mined: input.key-injection.pc-character
 win_app/tests/test_input_injector.py::PlanKeyInputsBareCharacterTests::test_shift_required_and_held_uses_vk_path_with_no_synthetic_shift  mined: input.key-injection.pc-character, input.key-injection.no-own-modifier
 win_app/tests/test_input_injector.py::PlanKeyInputsBareCharacterTests::test_shift_required_but_not_held_falls_back_to_unicode  mined: input.key-injection.pc-shift-unheld
-win_app/tests/test_input_injector.py::PlanKeyInputsBareCharacterTests::test_unresolvable_character_without_any_chord_falls_back_to_unicode  mined: input.key-injection.pc-unresolvable, input.text.pc-units, input.layout.can-type-pc
+win_app/tests/test_input_injector.py::PlanKeyInputsBareCharacterTests::test_unresolvable_character_without_any_chord_falls_back_to_unicode  mined: input.key-injection.pc-unresolvable, input.layout.can-type-pc, input.key-injection.pc-text-form
 win_app/tests/test_input_injector.py::PlanKeyInputsChordTests::test_caps_capital_keeps_the_real_chord_key_and_the_forwarded_shift  mined: input.key-injection.pc-chord-key, input.key-injection.repeat-same-key, input.key-injection.release-same-key
 win_app/tests/test_input_injector.py::PlanKeyInputsChordTests::test_chord_from_another_script_uses_its_physical_place  mined: input.layout.place-chord, input.key-injection.release-same-key
 win_app/tests/test_input_injector.py::PlanKeyInputsChordTests::test_chord_uses_the_real_key_even_when_translation_needs_altgr  mined: input.key-injection.pc-chord-key
@@ -721,7 +721,7 @@ win_app/tests/test_input_injector.py::PlanKeyInputsNamedKeyTests::test_input_met
 win_app/tests/test_input_injector.py::PlanKeyInputsNamedKeyTests::test_named_keys_use_scan_lookup  mined: input.key-injection.pc-named, input.key-injection.pc-scan
 win_app/tests/test_input_injector.py::PlanKeyInputsNamedKeyTests::test_named_modifier_key_updates_mods_down  mined: input.key-injection.held-modifiers
 win_app/tests/test_input_injector.py::PlanKeyInputsNamedKeyTests::test_non_extended_named_key_has_no_extended_flag  mined: input.key-injection.pc-extended
-win_app/tests/test_input_injector.py::PlanKeyInputsNamedKeyTests::test_release_all_releases_a_held_named_non_modifier_key  mined: input.held-key.driven-release, input.key-injection.release-same-key, input.key-injection.pc-named-held
+win_app/tests/test_input_injector.py::PlanKeyInputsNamedKeyTests::test_release_all_releases_a_held_named_non_modifier_key  mined: input.key-injection.pc-named-held, input.held-key.driven-release-all
 win_app/tests/test_input_injector.py::PlanKeyInputsNamedKeyTests::test_unknown_key_name_is_dropped  mined: input.key-injection.pc-unknown
 win_app/tests/test_input_injector.py::PlanScrollUnitsLineModeTests::test_line_mode_defaults_to_no_horizontal_movement  mined: input.scroll.pc-inject
 win_app/tests/test_input_injector.py::PlanScrollUnitsLineModeTests::test_line_mode_scales_by_120_and_never_carries_a_remainder  mined: input.scroll.pc-inject
@@ -745,7 +745,7 @@ win_app/tests/test_links.py::KeyTests::test_positional_keeps_each_key_in_its_pla
 win_app/tests/test_links.py::KeyTests::test_right_windows_key_shortcuts_become_mac_intents  mined: input.special-key.windows-s-spotlight
 win_app/tests/test_links.py::KeyTests::test_the_windows_key_goes_to_a_mac_as_ctrl_in_the_semantic_style  mined: input.modifier.pc-semantic, input.special-key.windows-key-held-back, input.special-key.windows-key-alone
 win_app/tests/test_links.py::KeyTests::test_to_another_pc_every_key_goes_as_itself  mined: input.modifier.same-family
-win_app/tests/test_links.py::KeyTests::test_us_travels_with_a_character  mined: input.key-name.character, input.layout.mac-us-place, input.layout.pc-us-place
+win_app/tests/test_links.py::KeyTests::test_us_travels_with_a_character  mined: input.key-name.message, input.layout.us-place
 win_app/tests/test_links.py::KeyTests::test_windows_key_after_click_can_be_used_for_a_shortcut_without_sticking  mined: input.special-key.windows-shortcut-after-click, input.special-key.windows-key-held-back
 win_app/tests/test_links.py::KeyTests::test_windows_notifications_shortcut_is_dropped_instead_of_becoming_control_n  mined: input.special-key.windows-n-dropped
 win_app/tests/test_links.py::KeyTests::test_windows_search_and_dictation_shortcuts_become_mac_intents  mined: input.special-key.windows-s-spotlight, input.special-key.windows-h-dictation
@@ -760,7 +760,7 @@ win_app/tests/test_same_os_keys.py::_Pair::test_every_modifier_arrives_as_itself
 win_app/tests/test_same_os_keys.py::_Pair::test_every_modifier_arrives_as_itself_in_the_semantic_style  mined: input.modifier.same-family, input.modifier.pc-names
 win_app/tests/test_stuck_modifier_on_drop.py::WindowsInjectorReleaseTests::test_the_windows_injector_releases_keys_and_buttons  mined: input.held-key.driven-release-all
 win_app/tests/test_two_scripts.py::CaptureTests::test_scan_codes_name_the_us_place  mined: input.layout.pc-us-place
-win_app/tests/test_two_scripts.py::PlaceTests::test_a_capital_without_shift_is_this_pcs_capital  mined: input.layout.place-caps-capital, input.text.pc-units
+win_app/tests/test_two_scripts.py::PlaceTests::test_a_capital_without_shift_is_this_pcs_capital  mined: input.layout.place-caps-capital, input.key-injection.pc-text-form
 win_app/tests/test_two_scripts.py::PlaceTests::test_a_capital_without_shift_lets_go_of_the_character_it_typed  mined: input.layout.place-caps-capital
 win_app/tests/test_two_scripts.py::PlaceTests::test_a_key_with_no_place_keeps_the_old_answer  mined: input.layout.place-none
 win_app/tests/test_two_scripts.py::PlaceTests::test_a_letter_from_the_other_script_types_this_pcs_letter  mined: input.layout.place-other-script
