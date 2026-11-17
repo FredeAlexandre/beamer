@@ -1,3 +1,4 @@
 # The store domain's slice of the Python ledger, laid out by #51.
 # Owner domains and the ambiguous assignments: spec/ledger/README.md.
-# No Python test is assigned to this domain.
+core/tests/test_profiles.py::ProfilesTests::test_bad_nested_register_is_preserved_not_executed
+core/tests/test_profiles.py::ProfilesTests::test_unreadable_objects_are_kept_aside
