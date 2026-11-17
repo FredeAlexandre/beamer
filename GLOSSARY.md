@@ -40,13 +40,14 @@ _Avoid_: feature, caps
 ## Discovery
 
 **Beacon**:
-The datagram a machine broadcasts every 2 seconds on each of its networks, saying only that a
-Beamer takes links there, on which port, and whether it shows a code.
-_Avoid_: announcement, advert
+The broadcast a machine sends on its local networks, from UDP port 24820, to say a Beamer is
+there and whether it shows a code. It proves nothing about who sent it, and never carries a
+machine id.
+_Avoid_: announcement, advertisement, mDNS record
 
 **Machines heard**:
 The machines whose beacons this machine has heard in the last 7 seconds, each by the address its
-beacon came from and the port it names. They are not peers until paired.
+beacon came from. Hearing a machine proves nothing about which machine it is.
 _Avoid_: nearby list, discovered machines
 
 **Chosen address**:

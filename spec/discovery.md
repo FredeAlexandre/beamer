@@ -3,8 +3,8 @@
 How machines find each other on the network: the beacon each machine broadcasts and the machines
 heard from it, the address this machine offers for pairing by address, each peer's chosen and
 learnt addresses and how they are dialled, the probes that find a peer whose link has been down,
-and Wake-on-LAN (F20). LAN discovery and dormant repair are kept with F2 by #11, and F20 ships; the
-beacon, the address lists and the probes are #14's.
+and Wake-on-LAN (F20). LAN discovery and the probes (what #14 calls dormant repair) are kept with F2
+by #11, and F20 ships; the beacon, the address lists and the probes are #14's.
 
 The rules come from #14 and ADR 0003, and from the Python app at `archive/python` (`core/pairing.py`'s
 beacons and discovery, `core/link.py`, `core/receiver.py`, `core/wol.py`,
@@ -25,8 +25,9 @@ Every rule is `ci` unless it says otherwise.
 ## Beacons
 
 > r[discovery.beacon.every-two-seconds]
-> While Beamer runs, a machine sends a beacon every 2 s, to UDP port 24820 of the limited broadcast
-> address 255.255.255.255 and of the directed broadcast address of each of its networks.
+> While Beamer runs, a machine sends a beacon every 2 s, from UDP port 24820 (`link.transport.port`)
+> to UDP port 24820 of the limited broadcast address 255.255.255.255 and of the directed broadcast
+> address of each of its networks.
 >
 > - parity: Python sent its beacons to UDP port 24821 (#14: one UDP port, 24820, for links, pairing and beacons)
 
@@ -41,23 +42,19 @@ When a machine cannot list its interfaces, it sends each beacon to 255.255.255.2
 broadcast address of each of its IPv4 addresses.
 
 > r[discovery.beacon.bytes]
-> A beacon is one UDP datagram of exactly 11 bytes: the byte 0x00, so QUIC's fixed bit is clear and
-> no beacon is taken for a QUIC packet; the six ASCII bytes `beamer`; the beacon version, 1; the port
-> this machine takes links on, as two bytes, most significant first, from 1 to 65535; and a flags
-> byte whose lowest bit is set while this machine shows a code (`pairing.code.beacon`) and whose
-> other bits are zero. A beacon carries nothing else: no name, no machine id, no platform.
+> A beacon is one UDP datagram of exactly 9 bytes: the byte 0x00, so QUIC's fixed bit is clear and
+> no beacon is taken for a QUIC packet; the six ASCII bytes `beamer`; the beacon version, 1; and a
+> flags byte whose lowest bit is set while this machine shows a code (`pairing.code.beacon`) and
+> whose other bits are zero. A beacon carries nothing else: no port, no name, no machine id, no
+> platform.
 >
-> - parity: Python's beacon was JSON carrying the machine's name, platform, link port, pairing port and pairing version, and, while a code was shown, its pairing id and machine id (#14: the beacon says only that a Beamer is here, on this port, plus a flag while a code is shown, and never carries a stable id)
+> - parity: Python's beacon was JSON carrying the machine's name, platform, link port, pairing port and pairing version, and, while a code was shown, its pairing id and machine id (#14: one UDP port, 24820, for links, pairing and beacons, so a beacon names no port; it says only that a Beamer is here, plus a flag while a code is shown, and never carries a stable id)
 > - fuzz: discovery-packet
 > - model: pairing
 
-r[discovery.beacon.port]
-The port a beacon names is the one this machine takes links on (`spec/link.md`), never a port
-saved for one of its peers.
-
 > r[discovery.beacon.ignored]
-> A datagram with QUIC's fixed bit clear that is not a beacon as `discovery.beacon.bytes` sets it
-> out (another length, another first byte, other bytes than `beamer`, another version, port 0, or a
+> A datagram with QUIC's fixed bit clear that is not exactly the 9 bytes `discovery.beacon.bytes`
+> sets out (another length, another first byte, other bytes than `beamer`, another version, or a
 > flag bit other than the lowest), whatever its size up to 65,535 bytes, is ignored: it is not
 > listed, nothing is sent in answer, nothing is logged for it, and the machine goes on sending
 > beacons and hearing others.
@@ -69,9 +66,13 @@ A report that a datagram this machine sent found no port open (an ICMP port unre
 Windows delivers as an error on the next receive) never stops the machine sending beacons or
 hearing them.
 
-r[discovery.beacon.port-failure]
-Any other failure to receive on UDP port 24820 is reported, naming the error, rather than leaving
-the machine looking as if it heard nothing.
+> r[discovery.beacon.port-failure]
+> Any other failure to receive on UDP port 24820 is a failure of the port the machine takes links
+> on, and is dealt with as `link.transport.port-taken` deals with a taken port: the machine lets the
+> port go, reports that it cannot take links, naming the port and the error, sends no beacons and
+> hears none while it lacks the port, and tries to take the port again every 5 s until it has it.
+>
+> - parity: Python's beacon service stopped for good on such a failure, closed its socket and showed that Beamer could not look for machines, naming the error, until the app restarted (#14: beacons share the link's one UDP port, so losing it is the link's failure, which `link.transport.port-taken` retries every 5 s)
 
 r[discovery.beacon.not-delayed]
 Resolving a DNS name, one typed to pair by address or one of a peer's chosen addresses, never
@@ -86,15 +87,14 @@ delays a beacon going out or one being heard.
 ## Machines heard
 
 > r[discovery.heard.list]
-> Core reports the machines heard: for each address a beacon came from and port that beacon names,
-> whether its latest beacon says a code is shown. A machine heard is listed until 7 s pass with no
-> beacon from that address naming that port.
+> Core reports the machines heard: for each address a beacon came from, whether its latest beacon
+> says a code is shown. A machine heard is listed until 7 s pass with no beacon from that address.
 >
 > - model: pairing
 
 > r[discovery.heard.own]
-> A machine never lists itself: a beacon from one of its own addresses that names its own port is
-> not listed, though it hears its own broadcasts.
+> A machine never lists itself: a beacon from one of its own addresses is not listed, though it
+> hears its own broadcasts.
 >
 > - model: pairing
 
@@ -118,18 +118,21 @@ delays a beacon going out or one being heard.
 ## A peer's addresses
 
 > r[discovery.address.list]
-> Each peer has a list of addresses, each an IPv4 address or a DNS name with a port. Each address is
-> a chosen address or a learnt address.
+> Each peer has a list of addresses, each an IPv4 address or a DNS name. Each address is a chosen
+> address or a learnt address.
 >
 > - parity: Python kept one address and port per peer, marked as chosen or not (#14: an address list per peer, of addresses learnt on the LAN and ones given by hand)
 > - model: link
 
 > r[discovery.address.choose]
-> The user can give a peer chosen addresses, each an IPv4 address or a DNS name, which are dialled at
-> port 24820, and can remove them. Choosing an address the peer already has as a learnt address
-> makes it chosen.
+> The user can give a peer chosen addresses, each an IPv4 address or a DNS name, and can remove
+> them. A chosen address is dialled on the one link port (`link.transport.port`).
 >
-> - parity: Python took a port with the address the user chose (`spec/link.md`: a machine takes links on UDP port 24820 only)
+> - parity: Python took a port with the address the user chose (`link.transport.port`: no machine has a port of its own)
+
+r[discovery.address.choose-learnt]
+Choosing an address the peer already has as a learnt address makes it a chosen address, and it is
+no longer one of the peer's learnt addresses.
 
 > r[discovery.address.chosen-only]
 > From the moment a peer has a chosen address, it is dialled only at its chosen addresses: its learnt
@@ -155,8 +158,8 @@ Choosing or removing an address for one peer changes no other peer's addresses.
 > - model: link
 
 > r[discovery.address.learnt-incoming]
-> A link that a peer dials to this machine teaches the address and port it came from, unless that
-> address is a loopback or link-local one.
+> A link that a peer dials to this machine teaches the address it came from, unless that address is
+> a loopback or link-local one.
 >
 > - parity: Python learnt it only from a peer that said it took links, by naming a port other than 0 (#14: every machine takes links on its one UDP port)
 > - model: link
@@ -191,9 +194,14 @@ A chosen address that is a DNS name is resolved at each dial, and each IPv4 addr
 is dialled as one of the peer's addresses.
 
 > r[discovery.dial.one-report]
-> A dial at one of a peer's addresses that fails reports nothing while a dial at another of its
-> addresses is in progress. The link reports the peer unreachable only once every one of its dials has
-> failed.
+> A peer's dials at all its addresses together make one dial of the peer, in the sense of
+> `link.dial.deadline`, `link.dial.backoff` and `link.report.down`. A dial at one of its addresses
+> that fails reports nothing, and starts no new dial, while a dial at another of its addresses is in
+> progress or still to start. The dial of the peer fails once every address dial has failed, or 5 s
+> after its first address dial began, which gives up those still in progress. Only then does the link
+> report the peer down: with the reason of the first address dial that ended for a reason other
+> than that the peer is unreachable, or as unreachable when every one ended so. Then
+> `link.dial.backoff`'s wait begins, and the next dial of the peer dials all its addresses again.
 >
 > - model: link
 
@@ -202,16 +210,15 @@ is dialled as one of the peer's addresses.
 > r[discovery.probe.when]
 > A peer in use with no chosen address, whose link has been down for 10 s, or which has had no link
 > in the 10 s since Beamer started, is probed: this machine dials each machine heard, at the address
-> its beacon came from and the port it names, that is neither one of the peer's addresses nor an
+> its beacon came from (`link.transport.port`), that is neither one of the peer's addresses nor an
 > address of another peer that has a link up. It dials each such address at most once every 30 s.
 >
-> - parity: Python tried only beacons carrying the peer's name, passed over a beacon whose machine id was another peer's, tried another peer's saved address last rather than never, and tried one address every 30 s, the next in turn (#14: dormant repair tries each beacon address it hears that isn't a known address of another linked peer, at most once per address every 30 s, and the beacon carries no name)
+> - parity: Python tried only beacons carrying the peer's name, passed over a beacon whose machine id was another peer's, tried another peer's saved address last rather than never, and tried one address every 30 s, the next in turn (#14: probing tries each beacon address it hears that isn't a known address of another linked peer, at most once per address every 30 s, and the beacon carries no name)
 > - model: link
 
 > r[discovery.probe.found]
 > A probe that authenticates as the peer gives the peer its link, and its address becomes one of the
-> peer's learnt addresses. A probe that fails saves nothing, and its link reports nothing
-> (`spec/link.md`).
+> peer's learnt addresses. A probe that fails reports as `link.report.probe-silent` says.
 >
 > - model: link
 
@@ -264,9 +271,11 @@ cannot cross, with the reason its link last reported.
 r[discovery.wake.packet]
 A wake sends the Wake-on-LAN magic packet, 102 bytes: six bytes 0xFF, then the peer's hardware
 address sixteen times. It goes to UDP port 9 of 255.255.255.255, of the /24 broadcast address of the
-address at which this machine last had a link with the peer, and of that address itself. When it
-cannot be sent to 255.255.255.255, the app reports that the wake packet could not be sent, and the
-wake ends.
+address at which this machine last had a link with the peer, and of that address itself.
+
+r[discovery.wake.send-failed]
+When the wake packet cannot be sent to 255.255.255.255, the app reports that the wake packet could
+not be sent, and the wake ends.
 
 r[discovery.wake.waiting]
 A wake waits up to 60 s for a link with the peer. When one comes up, the app reports the peer awake,

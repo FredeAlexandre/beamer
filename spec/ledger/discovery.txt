@@ -1,11 +1,11 @@
 # The discovery domain's slice of the Python ledger, laid out by #51.
 # Owner domains and the ambiguous assignments: spec/ledger/README.md.
-core/tests/test_address_choice_commit.py::AddressCommitTests::test_mac_connection_commit_marks_the_same_address_as_explicit  mined: discovery.address.choose
+core/tests/test_address_choice_commit.py::AddressCommitTests::test_mac_connection_commit_marks_the_same_address_as_explicit  mined: discovery.address.choose-learnt
 core/tests/test_address_choice_commit.py::AddressCommitTests::test_qt_pin_control_saves_only_the_chosen_machine  mined: discovery.address.one-peer, discovery.address.choose
 core/tests/test_address_choice_commit.py::AddressCommitTests::test_releasing_a_pin_allows_discovery_and_pinning_stops_drift  mined: discovery.address.unchosen, discovery.address.chosen-only, discovery.probe.when
 core/tests/test_link.py::LinkFollowTests::test_a_beacon_that_names_another_machine_is_never_tried_and_one_at_its_address_is_tried_last  mined: discovery.probe.when
 core/tests/test_link.py::LinkFollowTests::test_a_beacon_with_the_exact_name_is_tried_once_the_link_has_been_down_ten_seconds  mined: discovery.probe.when
-core/tests/test_link.py::LinkFollowTests::test_a_failed_try_shows_nothing_and_saves_nothing  mined: discovery.probe.found, discovery.address.learnt-on-auth
+core/tests/test_link.py::LinkFollowTests::test_a_failed_try_shows_nothing_and_saves_nothing  mined: discovery.address.learnt-on-auth
 core/tests/test_link.py::LinkFollowTests::test_discovery_matches_the_machine_name_not_its_local_label  mined: discovery.probe.when
 core/tests/test_link.py::LinkFollowTests::test_several_beacons_with_the_name_are_tried_in_turn  mined: discovery.probe.when
 core/tests/test_link.py::LinkFollowTests::test_the_address_is_saved_once_the_link_authenticates_there  mined: discovery.probe.found, discovery.address.learnt-on-auth
@@ -14,9 +14,9 @@ core/tests/test_link.py::LinkHardwareTests::test_a_hook_that_raises_sends_no_hw_
 core/tests/test_link.py::LinkHardwareTests::test_the_hook_is_asked_with_the_host_this_link_dials  mined: discovery.hardware.record, discovery.hardware.of-peer
 core/tests/test_link.py::LinkHardwareTests::test_the_hook_wins_over_the_identitys_own_hw  mined: discovery.hardware.record
 core/tests/test_link.py::LinkHardwareTests::test_without_a_hook_the_identitys_hw_is_sent_as_before  python-detail: the one hardware address Python sent when a link was built without its lookup towards the peer
-core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_missing_beacon_port_uses_saved_port_after_authentication  mined: discovery.beacon.bytes, discovery.address.learnt-on-auth
-core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_pinned_choices_and_invalid_beacon_ports_are_never_followed  mined: discovery.address.chosen-only, discovery.beacon.ignored
-core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_receive_only_peer_restarts_at_new_port_while_old_port_is_occupied  mined: discovery.probe.when, discovery.probe.found
+core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_missing_beacon_port_uses_saved_port_after_authentication  mined: discovery.probe.when, discovery.probe.found, discovery.address.learnt-on-auth
+core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_pinned_choices_and_invalid_beacon_ports_are_never_followed  mined: discovery.address.chosen-only
+core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_receive_only_peer_restarts_at_new_port_while_old_port_is_occupied  wire-v6: a peer that took links on another port at the same address; #14's one UDP port, 24820, leaves a peer no other port
 core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_repaired_pin_reconnects_after_outage_without_following_wifi  mined: discovery.address.chosen-only
 core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_same_address_endpoints_rotate_after_downtime_and_cooldown  mined: discovery.probe.when
 core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_unauthenticated_alternate_port_never_changes_saved_endpoint  mined: discovery.address.learnt-on-auth
@@ -56,7 +56,7 @@ mac_app/tests/test_hardware_mac.py::LiveInterfaceTableTest::test_the_table_reads
 mac_app/tests/test_mac_links.py::HardwareHookTests::test_each_link_is_handed_the_controllers_hardware_hook  python-detail: the Mac's controller handing its hardware lookup to each link object
 mac_app/tests/test_mac_links.py::HardwareHookTests::test_no_hook_leaves_the_link_without_one  python-detail: the Mac's controller handing its hardware lookup to each link object
 mac_app/tests/test_mac_listener_port.py::OwnPortTests::test_a_controller_built_from_a_config_alone_still_listens_where_it_dials  python-detail: a Mac controller built from the flat 1.4-era config rather than the settings store
-mac_app/tests/test_mac_listener_port.py::OwnPortTests::test_the_port_is_the_settings_own_not_the_first_machines  mined: discovery.beacon.port
+mac_app/tests/test_mac_listener_port.py::OwnPortTests::test_the_port_is_the_settings_own_not_the_first_machines  wire-v6: a machine's own link port, replaced by the one UDP port 24820 (#14)
 mac_app/tests/test_pairing.py::FindTests::test_a_name_that_never_resolves_does_not_hold_up_beacons  mined: discovery.beacon.not-delayed
 mac_app/tests/test_pairing.py::FindTests::test_a_pc_no_beacon_reaches_is_found_by_address_and_pairs  wire-v6: the find datagram that asked a machine at an address for its beacon; #14 pairs by address over a pairing connection, with no beacon
 mac_app/tests/test_pairing.py::FindTests::test_an_empty_address_stops_asking  wire-v6: the find datagram that asked a machine at an address for its beacon; #14 pairs by address over a pairing connection, with no beacon
