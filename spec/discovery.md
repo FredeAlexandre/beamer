@@ -197,11 +197,16 @@ is dialled as one of the peer's addresses.
 > A peer's dials at all its addresses together make one dial of the peer, in the sense of
 > `link.dial.deadline`, `link.dial.backoff` and `link.report.down`. A dial at one of its addresses
 > that fails reports nothing, and starts no new dial, while a dial at another of its addresses is in
-> progress or still to start. The dial of the peer fails once every address dial has failed, or 5 s
-> after its first address dial began, which gives up those still in progress. Only then does the link
-> report the peer down: with the reason of the first address dial that ended for a reason other
-> than that the peer is unreachable, or as unreachable when every one ended so. Then
-> `link.dial.backoff`'s wait begins, and the next dial of the peer dials all its addresses again.
+> progress or still to start. When every address dial has failed less than 5 s after the first one
+> began, the dial of the peer fails, and the link reports the peer down with the reason link gives
+> the first address dial that failed for a reason other than that the peer is unreachable, or as
+> unreachable when each one failed so. A dial of the peer that has not authenticated 5 s after its
+> first address dial began is given up as `link.dial.deadline` says, with the address dials still
+> in progress, and the link reports the peer unreachable, whatever the address dials that failed
+> before gave as their reasons. The next dial of the peer dials all its addresses again. When the
+> peer refused this machine's key at one of its addresses, the dial of the peer is one the peer
+> ended by refusing this machine's key, and the next dial comes as `link.auth.forgotten-redial`
+> says; otherwise it comes as `link.dial.backoff` says.
 >
 > - model: link
 
