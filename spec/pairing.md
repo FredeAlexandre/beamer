@@ -488,10 +488,10 @@ The rules that hold whoever takes part without the code to one guess against eac
 > r[pairing.peers.entry]
 > After a pairing, each machine has the other as a peer, with: its public key pinned and its
 > machine id computed from it; its name and platform as the exchange proved them; the
-> time of the pairing; never linked yet; in use; not dormant; this machine may drive it and may be
-> driven by it; and no edge chosen to face it.
+> time of the pairing; never linked yet; in use; not dormant; and this machine may drive it and
+> may be driven by it.
 >
-> - parity: Python saved a shared token from the exchange in place of a pinned public key (#14 and ADR 0003: links authenticate by pinned keys)
+> - parity: Python saved a shared token from the exchange in place of a pinned public key, and an empty edge for the peer to face, with no stamp and no machine that set it (#14 and ADR 0003: links authenticate by pinned keys; #14: the edge a peer faces is read off the shared crossing map, `crossing.map.place.chosen-edge`)
 > - model: pairing
 
 > r[pairing.peers.address]
@@ -525,9 +525,11 @@ The rules that hold whoever takes part without the code to one guess against eac
 > is accepted, with nothing restarted.
 
 > r[pairing.peers.first-zone]
-> A peer just paired, toward which this machine has no zone, gets a zone so input can cross to it
-> before its zones are chosen: on an edge of this machine's displays, or at a corner, as
-> `crossing.derive.first-zone` derives it from the peer's first place on the crossing map.
+> A peer just paired, toward which this machine has no zone, gets the zones
+> `crossing.derive.first-zone` derives from its first place on the crossing map, so input can cross
+> to it before its zones are chosen: on edges of this machine's displays, or at a corner. A peer
+> whose first footprint touches none of this machine's displays, as when no snap point is free for
+> it, gets no zone (`crossing.derive.no-contact`).
 
 > r[pairing.peers.other-zones]
 > A pairing leaves every other peer's zones as they were, apart from sharing an edge with the new
@@ -585,10 +587,10 @@ The rules that hold whoever takes part without the code to one guess against eac
 > - model: link
 
 > r[pairing.dormant.kept]
-> A dormant peer keeps its zones, the edge chosen to face it and its place on the crossing map,
-> but none of its zones leads anywhere while it is dormant, and it blocks no other peer's zone or
-> place on the crossing map. Once it is no longer dormant, its zones lead to it again, laid out
-> with the other peers' as the crossing map places them.
+> A dormant peer keeps its zones, the edge it faces (`crossing.map.facing`) and its place on the
+> crossing map, but none of its zones leads anywhere while it is dormant, and it blocks no other
+> peer's zone or place on the crossing map. Once it is no longer dormant, its zones lead to it
+> again, laid out with the other peers' as the crossing map places them.
 
 > r[pairing.dormant.repair]
 > Pairing again with a dormant peer, one with the same public key, replaces it rather than being
