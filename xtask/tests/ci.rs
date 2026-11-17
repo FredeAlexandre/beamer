@@ -58,12 +58,15 @@ impl Workspace {
         assert!(out.status.success(), "git {args:?} failed: {out:?}");
     }
 
-    /// `cargo xtask <args>` from the workspace's root, with its own target dir.
+    /// `cargo xtask <args>` from the workspace's root, building as the gate builds (#148): no
+    /// target dir is passed, so the workspace builds into its own `target/` and cargo-mutants
+    /// builds each mutant in a fresh `target/` of its own copy of the tree.
     fn xtask(&self, args: &[&str]) -> Run {
         let out = Command::new(env!("CARGO_BIN_EXE_xtask"))
             .args(args)
             .current_dir(self.root())
-            .env("CARGO_TARGET_DIR", self.root().join("target"))
+            .env_remove("CARGO_TARGET_DIR")
+            .env_remove("CARGO_BUILD_TARGET_DIR")
             .output()
             .expect("the xtask binary runs");
         Run {
@@ -469,4 +472,62 @@ fn only_the_crates_that_reach_a_mutated_crate_run_their_tests() {
         "expected every crate but beamer-input to run its tests:\n{}",
         run.text
     );
+}
+
+// Unviable mutants (#148): a mutant whose build fails doesn't fail the gate, but its name and its
+// build log are printed, so a build that fails for another reason than the mutation shows why.
+
+/// `beamer-types` with `meters`, whose only mutant, `Default::default()`, cannot build: `Meters`
+/// has no `Default`. On a branch cut from `main`.
+fn unviable() -> Workspace {
+    let ws = task_branch();
+    ws.write(
+        "crates/beamer-types/src/meters.rs",
+        "pub struct Meters(pub u32);\n\npub fn meters() -> Meters {\n    Meters(1)\n}\n",
+    );
+    ws.write(
+        "crates/beamer-types/src/lib.rs",
+        "pub mod meters;\n\npub fn add(a: u32, b: u32) -> u32 {\n    a + b\n}\n\n\
+         pub fn sub(_a: u32, _b: u32) -> u32 {\n    todo!()\n}\n",
+    );
+    ws.write(
+        "crates/beamer-types/tests/meters.rs",
+        "#[test]\nfn one_meter() {\n    assert_eq!(beamer_types::meters::meters().0, 1);\n}\n",
+    );
+    ws.commit("a mutant that cannot build");
+    ws
+}
+
+#[track_caller]
+fn reports_the_unviable_mutant(run: &Run) {
+    run.passes();
+    assert!(
+        run.text.contains(
+            "mutants: unviable: crates/beamer-types/src/meters.rs:4:5: \
+             replace meters -> Meters with Default::default()"
+        ) && run.text.contains("error[E0277]")
+            && run.text.contains("Meters: Default"),
+        "expected the unviable mutant named, with its build error:\n{}",
+        run.text
+    );
+}
+
+#[test]
+fn the_gate_prints_an_unviable_mutant_s_build_log_and_passes() {
+    let ws = unviable();
+    reports_the_unviable_mutant(&mutants_gate(&ws));
+}
+
+#[test]
+fn the_nightly_prints_an_unviable_mutant_s_build_log() {
+    let ws = unviable();
+    reports_the_unviable_mutant(&ws.xtask(&[
+        "mutants",
+        "--runner",
+        "linux",
+        "--shard",
+        "0/1",
+        "--",
+        "--no-fail-fast",
+    ]));
 }
