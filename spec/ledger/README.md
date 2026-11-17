@@ -15,7 +15,7 @@ no Python test is its own:
 | `store` | #54 | 0 |
 | `discovery` | #55 | 116 |
 | `driving` | #56 | 327 |
-| `crossing` | #57 | 1115 |
+| `crossing` | #57 | 1116 |
 | `input` | #58 | 793 |
 | `clipboard` | #59 | 213 |
 | `settings` | #60 | 461 |
@@ -23,10 +23,10 @@ no Python test is its own:
 | `audio` | #62 | 148 |
 | `camera` | #63 | 202 |
 | `media` | #64 | 0 |
-| `platform` | #65 | 336 |
-| `runtime` | #66 | 3 |
-| `app` | #67 | 93 |
-| `viewmodel` | #68 | 1046 |
+| `platform` | #65 | 325 |
+| `runtime` | #66 | 4 |
+| `app` | #67 | 98 |
+| `viewmodel` | #68 | 1050 |
 | `ui` | #69 | 741 |
 | `perf` | #70 | 0 |
 | `observability` | #71 | 0 |
@@ -77,9 +77,14 @@ flooded its own messages, and those tests went to the feature), the media engine
 ## Ambiguous assignments
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
-There are 90, covering 1,195 tests. Each row names the other candidates and why the owner won.
+There are 96, covering 1,203 tests. Each row names the other candidates and why the owner won.
 A miner who finds such a test's assertions are all another domain's settles it as
 `.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
+
+Rows marked "moved from platform (#65)" record lines that did move, after #51 (#147): the platform
+miner found their assertions all another domain's, and moved them to that domain's slice with no
+fate. Each splits its class, an exception to rule 2's "no assignment finer than a class", except
+`LauncherArgumentHandoffTests`, which moved whole: the class's other tests stay platform's.
 
 | Tests | Count | Owner | Also a candidate | Why the owner |
 |---|---|---|---|---|
@@ -137,7 +142,8 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `mac_app/tests/test_mac_to_mac.py` | 4 | input | driving | two Macs on loopback; both classes check which keys arrive |
 | `mac_app/tests/test_mac_wire.py` | 12 | driving | input, link | the Mac's controller against a real responder, end to end |
 | `mac_app/tests/test_map_ticks.py` | 22 | ui | viewmodel | the crossing map's thirds, badge, fit and seam; the tests are their geometry |
-| `mac_app/tests/test_notices_mac.py` | 11 | platform | viewmodel | notification delivery (F36) is platform's; what a notice says is the viewmodel's |
+| `mac_app/tests/test_notices_mac.py` (its other tests) | 8 | platform | viewmodel | notification delivery (F36) is platform's; what a notice says is the viewmodel's |
+| `mac_app/tests/test_notices_mac.py`, class `TrayNoticeTest`: `test_repeated_refusals_update_the_tray_but_post_one_notice`, `test_the_tray_app_posts_through_the_notices_not_rumps_with_addresses_hidden_as_set`, `test_tray_state_names_the_current_input_owner` | 3 | viewmodel | platform | moved from platform (#65): which refusals raise a notification, a notification that hides addresses as set, and what the tray menu says of who drives; the class's US-spelling test stays platform's |
 | `mac_app/tests/test_part_edge_thirds.py` | 9 | crossing | viewmodel | map hit bands and ledger segments share the saved third |
 | `mac_app/tests/test_same_on_both.py` | 46 | settings | viewmodel | Same on all machines through the real window; its assertions are the sync's |
 | `mac_app/tests/test_settings_v6.py`, class `OverlapTests` | 8 | crossing | settings | overlapping zones in the saved settings |
@@ -145,6 +151,7 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `mac_app/tests/test_sidebar_response.py` | 11 | viewmodel | link | which response time the sidebar shows |
 | `mac_app/tests/test_tile_resize_mac.py` | 13 | viewmodel | crossing, ui | resizing a display's tile on the crossing map |
 | `mac_app/tests/test_update_config_redirecting.py` | 2 | driving | crossing | a settings reload while driving |
+| `win_app/tests/test_admin_mode.py`, class `AdminModeTests`: `test_helper_only_accepts_fixed_boolean_argument`, `test_helper_rejects_relative_config_before_changing_anything`, `test_startup_helper_rejects_show_argument` | 3 | app | platform | moved from platform (#65): the elevated command line accepts only its fixed arguments and changes nothing for any other |
 | `win_app/tests/test_admin_mode_ui.py` | 10 | viewmodel | platform | the admin mode controls and their diagnostics on the Input page |
 | `win_app/tests/test_app_config.py`, class `AppearanceConfigTests` | 3 | ui | settings | the saved appearance choice |
 | `win_app/tests/test_app_config.py`, class `EdgeGlowConfigTests` | 2 | ui | settings | the saved edge glow choice |
@@ -159,8 +166,11 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `win_app/tests/test_desktop_portal_cache.py` | 10 | input | crossing | Wayland input readers' display geometry |
 | `win_app/tests/test_desktop_x11.py` | 22 | input | crossing | the X11 desktop's pointer, buttons and full-screen check |
 | `win_app/tests/test_dormant_rows.py` | 11 | viewmodel | pairing, crossing | how a dormant peer's rows show |
+| `win_app/tests/test_gameinput_foreground.py`, class `GameInputForegroundTests`: `test_stale_visit_neither_moves_the_cursor_nor_calls_arrival` | 1 | crossing | platform | moved from platform (#65): a landing for a take that is no longer current neither moves the pointer nor reports it landed |
 | `win_app/tests/test_hook_key_repeat.py` | 8 | crossing | input | a held shortcut key's repeats in the hook |
 | `win_app/tests/test_idle_refresh.py` | 16 | viewmodel | runtime, ui | how often the window re-reads settings and redraws |
+| `win_app/tests/test_input_blocker.py`, class `ForegroundBlockerTests`: `test_all_messages_translate_before_interpolating_process_name` | 1 | viewmodel | platform | moved from platform (#65): an input problem's words go through `tr()` before the blocker's name is put in |
+| `win_app/tests/test_installer_maintenance.py`, class `LauncherArgumentHandoffTests` | 2 | app | platform | moved from platform (#65): what the elevated command line is given, and a path it refuses before it runs |
 | `win_app/tests/test_key_up_after_switch_back.py` | 7 | input | driving | a key released after input came home still reaches the peer |
 | `win_app/tests/test_links.py`, class `OnwardTests` | 16 | driving | crossing | pass on, when the driven machine's own zone fires |
 | `win_app/tests/test_links.py`, class `SettingsTests` | 6 | settings | crossing | settings that change what the sender does |
@@ -173,3 +183,4 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `win_app/tests/test_settings_migration.py`, class `OverlapTests` | 7 | crossing | settings | overlapping zones in the saved settings |
 | `win_app/tests/test_tile_resize_qt.py` | 16 | viewmodel | crossing, ui | resizing a display's tile on the crossing map |
 | `win_app/tests/test_vcam_install.py` | 38 | camera | platform | installing the virtual camera; camera's scope names it |
+| `win_app/tests/test_windows_tool_encoding.py`, class `WindowsToolEncodingTests`: `test_profile_overrides_keep_settings_and_logs_in_the_unicode_directory` | 1 | runtime | platform | moved from platform (#65): the settings and the log are kept in a data folder whose path is outside ASCII |

@@ -242,3 +242,30 @@ _Avoid_: audio follows input
 A shared entry saying which machine's camera another machine sees.
 _Avoid_: camera follows input
 
+
+## Platform
+
+**Start at login**:
+Beamer starting by itself when the user signs in: a login item on a Mac, the logon task's logon
+trigger on a PC.
+_Avoid_: autostart, start at sign-in, launch at login, startup
+
+**Logon task**:
+The one scheduled task, per Windows account, through which every launch of Beamer on a PC goes. It
+starts Beamer at admin mode's level, and at sign-in when Start at login is on.
+_Avoid_: sign-in task, autostart task, scheduled task
+
+**Admin mode**:
+A PC's opt-in to run Beamer with its account's administrator rights, so that its input reaches
+windows running as administrator.
+_Avoid_: run as administrator, elevated mode, control administrator windows
+
+**Elevated setup**:
+The one step of a PC's install that needs administrator rights, `beamer --elevated setup`. It
+changes only what differs, so it changes nothing when nothing does.
+_Avoid_: maintenance script, repair script
+
+**Input blocker**:
+The foreground window on a PC, as Beamer names it, when Windows refused Beamer's injection or its
+placing of the pointer.
+_Avoid_: foreground blocker, blocking window
