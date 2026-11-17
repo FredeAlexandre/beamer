@@ -12,6 +12,10 @@
 //! - **The tests of every crate that reaches a mutant run against it** (#135). A rule's spec tests
 //!   sit behind the highest seam that reaches it, often `beamer-sim`'s or `beamer-core`'s `tests/`,
 //!   not the mutated crate's own; cargo-mutants alone runs only the latter. See [`test_packages`].
+//!
+//! After the run it prints each unviable mutant, whose build failed, with its build log (#148).
+//! Unviable mutants don't fail the gate or the nightly; the log shows whether a build failed for
+//! another reason than the mutation.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -165,7 +169,66 @@ pub fn run(root: &Path, options: &Options) -> Result<u8> {
         3 => println!("mutants: timed-out mutants, listed in mutants.out/timeout.txt"),
         _ => {}
     }
+    // Only after a run that tested its mutants: otherwise mutants.out may be an older run's.
+    if matches!(code, 0 | 2 | 3) {
+        report_unviable(&root.join("mutants.out"));
+    }
     Ok(u8::try_from(code).unwrap_or(1))
+}
+
+/// Prints each unviable mutant of the run in `out` (cargo-mutants' `mutants.out`) with its build
+/// log (#148). An unviable mutant doesn't fail the gate, but a build that fails for another reason
+/// than the mutation would hide its mutants silently, and the run's directory is often gone.
+fn report_unviable(out: &Path) {
+    let unviable = match unviable_mutants(out) {
+        Ok(unviable) => unviable,
+        Err(message) => {
+            println!("mutants: cannot list the unviable mutants: {message}");
+            return;
+        }
+    };
+    if unviable.is_empty() {
+        return;
+    }
+    println!(
+        "mutants: {} unviable, their build failed; they don't fail the gate",
+        unviable.len()
+    );
+    for (name, log_path) in unviable {
+        println!("mutants: unviable: {name}");
+        let log = out.join(&log_path);
+        match fs::read_to_string(&log) {
+            Ok(text) => {
+                println!("----- mutants.out/{log_path} -----");
+                println!("{}", text.trim_end());
+                println!("----- end of mutants.out/{log_path} -----");
+            }
+            Err(e) => println!("mutants: cannot read its build log {}: {e}", log.display()),
+        }
+    }
+}
+
+/// The name and log path (relative to `out`) of each unviable mutant in `out/outcomes.json`.
+fn unviable_mutants(out: &Path) -> Result<Vec<(String, String)>> {
+    let path = out.join("outcomes.json");
+    let text =
+        fs::read_to_string(&path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let outcomes: serde_json::Value =
+        serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+    let outcomes = outcomes["outcomes"]
+        .as_array()
+        .ok_or_else(|| format!("{} has no outcomes", path.display()))?;
+    Ok(outcomes
+        .iter()
+        .filter(|outcome| outcome["summary"] == "Unviable")
+        .map(|outcome| {
+            let name = outcome["scenario"]["Mutant"]["name"]
+                .as_str()
+                .unwrap_or("(unnamed)");
+            let log = outcome["log_path"].as_str().unwrap_or_default();
+            (name.to_owned(), log.to_owned())
+        })
+        .collect())
 }
 
 /// The packages whose tests run against every mutant of the `mutated` crates: each crate, among
