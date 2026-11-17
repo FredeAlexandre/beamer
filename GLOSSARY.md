@@ -267,7 +267,7 @@ _Avoid_: maintenance script, repair script
 
 **Input blocker**:
 The foreground window on a PC, as Beamer names it, when Windows refused Beamer's injection or its
-placing of the pointer.
+placing of the pointer, or when GameInput's system window is in front of a driven PC.
 _Avoid_: foreground blocker, blocking window
 
 **Input problem**:

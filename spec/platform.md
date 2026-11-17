@@ -427,17 +427,21 @@ with administrator rights, and any other refusal, whatever words it carries, is 
 > The elevated setup deletes every inbound block rule whose program is `Beamer.exe` at its installed
 > path, the ones Windows writes when its "allow access" prompt is dismissed included, and any rule
 > named "Beamer (UDP-In)" for that program that differs from `platform.firewall.rule`, then writes
-> that rule when it is missing.
+> that rule when it is missing. A rule's program is `Beamer.exe` at its installed path exactly when
+> `platform.firewall.counts` would match it: environment variables expanded, ignoring case and taking
+> `/` for `\`. How a matching path is written is never a difference from `platform.firewall.rule`.
 >
-> - parity: Python's app never changed the firewall; its installer's repair deleted only its own three named rules whose program was exactly the installed path, wrote them again, and left block rules for an administrator to review (#21: setup deletes the block rules Windows writes when its prompt is dismissed)
+> - parity: Python's app never changed the firewall; its installer's repair deleted only its own three named rules whose program equalled the installed path ignoring case, so never one written with an environment variable or `/`, wrote them again, and left block rules for an administrator to review (#21: setup deletes the block rules Windows writes when its prompt is dismissed, and every block rule the check counts)
 
 > r[platform.firewall.setup-unchanged]
-> When Beamer's rule is as `platform.firewall.rule` says and no block rule for `Beamer.exe` at its
-> installed path exists, the elevated setup changes no firewall rule.
+> When Beamer's rule is as `platform.firewall.rule` says and no block rule exists whose program,
+> matched as `platform.firewall.counts` matches it, is `Beamer.exe` at its installed path, the
+> elevated setup changes no firewall rule.
 
 r[platform.firewall.setup-scope]
 The elevated setup and uninstall delete only rules whose program is `Beamer.exe` at its installed
-path: never another program's rule, one named "Beamer (UDP-In)" included, and never every rule.
+path, matched as `platform.firewall.counts` matches it: never another program's rule, one named
+"Beamer (UDP-In)" included, and never every rule.
 
 > r[platform.firewall.setup-gone]
 > A rule already gone when the elevated setup deletes it does not stop the setup, which still
