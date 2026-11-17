@@ -1288,10 +1288,14 @@ Only the shortcut key's own presses make a double-tap or a long press. A press o
 fires nothing, and does not end a pair half made.
 
 r[crossing.shortcut.repeat-not-a-tap]
-A press of the shortcut key while that key is already down, as the OS repeats a key kept down, is
-never a tap and never starts a long press. Keeping the key down in double-tap style fires nothing
-however long it stays down, also after the press that fired a double-tap, and a double-tap after
-its release fires as usual.
+A repeat of the shortcut key, as the OS sends while the key is kept down, is never a tap and never
+starts a long press. Keeping the key down in double-tap style fires nothing however long it stays
+down, also after the press that fired a double-tap, and a double-tap after its release fires as
+usual.
+
+r[crossing.shortcut.missed-release]
+A press of the shortcut key that is not a repeat is a tap even when the key's release before it
+was never seen, so a double-tap fires after a release the capture missed.
 
 > r[crossing.shortcut.down-before-on]
 > A press of the shortcut key that began while the shortcut was off is neither a tap nor a long
@@ -1530,6 +1534,12 @@ machine's keyboard, and is never shared with its peers.
 r[crossing.jump-key.kept]
 The press of a jump key's key, its repeats and its release are kept from this machine's apps and
 from every driven machine. Its modifiers are not: they go where input was as ordinary keys.
+
+> r[crossing.jump-key.repeat-no-move]
+> Only the first press of a jump key's chord crosses: its repeats move no input, so a jump key kept
+> down that brought input home does not cross out again.
+>
+> - model: driving
 
 r[crossing.jump-key.repeat]
 A key that was already down when the chord's modifiers went down is not a press of the chord: its
@@ -1824,8 +1834,9 @@ machine in use shows a pointer.
 r[crossing.pointer.still-while-driving]
 While a machine drives another, its own pointer stays where it was when input left: every pointer
 motion or drag on it is sent to the driven machine and leaves the pointer there, and a key event
-leaves the pointer alone. Once input is home, by any crossing method or because this machine can no
-longer capture input, the pointer follows its mouse again, and no pointer motion is undone.
+leaves the pointer alone. Once input is home, whatever brought it home (a crossing method, capture
+lost, the link lost, settings applied, a failure), the pointer follows its mouse again, and no
+pointer motion is undone.
 
 r[crossing.pointer.hide-driving]
 From the moment a driver's input moves to another machine until it comes home, the driver's own
