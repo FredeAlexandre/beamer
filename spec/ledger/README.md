@@ -10,11 +10,11 @@ no Python test is its own:
 
 | Domain | Task | Tests |
 |---|---|---|
-| `link` | #52 | 321 |
-| `pairing` | #53 | 286 |
+| `link` | #52 | 325 |
+| `pairing` | #53 | 288 |
 | `store` | #54 | 0 |
-| `discovery` | #55 | 116 |
-| `driving` | #56 | 327 |
+| `discovery` | #55 | 107 |
+| `driving` | #56 | 330 |
 | `crossing` | #57 | 1115 |
 | `input` | #58 | 793 |
 | `clipboard` | #59 | 213 |
@@ -77,9 +77,14 @@ flooded its own messages, and those tests went to the feature), the media engine
 ## Ambiguous assignments
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
-There are 90, covering 1,195 tests. Each row names the other candidates and why the owner won.
+There are 96, covering 1,200 tests. Each row names the other candidates and why the owner won.
 A miner who finds such a test's assertions are all another domain's settles it as
 `.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
+
+Six rows record lines that did move, after #51: the discovery miner (#55) found their assertions
+all another domain's, and moved them to that domain's slice with no fate. All but
+`PairedAddressTests` split a class, an exception to rule 2's "no assignment finer than a class":
+the class's other tests stay discovery's.
 
 | Tests | Count | Owner | Also a candidate | Why the owner |
 |---|---|---|---|---|
@@ -93,7 +98,8 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `core/tests/test_feature_flags.py` | 1 | pairing | app | its one test checks that phone pairing is hidden by default |
 | `core/tests/test_flatpak_libei_path.py` | 1 | input | platform | where Linux input capture finds libei |
 | `core/tests/test_length_size_sliders.py` | 13 | ui | settings, viewmodel | the effect length and size sliders, their values, presets and sync; effects are F30 (Later) |
-| `core/tests/test_link.py`, class `LinkFollowTests` | 7 | discovery | link | a link following a peer to a new address is discovery's address list |
+| `core/tests/test_link.py`, class `LinkFollowTests` (its other tests) | 6 | discovery | link | a link following a peer to a new address is discovery's address list |
+| `core/tests/test_link.py`, class `LinkFollowTests`: `test_a_peer_not_in_use_has_no_dial_target` | 1 | link | discovery | moved from discovery (#55): a peer that is not in use is never dialled at all |
 | `core/tests/test_link.py`, class `LinkHardwareTests` | 5 | discovery | link | the hardware address carried in the handshake serves Wake-on-LAN (F20) |
 | `core/tests/test_link_endpoint_follow.py` | 6 | discovery | link, pairing | discovered addresses are hints until the peer authenticates |
 | `core/tests/test_motion_flow.py` | 7 | link | input | bounded unacknowledged input, acks and the outbox are the link's input class |
@@ -102,6 +108,7 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `core/tests/test_pairing_paths.py`, class `InterfaceTests` | 4 | discovery | pairing | which interfaces a machine announces on |
 | `core/tests/test_pairing_paths.py`, class `OversizedDatagramTests` | 1 | discovery | pairing | an oversized datagram on the discovery socket |
 | `core/tests/test_patch15_nearby.py` | 3 | pairing | viewmodel | the nearby list's refresh, for pair nearby (F3, dropped) |
+| `core/tests/test_peer_address.py`, class `PairedAddressTests` | 2 | pairing | discovery | moved from discovery (#55): the address a pairing saves for a new peer, and a pairing that replaces a peer keeping the address the user typed |
 | `core/tests/test_portable_discovery.py` | 5 | platform | discovery | the portable build's discovery; the portable build (F23, dropped) is kept in one domain |
 | `core/tests/test_profiles_e2e.py` | 30 | crossing | settings, store | profiles synced over the links; profiles are crossing's (F7) |
 | `core/tests/test_profiles_migration.py` | 12 | settings | crossing | the settings-file migration to profiles; settings owns the settings file and its migrations |
@@ -131,7 +138,9 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `mac_app/tests/test_idle_refresh.py` | 6 | viewmodel | runtime, ui | how often the window and menu re-read settings and redraw |
 | `mac_app/tests/test_ignored_titles.py` | 16 | viewmodel | input | the names shown for stays-here inputs |
 | `mac_app/tests/test_link_state.py` | 14 | viewmodel | link | the words each link state shows |
-| `mac_app/tests/test_mac_listener_port.py` | 4 | discovery | link | the port the listener and the beacon use |
+| `mac_app/tests/test_mac_links.py`, class `HardwareHookTests`: `test_each_link_reads_a_large_frame_only_while_the_owner_expects_its_clipboard` | 1 | link | discovery, clipboard | moved from discovery (#55): a bulk message the app does not expect from that peer is cancelled unread |
+| `mac_app/tests/test_mac_listener_port.py` (its other tests) | 2 | discovery | link | the port the beacon names |
+| `mac_app/tests/test_mac_listener_port.py`, class `OwnPortTests`: `test_the_listener_follows_the_own_port_and_stays_when_the_first_machine_changes`, `test_switching_a_machine_out_of_use_rearms_the_listener` | 2 | link | discovery | moved from discovery (#55): the port this machine takes links on, and the links of a peer put out of use |
 | `mac_app/tests/test_mac_loopback.py` | 12 | driving | input, clipboard | the Mac driving a PC and driven by it over loopback, end to end |
 | `mac_app/tests/test_mac_three.py` (its other classes) | 18 | crossing | driving | a push through a zone takes the machine the zone leads to, with three machines |
 | `mac_app/tests/test_mac_to_mac.py` | 4 | input | driving | two Macs on loopback; both classes check which keys arrive |
@@ -145,6 +154,7 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `mac_app/tests/test_sidebar_response.py` | 11 | viewmodel | link | which response time the sidebar shows |
 | `mac_app/tests/test_tile_resize_mac.py` | 13 | viewmodel | crossing, ui | resizing a display's tile on the crossing map |
 | `mac_app/tests/test_update_config_redirecting.py` | 2 | driving | crossing | a settings reload while driving |
+| `mac_app/tests/test_wake.py`, class `ComingHomeThroughTheAppsControllerTests`: `test_the_pc_sending_input_home_returns_it`, `test_the_pc_taking_this_mac_over_ends_the_redirect` | 2 | driving | discovery | moved from discovery (#55): send home and being taken over end this machine's driving |
 | `win_app/tests/test_admin_mode_ui.py` | 10 | viewmodel | platform | the admin mode controls and their diagnostics on the Input page |
 | `win_app/tests/test_app_config.py`, class `AppearanceConfigTests` | 3 | ui | settings | the saved appearance choice |
 | `win_app/tests/test_app_config.py`, class `EdgeGlowConfigTests` | 2 | ui | settings | the saved edge glow choice |
@@ -166,7 +176,8 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `win_app/tests/test_links.py`, class `SettingsTests` | 6 | settings | crossing | settings that change what the sender does |
 | `win_app/tests/test_links_loopback.py` | 9 | driving | input | the PC's input to a real responder on loopback |
 | `win_app/tests/test_map_ticks.py` | 20 | ui | viewmodel | the crossing map's thirds, badge, status dot, fit and seam; the tests are their geometry |
-| `win_app/tests/test_parity.py`, class `AlertAndWakeTests` | 4 | discovery | viewmodel | the alerts and waking the Mac when a switch has no link |
+| `win_app/tests/test_parity.py`, class `AlertAndWakeTests` (its other tests) | 3 | discovery | viewmodel | the alerts and waking the Mac when a switch has no link |
+| `win_app/tests/test_parity.py`, class `AlertAndWakeTests`: `test_a_dead_link_sending_input_home_says_so` | 1 | driving | discovery, viewmodel | moved from discovery (#55): input comes home when its link is lost, and the app says so |
 | `win_app/tests/test_part_edge_corners_qt.py` | 12 | crossing | viewmodel | map thirds, contact geometry and ledger parity |
 | `win_app/tests/test_same_on_both.py` | 54 | settings | viewmodel | Same on all machines through the real window; its assertions are the sync's |
 | `win_app/tests/test_sender_motion_flow.py` | 8 | link | input, crossing | the sender batching motion before the link, keeping travel and barriers |

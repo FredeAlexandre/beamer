@@ -1,118 +1,109 @@
 # The discovery domain's slice of the Python ledger, laid out by #51.
 # Owner domains and the ambiguous assignments: spec/ledger/README.md.
-core/tests/test_address_choice_commit.py::AddressCommitTests::test_mac_connection_commit_marks_the_same_address_as_explicit
-core/tests/test_address_choice_commit.py::AddressCommitTests::test_qt_pin_control_saves_only_the_chosen_machine
-core/tests/test_address_choice_commit.py::AddressCommitTests::test_releasing_a_pin_allows_discovery_and_pinning_stops_drift
-core/tests/test_link.py::LinkFollowTests::test_a_beacon_that_names_another_machine_is_never_tried_and_one_at_its_address_is_tried_last
-core/tests/test_link.py::LinkFollowTests::test_a_beacon_with_the_exact_name_is_tried_once_the_link_has_been_down_ten_seconds
-core/tests/test_link.py::LinkFollowTests::test_a_failed_try_shows_nothing_and_saves_nothing
-core/tests/test_link.py::LinkFollowTests::test_a_peer_not_in_use_has_no_dial_target
-core/tests/test_link.py::LinkFollowTests::test_discovery_matches_the_machine_name_not_its_local_label
-core/tests/test_link.py::LinkFollowTests::test_several_beacons_with_the_name_are_tried_in_turn
-core/tests/test_link.py::LinkFollowTests::test_the_address_is_saved_once_the_link_authenticates_there
-core/tests/test_link.py::LinkHardwareTests::test_a_hook_that_knows_nothing_sends_no_hw
-core/tests/test_link.py::LinkHardwareTests::test_a_hook_that_raises_sends_no_hw_and_the_link_still_comes_up
-core/tests/test_link.py::LinkHardwareTests::test_the_hook_is_asked_with_the_host_this_link_dials
-core/tests/test_link.py::LinkHardwareTests::test_the_hook_wins_over_the_identitys_own_hw
-core/tests/test_link.py::LinkHardwareTests::test_without_a_hook_the_identitys_hw_is_sent_as_before
-core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_missing_beacon_port_uses_saved_port_after_authentication
-core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_pinned_choices_and_invalid_beacon_ports_are_never_followed
-core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_receive_only_peer_restarts_at_new_port_while_old_port_is_occupied
-core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_repaired_pin_reconnects_after_outage_without_following_wifi
-core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_same_address_endpoints_rotate_after_downtime_and_cooldown
-core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_unauthenticated_alternate_port_never_changes_saved_endpoint
-core/tests/test_pairing_paths.py::BroadcastTargetTests::test_each_interface_is_sent_the_broadcast_of_its_own_netmask
-core/tests/test_pairing_paths.py::BroadcastTargetTests::test_two_addresses_on_one_network_send_it_one_broadcast
-core/tests/test_pairing_paths.py::BroadcastTargetTests::test_with_no_interfaces_known_it_falls_back_to_a_24
-core/tests/test_pairing_paths.py::HostileNearbyDatagramTests::test_a_beacon_copying_this_machine_s_window_is_not_a_candidate
-core/tests/test_pairing_paths.py::HostileNearbyDatagramTests::test_a_list_or_object_type_is_dropped_without_a_traceback
-core/tests/test_pairing_paths.py::InterfaceTests::test_a_platform_that_will_not_say_gives_none
-core/tests/test_pairing_paths.py::InterfaceTests::test_pairing_address_prefers_a_private_default_route_outside_broadcast_interfaces
-core/tests/test_pairing_paths.py::InterfaceTests::test_qr_address_keeps_default_when_it_is_on_lan
-core/tests/test_pairing_paths.py::InterfaceTests::test_this_machine_s_interfaces_are_read_with_real_netmasks
-core/tests/test_pairing_paths.py::OversizedDatagramTests::test_a_datagram_too_large_for_the_buffer_does_not_stop_the_service
-core/tests/test_pairing_service.py::BeaconTests::test_a_pairing_2_beacon_is_reported_older_and_sent_nothing
-core/tests/test_pairing_service.py::BeaconTests::test_id_and_pair_only_while_a_code_is_up
-core/tests/test_pairing_service.py::OwnBeaconTests::test_a_machine_that_hears_its_own_beacons_does_not_list_itself
-core/tests/test_pairing_v3.py::BeaconTests::test_the_id_and_pairing_id_travel_only_while_a_code_is_up
-core/tests/test_peer_address.py::ChosenAddressTests::test_an_empty_address_can_be_learnt_and_followed
-core/tests/test_peer_address.py::ChosenAddressTests::test_choice_made_after_a_beacon_was_queued_is_used_for_dialling
-core/tests/test_peer_address.py::ChosenAddressTests::test_choice_made_during_handshake_wins_over_learned_address
-core/tests/test_peer_address.py::ChosenAddressTests::test_discovery_does_not_try_another_interface_for_a_saved_choice
-core/tests/test_peer_address.py::ChosenAddressTests::test_reverse_link_cannot_overwrite_a_saved_choice
-core/tests/test_peer_address.py::PairedAddressTests::test_pairing_saves_a_followable_address
-core/tests/test_peer_address.py::PairedAddressTests::test_repair_of_a_migrated_typed_address_keeps_it_pinned
-core/tests/test_responder_handshake.py::TheWelcomesHardwareAddress::test_a_hook_that_knows_nothing_sends_no_hw
-core/tests/test_responder_handshake.py::TheWelcomesHardwareAddress::test_a_hook_that_raises_sends_no_hw_and_the_link_still_comes_up
-core/tests/test_responder_handshake.py::TheWelcomesHardwareAddress::test_the_hook_is_asked_with_the_address_the_link_came_from_and_its_answer_is_sent
-core/tests/test_responder_handshake.py::TheWelcomesHardwareAddress::test_without_a_hook_the_identitys_hw_is_sent_as_before
-mac_app/tests/test_hardware_mac.py::FormatMacTest::test_six_bytes_become_lower_case_colon_groups
-mac_app/tests/test_hardware_mac.py::FormatMacTest::test_wrong_length_and_all_zero_are_unknown
-mac_app/tests/test_hardware_mac.py::HardwareAddressTowardsTest::test_an_address_on_no_interface_is_unknown
-mac_app/tests/test_hardware_mac.py::HardwareAddressTowardsTest::test_an_interface_with_no_link_layer_address_is_unknown
-mac_app/tests/test_hardware_mac.py::HardwareAddressTowardsTest::test_failures_are_unknown_not_raised
-mac_app/tests/test_hardware_mac.py::HardwareAddressTowardsTest::test_no_host_is_unknown_without_touching_the_network
-mac_app/tests/test_hardware_mac.py::HardwareAddressTowardsTest::test_off_macos_is_unknown_without_touching_the_network
-mac_app/tests/test_hardware_mac.py::HardwareAddressTowardsTest::test_the_adapter_that_carries_the_route_names_the_address
-mac_app/tests/test_hardware_mac.py::LiveInterfaceTableTest::test_every_real_address_is_well_formed
-mac_app/tests/test_hardware_mac.py::LiveInterfaceTableTest::test_the_table_reads_this_macs_interfaces
-mac_app/tests/test_mac_links.py::HardwareHookTests::test_each_link_is_handed_the_controllers_hardware_hook
-mac_app/tests/test_mac_links.py::HardwareHookTests::test_each_link_reads_a_large_frame_only_while_the_owner_expects_its_clipboard
-mac_app/tests/test_mac_links.py::HardwareHookTests::test_no_hook_leaves_the_link_without_one
-mac_app/tests/test_mac_listener_port.py::OwnPortTests::test_a_controller_built_from_a_config_alone_still_listens_where_it_dials
-mac_app/tests/test_mac_listener_port.py::OwnPortTests::test_switching_a_machine_out_of_use_rearms_the_listener
-mac_app/tests/test_mac_listener_port.py::OwnPortTests::test_the_listener_follows_the_own_port_and_stays_when_the_first_machine_changes
-mac_app/tests/test_mac_listener_port.py::OwnPortTests::test_the_port_is_the_settings_own_not_the_first_machines
-mac_app/tests/test_pairing.py::FindTests::test_a_name_that_never_resolves_does_not_hold_up_beacons
-mac_app/tests/test_pairing.py::FindTests::test_a_pc_no_beacon_reaches_is_found_by_address_and_pairs
-mac_app/tests/test_pairing.py::FindTests::test_an_empty_address_stops_asking
-mac_app/tests/test_pairing_announcer_error.py::AnnouncerSocketErrorTests::test_a_datagram_reset_is_survived
-mac_app/tests/test_pairing_announcer_error.py::AnnouncerSocketErrorTests::test_any_other_socket_error_is_reported_not_swallowed
-mac_app/tests/test_pairing_announcer_error.py::DiscoverySocketErrorTests::test_a_datagram_reset_is_survived
-mac_app/tests/test_pairing_announcer_error.py::DiscoverySocketErrorTests::test_any_other_socket_error_is_reported
-mac_app/tests/test_wake.py::ComingHomeThroughTheAppsControllerTests::test_a_dropped_link_returns_input_without_waking_anything
-mac_app/tests/test_wake.py::ComingHomeThroughTheAppsControllerTests::test_the_pc_sending_input_home_returns_it
-mac_app/tests/test_wake.py::ComingHomeThroughTheAppsControllerTests::test_the_pc_taking_this_mac_over_ends_the_redirect
-mac_app/tests/test_wake.py::FollowingAMovedPcThroughTheAppsControllerTests::test_the_app_controller_offers_the_beacons_and_takes_the_new_address
-mac_app/tests/test_wake.py::MagicPacketTests::test_layout_is_six_ff_then_the_address_sixteen_times
-mac_app/tests/test_wake.py::MagicPacketTests::test_rejects_a_bad_address
-mac_app/tests/test_wake.py::ParsingTests::test_macos_arp_line_is_padded
-mac_app/tests/test_wake.py::ParsingTests::test_parse_mac_normalises_both_platforms
-mac_app/tests/test_wake.py::ParsingTests::test_windows_arp_line_yields_the_right_host
-mac_app/tests/test_wake.py::WakingControllerTests::test_a_pc_that_answered_and_refused_is_not_woken
-mac_app/tests/test_wake.py::WakingControllerTests::test_a_pc_that_did_not_answer_is_woken_for_every_other_kind
-mac_app/tests/test_wake.py::WakingControllerTests::test_a_primary_link_up_cannot_overwrite_a_settings_change_made_meanwhile
-mac_app/tests/test_wake.py::WakingControllerTests::test_a_slow_address_lookup_does_not_hold_the_link_up_callback
-mac_app/tests/test_wake.py::WakingControllerTests::test_an_address_the_table_already_agrees_with_is_not_reported
-mac_app/tests/test_wake.py::WakingControllerTests::test_gives_up_after_the_window_with_nothing_queued
-mac_app/tests/test_wake.py::WakingControllerTests::test_redirecting_for_an_edge_forwards_display_and_side
-mac_app/tests/test_wake.py::WakingControllerTests::test_status_written_underneath_a_wake_shows_through_afterwards
-mac_app/tests/test_wake.py::WakingControllerTests::test_successful_connection_learns_and_reports_a_new_address
-mac_app/tests/test_wake.py::WakingControllerTests::test_switch_while_unreachable_sends_the_packet_and_shows_waking
-mac_app/tests/test_wake.py::WakingControllerTests::test_the_address_is_looked_up_at_the_host_the_link_dialled
-mac_app/tests/test_wake.py::WakingControllerTests::test_without_a_hardware_address_the_switch_fails_as_before
-mac_app/tests/test_wake_three.py::WakingThree::test_a_switch_to_a_sleeping_machine_wakes_that_machine
-mac_app/tests/test_wake_three.py::WakingThree::test_can_wake_speaks_of_the_machine_in_question
-mac_app/tests/test_wake_three.py::WakingThree::test_every_link_coming_up_learns_its_own_machines_address
-mac_app/tests/test_wake_three.py::WakingThree::test_moving_input_on_to_a_sleeping_machine_wakes_it_and_leaves_input_where_it_is
-mac_app/tests/test_wake_three.py::WakingThree::test_the_shortcut_to_nothing_up_wakes_the_first_it_would_send_to
-win_app/tests/test_hardware_win.py::FormatMacTest::test_all_zero_is_unknown
-win_app/tests/test_hardware_win.py::FormatMacTest::test_six_bytes_become_lower_case_colon_groups
-win_app/tests/test_hardware_win.py::FormatMacTest::test_wrong_length_is_unknown
-win_app/tests/test_hardware_win.py::HardwareAddressTowardsTest::test_a_failing_adapter_walk_never_raises
-win_app/tests/test_hardware_win.py::HardwareAddressTowardsTest::test_a_failing_lookup_never_raises
-win_app/tests/test_hardware_win.py::HardwareAddressTowardsTest::test_an_all_zero_adapter_is_skipped
-win_app/tests/test_hardware_win.py::HardwareAddressTowardsTest::test_garbage_host_is_unknown
-win_app/tests/test_hardware_win.py::HardwareAddressTowardsTest::test_off_windows_is_unknown_without_touching_the_network
-win_app/tests/test_hardware_win.py::HardwareAddressTowardsTest::test_the_adapter_that_owns_the_routed_address_wins
-win_app/tests/test_hardware_win.py::RealAdapterTest::test_result_is_unknown_or_well_formed
-win_app/tests/test_links.py::WakeTests::test_a_peer_that_answered_and_refused_is_not_woken
-win_app/tests/test_links.py::WakeTests::test_a_peer_without_a_hardware_address_is_not_woken
-win_app/tests/test_links.py::WakeTests::test_switching_with_the_peer_asleep_wakes_it
-win_app/tests/test_pairing.py::BeaconTests::test_beacon_carries_only_name_port_version_and_pairing_id
-win_app/tests/test_pairing.py::BeaconTests::test_beacon_without_a_code_has_no_pairing_id
-win_app/tests/test_pairing.py::BeaconTests::test_decode_ignores_foreign_datagrams
-win_app/tests/test_parity.py::AlertAndWakeTests::test_a_dead_link_sending_input_home_says_so
-win_app/tests/test_parity.py::AlertAndWakeTests::test_a_mac_that_refused_the_token_is_not_woken
-win_app/tests/test_parity.py::AlertAndWakeTests::test_a_switch_with_no_link_and_no_address_says_why
-win_app/tests/test_parity.py::AlertAndWakeTests::test_a_switch_with_no_link_wakes_a_mac_whose_address_is_known
+core/tests/test_address_choice_commit.py::AddressCommitTests::test_mac_connection_commit_marks_the_same_address_as_explicit  mined: discovery.address.choose
+core/tests/test_address_choice_commit.py::AddressCommitTests::test_qt_pin_control_saves_only_the_chosen_machine  mined: discovery.address.one-peer, discovery.address.choose
+core/tests/test_address_choice_commit.py::AddressCommitTests::test_releasing_a_pin_allows_discovery_and_pinning_stops_drift  mined: discovery.address.unchosen, discovery.address.chosen-only, discovery.probe.when
+core/tests/test_link.py::LinkFollowTests::test_a_beacon_that_names_another_machine_is_never_tried_and_one_at_its_address_is_tried_last  mined: discovery.probe.when
+core/tests/test_link.py::LinkFollowTests::test_a_beacon_with_the_exact_name_is_tried_once_the_link_has_been_down_ten_seconds  mined: discovery.probe.when
+core/tests/test_link.py::LinkFollowTests::test_a_failed_try_shows_nothing_and_saves_nothing  mined: discovery.probe.found, discovery.address.learnt-on-auth
+core/tests/test_link.py::LinkFollowTests::test_discovery_matches_the_machine_name_not_its_local_label  mined: discovery.probe.when
+core/tests/test_link.py::LinkFollowTests::test_several_beacons_with_the_name_are_tried_in_turn  mined: discovery.probe.when
+core/tests/test_link.py::LinkFollowTests::test_the_address_is_saved_once_the_link_authenticates_there  mined: discovery.probe.found, discovery.address.learnt-on-auth
+core/tests/test_link.py::LinkHardwareTests::test_a_hook_that_knows_nothing_sends_no_hw  mined: discovery.hardware.unknown
+core/tests/test_link.py::LinkHardwareTests::test_a_hook_that_raises_sends_no_hw_and_the_link_still_comes_up  mined: discovery.hardware.unknown
+core/tests/test_link.py::LinkHardwareTests::test_the_hook_is_asked_with_the_host_this_link_dials  mined: discovery.hardware.record, discovery.hardware.of-peer
+core/tests/test_link.py::LinkHardwareTests::test_the_hook_wins_over_the_identitys_own_hw  mined: discovery.hardware.record
+core/tests/test_link.py::LinkHardwareTests::test_without_a_hook_the_identitys_hw_is_sent_as_before  python-detail: the one hardware address Python sent when a link was built without its lookup towards the peer
+core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_missing_beacon_port_uses_saved_port_after_authentication  mined: discovery.beacon.layout, discovery.address.learnt-on-auth
+core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_pinned_choices_and_invalid_beacon_ports_are_never_followed  mined: discovery.address.chosen-only, discovery.beacon.ignored
+core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_receive_only_peer_restarts_at_new_port_while_old_port_is_occupied  mined: discovery.probe.when, discovery.probe.found
+core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_repaired_pin_reconnects_after_outage_without_following_wifi  mined: discovery.address.chosen-only
+core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_same_address_endpoints_rotate_after_downtime_and_cooldown  mined: discovery.probe.when
+core/tests/test_link_endpoint_follow.py::EndpointFollowTests::test_unauthenticated_alternate_port_never_changes_saved_endpoint  mined: discovery.address.learnt-on-auth
+core/tests/test_pairing_paths.py::BroadcastTargetTests::test_each_interface_is_sent_the_broadcast_of_its_own_netmask  mined: discovery.beacon.networks, discovery.beacon.every-two-seconds
+core/tests/test_pairing_paths.py::BroadcastTargetTests::test_two_addresses_on_one_network_send_it_one_broadcast  mined: discovery.beacon.networks
+core/tests/test_pairing_paths.py::BroadcastTargetTests::test_with_no_interfaces_known_it_falls_back_to_a_24  mined: discovery.beacon.no-interfaces
+core/tests/test_pairing_paths.py::HostileNearbyDatagramTests::test_a_beacon_copying_this_machine_s_window_is_not_a_candidate  dropped: pair nearby (F3), which #11 drops
+core/tests/test_pairing_paths.py::HostileNearbyDatagramTests::test_a_list_or_object_type_is_dropped_without_a_traceback  mined: discovery.beacon.ignored
+core/tests/test_pairing_paths.py::InterfaceTests::test_a_platform_that_will_not_say_gives_none  mined: discovery.beacon.no-interfaces
+core/tests/test_pairing_paths.py::InterfaceTests::test_pairing_address_prefers_a_private_default_route_outside_broadcast_interfaces  mined: discovery.own-address.offered
+core/tests/test_pairing_paths.py::InterfaceTests::test_qr_address_keeps_default_when_it_is_on_lan  mined: discovery.own-address.offered
+core/tests/test_pairing_paths.py::InterfaceTests::test_this_machine_s_interfaces_are_read_with_real_netmasks  mined: discovery.beacon.networks
+core/tests/test_pairing_paths.py::OversizedDatagramTests::test_a_datagram_too_large_for_the_buffer_does_not_stop_the_service  mined: discovery.beacon.ignored
+core/tests/test_pairing_service.py::BeaconTests::test_a_pairing_2_beacon_is_reported_older_and_sent_nothing  dropped: compatibility with older Python pairing versions (#11 drops pairing v2 and any compatibility with the Python apps)
+core/tests/test_pairing_service.py::BeaconTests::test_id_and_pair_only_while_a_code_is_up  mined: discovery.beacon.layout
+core/tests/test_pairing_service.py::OwnBeaconTests::test_a_machine_that_hears_its_own_beacons_does_not_list_itself  mined: discovery.heard.own
+core/tests/test_pairing_v3.py::BeaconTests::test_the_id_and_pairing_id_travel_only_while_a_code_is_up  mined: discovery.beacon.layout
+core/tests/test_peer_address.py::ChosenAddressTests::test_an_empty_address_can_be_learnt_and_followed  mined: discovery.address.learnt-incoming, discovery.probe.when, discovery.probe.found
+core/tests/test_peer_address.py::ChosenAddressTests::test_choice_made_after_a_beacon_was_queued_is_used_for_dialling  mined: discovery.address.chosen-only
+core/tests/test_peer_address.py::ChosenAddressTests::test_choice_made_during_handshake_wins_over_learned_address  mined: discovery.address.chosen-only
+core/tests/test_peer_address.py::ChosenAddressTests::test_discovery_does_not_try_another_interface_for_a_saved_choice  mined: discovery.address.chosen-only
+core/tests/test_peer_address.py::ChosenAddressTests::test_reverse_link_cannot_overwrite_a_saved_choice  mined: discovery.address.chosen-only
+core/tests/test_responder_handshake.py::TheWelcomesHardwareAddress::test_a_hook_that_knows_nothing_sends_no_hw  mined: discovery.hardware.unknown
+core/tests/test_responder_handshake.py::TheWelcomesHardwareAddress::test_a_hook_that_raises_sends_no_hw_and_the_link_still_comes_up  mined: discovery.hardware.unknown
+core/tests/test_responder_handshake.py::TheWelcomesHardwareAddress::test_the_hook_is_asked_with_the_address_the_link_came_from_and_its_answer_is_sent  mined: discovery.hardware.record, discovery.hardware.of-peer
+core/tests/test_responder_handshake.py::TheWelcomesHardwareAddress::test_without_a_hook_the_identitys_hw_is_sent_as_before  python-detail: the one hardware address Python sent when a link was built without its lookup towards the peer
+mac_app/tests/test_hardware_mac.py::FormatMacTest::test_six_bytes_become_lower_case_colon_groups  mined: discovery.hardware.form
+mac_app/tests/test_hardware_mac.py::FormatMacTest::test_wrong_length_and_all_zero_are_unknown  mined: discovery.hardware.form, discovery.hardware.unknown
+mac_app/tests/test_hardware_mac.py::HardwareAddressTowardsTest::test_an_address_on_no_interface_is_unknown  mined: discovery.hardware.record
+mac_app/tests/test_hardware_mac.py::HardwareAddressTowardsTest::test_an_interface_with_no_link_layer_address_is_unknown  mined: discovery.hardware.unknown
+mac_app/tests/test_hardware_mac.py::HardwareAddressTowardsTest::test_failures_are_unknown_not_raised  mined: discovery.hardware.unknown
+mac_app/tests/test_hardware_mac.py::HardwareAddressTowardsTest::test_no_host_is_unknown_without_touching_the_network  python-detail: Python's lookup called with no address to look towards
+mac_app/tests/test_hardware_mac.py::HardwareAddressTowardsTest::test_off_macos_is_unknown_without_touching_the_network  python-detail: the Mac's module run on another platform
+mac_app/tests/test_hardware_mac.py::HardwareAddressTowardsTest::test_the_adapter_that_carries_the_route_names_the_address  mined: discovery.hardware.record
+mac_app/tests/test_hardware_mac.py::LiveInterfaceTableTest::test_every_real_address_is_well_formed  mined: discovery.hardware.form, discovery.hardware.record
+mac_app/tests/test_hardware_mac.py::LiveInterfaceTableTest::test_the_table_reads_this_macs_interfaces  mined: discovery.hardware.record
+mac_app/tests/test_mac_links.py::HardwareHookTests::test_each_link_is_handed_the_controllers_hardware_hook  python-detail: the Mac's controller handing its hardware lookup to each link object
+mac_app/tests/test_mac_links.py::HardwareHookTests::test_no_hook_leaves_the_link_without_one  python-detail: the Mac's controller handing its hardware lookup to each link object
+mac_app/tests/test_mac_listener_port.py::OwnPortTests::test_a_controller_built_from_a_config_alone_still_listens_where_it_dials  python-detail: a Mac controller built from the flat 1.4-era config rather than the settings store
+mac_app/tests/test_mac_listener_port.py::OwnPortTests::test_the_port_is_the_settings_own_not_the_first_machines  mined: discovery.beacon.port
+mac_app/tests/test_pairing.py::FindTests::test_a_name_that_never_resolves_does_not_hold_up_beacons  mined: discovery.beacon.not-delayed
+mac_app/tests/test_pairing.py::FindTests::test_a_pc_no_beacon_reaches_is_found_by_address_and_pairs  wire-v6: the find datagram that asked a machine at an address for its beacon; #14 pairs by address over a pairing connection, with no beacon
+mac_app/tests/test_pairing.py::FindTests::test_an_empty_address_stops_asking  wire-v6: the find datagram that asked a machine at an address for its beacon; #14 pairs by address over a pairing connection, with no beacon
+mac_app/tests/test_pairing_announcer_error.py::AnnouncerSocketErrorTests::test_a_datagram_reset_is_survived  mined: discovery.beacon.reset
+mac_app/tests/test_pairing_announcer_error.py::AnnouncerSocketErrorTests::test_any_other_socket_error_is_reported_not_swallowed  mined: discovery.beacon.port-failure
+mac_app/tests/test_pairing_announcer_error.py::DiscoverySocketErrorTests::test_a_datagram_reset_is_survived  mined: discovery.beacon.reset
+mac_app/tests/test_pairing_announcer_error.py::DiscoverySocketErrorTests::test_any_other_socket_error_is_reported  mined: discovery.beacon.port-failure
+mac_app/tests/test_wake.py::ComingHomeThroughTheAppsControllerTests::test_a_dropped_link_returns_input_without_waking_anything  mined: discovery.wake.lost-link
+mac_app/tests/test_wake.py::FollowingAMovedPcThroughTheAppsControllerTests::test_the_app_controller_offers_the_beacons_and_takes_the_new_address  mined: discovery.probe.when, discovery.probe.found
+mac_app/tests/test_wake.py::MagicPacketTests::test_layout_is_six_ff_then_the_address_sixteen_times  mined: discovery.wake.packet
+mac_app/tests/test_wake.py::MagicPacketTests::test_rejects_a_bad_address  mined: discovery.hardware.form
+mac_app/tests/test_wake.py::ParsingTests::test_macos_arp_line_is_padded  mined: discovery.hardware.of-peer, discovery.hardware.form
+mac_app/tests/test_wake.py::ParsingTests::test_parse_mac_normalises_both_platforms  mined: discovery.hardware.of-peer, discovery.hardware.form
+mac_app/tests/test_wake.py::ParsingTests::test_windows_arp_line_yields_the_right_host  mined: discovery.hardware.of-peer
+mac_app/tests/test_wake.py::WakingControllerTests::test_a_pc_that_answered_and_refused_is_not_woken  mined: discovery.wake.refused
+mac_app/tests/test_wake.py::WakingControllerTests::test_a_pc_that_did_not_answer_is_woken_for_every_other_kind  mined: discovery.wake.crossing, discovery.wake.refused
+mac_app/tests/test_wake.py::WakingControllerTests::test_a_primary_link_up_cannot_overwrite_a_settings_change_made_meanwhile  mined: discovery.address.concurrent-save
+mac_app/tests/test_wake.py::WakingControllerTests::test_a_slow_address_lookup_does_not_hold_the_link_up_callback  mined: discovery.hardware.not-delayed
+mac_app/tests/test_wake.py::WakingControllerTests::test_an_address_the_table_already_agrees_with_is_not_reported  python-detail: whether the Mac's callback ran for a hardware address it already had; what is saved is the same
+mac_app/tests/test_wake.py::WakingControllerTests::test_gives_up_after_the_window_with_nothing_queued  mined: discovery.wake.waiting, discovery.wake.once, discovery.wake.status
+mac_app/tests/test_wake.py::WakingControllerTests::test_redirecting_for_an_edge_forwards_display_and_side  python-detail: the waking controller passing a crossing's arguments on to the class it wraps
+mac_app/tests/test_wake.py::WakingControllerTests::test_status_written_underneath_a_wake_shows_through_afterwards  mined: discovery.wake.status
+mac_app/tests/test_wake.py::WakingControllerTests::test_successful_connection_learns_and_reports_a_new_address  mined: discovery.hardware.of-peer, discovery.wake.can-wake
+mac_app/tests/test_wake.py::WakingControllerTests::test_switch_while_unreachable_sends_the_packet_and_shows_waking  mined: discovery.wake.crossing, discovery.wake.packet
+mac_app/tests/test_wake.py::WakingControllerTests::test_the_address_is_looked_up_at_the_host_the_link_dialled  mined: discovery.hardware.of-peer
+mac_app/tests/test_wake.py::WakingControllerTests::test_without_a_hardware_address_the_switch_fails_as_before  mined: discovery.wake.no-address, discovery.wake.can-wake
+mac_app/tests/test_wake_three.py::WakingThree::test_a_switch_to_a_sleeping_machine_wakes_that_machine  mined: discovery.wake.crossing, discovery.wake.packet, discovery.wake.status
+mac_app/tests/test_wake_three.py::WakingThree::test_can_wake_speaks_of_the_machine_in_question  mined: discovery.wake.can-wake
+mac_app/tests/test_wake_three.py::WakingThree::test_every_link_coming_up_learns_its_own_machines_address  mined: discovery.hardware.of-peer
+mac_app/tests/test_wake_three.py::WakingThree::test_moving_input_on_to_a_sleeping_machine_wakes_it_and_leaves_input_where_it_is  mined: discovery.wake.crossing
+mac_app/tests/test_wake_three.py::WakingThree::test_the_shortcut_to_nothing_up_wakes_the_first_it_would_send_to  mined: discovery.wake.crossing
+win_app/tests/test_hardware_win.py::FormatMacTest::test_all_zero_is_unknown  mined: discovery.hardware.form, discovery.hardware.unknown
+win_app/tests/test_hardware_win.py::FormatMacTest::test_six_bytes_become_lower_case_colon_groups  mined: discovery.hardware.form
+win_app/tests/test_hardware_win.py::FormatMacTest::test_wrong_length_is_unknown  mined: discovery.hardware.form, discovery.hardware.unknown
+win_app/tests/test_hardware_win.py::HardwareAddressTowardsTest::test_a_failing_adapter_walk_never_raises  mined: discovery.hardware.unknown
+win_app/tests/test_hardware_win.py::HardwareAddressTowardsTest::test_a_failing_lookup_never_raises  mined: discovery.hardware.unknown
+win_app/tests/test_hardware_win.py::HardwareAddressTowardsTest::test_an_all_zero_adapter_is_skipped  mined: discovery.hardware.unknown
+win_app/tests/test_hardware_win.py::HardwareAddressTowardsTest::test_garbage_host_is_unknown  python-detail: Python's lookup called with text that is no IPv4 address
+win_app/tests/test_hardware_win.py::HardwareAddressTowardsTest::test_off_windows_is_unknown_without_touching_the_network  python-detail: the Windows module run on another platform
+win_app/tests/test_hardware_win.py::HardwareAddressTowardsTest::test_the_adapter_that_owns_the_routed_address_wins  mined: discovery.hardware.record
+win_app/tests/test_hardware_win.py::RealAdapterTest::test_result_is_unknown_or_well_formed  mined: discovery.hardware.form, discovery.hardware.record
+win_app/tests/test_links.py::WakeTests::test_a_peer_that_answered_and_refused_is_not_woken  mined: discovery.wake.refused
+win_app/tests/test_links.py::WakeTests::test_a_peer_without_a_hardware_address_is_not_woken  mined: discovery.wake.no-address
+win_app/tests/test_links.py::WakeTests::test_switching_with_the_peer_asleep_wakes_it  mined: discovery.wake.crossing, discovery.wake.packet
+win_app/tests/test_pairing.py::BeaconTests::test_beacon_carries_only_name_port_version_and_pairing_id  mined: discovery.beacon.layout
+win_app/tests/test_pairing.py::BeaconTests::test_beacon_without_a_code_has_no_pairing_id  mined: discovery.beacon.layout
+win_app/tests/test_pairing.py::BeaconTests::test_decode_ignores_foreign_datagrams  mined: discovery.beacon.ignored
+win_app/tests/test_parity.py::AlertAndWakeTests::test_a_mac_that_refused_the_token_is_not_woken  mined: discovery.wake.refused
+win_app/tests/test_parity.py::AlertAndWakeTests::test_a_switch_with_no_link_and_no_address_says_why  mined: discovery.wake.no-address
+win_app/tests/test_parity.py::AlertAndWakeTests::test_a_switch_with_no_link_wakes_a_mac_whose_address_is_known  mined: discovery.wake.crossing, discovery.wake.packet
