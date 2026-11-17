@@ -7,7 +7,7 @@ core/tests/test_dormant_repair.py::DormantPeerTests::test_dormant_state_is_saved
 core/tests/test_dormant_repair.py::DormantPeerTests::test_dormant_tile_does_not_block_another_tile  mined: pairing.dormant.kept
 core/tests/test_dormant_repair.py::DormantPeerTests::test_dormant_without_a_reason_still_needs_repair  python-detail: a settings-file peer marked dormant with its reason field missing
 core/tests/test_dormant_repair.py::DormantPeerTests::test_forgotten_marks_the_peer_dormant_with_a_reason  mined: pairing.dormant.forgotten
-core/tests/test_dormant_repair.py::DormantPeerTests::test_host_rejects_a_distinct_addition_at_capacity  mined: pairing.capacity.full-confirm, pairing.capacity.limit
+core/tests/test_dormant_repair.py::DormantPeerTests::test_host_rejects_a_distinct_addition_at_capacity  mined: pairing.capacity.full-confirm, pairing.capacity.limit, pairing.known.last-check
 core/tests/test_dormant_repair.py::DormantPeerTests::test_host_replaces_a_dormant_peer_at_capacity  mined: pairing.dormant.repair, pairing.capacity.dormant-room
 core/tests/test_dormant_repair.py::DormantPeerTests::test_layout_compilation_keeps_dormant_zones_and_saved_position  mined: pairing.dormant.kept
 core/tests/test_dormant_repair.py::DormantPeerTests::test_pairing_client_allows_capacity_when_a_peer_might_be_repaired  mined: pairing.capacity.dormant-room
@@ -15,7 +15,7 @@ core/tests/test_dormant_repair.py::DormantPeerTests::test_qr_known_check_allows_
 core/tests/test_dormant_repair.py::DormantPeerTests::test_repair_keeps_a_legacy_saved_address_without_pin_provenance  dropped: a peer saved by an earlier Python version with no record of how its address was chosen; F19 starts fresh, with no migration (#11)
 core/tests/test_dormant_repair.py::DormantPeerTests::test_repair_keeps_an_explicit_address_even_when_pairing_uses_wifi  mined: pairing.peers.replace-address
 core/tests/test_dormant_repair.py::DormantPeerTests::test_repair_replaces_the_entry_and_keeps_local_machine_fields  mined: pairing.dormant.repair, pairing.peers.replace-keeps
-core/tests/test_dormant_repair.py::DormantPeerTests::test_repaired_peer_with_retained_side_and_intent_crosses_at_its_picture_contact  mined: pairing.peers.replace-keeps, pairing.dormant.kept
+core/tests/test_dormant_repair.py::DormantPeerTests::test_repaired_peer_with_retained_side_and_intent_crosses_at_its_picture_contact  mined: pairing.peers.replace-keeps
 core/tests/test_dormant_repair.py::DormantPeerTests::test_successful_link_clears_dormant_state  mined: pairing.dormant.cleared
 core/tests/test_dormant_repair.py::DormantPeerTests::test_successful_link_keeps_intent_and_compile_allocates_the_shared_stretch  mined: pairing.dormant.cleared, pairing.dormant.kept
 core/tests/test_dormant_repair.py::DormantPeerTests::test_wrong_id_marks_the_peer_dormant_with_a_reason  wire-v6: the v6 handshake's wrong_id answer; with pinned keys a peer's machine id is always its key's (#14)
@@ -49,8 +49,8 @@ core/tests/test_pair1_windows.py::WindowsPairingTests::test_tcp_transport_failur
 core/tests/test_pair1_windows.py::WindowsPairingTests::test_two_windows_peers_pair_by_address  mined: pairing.by-address.dial
 core/tests/test_pair1_windows.py::WindowsPairingTests::test_two_windows_peers_pair_over_udp_with_receiving_enabled  mined: pairing.by-beacon.dial, pairing.peers.entry
 core/tests/test_pair1_windows.py::WindowsPairingTests::test_wrong_code_is_refused_and_cancelled  mined: pairing.exchange.entering-checks-first
-core/tests/test_pairing_cpace.py::ClientStateTests::test_a_reply_to_another_attempt_is_not_judged  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
-core/tests/test_pairing_cpace.py::ClientStateTests::test_malformed_answers_are_refused_without_an_exception  mined: pairing.exchange.fields, pairing.exchange.entering-checks-first
+core/tests/test_pairing_cpace.py::ClientStateTests::test_a_reply_to_another_attempt_is_not_judged  mined: pairing.connection.order
+core/tests/test_pairing_cpace.py::ClientStateTests::test_malformed_answers_are_refused_without_an_exception  mined: pairing.exchange.fields, pairing.exchange.entering-checks-first, pairing.connection.malformed
 core/tests/test_pairing_cpace.py::ClientStateTests::test_names_are_cut_before_they_are_sent_and_bound_as_sent  mined: pairing.exchange.name-cut
 core/tests/test_pairing_cpace.py::ClientStateTests::test_no_token_before_the_answer_was_accepted  mined: pairing.connection.order, pairing.exchange.receipt
 core/tests/test_pairing_cpace.py::ClientStateTests::test_the_host_s_name_is_known_only_once_its_tag_checks_out  mined: pairing.exchange.proved-name
@@ -70,8 +70,8 @@ core/tests/test_pairing_cpace.py::HostStateTests::test_a_refused_start_is_answer
 core/tests/test_pairing_cpace.py::HostStateTests::test_an_exchange_the_code_outlives_is_not_completed  mined: pairing.code.lifetime
 core/tests/test_pairing_cpace.py::HostStateTests::test_an_expired_code_is_not_answered  mined: pairing.code.lifetime, pairing.connection.no-code
 core/tests/test_pairing_cpace.py::HostStateTests::test_another_pairing_version_is_told_so  mined: pairing.connection.version
-core/tests/test_pairing_cpace.py::HostStateTests::test_datagrams_that_are_not_for_the_host_get_no_answer  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
-core/tests/test_pairing_cpace.py::HostStateTests::test_malformed_starts_are_refused_without_an_exception  mined: pairing.exchange.fields, pairing.cpace.low-order
+core/tests/test_pairing_cpace.py::HostStateTests::test_datagrams_that_are_not_for_the_host_get_no_answer  mined: pairing.connection.order
+core/tests/test_pairing_cpace.py::HostStateTests::test_malformed_starts_are_refused_without_an_exception  mined: pairing.exchange.fields, pairing.cpace.low-order, pairing.connection.malformed
 core/tests/test_pairing_cpace.py::HostStateTests::test_only_a_newly_made_answer_is_marked_fresh  wire-v6: a resent start answered from memory; a pairing connection's stream is not resent by Beamer (#14)
 core/tests/test_pairing_cpace.py::HostStateTests::test_retransmitted_datagrams_get_the_same_replies  wire-v6: a resent start answered from memory; a pairing connection's stream is not resent by Beamer (#14)
 core/tests/test_pairing_cpace.py::OneGuessTests::test_a_code_answers_one_share_even_for_the_right_code  mined: pairing.guess.one-start
@@ -103,20 +103,20 @@ core/tests/test_pairing_cpace.py::VersionTests::test_a_pairing_id_that_could_not
 core/tests/test_pairing_cpace.py::VersionTests::test_every_beacon_says_which_exchange_the_host_speaks  wire-v6: the beacon's pairing version; #14 settles the version by an exact ALPN match
 core/tests/test_pairing_cpace.py::VersionTests::test_only_one_attempt_runs_at_a_time  mined: pairing.exchange.one-attempt
 core/tests/test_pairing_cpace.py::VersionTests::test_the_ration_is_not_wiped_by_a_burst_of_made_up_addresses  wire-v6: refusals rationed per source address on the UDP pairing socket; #14 runs pairing in a QUIC pairing connection
-core/tests/test_pairing_paths.py::AnswerSourceTests::test_a_requester_on_no_network_of_this_machine_s_is_routed_as_ever  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
-core/tests/test_pairing_paths.py::AnswerSourceTests::test_a_requester_on_one_of_this_machine_s_networks_is_answered_from_that_network  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
-core/tests/test_pairing_paths.py::AnswerSourceTests::test_two_addresses_on_the_requester_s_network_leave_the_routing_table_s_choice_alone  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
-core/tests/test_pairing_paths.py::AnswerSourceTests::test_where_the_routing_table_agrees_nothing_changes  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
+core/tests/test_pairing_paths.py::AnswerSourceTests::test_a_requester_on_no_network_of_this_machine_s_is_routed_as_ever  mined: pairing.connection.dial-from
+core/tests/test_pairing_paths.py::AnswerSourceTests::test_a_requester_on_one_of_this_machine_s_networks_is_answered_from_that_network  mined: pairing.connection.dial-from, pairing.connection.answer-from
+core/tests/test_pairing_paths.py::AnswerSourceTests::test_two_addresses_on_the_requester_s_network_leave_the_routing_table_s_choice_alone  mined: pairing.connection.dial-from
+core/tests/test_pairing_paths.py::AnswerSourceTests::test_where_the_routing_table_agrees_nothing_changes  mined: pairing.connection.dial-from
 core/tests/test_pairing_paths.py::AskTests::test_a_bad_receipt_from_elsewhere_is_ignored_and_one_from_the_asked_address_decides  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
 core/tests/test_pairing_paths.py::AskTests::test_only_the_first_of_each_kind_from_elsewhere_is_kept  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
 core/tests/test_pairing_paths.py::AskTests::test_the_asked_address_wins_even_when_its_reply_is_queued_behind_the_window_s_end  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
 core/tests/test_pairing_paths.py::AskTests::test_with_nothing_from_the_asked_address_an_ok_reply_from_elsewhere_beats_a_refusal  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
-core/tests/test_pairing_paths.py::HostAnswersFromTheRequesterSNetworkTests::test_both_ends_send_from_the_address_on_the_other_s_network  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
-core/tests/test_pairing_paths.py::ReceiveTests::test_an_oversized_datagram_on_windows_is_passed_over  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
+core/tests/test_pairing_paths.py::HostAnswersFromTheRequesterSNetworkTests::test_both_ends_send_from_the_address_on_the_other_s_network  mined: pairing.connection.dial-from, pairing.connection.answer-from
+core/tests/test_pairing_paths.py::ReceiveTests::test_an_oversized_datagram_on_windows_is_passed_over  python-detail: Windows' recvfrom error 10040 (WSAEMSGSIZE) on Python's own UDP pairing socket
 core/tests/test_pairing_paths.py::ReceiveTests::test_any_other_failure_ends_the_attempt_as_no_answer  mined: pairing.connection.no-answer
-core/tests/test_pairing_paths.py::RequesterTakesAnAnswerFromAnyAddressTests::test_a_forged_receipt_from_any_address_leaves_no_half_pairing  mined: pairing.exchange.receipt
+core/tests/test_pairing_paths.py::RequesterTakesAnAnswerFromAnyAddressTests::test_a_forged_receipt_from_any_address_leaves_no_half_pairing  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
 core/tests/test_pairing_paths.py::RequesterTakesAnAnswerFromAnyAddressTests::test_an_answer_for_another_pairing_id_is_not_taken  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
-core/tests/test_pairing_paths.py::RequesterTakesAnAnswerFromAnyAddressTests::test_an_answer_from_another_address_still_pairs  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
+core/tests/test_pairing_paths.py::RequesterTakesAnAnswerFromAnyAddressTests::test_an_answer_from_another_address_still_pairs  mined: pairing.peers.address
 core/tests/test_pairing_paths.py::RequesterTakesAnAnswerFromAnyAddressTests::test_forged_answers_from_another_address_lose_to_the_host_s_own  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
 core/tests/test_pairing_paths.py::RequesterTakesAnAnswerFromAnyAddressTests::test_nothing_is_taken_while_no_attempt_is_under_way  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
 core/tests/test_pairing_paths.py::RequesterTakesAnAnswerFromAnyAddressTests::test_with_nothing_from_the_host_a_refusal_from_elsewhere_still_ends_the_attempt  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
@@ -208,7 +208,7 @@ core/tests/test_peerlist.py::AddPeerTests::test_a_new_entry_goes_on_the_end  min
 core/tests/test_peerlist.py::AddPeerTests::test_a_replaced_entry_gives_its_place_to_the_new_one  mined: pairing.peers.order
 core/tests/test_peerlist.py::AddPeerTests::test_an_entry_replaced_by_token_is_found_though_the_caller_holds_a_copy  python-detail: the peer list finding the replaced entry by its token from a copied dict
 core/tests/test_peerlist.py::AddPeerTests::test_an_entry_that_is_not_the_1_4_one_gives_nothing_by_host  dropped: the 1.4.x migration of the settings file, which F19 ships without (#11)
-core/tests/test_peerlist.py::AddPeerTests::test_other_machines_zones_are_left_alone  mined: pairing.peers.other-zones
+core/tests/test_peerlist.py::AddPeerTests::test_other_machines_zones_are_left_alone  mined: pairing.peers.other-zones, pairing.peers.first-zone
 core/tests/test_peerlist.py::AddPeerTests::test_the_machine_at_the_1_4_entrys_host_takes_over_its_side_and_zones  dropped: the 1.4.x migration of the settings file, which F19 ships without (#11)
 core/tests/test_peerlist.py::AddPeerTests::test_the_replaced_entrys_zones_go_with_it_when_it_was_matched_by_name_alone  dropped: the 1.4.x migration of the settings file, which F19 ships without (#11)
 core/tests/test_peerlist.py::AddPeerTests::test_zones_of_a_machine_paired_again_under_its_own_id_stay  mined: pairing.peers.replace-keeps
@@ -235,10 +235,10 @@ mac_app/tests/test_mac_pairing.py::MacPairingTests::test_a_pairing_this_mac_host
 mac_app/tests/test_pairing.py::ImpostorTests::test_a_forged_receipt_does_not_yield_a_token  mined: pairing.exchange.receipt
 mac_app/tests/test_pairing.py::ImpostorTests::test_a_refusal_from_the_pc_does_not_spend_the_code  mined: pairing.guess.failed-code
 mac_app/tests/test_pairing.py::ImpostorTests::test_a_spent_code_may_be_sent_again_once_it_could_no_longer_be_live  mined: pairing.guess.failed-code
-mac_app/tests/test_pairing.py::ImpostorTests::test_the_first_answer_decides_and_a_wrong_one_is_never_confirmed  mined: pairing.guess.one-answer, pairing.guess.failed-code
+mac_app/tests/test_pairing.py::ImpostorTests::test_the_first_answer_decides_and_a_wrong_one_is_never_confirmed  mined: pairing.guess.one-answer, pairing.guess.failed-code, pairing.exchange.entering-checks-first
 mac_app/tests/test_pairing.py::LoopbackTests::test_a_good_answer_leaves_a_fixed_time_after_its_start  mined: pairing.connection.answer-time
 mac_app/tests/test_pairing.py::LoopbackTests::test_a_used_code_does_not_pair_a_second_mac  mined: pairing.code.single-use
-mac_app/tests/test_pairing.py::LoopbackTests::test_discovers_pairs_and_stores_one_token_each_side  mined: pairing.by-beacon.dial, pairing.exchange.proved-name, pairing.peers.entry
+mac_app/tests/test_pairing.py::LoopbackTests::test_discovers_pairs_and_stores_one_token_each_side  mined: pairing.by-beacon.dial, pairing.exchange.proved-name, pairing.peers.entry, pairing.peers.address, pairing.code.beacon, pairing.code.single-use
 mac_app/tests/test_pairing.py::LoopbackTests::test_pairing_without_a_code_on_the_pc_says_so  mined: pairing.connection.no-code
 mac_app/tests/test_pairing.py::LoopbackTests::test_refusals_are_rationed_so_the_port_is_no_amplifier  wire-v6: refusals rationed per source address on the UDP pairing socket; #14 runs pairing in a QUIC pairing connection
 mac_app/tests/test_pairing.py::LoopbackTests::test_replies_nobody_is_waiting_for_are_not_kept  wire-v6: the UDP pairing datagrams, sorted by source address and pairing id; #14 runs pairing in one QUIC pairing connection
@@ -260,7 +260,7 @@ mac_app/tests/test_settings_v6.py::PairedAndRemovedTests::test_one_machines_dire
 mac_app/tests/test_settings_v6.py::PairedAndRemovedTests::test_only_the_two_switches_can_be_changed_this_way  python-detail: the Mac settings store's setter refusing fields other than the two permissions
 mac_app/tests/test_settings_v6.py::PairedAndRemovedTests::test_removing_a_machine_takes_its_zones_and_leaves_the_others  mined: pairing.remove.peer
 mac_app/tests/test_settings_v6.py::PairedAndRemovedTests::test_removing_a_machine_that_is_not_there_is_nothing  mined: pairing.remove.unknown
-mac_app/tests/test_settings_v6.py::PairedAndRemovedTests::test_removing_the_first_machine_makes_the_next_the_one_the_flat_settings_read  python-detail: the Mac settings store's flat view of its first peer, which the Rust app has no counterpart of
+mac_app/tests/test_settings_v6.py::PairedAndRemovedTests::test_removing_the_first_machine_makes_the_next_the_one_the_flat_settings_read  mined: pairing.remove.peer
 mac_app/tests/test_settings_v6.py::PairedAndRemovedTests::test_removing_the_only_machine_leaves_this_one_unpaired_and_it_stays_so  mined: pairing.remove.last
 mac_app/tests/test_settings_v6.py::PairedAndRemovedTests::test_the_book_the_links_read_sees_a_removal_at_once  mined: pairing.remove.link
 mac_app/tests/test_settings_v6.py::PairedAndRemovedTests::test_the_first_machines_switches_reach_the_flat_settings  python-detail: the Mac settings store's flat view of its first peer, which the Rust app has no counterpart of
@@ -273,7 +273,7 @@ win_app/tests/test_app_config.py::ReadFallbackPeerBookTests::test_with_no_good_c
 win_app/tests/test_pair_nearby_ui.py::NearbyPairingUiTest::test_machine_actions_keep_typed_pairing_and_add_phone_and_nearby  dropped: pair nearby (F3), which #11 drops, and phone pairing, out of scope
 win_app/tests/test_pair_nearby_ui.py::NearbyPairingUiTest::test_nearby_candidates_removal_and_sheet_destruction_clears_deferred_deletes  dropped: pair nearby (F3), which #11 drops
 win_app/tests/test_pair_nearby_ui.py::NearbyPairingUiTest::test_nearby_status_copy_candidates_and_manual_confirmation  dropped: pair nearby (F3), which #11 drops
-win_app/tests/test_pair_nearby_ui.py::NearbyPairingUiTest::test_new_window_repair_and_window_close_cancel_nearby  dropped: pair nearby (F3), which #11 drops
+win_app/tests/test_pair_nearby_ui.py::NearbyPairingUiTest::test_new_window_repair_and_window_close_cancel_nearby  mined: pairing.by-address.pair-again
 win_app/tests/test_pair_nearby_ui.py::NearbyPairingUiTest::test_phone_pairing_stays_hidden_while_nearby_pairing_remains_available  dropped: pair nearby (F3), which #11 drops, and phone pairing, out of scope
 win_app/tests/test_pair_nearby_ui.py::NearbyPairingUiTest::test_waiting_terminal_copy_and_cancel_action  dropped: pair nearby (F3), which #11 drops
 win_app/tests/test_pairing.py::CodeLifetimeTests::test_cancelling_leaves_no_outcome  mined: pairing.code.cancel

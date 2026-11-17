@@ -120,6 +120,7 @@ The published vectors the CPace rules name are copied as data in
 > is shown, then closed. The entering machine reports that the other machine is not showing a
 > code.
 >
+> - parity: Python's pairing by address listened only while a code was shown, so a connection to a machine showing none failed and the entering machine reported that it did not answer (#14: pairing runs on the link's UDP port, which is open whenever Beamer runs)
 > - model: pairing
 
 > r[pairing.connection.version]
@@ -130,11 +131,12 @@ The published vectors the CPace rules name are copied as data in
 > - parity: Python answered a start of another pairing version with `version` and dropped its code (#14's version policy is an exact ALPN match, settled before any pairing message, so no guess at the code is spent)
 
 > r[pairing.connection.four]
-> A showing machine holds at most four pairing connections at once, and at most one from each
-> address: a new connection from an address that already has one replaces it. With four held, a
-> new connection from another address replaces the one held longest, except the connection whose
-> start the code is bound to, which is never replaced. This holds whatever the connections send,
-> a start replayed on each of them included.
+> A showing machine holds at most four pairing connections at once. The connection whose start the
+> code is bound to is never replaced. A new connection from an address that already has another
+> connection held replaces that one; a new connection from the address of the bound connection is
+> held beside it. Otherwise, with four held, a new connection replaces the one held longest, other
+> than the bound connection. This holds whatever the connections send, the bound start sent again
+> on each of them included.
 >
 > - model: pairing
 
@@ -160,13 +162,20 @@ The published vectors the CPace rules name are copied as data in
 > order, a second start on the same connection included, closes the pairing connection with
 > nothing sent. The code and an exchange under way on another connection are untouched.
 >
+> - parity: Python answered a confirmation with no exchange under way with `not_pairing` and left the code shown, and passed over a message of another kind or for another pairing id, still pairing on the right one that came after it (#14: one exchange runs on one stream of its own pairing connection, so a message out of order is never another attempt's)
 > - model: pairing
 > - fuzz: pairing-message
 
 > r[pairing.connection.malformed]
 > A pairing message that does not decode, or that is longer than 1024 bytes, closes its pairing
-> connection with nothing sent, before any of it is acted on. The code is untouched.
+> connection with nothing sent, before any of it is acted on. A message does not decode when its
+> kind is unknown; when a field is missing, repeated, of the wrong type, or follows the last one;
+> when a share is not 32 bytes; when a tag is not 64 bytes, nor, in a confirmation, empty; or when
+> a name or a platform is not valid UTF-8. A showing machine's code is untouched. An entering
+> machine reports that the code was not accepted, and may send that code again
+> (`pairing.guess.failed-code`).
 >
+> - parity: Python refused a start whose share, nonce, name or machine id had the wrong type or length with `refused` and ended the code, and took such an answer as a wrong tag, sending an abort and refusing that code for 120 seconds (#14 decodes each message by its type before the exchange sees it, and bytes that are not a pairing message test no guess at the code)
 > - fuzz: pairing-message
 
 > r[pairing.connection.message-size]
@@ -180,12 +189,22 @@ The published vectors the CPace rules name are copied as data in
 > connection.
 
 > r[pairing.connection.answer-time]
-> The showing machine sends its answer to a start 50 milliseconds after the start arrived,
-> however long working it out took. A refusal of a start is sent at once: everything that can
-> refuse a start is checked before the code is used, so no refusal carries the time the code's
-> generator took.
+> The showing machine sends its answer to a start no sooner than 50 milliseconds after the start
+> arrived, and as soon as it is worked out when that takes longer. A refusal of a start is sent
+> without that wait.
 >
 > - model: pairing
+
+> r[pairing.connection.answer-from]
+> The showing machine sends every packet of a pairing connection from the address the connection
+> arrived at, whichever address its routing table would send from.
+>
+> - parity: Python answered from its own address on the entering machine's network when its routing table picked another, and from the routed address when it had none on that network (#14: a QUIC connection's packets come from the address its client dialled, which is the one Python picked whenever it had one)
+
+> r[pairing.connection.dial-from]
+> The entering machine sends a pairing connection's packets from its own address on the network
+> of the address it dials, when it has one there and its routing table would send from an address
+> on another network. Otherwise it sends from the address its routing table chooses.
 
 ## CPace
 
@@ -223,9 +242,11 @@ The published vectors the CPace rules name are copied as data in
 > r[pairing.cpace.low-order]
 > A share that gives an all-zero shared secret is refused, as the draft's `scalar_mult_vfy`
 > requires. The shares in `low_order_shares.must_refuse` of `pairing-vectors.json` are refused,
-> and those in `must_give` give their products. The showing machine checks the entering machine's
-> share before it works out the code's generator.
+> and those in `must_give` give their products. A showing machine refuses such a start with a
+> refusal saying refused, ends the code, and reports that a wrong code was entered. An entering
+> machine takes such an answer as a wrong tag Tb (`pairing.exchange.entering-checks-first`).
 >
+> - model: pairing
 > - fuzz: pairing-message
 
 > r[pairing.cpace.fresh-scalar]
@@ -258,11 +279,13 @@ The published vectors the CPace rules name are copied as data in
 > - fuzz: pairing-message
 
 > r[pairing.exchange.fields]
-> A name is 1 to 48 Unicode code points of valid Unicode. A platform is 1 to 16 characters from
-> `a` to `z`, `0` to `9` and `_`: a platform Beamer does not know, of that shape, pairs like any
-> other. A link port is 1 to 65535. The showing machine refuses a start with any of them out of
-> shape, which ends the code. The entering machine refuses an answer with any of them out of shape
-> as it would a wrong tag Tb.
+> In a message that decodes (`pairing.connection.malformed`), a name is 1 to 48 code points, a
+> platform is 1 to 16 characters from `a` to `z`, `0` to `9` and `_`, and a link port is 1 to
+> 65535; any other value is out of shape. A platform Beamer does not know, of that shape, pairs
+> like any other. The showing machine refuses a start with any of them out of shape with a refusal
+> saying refused, ends the code, and reports that a wrong code was entered. The entering machine
+> takes an answer with any of them out of shape as a wrong tag Tb
+> (`pairing.exchange.entering-checks-first`).
 >
 > - parity: Python took link port 0 as a phone, saved without an address and never dialled (phone peers are out of scope, #11)
 > - model: pairing
@@ -274,8 +297,8 @@ The published vectors the CPace rules name are copied as data in
 
 > r[pairing.exchange.entering-checks-first]
 > The entering machine checks tag Tb before it sends anything more. When Tb does not check out,
-> or the answer is malformed, it sends an abort, a confirmation with no tag, once, stores nothing,
-> and reports that the code was not accepted. The showing machine answers an abort with a refusal,
+> or the answer's fields are out of shape, it sends an abort, a confirmation with no tag, once,
+> stores nothing, and reports that the code was not accepted. The showing machine answers an abort with a refusal,
 > ends the code, and reports that a wrong code was entered.
 >
 > - model: pairing
@@ -289,7 +312,10 @@ The published vectors the CPace rules name are copied as data in
 
 > r[pairing.exchange.receipt]
 > The entering machine stores nothing before the receipt's tag Td checks out. A receipt that is a
-> refusal, or whose tag does not check out, ends the attempt with nothing stored.
+> refusal ends the attempt with nothing stored, reported as `pairing.outcome.entering` maps that
+> refusal. A receipt whose tag does not check out ends the attempt with nothing stored, reported
+> as the code not accepted. Neither makes the entering machine refuse that code again
+> (`pairing.guess.failed-code`).
 >
 > - model: pairing
 
@@ -320,8 +346,10 @@ The rules that hold whoever takes part without the code to one guess against eac
 
 > r[pairing.guess.one-start]
 > A code answers one start. The first start that passes the checks binds the code. Any later
-> start, on any pairing connection, is refused, and the exchange under way is left alone.
+> start, on another pairing connection, is refused with a refusal saying refused, and the code
+> and the exchange under way are left alone.
 >
+> - parity: Python answered the bound start sent again, unchanged, with the answer it had already sent (#14: QUIC carries a start reliably, so it is never sent twice, and a start on another pairing connection is under another sid)
 > - model: pairing
 
 > r[pairing.guess.one-answer]
@@ -379,7 +407,9 @@ The rules that hold whoever takes part without the code to one guess against eac
 
 > r[pairing.known.linked-since]
 > When the peer a pairing would replace links before the pairing is stored, the pairing is not
-> stored and that peer is kept as it is. A showing machine then reports the pairing not saved.
+> stored and that peer is kept as it is. A showing machine then sends a refusal saying refused in
+> place of the receipt, and reports the pairing not saved. An entering machine reports the
+> pairing not saved.
 >
 > - model: pairing
 
@@ -417,8 +447,8 @@ The rules that hold whoever takes part without the code to one guess against eac
 
 > r[pairing.capacity.full-confirm]
 > A showing machine that reached 32 peers between a start and its confirmation refuses the
-> confirmation, ends the code, stores nothing, and reports itself full, unless the new pairing
-> replaces one of its peers.
+> confirmation with a refusal saying refused, ends the code, stores nothing, and reports itself
+> full, unless the new pairing replaces one of its peers.
 >
 > - model: pairing
 
@@ -433,16 +463,23 @@ The rules that hold whoever takes part without the code to one guess against eac
 
 > r[pairing.peers.showing-stores-first]
 > The showing machine stores the new peer before it sends the receipt, so the receipt proves the
-> peer was stored. When storing fails, it sends a refusal instead, keeps nothing, and reports the
-> pairing not saved. The entering machine then stores nothing.
+> peer was stored. When storing fails, it sends a refusal saying refused instead, keeps nothing,
+> and reports the pairing not saved. The entering machine then stores nothing.
+>
+> - model: pairing
+
+> r[pairing.peers.entering-not-saved]
+> When the entering machine cannot store the new peer once tag Td has checked out, it keeps
+> nothing and reports the pairing not saved. The showing machine keeps the peer it stored, which a
+> pairing again within 10 minutes replaces (`pairing.known.lost-receipt`).
 >
 > - model: pairing
 
 > r[pairing.peers.entry]
 > After a pairing, each machine has the other as a peer, with: its public key pinned and its
 > machine id computed from it; its name, platform and link port as the exchange proved them; the
-> time of the pairing; never linked yet; this machine may drive it and may be driven by it; and
-> no edge chosen to face it.
+> time of the pairing; never linked yet; in use; not dormant; this machine may drive it and may be
+> driven by it; and no edge chosen to face it.
 >
 > - parity: Python saved a shared token from the exchange in place of a pinned public key (#14 and ADR 0003: links authenticate by pinned keys)
 > - model: pairing
@@ -477,9 +514,11 @@ The rules that hold whoever takes part without the code to one guess against eac
 > is accepted, with nothing restarted.
 
 > r[pairing.peers.first-zone]
-> A peer just paired, toward which this machine has no zone, gets one zone along a whole edge of
-> this machine's display, so input can cross to it before its zones are chosen. Which edge it is
-> the crossing map's choice (`spec/crossing.md`).
+> A peer just paired, toward which this machine has no zone, gets one zone on an edge of this
+> machine's display, so input can cross to it before its zones are chosen. The zone runs the whole
+> edge when no other peer's zone is on it, and otherwise shares the edge with theirs as the
+> crossing map lays them out. Which edge it is, and how it is shared, are the crossing map's
+> choice (`spec/crossing.md`).
 
 > r[pairing.peers.other-zones]
 > A pairing leaves every other peer's zones as they were, apart from sharing an edge with the new
@@ -520,11 +559,11 @@ The rules that hold whoever takes part without the code to one guess against eac
 ## Dormant peers
 
 > r[pairing.dormant.forgotten]
-> A peer this machine has linked with becomes dormant when, for 60 seconds, every link attempt to
-> it ends with the peer refusing this machine's key (`spec/link.md`). Its reason is that the other
-> machine no longer has this pairing.
+> A peer becomes dormant as soon as its link reports that the peer no longer has this pairing: the
+> peer proved its pinned key and refused this machine's (`link.auth.forgotten` in
+> `spec/link.md`). Its reason is that the other machine no longer has this pairing.
 >
-> - parity: Python's evidence was every handshake closed unanswered for 60 seconds, and it also marked a peer dormant when its token's link answered under another machine id (#14: links authenticate by pinned keys, so a key refused is the evidence, and a machine id can no longer differ from its key's)
+> - parity: Python marked a peer dormant only after 60 seconds in which every handshake with a peer that had linked before closed unanswered, and also when its token's link answered under another machine id (#14: links authenticate by pinned keys, so one refusal of this machine's key, made by the peer itself, is the evidence the 60 seconds of silence stood for, and a machine id can no longer differ from its key's)
 > - model: link
 
 > r[pairing.dormant.saved]
@@ -572,6 +611,10 @@ The rules that hold whoever takes part without the code to one guess against eac
 >
 > - parity: Python paired by address over TCP to port 24821 (#14: one UDP port, 24820, for links, pairing and beacons)
 
+> r[pairing.by-address.pair-again]
+> Asking to pair again with a peer opens pairing by address with that peer's saved address filled
+> in, for the user to enter the code the peer shows.
+
 > r[pairing.by-address.typed]
 > An address the user typed to pair is saved for the new peer as chosen by the user, which
 > discovery never replaces. The showing machine saves the address the connection came from as
@@ -592,6 +635,10 @@ The rules that hold whoever takes part without the code to one guess against eac
 > the name the exchange proved; not showing a code; the code was not accepted; the two run
 > different versions of Beamer; did not answer; one of the two machines is full; already paired
 > here, naming the peer and the day it was paired, or that it is this machine itself; already
-> paired there; or another pairing is still finishing.
+> paired there; not saved; or another pairing is still finishing.
+>
+> A refusal the showing machine sends is reported by the refusal it names: no code shown as not
+> showing a code; refused as the code was not accepted; already paired as already paired there;
+> and full as one of the two machines is full.
 >
 > - model: pairing

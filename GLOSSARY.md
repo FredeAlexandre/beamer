@@ -40,6 +40,11 @@ The QUIC connection, under the ALPN `beamer-pair/1`, that carries one pairing's 
 never a link.
 _Avoid_: pairing link, pairing channel
 
+**Beacon**:
+The broadcast a machine sends on its local networks to say a Beamer is there, on which port, and
+whether it shows a code. It proves nothing about who sent it, and never carries a machine id.
+_Avoid_: announcement, advertisement, mDNS record
+
 **Dormant peer**:
 A peer whose link shows it no longer holds this machine's key. It keeps its zones and its place on
 the crossing map until it is paired again or removed.
