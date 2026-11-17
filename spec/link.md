@@ -126,7 +126,8 @@ machine has not pinned keep handshakes with it open.
 > After a dial fails or a link closes, the next dial to that peer comes 0.25 s later, and each
 > further wait doubles, up to 2 s. A link that comes up starts the waits from 0.25 s again. A dial
 > the peer ended by refusing this machine's key is the exception: `link.auth.forgotten-redial`
-> replaces these waits until a link with that peer comes up.
+> replaces these waits until a link with that peer comes up or this machine's pairing with it
+> changes.
 >
 > - parity: Python dialled again every 2 s (#14: re-dialling waits from 0.25 s, doubling up to 2 s)
 > - model: link
@@ -216,7 +217,13 @@ arriving slowly keeps the link up as long as its pieces keep coming.
 > this machine sends, stopped acknowledging input, a message that does not decode, the peer broke
 > the protocol, closed by the peer, replaced, this machine forgot the peer or put it out of use,
 > the peer's pinned key changed, or a reason the app gave. Each rule that closes a link names its
-> reason from this list.
+> reason from this list. A link the app closes by quitting reports nothing (`link.send.quit`).
+>
+> - model: link
+
+> r[link.report.peer-closed]
+> When the peer closes a link and no other rule gives this end a reason, this end reports down with
+> the reason that the peer closed it.
 >
 > - model: link
 
@@ -262,7 +269,8 @@ app is told so. A pointer move that merges into one already waiting counts as no
 
 r[link.send.quit]
 When the app quits, it waits up to 0.5 s for what it already gave each link to be sent, then
-closes the links.
+closes the links. This end reports nothing for them, and the peer's end reports down with the
+reason that the peer closed it (`link.report.peer-closed`).
 
 ## Traffic classes
 
