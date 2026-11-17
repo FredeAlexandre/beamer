@@ -37,6 +37,45 @@ Something a machine can do, which it reports as ready, needs permission, refused
 here.
 _Avoid_: feature, caps
 
+## Discovery
+
+**Beacon**:
+The broadcast a machine sends on its local networks, from UDP port 24820, to say a Beamer is
+there and whether it shows a code. It proves nothing about who sent it, and never carries a
+machine id.
+_Avoid_: announcement, advertisement, mDNS record
+
+**Machines heard**:
+The machines whose beacons this machine has heard in the last 7 seconds, each by the address its
+beacon came from. Hearing a machine proves nothing about which machine it is.
+_Avoid_: nearby list, discovered machines
+
+**Chosen address**:
+An address the user gave for a peer. A peer with one is dialled only at its chosen addresses, and
+nothing Beamer hears or learns changes them.
+_Avoid_: pinned address, saved choice, explicit address
+
+**Learnt address**:
+An address Beamer saved for a peer because a pairing or an authenticated link reached the peer
+there. Beamer replaces learnt addresses as the peer moves.
+_Avoid_: followed address, endpoint
+
+**LAN address**:
+An address on the network of one of this machine's interfaces, as that interface's netmask sets it.
+_Avoid_: local address
+
+**Probe**:
+A dial at the address of a machine heard, to find a peer whose link has been down for 10 seconds.
+_Avoid_: endpoint follow
+
+**Hardware address**:
+The six-byte link-layer address of a network adapter, which Wake-on-LAN sends its packet to.
+_Avoid_: MAC address, hw
+
+**Wake**:
+Sending a peer with no link a Wake-on-LAN packet, then waiting up to 60 seconds for its link.
+_Avoid_: wake-up, WoL
+
 ## Shared state
 
 **Cluster**:
