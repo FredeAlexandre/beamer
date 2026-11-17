@@ -39,9 +39,9 @@ core/tests/test_atlas.py::AtlasTests::test_layout_state_carries_the_machine_name
 core/tests/test_atlas.py::AtlasTests::test_layout_state_carries_validated_display_rectangles  mined: crossing.map.displays.record, crossing.map.displays.valid
 core/tests/test_atlas.py::AtlasTests::test_missing_own_tile_is_placed_before_compiling_contacts  mined: crossing.map.members.this
 core/tests/test_atlas.py::AtlasTests::test_missing_peer_avoids_saved_tiles_and_keeps_saved_metadata  mined: crossing.map.place.kept, crossing.map.place.unplaced
-core/tests/test_atlas.py::AtlasTests::test_named_third_party_is_dropped_when_its_peer_no_longer_lists_it  mined: crossing.map.members.third-party, crossing.map.members.prune
+core/tests/test_atlas.py::AtlasTests::test_named_third_party_is_dropped_when_its_peer_no_longer_lists_it  mined: crossing.map.members.third-party
 core/tests/test_atlas.py::AtlasTests::test_named_third_party_tile_requires_a_live_non_shelved_peer  mined: crossing.map.members.third-party
-core/tests/test_atlas.py::AtlasTests::test_named_third_party_tile_survives_while_its_direct_peer_lists_it  mined: crossing.map.members.third-party, crossing.map.members.prune
+core/tests/test_atlas.py::AtlasTests::test_named_third_party_tile_survives_while_its_direct_peer_lists_it  mined: crossing.map.members.third-party
 core/tests/test_atlas.py::AtlasTests::test_new_layout_peers_are_placed_touching_the_local_machine  mined: crossing.map.place.unplaced
 core/tests/test_atlas.py::AtlasTests::test_overlap_marks_only_the_involved_tiles_and_keeps_other_contacts  mined: crossing.derive.overlap, crossing.map.overlap.reported
 core/tests/test_atlas.py::AtlasTests::test_overlap_refused_with_nearest_free_snap  mined: crossing.map.drop.overlap, crossing.map.snap.points, crossing.map.snap.choice, crossing.map.snap.free, crossing.map.overlap.reported
@@ -50,20 +50,20 @@ core/tests/test_atlas.py::AtlasTests::test_per_screen_aba_below_compiles_on_both
 core/tests/test_atlas.py::AtlasTests::test_per_screen_contact_zones_keep_only_the_shared_span  mined: crossing.zone.contact-span
 core/tests/test_atlas.py::AtlasTests::test_per_screen_zones_include_both_aba_edges_and_b1_corner_routes  mined: crossing.zone.display-contact, crossing.derive.corner.contact, crossing.map.shared.own-zones
 core/tests/test_atlas.py::AtlasTests::test_place_beside_centres_the_tile_for_a_whole_edge_and_keeps_its_fields  mined: crossing.map.recentre, crossing.map.place.first-peer
-core/tests/test_atlas.py::AtlasTests::test_pruning_stamps_the_cleaned_shared_picture  mined: crossing.map.members.prune, crossing.map.members.third-party
+core/tests/test_atlas.py::AtlasTests::test_pruning_stamps_the_cleaned_shared_picture  mined: crossing.map.members.third-party
 core/tests/test_atlas.py::AtlasTests::test_pruning_strips_vouch_metadata_without_restamping  python-detail: the vouched_by field earlier Python versions wrote into the crossing map, which the Rust app never holds
 core/tests/test_atlas.py::AtlasTests::test_rc13_right_peer_fills_free_snap_beside_saved_left_peer  mined: crossing.map.place.facing, crossing.map.place.kept
 core/tests/test_atlas.py::AtlasTests::test_rc6_saved_display_layout_keeps_the_mac_and_pc_edge_and_the_laptop_edge  mined: crossing.derive.share.claim, crossing.derive.share.zone, crossing.map.members.third-party, crossing.map.members.name
-core/tests/test_atlas.py::AtlasTests::test_rc7_ghost_tiles_are_pruned_and_not_derived_or_fabricated  mined: crossing.map.members.third-party, crossing.map.members.prune, crossing.map.members.retain
+core/tests/test_atlas.py::AtlasTests::test_rc7_ghost_tiles_are_pruned_and_not_derived_or_fabricated  mined: crossing.map.members.third-party, crossing.map.members.retain
 core/tests/test_atlas.py::AtlasTests::test_rc7_shape_keeps_pc_crossing_and_names_the_overlapping_pair  mined: crossing.map.overlap.reported, crossing.derive.overlap, crossing.derive.share.claim, crossing.map.members.third-party
-core/tests/test_atlas.py::AtlasTests::test_rc7_shared_picture_keeps_only_named_thirds_in_the_current_paired_list  mined: crossing.map.members.third-party, crossing.map.members.prune
+core/tests/test_atlas.py::AtlasTests::test_rc7_shared_picture_keeps_only_named_thirds_in_the_current_paired_list  mined: crossing.map.members.third-party
 core/tests/test_atlas.py::AtlasTests::test_received_layout_keeps_a_present_shelved_peer_tile_exactly  mined: crossing.map.members.retain, crossing.map.place.inactive
 core/tests/test_atlas.py::AtlasTests::test_received_layout_places_a_missing_held_peer_by_its_default_side  mined: crossing.map.members.retain, crossing.map.place.facing
 core/tests/test_atlas.py::AtlasTests::test_received_layout_restores_missing_locally_held_peer_tiles  mined: crossing.map.members.retain
 core/tests/test_atlas.py::AtlasTests::test_reporting_a_display_change_updates_the_shared_layout_stamp_once  mined: crossing.map.displays.record
 core/tests/test_atlas.py::AtlasTests::test_saved_peer_tiles_are_authoritative_when_deriving_layout  mined: crossing.map.place.kept, crossing.map.members.third-party
 core/tests/test_atlas.py::AtlasTests::test_set_elsewhere_only_when_a_peer_lacks_layout_capability  mined: crossing.derive.between
-core/tests/test_atlas.py::AtlasTests::test_shared_picture_accepts_named_third_party_in_current_paired_list  mined: crossing.map.members.third-party, crossing.map.members.prune
+core/tests/test_atlas.py::AtlasTests::test_shared_picture_accepts_named_third_party_in_current_paired_list  mined: crossing.map.members.third-party
 core/tests/test_atlas.py::AtlasTests::test_shifted_b1_keeps_the_machine_tile_scale_and_moves_only_its_display  mined: crossing.map.displays.apart, crossing.map.displays.fill
 core/tests/test_atlas.py::AtlasTests::test_single_tile_model_has_no_second_contact_sentence  python-detail: a sentence key's absence from a Python table
 core/tests/test_atlas.py::AtlasTests::test_snap_keeps_existing_third_marks  mined: crossing.map.snap.points
@@ -115,8 +115,8 @@ core/tests/test_crossing_input_fence.py::RealResponderInputFence::test_shortcut_
 core/tests/test_crossing_input_fence.py::RealResponderInputFence::test_visiting_push_waits_for_real_receiver_input_before_returning  python-detail: a test of the Python end-to-end harness's own waits and timeouts, not of Beamer
 core/tests/test_crossing_state.py::CrossingStateTests::test_a_152_peer_keeps_only_the_first_arrangement_side_and_no_display_routes  dropped: peers running older Beamer versions, no compatibility with the Python apps (#11 Drop)
 core/tests/test_crossing_state.py::CrossingStateTests::test_a_left_out_machine_never_keeps_the_notch_from_one_in_use  mined: crossing.derive.notch.one
-core/tests/test_crossing_state.py::CrossingStateTests::test_a_picture_omitting_a_tileless_peer_places_it_against_the_arriving_layout  mined: crossing.map.members.retain, crossing.map.place.facing, crossing.map.place.default-unstamped
-core/tests/test_crossing_state.py::CrossingStateTests::test_a_picture_omitting_two_peers_places_the_tileless_one_clear_of_the_kept_one  mined: crossing.map.members.retain, crossing.map.place.facing, crossing.map.place.default-unstamped
+core/tests/test_crossing_state.py::CrossingStateTests::test_a_picture_omitting_a_tileless_peer_places_it_against_the_arriving_layout  mined: crossing.map.members.retain, crossing.map.place.facing, crossing.map.place.default-written
+core/tests/test_crossing_state.py::CrossingStateTests::test_a_picture_omitting_two_peers_places_the_tileless_one_clear_of_the_kept_one  mined: crossing.map.members.retain, crossing.map.place.facing, crossing.map.place.default-written
 core/tests/test_crossing_state.py::CrossingStateTests::test_a_relayed_picture_without_our_tile_is_not_answered  wire-v6: the v6 layout message, which the store replaces (#14)
 core/tests/test_crossing_state.py::CrossingStateTests::test_a_shifted_contact_only_crosses_its_own_contacting_thirds  mined: crossing.derive.share.claim, crossing.landing.contact
 core/tests/test_crossing_state.py::CrossingStateTests::test_an_old_file_with_several_notches_keeps_the_first_in_ways_order  mined: crossing.derive.notch.one
@@ -124,7 +124,7 @@ core/tests/test_crossing_state.py::CrossingStateTests::test_an_old_peers_arrange
 core/tests/test_crossing_state.py::CrossingStateTests::test_arrangement_from_picture_peer_never_moves_or_echoes  mined: crossing.return.status, crossing.return.names-holder
 core/tests/test_crossing_state.py::CrossingStateTests::test_corners_and_notch_use_first_peer_and_notch_is_mac_only  mined: crossing.derive.corner.taken, crossing.derive.notch.one, crossing.derive.notch.mac
 core/tests/test_crossing_state.py::CrossingStateTests::test_displays_changed_gives_an_old_peer_no_tile_and_keeps_its_side  dropped: peers running older Beamer versions, no compatibility with the Python apps (#11 Drop)
-core/tests/test_crossing_state.py::CrossingStateTests::test_displays_changed_persists_a_missing_zoned_peer_tile_on_its_side  mined: crossing.map.place.facing, crossing.map.place.default-unstamped
+core/tests/test_crossing_state.py::CrossingStateTests::test_displays_changed_persists_a_missing_zoned_peer_tile_on_its_side  mined: crossing.map.place.facing, crossing.map.place.default-written
 core/tests/test_crossing_state.py::CrossingStateTests::test_dragging_an_old_peer_sets_its_side_and_tells_it  dropped: peers running older Beamer versions, no compatibility with the Python apps (#11 Drop)
 core/tests/test_crossing_state.py::CrossingStateTests::test_edit_remembers_thirds_off_and_drop_cannot_revive_them  mined: crossing.derive.choices.kept, crossing.derive.edge.toggle-third, crossing.return.status
 core/tests/test_crossing_state.py::CrossingStateTests::test_edit_replaces_edges_and_corners_in_canonical_order_and_drops_held_corners  mined: crossing.derive.corner.taken, crossing.derive.corner.independent
@@ -169,7 +169,7 @@ core/tests/test_idle_pointer.py::IdlePointerTests::test_leaving_twice_hides_once
 core/tests/test_motion_paths.py::MotionPathTests::test_legacy_coalescing_does_not_erase_diagonal_path  wire-v6: the v6 move message's samples, which spec/link.md's merged moves replace
 core/tests/test_motion_paths.py::MotionPathTests::test_malformed_or_unbounded_paths_are_rejected  wire-v6: the v6 move message's samples, which spec/link.md's merged moves replace
 core/tests/test_profile_events.py::ProfileEventTests::test_deleting_saved_row_does_not_change_live_or_desk_state  mined: crossing.profile.saved.delete
-core/tests/test_profile_events.py::ProfileEventTests::test_desk_arrival_is_refused_from_a_peer_that_cannot_drive  mined: crossing.profile.sync.trusted
+core/tests/test_profile_events.py::ProfileEventTests::test_desk_arrival_is_refused_from_a_peer_that_cannot_drive  mined: crossing.profile.sync.any-machine
 core/tests/test_profile_events.py::ProfileEventTests::test_edit_other_changes_only_the_target_machine_row  mined: crossing.profile.choices.edit-other
 core/tests/test_profile_events.py::ProfileEventTests::test_edit_other_ignores_notch_controls_for_a_non_mac_target  mined: crossing.profile.choices.notch-mac
 core/tests/test_profile_events.py::ProfileEventTests::test_edit_other_keeps_the_last_thirds_choice_and_refuses_a_held_corner  mined: crossing.derive.choices.partial, crossing.profile.choices.corner-taken
@@ -253,8 +253,8 @@ core/tests/test_profiles_e2e.py::Override::test_override_holds_b_until_it_turns_
 core/tests/test_profiles_e2e.py::Override::test_sharing_mine_sends_the_own_row_to_the_desk  mined: crossing.own-zones.edits, crossing.own-zones.share
 core/tests/test_profiles_e2e.py::PlainMiddle::test_a_machine_without_profiles_relays_nothing_and_is_unaffected  dropped: peers running older Beamer versions, no compatibility with the Python apps (#11 Drop)
 core/tests/test_profiles_e2e.py::PlainMiddle::test_with_a_direct_link_the_desk_still_syncs_and_the_plain_machine_is_untouched  dropped: peers running older Beamer versions, no compatibility with the Python apps (#11 Drop)
-core/tests/test_profiles_e2e.py::Refusal::test_a_desk_from_a_peer_that_may_not_drive_is_refused  mined: crossing.profile.sync.trusted
-core/tests/test_profiles_e2e.py::Refusal::test_what_a_trusted_peer_relays_is_taken_whoever_made_it  mined: crossing.profile.sync.trusted
+core/tests/test_profiles_e2e.py::Refusal::test_a_desk_from_a_peer_that_may_not_drive_is_refused  mined: crossing.profile.sync.any-machine
+core/tests/test_profiles_e2e.py::Refusal::test_what_a_trusted_peer_relays_is_taken_whoever_made_it  mined: crossing.profile.sync.any-machine
 core/tests/test_profiles_e2e.py::SameWaysChangesNothing::test_a_stale_machine_turning_it_on_again_seeds_nobody  mined: crossing.own-zones.every-machine-same, crossing.own-zones.every-machine-off-again
 core/tests/test_profiles_e2e.py::SameWaysChangesNothing::test_each_machine_turns_it_on_from_its_own_page  mined: crossing.own-zones.every-machine, crossing.own-zones.every-machine-off
 core/tests/test_profiles_e2e.py::SameWaysChangesNothing::test_four_machines  mined: crossing.own-zones.every-machine-off
@@ -286,7 +286,7 @@ core/tests/test_responder_ownership.py::Zones::test_a_zone_change_rearms_while_d
 core/tests/test_responder_ownership.py::Zones::test_after_a_switch_the_zones_are_disarmed_until_a_stay  mined: crossing.armed.spent
 core/tests/test_responder_ownership.py::Zones::test_held_edges_do_not_cross  mined: crossing.full-screen.zones, crossing.pause.zones
 core/tests/test_responder_ownership.py::Zones::test_reach_limits_the_zones_armed  mined: crossing.armed.reach, crossing.armed.driven-own-zones, crossing.landing.offset
-core/tests/test_responder_ownership.py::Zones::test_the_owners_resistance_is_used  mined: crossing.push.resistance
+core/tests/test_responder_ownership.py::Zones::test_the_owners_resistance_is_used  mined: crossing.push.resistance-driven
 core/tests/test_responder_ownership.py::Zones::test_the_send_home_names_no_position  mined: crossing.armed.spent
 core/tests/test_responder_ported.py::Pressure::test_a_push_short_of_the_resistance_holds_and_breaking_through_crosses  mined: crossing.push.held-at-edge, crossing.push.breakthrough, crossing.method.report-pressure
 core/tests/test_responder_ported.py::Pressure::test_the_log_names_the_edge_a_pointer_landed_on_and_the_edge_it_pushed_through  mined: crossing.log.arrival, crossing.log.zone-fired
@@ -349,23 +349,23 @@ core/tests/test_tile_resize.py::TileResizeTests::test_resize_from_drag_uses_the_
 core/tests/test_tile_resize.py::TileResizeTests::test_resize_keeps_aspect_position_and_scaled_offsets  mined: crossing.map.resize.proportional
 core/tests/test_tile_resize.py::TileResizeTests::test_taller_resized_peer_maps_contact_to_its_lower_half  mined: crossing.zone.contact-span, crossing.map.resize.proportional
 core/tests/test_way_helpers.py::WayHelperTests::test_toggle_part_keeps_one_part_and_uses_edge_order  dropped: uncalled code, dead in the Python app (#11 Drop)
-core/tests/test_ways.py::AMachineThatIsAsleep::test_a_left_out_zone_stays_off_when_its_machine_connects  mined: crossing.derive.kept-off, crossing.map.place.restored, crossing.derive.choices.kept
+core/tests/test_ways.py::AMachineThatIsAsleep::test_a_left_out_zone_stays_off_when_its_machine_connects  mined: crossing.derive.kept-off, crossing.derive.choices.kept
 core/tests/test_ways.py::AMachineThatIsAsleep::test_a_machine_back_over_a_stretch_another_holds_stays_off_and_says_so  mined: crossing.derive.no-link
 core/tests/test_ways.py::AMachineThatIsAsleep::test_a_machine_that_removed_this_pairing_stays_off_for_good_and_the_page_says_so  mined: crossing.derive.inactive, crossing.derive.choices.kept
 core/tests/test_ways.py::AMachineThatIsAsleep::test_a_machine_with_no_link_has_its_zone_set_aside_not_lost  mined: crossing.derive.no-link, crossing.derive.choices.kept
 core/tests/test_ways.py::AMachineThatIsAsleep::test_a_zone_the_user_changes_while_it_is_set_aside_is_no_longer_set_aside  mined: crossing.derive.no-link, crossing.derive.edge.form
-core/tests/test_ways.py::AMachineThatIsAsleep::test_it_waits_while_the_machine_is_still_asleep  mined: crossing.derive.no-link
+core/tests/test_ways.py::AMachineThatIsAsleep::test_it_waits_while_the_machine_is_still_asleep  dropped: uncalled code, dead in the Python app (#11 Drop)
 core/tests/test_ways.py::AMachineThatIsAsleep::test_the_zone_comes_back_when_the_machine_connects_and_the_stretch_is_free  mined: crossing.derive.no-link
 core/tests/test_ways.py::AMachineThatIsGone::test_a_machine_that_is_not_here_is_offered_no_third_and_blocks_nothing  mined: crossing.derive.inactive, crossing.derive.choices.kept
 core/tests/test_ways.py::AMachineThatIsGone::test_an_arrangement_from_a_machine_that_is_here_takes_the_side_from_one_that_is_not  mined: crossing.derive.no-link
 core/tests/test_ways.py::AMachineThatIsGone::test_choosing_the_edge_on_the_crossing_page_takes_it_from_a_machine_that_is_not_here  mined: crossing.derive.choices.kept, crossing.derive.overlap
-core/tests/test_ways.py::AMachineThatIsGone::test_giving_way_leaves_zones_elsewhere_and_machines_that_are_here_alone  mined: crossing.derive.no-link
+core/tests/test_ways.py::AMachineThatIsGone::test_giving_way_leaves_zones_elsewhere_and_machines_that_are_here_alone  dropped: uncalled code, dead in the Python app (#11 Drop)
 core/tests/test_ways.py::AMachineThatIsGone::test_two_machines_that_are_both_here_keep_the_rule_and_the_share_offer  dropped: uncalled code, dead in the Python app (#11 Drop)
 core/tests/test_ways.py::AMachineThatIsGone::test_without_liveness_the_machine_arriving_still_gives_way_as_before  dropped: uncalled code, dead in the Python app (#11 Drop)
 core/tests/test_ways.py::Arrangement::test_a_newer_arrangement_sets_the_opposite_side_for_that_peer_only  mined: crossing.map.shared.facing
 core/tests/test_ways.py::Arrangement::test_a_side_that_now_overlaps_turns_the_senders_zones_off_and_names_both  wire-v6: the v6 arrangement message, which the store replaces (#14)
-core/tests/test_ways.py::Arrangement::test_a_tie_won_on_the_id_applies  wire-v6: the v6 arrangement message, which the store replaces (#14)
-core/tests/test_ways.py::Arrangement::test_an_older_one_or_a_tie_lost_on_the_id_changes_nothing  wire-v6: the v6 arrangement message, which the store replaces (#14)
+core/tests/test_ways.py::Arrangement::test_a_tie_won_on_the_id_applies  mined: crossing.map.shared.facing
+core/tests/test_ways.py::Arrangement::test_an_older_one_or_a_tie_lost_on_the_id_changes_nothing  mined: crossing.map.shared.facing
 core/tests/test_ways.py::Arrangement::test_an_unknown_peer_bad_edge_or_bad_by_changes_nothing  wire-v6: the v6 arrangement message, which the store replaces (#14)
 core/tests/test_ways.py::Blocked::test_a_machine_whose_side_is_taken_and_has_no_way_in_is_told_which_machine_has_it  dropped: uncalled code, dead in the Python app (#11 Drop)
 core/tests/test_ways.py::Blocked::test_a_machine_with_a_corner_in_use_is_not_blocked  dropped: uncalled code, dead in the Python app (#11 Drop)
@@ -385,7 +385,7 @@ core/tests/test_ways.py::EveryMachineHasAWayIn::test_an_arrangement_for_a_machin
 core/tests/test_ways.py::EveryMachineHasAWayIn::test_an_arrangement_onto_another_machines_edge_gives_it_the_edge_off_and_says_so  mined: crossing.map.shared.facing, crossing.derive.share.one-peer
 core/tests/test_ways.py::EveryMachineHasAWayIn::test_one_whose_side_is_another_machines_edge_gets_it_off_so_the_settings_stay_readable  mined: crossing.map.place.facing, crossing.map.place.unplaced, crossing.derive.share.one-peer
 core/tests/test_ways.py::InactiveZones::test_a_not_in_use_peer_gets_an_off_zone_when_zones_are_ensured  mined: crossing.derive.inactive, crossing.derive.choices.default
-core/tests/test_ways.py::InactiveZones::test_a_not_in_use_zone_set_aside_stays_off_when_its_peer_connects  dropped: uncalled code, dead in the Python app (#11 Drop)
+core/tests/test_ways.py::InactiveZones::test_a_not_in_use_zone_set_aside_stays_off_when_its_peer_connects  mined: crossing.derive.inactive, crossing.derive.choices.kept
 core/tests/test_ways.py::InactiveZones::test_arrangement_does_not_turn_off_a_zone_for_clashing_with_an_inactive_peer  wire-v6: the v6 arrangement message, which the store replaces (#14)
 core/tests/test_ways.py::InactiveZones::test_inactive_zone_does_not_block_a_missing_zone_in_ensure_zones  mined: crossing.derive.inactive
 core/tests/test_ways.py::InactiveZones::test_inactive_zone_does_not_make_a_share_offer  dropped: uncalled code, dead in the Python app (#11 Drop)
@@ -464,11 +464,11 @@ core/tests/test_ways.py::TheShortcutsMachine::test_else_the_first_that_can_take_
 core/tests/test_ways.py::TheShortcutsMachine::test_else_the_first_this_machine_sends_to_so_the_refusal_or_the_wake_names_it  mined: crossing.shortcut.machine-none-ready, crossing.shortcut.machine-eligible
 core/tests/test_ways.py::TheShortcutsMachine::test_nothing_paired_picks_nothing  mined: crossing.shortcut.machine-nothing
 core/tests/test_ways.py::TheShortcutsMachine::test_the_machine_input_was_last_on_while_it_can_take_input  mined: crossing.shortcut.machine
-core/tests/test_ways.py::TheShownDefault::test_a_default_never_moves_a_side_already_set  mined: crossing.map.place.first-peer
-core/tests/test_ways.py::TheShownDefault::test_a_machine_paired_beside_the_one_migrated_from_1_4_is_given_no_side  dropped: the 1.4.x migration (F19 ships without it, #11)
-core/tests/test_ways.py::TheShownDefault::test_a_phone_alone_is_given_no_side  dropped: phone peers, out of scope (#11, charting)
-core/tests/test_ways.py::TheShownDefault::test_the_held_default_loses_to_a_side_the_peer_chooses  mined: crossing.map.place.default-unstamped, crossing.map.shared.facing
-core/tests/test_ways.py::TheShownDefault::test_the_one_machine_not_placed_holds_right_unstamped_so_its_edge_fires  mined: crossing.map.place.first-peer, crossing.map.place.default-unstamped, crossing.derive.first-zone
+core/tests/test_ways.py::TheShownDefault::test_a_default_never_moves_a_side_already_set  dropped: uncalled code, dead in the Python app (#11 Drop)
+core/tests/test_ways.py::TheShownDefault::test_a_machine_paired_beside_the_one_migrated_from_1_4_is_given_no_side  dropped: uncalled code, dead in the Python app (#11 Drop)
+core/tests/test_ways.py::TheShownDefault::test_a_phone_alone_is_given_no_side  dropped: uncalled code, dead in the Python app (#11 Drop)
+core/tests/test_ways.py::TheShownDefault::test_the_held_default_loses_to_a_side_the_peer_chooses  dropped: uncalled code, dead in the Python app (#11 Drop)
+core/tests/test_ways.py::TheShownDefault::test_the_one_machine_not_placed_holds_right_unstamped_so_its_edge_fires  dropped: uncalled code, dead in the Python app (#11 Drop)
 core/tests/test_ways.py::TheShownDefault::test_with_several_machines_none_is_given_a_side_nobody_chose  dropped: uncalled code, dead in the Python app (#11 Drop)
 core/tests/test_ways.py::WayBack::test_a_zone_in_use_with_a_side_or_a_corner_is_a_way  mined: crossing.return.status
 core/tests/test_ways.py::WayBack::test_an_arrangement_keeps_what_the_sender_said_whether_or_not_its_side_is_newer  mined: crossing.return.status
@@ -514,7 +514,7 @@ mac_app/tests/test_bridge.py::CrossingWiringTests::test_no_crossing_while_a_butt
 mac_app/tests/test_bridge.py::CrossingWiringTests::test_no_crossing_while_disconnected  mined: crossing.armed.home
 mac_app/tests/test_bridge.py::CrossingWiringTests::test_paused_and_unready_internal_seams_do_not_warp_or_build_pressure  mined: crossing.push.seam-stop, crossing.pause.zones, crossing.pause.other-methods, crossing.armed.home
 mac_app/tests/test_bridge.py::CrossingWiringTests::test_paused_crossing_leaves_the_edge_alone_while_the_shortcut_still_switches  mined: crossing.pause.zones, crossing.pause.other-methods
-mac_app/tests/test_bridge.py::CrossingWiringTests::test_pushing_the_edge_swallows_and_warps_then_crosses_with_the_offset  mined: crossing.push.held-at-edge, crossing.landing.offset, crossing.landing.facing-edge, crossing.push.resistance, crossing.method.report-tick, crossing.method.report-cross
+mac_app/tests/test_bridge.py::CrossingWiringTests::test_pushing_the_edge_swallows_and_warps_then_crosses_with_the_offset  mined: crossing.push.held-at-edge, crossing.landing.offset, crossing.landing.facing-edge, crossing.push.resistance-home, crossing.method.report-tick, crossing.method.report-cross
 mac_app/tests/test_bridge.py::CrossingWiringTests::test_shortcut_only_leaves_the_edge_alone  mined: crossing.armed.zones-only
 mac_app/tests/test_bridge.py::CrossingWiringTests::test_shortcut_switch_takes_with_no_position_and_shows_no_arrival  mined: crossing.landing.no-edge, crossing.method.report-none-out
 mac_app/tests/test_bridge.py::CrossingWiringTests::test_switching_home_while_already_home_shows_nothing  mined: crossing.method.report-quiet
@@ -624,7 +624,7 @@ mac_app/tests/test_crossing_matrix.py::MacDrivenTests::test_an_unplaced_machine_
 mac_app/tests/test_crossing_matrix.py::MacDrivenTests::test_each_arrangement_lands_on_the_edge_facing_the_pc_and_that_edge_leads_home  mined: crossing.landing.offset, crossing.landing.facing-edge, crossing.armed.driven-own-zones
 mac_app/tests/test_crossing_matrix.py::MacDrivenTests::test_home_through_this_macs_zone_whatever_this_macs_own_ways_and_arrangement_are  mined: crossing.armed.driven-own-zones, crossing.landing.facing-edge
 mac_app/tests/test_crossing_matrix.py::MacDrivenTests::test_the_macs_pause_and_full_screen_hold_its_edges_against_the_pcs_pointer  mined: crossing.pause.zones, crossing.full-screen.zones
-mac_app/tests/test_crossing_matrix.py::MacDrivenTests::test_the_way_home_uses_the_resistance_the_pc_sends_with_the_take  mined: crossing.push.resistance
+mac_app/tests/test_crossing_matrix.py::MacDrivenTests::test_the_way_home_uses_the_resistance_the_pc_sends_with_the_take  mined: crossing.push.resistance-driven
 mac_app/tests/test_crossing_matrix.py::MacDrivenTests::test_this_macs_full_screen_setting_alone_decides_its_edges_while_the_pc_drives_it  mined: crossing.full-screen.zones
 mac_app/tests/test_crossing_matrix.py::MacDrivenTests::test_this_macs_own_pointer_can_take_input_back_only_with_its_own_link_to_the_pc_up  mined: crossing.armed.own-pointer-while-driven
 mac_app/tests/test_crossing_matrix.py::MacToPcTests::test_a_corner_zone_leads_home_through_its_corner_and_only_by_a_diagonal_push  mined: crossing.armed.driven-own-zones, crossing.landing.facing-edge, crossing.zone.corner-diagonal
@@ -636,7 +636,7 @@ mac_app/tests/test_crossing_matrix.py::MacToPcTests::test_each_arrangement_cross
 mac_app/tests/test_crossing_matrix.py::MacToPcTests::test_home_through_any_third_of_an_edge_zone  mined: crossing.armed.driven-own-zones, crossing.landing.facing-edge, crossing.zone.edge-wall
 mac_app/tests/test_crossing_matrix.py::MacToPcTests::test_nothing_crosses_while_the_link_is_down_and_nothing_is_swallowed  mined: crossing.armed.home
 mac_app/tests/test_crossing_matrix.py::MacToPcTests::test_paused_and_full_screen_hold_the_mac_pointer_but_not_the_pc_pointer_coming_home  mined: crossing.pause.zones, crossing.full-screen.zones
-mac_app/tests/test_crossing_matrix.py::MacToPcTests::test_the_way_home_uses_the_resistance_this_mac_sends_with_the_take  mined: crossing.push.resistance
+mac_app/tests/test_crossing_matrix.py::MacToPcTests::test_the_way_home_uses_the_resistance_this_mac_sends_with_the_take  mined: crossing.push.resistance-driven, crossing.push.resistance-take
 mac_app/tests/test_crossing_matrix.py::MacToPcTests::test_this_macs_direction_switch_off_stops_every_way_out  mined: crossing.armed.home
 mac_app/tests/test_crossing_matrix.py::MacWaysInTests::test_every_way_crosses_where_it_says_and_nowhere_else  mined: crossing.zone.edge-wall, crossing.zone.thirds, crossing.zone.corner-diagonal, crossing.zone.corner-edge, crossing.landing.corner, crossing.zone.notch, crossing.zone.order
 mac_app/tests/test_crossing_matrix.py::MacWaysInTests::test_the_shortcut_alone_leaves_every_edge_a_wall  mined: crossing.armed.zones-only
@@ -703,11 +703,11 @@ mac_app/tests/test_pointer_hide.py::DrivenPointerTests::test_moving_the_pointer_
 mac_app/tests/test_pointer_hide.py::DrivenPointerTests::test_stopping_shows_it  mined: crossing.pointer.shown-on-quit
 mac_app/tests/test_pointer_hide.py::DrivenPointerTests::test_switched_off_the_driver_letting_go_leaves_it  mined: crossing.pointer.setting-off
 mac_app/tests/test_pointer_hide.py::DrivenPointerTests::test_the_driver_letting_go_hides_it  mined: crossing.pointer.idle-hide
-mac_app/tests/test_pointer_hide.py::PointerHiderTests::test_a_failing_background_call_still_tries_to_hide_and_never_raises  mined: crossing.pointer.mac-background
+mac_app/tests/test_pointer_hide.py::PointerHiderTests::test_a_failing_background_call_still_tries_to_hide_and_never_raises  mined: crossing.pointer.mac-background-ask
 mac_app/tests/test_pointer_hide.py::PointerHiderTests::test_a_hide_the_system_refused_is_not_counted_as_hidden  mined: crossing.pointer.hide-refused
 mac_app/tests/test_pointer_hide.py::PointerHiderTests::test_hiding_twice_hides_once_so_one_show_undoes_it  mined: crossing.pointer.hide-once
 mac_app/tests/test_pointer_hide.py::PointerHiderTests::test_show_without_a_hide_does_nothing  mined: crossing.pointer.hide-once
-mac_app/tests/test_pointer_hide.py::PointerHiderTests::test_the_background_permission_is_asked_for_once_before_the_first_hide  mined: crossing.pointer.mac-background
+mac_app/tests/test_pointer_hide.py::PointerHiderTests::test_the_background_permission_is_asked_for_once_before_the_first_hide  mined: crossing.pointer.mac-background-ask
 mac_app/tests/test_profiles_sync_mac.py::LoadNoteTests::test_older_version_note_is_in_memory_and_consumed_once  dropped: migration of older settings files (F19 ships without migrations, a fresh start, #11)
 mac_app/tests/test_profiles_sync_mac.py::ProfileSyncTests::test_a_change_made_outside_a_crossing_event_still_reaches_linked_peers  wire-v6: the v6 profile messages, which the store replaces (#14)
 mac_app/tests/test_profiles_sync_mac.py::ProfileSyncTests::test_arrival_runs_crossing_event_and_saves_before_rearming  mined: crossing.armed.follows-changes
@@ -718,7 +718,7 @@ mac_app/tests/test_profiles_sync_mac.py::ProfileSyncTests::test_link_up_sends_wh
 mac_app/tests/test_profiles_sync_mac.py::ProfileSyncTests::test_local_register_edits_use_separate_frames_and_only_profile_peers  wire-v6: the v6 profile messages, which the store replaces (#14)
 mac_app/tests/test_profiles_sync_mac.py::ProfileSyncTests::test_new_profile_event_does_not_inject_unsupported_capable_keyword  python-detail: the Mac controller passing a keyword argument new_profile does not take
 mac_app/tests/test_profiles_sync_mac.py::ProfileSyncTests::test_profile_capability_and_last_heard_reset_survive_reconnect  wire-v6: the v6 profile messages, which the store replaces (#14)
-mac_app/tests/test_profiles_sync_mac.py::ProfileSyncTests::test_unlinked_and_malformed_arrivals_do_not_change_settings  mined: crossing.profile.sync.trusted, crossing.profile.schema.alone
+mac_app/tests/test_profiles_sync_mac.py::ProfileSyncTests::test_unlinked_and_malformed_arrivals_do_not_change_settings  mined: crossing.profile.sync.any-machine, crossing.profile.schema.alone
 mac_app/tests/test_settings_v6.py::OverlapTests::test_duplicate_legacy_corner_zones_compile_to_one_corner  mined: crossing.derive.corner.one
 mac_app/tests/test_settings_v6.py::OverlapTests::test_editing_edge_and_thirds_compiles_a_whole_edge_without_a_part_zone  mined: crossing.derive.edge.form
 mac_app/tests/test_settings_v6.py::OverlapTests::test_legacy_edge_and_thirds_both_on_cross_by_the_whole_edge  dropped: the 1.4.x migration (F19 ships without it, #11)
@@ -773,7 +773,7 @@ mac_app/tests/test_way_home.py::WayHomeFollowsThisMacTests::test_the_notch_arms_
 mac_app/tests/test_way_home.py::WayHomeFollowsThisMacTests::test_the_notch_crosses_the_top_edge_whichever_side_the_pc_is_on  mined: crossing.zone.notch
 mac_app/tests/test_way_home.py::WayHomeFollowsThisMacTests::test_the_notch_is_read_at_each_push  mined: crossing.zone.notch
 mac_app/tests/test_way_home.py::WayHomeFollowsThisMacTests::test_the_shortcut_alone_leaves_no_way_home_by_the_pointer  mined: crossing.armed.zones-only
-mac_app/tests/test_way_home.py::WayHomeFollowsThisMacTests::test_the_whole_edge  mined: crossing.armed.driven-own-zones, crossing.push.resistance
+mac_app/tests/test_way_home.py::WayHomeFollowsThisMacTests::test_the_whole_edge  mined: crossing.armed.driven-own-zones, crossing.push.resistance-driven
 mac_app/tests/test_way_home.py::WayHomeFollowsThisMacTests::test_the_whole_edge_stands_in_for_its_thirds  mined: crossing.derive.share.zone, crossing.zone.thirds
 mac_app/tests/test_way_home.py::WayHomeFollowsThisMacTests::test_the_whole_edge_still_wins_over_the_notch  mined: crossing.zone.order
 mac_app/tests/test_way_home.py::WayHomeFollowsThisMacTests::test_without_a_measured_notch_there_is_no_notch_zone  mined: crossing.zone.notch
@@ -782,9 +782,9 @@ win_app/tests/test_app_config.py::OverlappingZonesTests::test_inactive_peer_zone
 win_app/tests/test_app_config.py::OverlappingZonesTests::test_overlapping_legacy_choices_load_as_intent_and_contact_zones  mined: crossing.derive.share.one-peer, crossing.derive.choices.kept, crossing.map.saved.derived
 win_app/tests/test_arrangement.py::ArrangementTests::test_a_newer_stamp_sets_the_opposite_side_and_the_stamp_and_author  mined: crossing.map.shared.newest, crossing.map.shared.one
 win_app/tests/test_arrangement.py::ArrangementTests::test_a_peer_that_is_not_in_the_list_or_an_edge_that_is_not_one_is_ignored  wire-v6: the v6 arrangement message, which the store replaces (#14)
-win_app/tests/test_arrangement.py::ArrangementTests::test_an_older_or_equal_stamp_changes_nothing  mined: crossing.map.shared.newest
+win_app/tests/test_arrangement.py::ArrangementTests::test_an_older_or_equal_stamp_changes_nothing  mined: crossing.map.shared.facing
 win_app/tests/test_arrangement.py::ArrangementTests::test_old_peer_arrangement_compiles_one_side_allocation_without_clash_notices  dropped: peers running older Beamer versions, no compatibility with the Python apps (#11 Drop)
-win_app/tests/test_arrangement.py::ArrangementTests::test_the_same_second_goes_to_the_larger_id  mined: crossing.map.shared.newest
+win_app/tests/test_arrangement.py::ArrangementTests::test_the_same_second_goes_to_the_larger_id  mined: crossing.map.shared.facing
 win_app/tests/test_arrangement.py::LearnedTests::test_the_token_comes_back_too_so_a_fold_cannot_be_undone_by_a_save  python-detail: the Windows settings file's flat view of its first peer
 win_app/tests/test_arrangement.py::LearnedTests::test_what_the_links_write_comes_back_in_the_flat_names  python-detail: the Windows settings file's flat view of its first peer
 win_app/tests/test_capture_portal.py::BarrierTest::test_a_corner_is_its_two_walls_as_far_as_the_corner_push_reaches  dropped: Linux-only, out of scope (#1)
@@ -826,9 +826,9 @@ win_app/tests/test_crossing_matrix.py::ArrangementHeldByBothTests::test_a_fresh_
 win_app/tests/test_crossing_matrix.py::ArrangementHeldByBothTests::test_a_newer_arrangement_is_applied_as_this_pcs_opposite_edge  mined: crossing.map.shared.facing, crossing.map.shared.newest, crossing.armed.follows-changes
 win_app/tests/test_crossing_matrix.py::ArrangementHeldByBothTests::test_an_older_arrangement_is_ignored  mined: crossing.map.shared.facing, crossing.map.shared.newest
 win_app/tests/test_crossing_matrix.py::ArrangementHeldByBothTests::test_the_same_arrangement_over_the_second_link_changes_nothing_and_logs_nothing  mined: crossing.map.shared.facing, crossing.map.shared.newest, crossing.log.map-unchanged
-win_app/tests/test_crossing_matrix.py::PcWayOutNamedToThePeerTests::test_a_crossing_names_the_edge_of_the_peer_it_arrives_by_and_the_pcs_resistance  mined: crossing.landing.offset, crossing.landing.facing-edge, crossing.push.resistance
-win_app/tests/test_crossing_matrix.py::PcWayOutNamedToThePeerTests::test_a_resistance_the_peer_reported_is_never_read  mined: crossing.push.resistance
-win_app/tests/test_crossing_matrix.py::PcWayOutNamedToThePeerTests::test_the_pcs_resistance_is_what_it_asks_the_peer_for_never_the_peers_own  mined: crossing.push.resistance
+win_app/tests/test_crossing_matrix.py::PcWayOutNamedToThePeerTests::test_a_crossing_names_the_edge_of_the_peer_it_arrives_by_and_the_pcs_resistance  mined: crossing.landing.offset, crossing.landing.facing-edge, crossing.push.resistance-take
+win_app/tests/test_crossing_matrix.py::PcWayOutNamedToThePeerTests::test_a_resistance_the_peer_reported_is_never_read  mined: crossing.push.resistance-take
+win_app/tests/test_crossing_matrix.py::PcWayOutNamedToThePeerTests::test_the_pcs_resistance_is_what_it_asks_the_peer_for_never_the_peers_own  mined: crossing.push.resistance-take
 win_app/tests/test_crossing_matrix.py::PcWaysOutTests::test_a_corner_arrives_at_the_end_of_its_crossing_edge_nearest_it  mined: crossing.zone.corner-edge, crossing.landing.corner
 win_app/tests/test_crossing_matrix.py::PcWaysOutTests::test_a_pc_that_holds_no_side_has_no_edge_or_part_way_out_but_its_corner_still_crosses  mined: crossing.derive.corner.contact
 win_app/tests/test_crossing_matrix.py::PcWaysOutTests::test_every_way_crosses_where_it_says_and_nowhere_else  mined: crossing.zone.edge-wall, crossing.zone.thirds, crossing.zone.corner-diagonal, crossing.zone.corner-edge, crossing.landing.corner
@@ -899,10 +899,10 @@ win_app/tests/test_links.py::CornerTests::test_the_push_names_its_corner_for_the
 win_app/tests/test_links.py::CornerTests::test_the_same_diagonal_away_from_the_corner_does_not  mined: crossing.zone.corner-diagonal
 win_app/tests/test_links.py::EdgeTests::test_a_drag_to_the_edge_is_not_a_crossing  mined: crossing.push.drag
 win_app/tests/test_links.py::EdgeTests::test_a_failed_cursor_read_skips_that_event_without_disabling_crossing  mined: crossing.push.unreadable-pointer, crossing.log.pointer-unreadable
-win_app/tests/test_links.py::EdgeTests::test_a_held_edge_does_not_cross  mined: crossing.pause.zones, crossing.pause.other-methods
+win_app/tests/test_links.py::EdgeTests::test_a_held_edge_does_not_cross  mined: crossing.pause.zones
 win_app/tests/test_links.py::EdgeTests::test_a_peer_that_does_not_accept_input_is_not_a_zone_to_cross_into  mined: crossing.armed.home
 win_app/tests/test_links.py::EdgeTests::test_a_pointer_off_the_edge_never_crosses  mined: crossing.push.not-at-zone
-win_app/tests/test_links.py::EdgeTests::test_a_push_against_the_edge_takes_the_peer_with_the_edge_and_offset  mined: crossing.landing.offset, crossing.landing.facing-edge, crossing.push.resistance
+win_app/tests/test_links.py::EdgeTests::test_a_push_against_the_edge_takes_the_peer_with_the_edge_and_offset  mined: crossing.landing.offset, crossing.landing.facing-edge, crossing.push.resistance-home
 win_app/tests/test_links.py::EdgeTests::test_a_push_away_from_the_edge_never_crosses  mined: crossing.push.not-at-zone
 win_app/tests/test_links.py::EdgeTests::test_a_zone_leads_to_its_own_peer  mined: crossing.zone.leads-to
 win_app/tests/test_links.py::EdgeTests::test_a_zone_that_is_off_never_crosses  mined: crossing.derive.edge.off
@@ -917,8 +917,8 @@ win_app/tests/test_linux_desktop.py::DesktopTests::test_session_desktop_is_a_fal
 win_app/tests/test_parity.py::HeldEdgeTests::test_a_button_whose_release_was_never_seen_does_not_hold_the_edge_for_ever  mined: crossing.push.drag-unseen-release
 win_app/tests/test_parity.py::HeldEdgeTests::test_a_drag_against_the_edge_does_not_cross  mined: crossing.push.drag
 win_app/tests/test_parity.py::HeldEdgeTests::test_a_drag_crosses_when_the_setting_is_off  mined: crossing.push.drag-off
-win_app/tests/test_parity.py::HeldEdgeTests::test_a_full_screen_app_holds_the_edge  mined: crossing.full-screen.zones, crossing.full-screen.other-methods
-win_app/tests/test_parity.py::HeldEdgeTests::test_pause_holds_the_edge_and_leaves_the_shortcut  mined: crossing.pause.zones
+win_app/tests/test_parity.py::HeldEdgeTests::test_a_full_screen_app_holds_the_edge  mined: crossing.full-screen.zones
+win_app/tests/test_parity.py::HeldEdgeTests::test_pause_holds_the_edge_and_leaves_the_shortcut  mined: crossing.pause.zones, crossing.pause.other-methods
 win_app/tests/test_parity.py::HeldEdgeTests::test_this_pcs_full_screen_setting_decides_its_edges_while_the_mac_drives_it  mined: crossing.full-screen.zones
 win_app/tests/test_parity.py::HeldEdgeTests::test_with_the_hold_off_a_full_screen_app_does_not_hold_the_edge_either_way  mined: crossing.full-screen.setting
 win_app/tests/test_parity.py::ReviewFixTests::test_a_key_recorded_in_hold_style_while_held_is_let_go_on_windows  mined: crossing.shortcut.key-long-press
@@ -936,8 +936,8 @@ win_app/tests/test_pc_three_machines.py::SetWaysTests::test_a_machine_that_is_no
 win_app/tests/test_pc_three_machines.py::SetWaysTests::test_an_arrangement_rewrites_the_edge_that_machines_corner_crosses  mined: crossing.zone.corner-edge, crossing.map.shared.facing, crossing.map.shared.newest
 win_app/tests/test_pc_three_machines.py::SetWaysTests::test_an_unchanged_side_is_not_a_move  mined: crossing.derive.choices.one-peer
 win_app/tests/test_pc_three_machines.py::SetWaysTests::test_no_side_given_keeps_the_side_held_whatever_the_window_last_read  mined: crossing.derive.choices.one-peer, crossing.zone.corner-edge
-win_app/tests/test_pc_three_machines.py::SetWaysTests::test_old_peer_arrangement_compiles_without_historical_off_zones  mined: crossing.map.shared.facing, crossing.map.shared.newest, crossing.derive.share.one-peer, crossing.derive.choices.kept
-win_app/tests/test_pc_three_machines.py::SetWaysTests::test_old_peer_on_a_taken_side_keeps_intent_without_an_overlapping_zone  mined: crossing.derive.share.one-peer, crossing.derive.choices.kept
+win_app/tests/test_pc_three_machines.py::SetWaysTests::test_old_peer_arrangement_compiles_without_historical_off_zones  dropped: peers running older Beamer versions, no compatibility with the Python apps (#11 Drop)
+win_app/tests/test_pc_three_machines.py::SetWaysTests::test_old_peer_on_a_taken_side_keeps_intent_without_an_overlapping_zone  dropped: peers running older Beamer versions, no compatibility with the Python apps (#11 Drop)
 win_app/tests/test_pc_three_machines.py::SetWaysTests::test_reading_the_settings_gives_a_machine_with_no_zone_its_edge_and_writes_it  mined: crossing.derive.first-zone
 win_app/tests/test_pc_three_machines.py::SetWaysTests::test_shared_side_way_edit_saves_intent_without_a_clash_refusal  mined: crossing.derive.share.one-peer, crossing.derive.choices.kept
 win_app/tests/test_pc_three_machines.py::SetWaysTests::test_way_edit_writes_one_peers_intent_and_keeps_both_sides  mined: crossing.derive.choices.one-peer, crossing.zone.corner-edge
@@ -960,7 +960,7 @@ win_app/tests/test_profiles_sync_qt.py::ProfilesSyncQtTests::test_a_change_made_
 win_app/tests/test_profiles_sync_qt.py::ProfilesSyncQtTests::test_framed_desk_is_sent_only_to_profiles_peers_and_never_with_layout_or_design  wire-v6: the v6 profile messages, which the store replaces (#14)
 win_app/tests/test_profiles_sync_qt.py::ProfilesSyncQtTests::test_link_up_returns_whole_framed_desk  wire-v6: the v6 profile messages, which the store replaces (#14)
 win_app/tests/test_profiles_sync_qt.py::ProfilesSyncQtTests::test_received_desk_uses_crossing_event_path_and_marks_current_link_heard  wire-v6: the v6 profile messages, which the store replaces (#14)
-win_app/tests/test_profiles_sync_qt.py::ProfilesSyncQtTests::test_rejected_desk_cannot_change_settings_or_forward_registers  mined: crossing.profile.sync.trusted
+win_app/tests/test_profiles_sync_qt.py::ProfilesSyncQtTests::test_rejected_desk_cannot_change_settings_or_forward_registers  mined: crossing.profile.sync.any-machine
 win_app/tests/test_profiles_sync_qt.py::ProfilesSyncQtTests::test_shake_notice_uses_local_count_and_stops_after_three  mined: crossing.shake.notice
 win_app/tests/test_profiles_sync_qt.py::ProfilesSyncQtTests::test_shake_settings_reach_sender_without_resetting_an_unchanged_detector  mined: crossing.profile.shake.applies
 win_app/tests/test_profiles_sync_qt.py::ProfilesSyncQtTests::test_startup_configures_shake_before_input_hooks_start  mined: crossing.profile.shake.applies

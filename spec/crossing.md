@@ -50,19 +50,21 @@ of them are armed at a given moment is Armed zones'.
 > it, and an edge between two of this machine's displays never is: there the pointer passes onto
 > the other display and builds nothing.
 >
-> - parity: Python's PC counted only the edge's outermost pixel row or column, its Mac 1.5 px, because a Mac reports fractional positions (#16: one crossing engine for every platform)
+> - parity: Python's zones on every driven machine, the Mac included, and the PC's home zones counted only the edge's outermost pixel row or column; only the Mac's home zones counted 1.5 px, because a Mac reports fractional positions (#16: one crossing engine for every platform; the Mac's at home)
 
-r[crossing.zone.display]
-A zone that names one of this machine's displays is that display's edge only. It is pushable
-while the pointer is on that display within 1.5 px of that edge, whether or not another display
-of this machine lies beyond it, so a zone can sit on the edge between two of this machine's
-displays.
+> r[crossing.zone.display]
+> A zone that names one of this machine's displays is that display's edge only. It is pushable
+> while the pointer is on that display within 1.5 px of that edge, whether or not another display
+> of this machine lies beyond it, so a zone can sit on the edge between two of this machine's
+> displays.
+>
+> - parity: Python's zones on every driven machine, the Mac included, and the PC's home zones took the pointer as at a zone naming a display wherever it was within that display's stretch along the edge and no more than 1.5 px inside its edge, on that display or on another beyond it; only the Mac's home zones needed it on that display (#16: one crossing engine for every platform; the Mac's at home)
 
 > r[crossing.zone.unknown-display]
 > A zone that names a display this machine does not have is never pushable: neither its edge nor
 > its corner is replaced by the edge or corner of all this machine's displays.
 >
-> - parity: Python's PC took an edge or thirds zone naming a display it did not have as a zone on the whole edge of all its displays, while its corner zones, and every zone on the Mac, were never pushable (#16: one crossing engine for every platform; never crossing where the crossing map put no zone)
+> - parity: Python's zones on every driven machine, the Mac included, and the PC's home zones took an edge or thirds zone naming a display the machine did not have as a zone on the whole edge of all its displays, while their corner zones, and every home zone on the Mac, were never pushable (#16: one crossing engine for every platform; never crossing where the crossing map put no zone)
 
 r[crossing.zone.overshoot]
 When one pointer move takes the pointer from inside the display a zone names across that display's
@@ -72,8 +74,8 @@ point the move started from is the pointer's last known position, or, when there
 position less the move.
 
 r[crossing.zone.overshoot-miss]
-A pointer move whose path meets the line of a zone's edge beyond either end of the display the
-zone names, or that starts outside that display, does not reach the zone: the pointer is not held at edge
+A pointer move whose path meets the line of a zone's edge beyond either end of the display the zone
+names, or that starts outside that display, does not reach the zone: the pointer is not held at edge
 and no push pressure builds.
 
 > r[crossing.zone.thirds]
@@ -84,7 +86,7 @@ and no push pressure builds.
 > fractions 1/3 and 2/3: a point at exactly 1/3 is in the middle third, one at 2/3 in the end third,
 > and the edge's last pixel in the end third. The rest of that edge is a wall.
 >
-> - parity: Python's Mac measured these fractions over the edge's length less one pixel (#16: one crossing engine for every platform; the PC's measure)
+> - parity: Python's home zones on the Mac measured these fractions over the edge's length less one pixel, while its zones on every driven machine, the Mac included, and the PC's home zones measured them over the whole length (#16: one crossing engine for every platform; the whole length)
 
 r[crossing.zone.display-contact]
 On the crossing map, a display of this machine and a display of a peer touch along an edge when an
@@ -114,7 +116,7 @@ than 10⁻⁹ of the edge's length is taken as ending at that end.
 > means within 1.5 px of the edge, even where other displays of this machine lie beyond both; for
 > one that names none, an edge with no display of this machine just beyond it.
 >
-> - parity: Python's Mac measured the box of a corner zone naming no display from the corner of the rectangle around all its displays, which no display reaches when they are staggered (#16: one crossing engine for every platform; the PC's)
+> - parity: Python's home zones on the Mac measured the box of a corner zone naming no display from the corner of the rectangle around all its displays, which no display reaches when they are staggered (#16: one crossing engine for every platform; that of its zones on every driven machine and the PC's home zones)
 
 r[crossing.zone.corner-diagonal]
 Only a diagonal push builds pressure against a corner zone: a move outward across both of the
@@ -134,7 +136,7 @@ meets one of them, kept on the display, and the move counts toward the corner as
 > or right edge; when the peer's display moves to another edge on the crossing map, the edge it
 > names follows.
 >
-> - parity: Python's Mac crossed every chosen corner through its left or right edge, whatever edge the peer was on (#16: one crossing engine for every platform; the PC's)
+> - parity: Python's Mac, at home and driven, crossed every chosen corner through its left or right edge, whatever edge the peer was on (#16: one crossing engine for every platform; the PC's)
 
 r[crossing.zone.notch]
 On a Mac, the notch zone is pushable only within 1.5 px of the top of this machine's displays and
@@ -189,8 +191,11 @@ where it meets it, so the pointer never passes through a zone onto a display bey
 ## The crossing map
 
 Each machine has a footprint on the crossing map, and its displays fill it. Footprints are placed
-and sized in map units. An inactive peer is a peer that is not in use, kept off the crossing map,
-or dormant (`pairing.dormant.kept`); every other machine on the crossing map is active.
+and sized in map units. The crossing map is one shared entry in the store (#14), the same on every
+machine; this machine's crossing map is the part of it this machine shows and derives its zones from
+(Which machines are on the crossing map, below). An inactive peer is a peer that is not in use,
+kept off the crossing map, or dormant (`pairing.dormant.kept`); every other machine on the crossing
+map is present.
 
 > r[crossing.map.footprint]
 > Each machine on the crossing map has a footprint: a rectangle placed in whole map units, whose
@@ -247,36 +252,42 @@ This machine is always on its crossing map. When the map has no footprint for it
 placed at (0, 0), 160 by 100 map units, before any contact is found or zone derived.
 
 r[crossing.map.members.peers]
-Every peer of this machine is on its crossing map, an inactive peer included. A peer's footprint
-leaves the map when its pairing is removed, unless it stays as a third party
+Every peer of this machine is on its crossing map, an inactive peer included. A peer whose pairing
+is removed stays on this machine's crossing map only as a third party
 (`crossing.map.members.third-party`).
 
-r[crossing.map.members.third-party]
-A machine that is neither this machine nor one of its peers is on this machine's crossing map only
-while a peer of this machine that is in use, not kept off the crossing map and not dormant has it in
-its paired list, and only while the crossing map carries a name for it. A footprint of any other
-machine is kept off this machine's crossing map: it is not shown, and it counts for no overlap,
-contact or snap point.
+> r[crossing.map.members.third-party]
+> A machine that is neither this machine nor one of its peers is on this machine's crossing map only
+> while a peer of this machine that is in use, not kept off the crossing map and not dormant has it
+> in its paired list, and only while the crossing map carries a name for it. Every other footprint
+> in the crossing map is kept off this machine's crossing map: it is not shown, and counts here for
+> no overlap, contact or snap point. Keeping a footprint off writes nothing: it stays in the
+> crossing map as it was, for the machines that show it, and a change this machine makes to the
+> crossing map keeps it.
+>
+> - model: store
+> - parity: Python removed from its crossing map every footprint it kept off, an unpaired peer's included, and sent the map, so its peers removed it too, even those that still showed it (#14: the crossing map is one shared entry, and a machine leaves it only when the cluster forgets that machine, so keeping a footprint off is a filter that writes nothing)
 
 r[crossing.map.members.name]
 The crossing map carries a name with a machine's footprint, without leading or trailing blanks. A
 name that is blank, or longer than 64 characters, is dropped, and the footprint is kept without it.
 
-> r[crossing.map.members.prune]
-> When this machine finds on its crossing map a footprint that `crossing.map.members.third-party`
-> keeps off, it removes it, and the removal is a change to the crossing map that reaches every
-> machine. A map from which nothing is removed is not changed.
+> r[crossing.map.members.forgotten]
+> The footprint of a machine that no machine in the cluster lists as a peer reads as unset, as the
+> store reads every shared entry naming a forgotten machine (#14): it is on no machine's crossing
+> map and counts for no overlap, contact or snap point anywhere. No machine writes its removal.
 >
 > - model: store
 
 > r[crossing.map.members.retain]
-> When the crossing map changes on another machine and the change lacks the footprint of a machine
-> that is on this machine's crossing map, this machine keeps the footprint it had for it, or places
-> it by default (`crossing.map.place.facing`, `crossing.map.place.unplaced`) when it had none.
-> Every footprint the change does carry, an inactive peer's included, replaces the one this machine
-> had.
+> A change to the crossing map arriving from another machine replaces this machine's whole crossing
+> map, every footprint in it, an inactive peer's included: a footprint the change lacks is gone here
+> too, and a machine on this machine's crossing map left with no footprint is placed by default
+> (`crossing.map.place.facing`, `crossing.map.place.unplaced`,
+> `crossing.map.place.default-written`).
 >
 > - model: store
+> - parity: Python kept the footprint it had for a machine on its crossing map that an arriving map lacked, and took only the footprints the arriving map carried (#14: the crossing map is one shared entry, the newest winning whole, so every machine ends with the same map)
 
 ### Where a machine sits
 
@@ -297,29 +308,35 @@ footprint keeps the edge it last faced, as a peer paired again does (`pairing.pe
 r[crossing.map.place.facing]
 A peer with no footprint that faces an edge of this machine gets a footprint the size of this
 machine's, flush against that edge. The peers facing one edge with no footprint sit in a row centred
-on the edge, touching each other, in the peer list's order. A footprint so placed that overlaps an
-active machine's footprint moves to the nearest free snap point (`crossing.map.snap.choice`, with no
-radius), so it shares that edge or touches a corner.
+on the edge, touching each other, in the peer list's order. A footprint so placed that overlaps a
+present machine's footprint moves to the nearest free snap point (`crossing.map.snap.choice`, with
+no radius), so it shares that edge or touches a corner.
 
 r[crossing.map.place.unplaced]
 A peer with no footprint that faces no edge, such as one just paired, gets a footprint the size of
 this machine's, centred across this machine's footprint and flush under the lowest bottom edge of
-the other active machines' footprints, or under this machine's footprint when no other is on the
+the other present machines' footprints, or under this machine's footprint when no other is on the
 map. Several such peers sit in a row centred there, touching each other, in the peer list's order.
 Each then moves to the nearest free snap point (`crossing.map.snap.choice`, with no radius), so that
 it touches this machine's footprint.
 
 r[crossing.map.place.first-peer]
 On a Mac whose crossing map is empty, the first peer paired gets its footprint flush against the
-right edge of the Mac's footprint, centred on it, and this placement is a change to the crossing map
-that reaches every machine.
+right edge of the Mac's footprint, centred on it.
 
-> r[crossing.map.place.default-unstamped]
-> A footprint placed by default (`crossing.map.place.facing`, `crossing.map.place.unplaced`) is not
-> a change to the crossing map: it is not written as one, and a footprint for that machine placed on
-> any other machine replaces it.
+> r[crossing.map.place.default-written]
+> A footprint placed by default, this machine's own (`crossing.map.members.this`) or a peer's
+> (`crossing.map.place.first-peer`, `crossing.map.place.facing`, `crossing.map.place.unplaced`), is
+> a change to the crossing map that reaches every machine, so two machines that pair end with one
+> map, each facing the other's facing edge. A machine is placed by default only while the crossing
+> map has no footprint for it. The placement is newer than the crossing map it was placed on and
+> older than every other change made to that map since, on any machine: such a change wins over it,
+> and a machine it then leaves with no footprint is placed by default again on the map that won. A
+> crossing map never changed is older than every change, so a machine new to the cluster takes the
+> cluster's crossing map over its own.
 >
 > - model: store
+> - parity: Python wrote no default placement but a Mac's first peer on an empty crossing map, written with the Mac's own displays: each machine kept its own default until a footprint for that machine came from elsewhere, so two paired machines that are not Macs each placed the other below itself, and each one's zone to the other was on its own bottom edge (#14: the crossing map is one shared entry and converges)
 
 r[crossing.map.place.inactive]
 An inactive peer's footprint stays on the crossing map where it was, but never blocks another
@@ -327,10 +344,10 @@ machine: machines are placed, dropped and snapped as if it were not there, they 
 it is in no overlap.
 
 > r[crossing.map.place.restored]
-> When a peer is restored, or in use again, and its footprint overlaps an active machine's, it
-> moves. When the peer faces an edge, it joins the row of active footprints touching that edge: the
+> When a peer is restored, or in use again, and its footprint overlaps a present machine's, it
+> moves. When the peer faces an edge, it joins the row of present footprints touching that edge: the
 > row, in its order along the edge with the peer last, touching end to end, is centred on the edge,
-> provided every footprint in it still touches that edge, none overlaps another active footprint,
+> provided every footprint in it still touches that edge, none overlaps another present footprint,
 > and each keeps the contacts it had with the footprints of machines beyond the row. Otherwise no
 > other footprint moves, and the peer's footprint moves to the nearest free snap point
 > (`crossing.map.snap.choice`, with no radius). The move is a change to the crossing map that
@@ -341,7 +358,7 @@ it is in no overlap.
 r[crossing.map.recentre]
 Recentring a peer puts its footprint flush against this machine's footprint, centred on the edge it
 touches, or, when it touches no edge, on the edge whose centred place is nearest its footprint, in
-the order left, right, top, bottom on a tie. When the centred place overlaps another active
+the order left, right, top, bottom on a tie. When the centred place overlaps another present
 machine's footprint, the footprint goes instead to the nearest free snap point from there
 (`crossing.map.snap.choice`, with no radius). It keeps its size, name and displays' offsets, and
 the move is taken as a drop without `crossing.map.snap.drop-radius`.
@@ -349,7 +366,7 @@ the move is taken as a drop without `crossing.map.snap.drop-radius`.
 > r[crossing.map.place.chosen-edge]
 > Choosing an edge for a peer whose footprint is not against it places the footprint centred
 > against that edge of this machine's footprint, or at the nearest free snap point
-> (`crossing.map.snap.choice`, with no radius) when another active machine's footprint is there,
+> (`crossing.map.snap.choice`, with no radius) when another present machine's footprint is there,
 > and its zones are derived there. Choosing the edge the peer's footprint is already against
 > changes nothing on the crossing map.
 >
@@ -390,11 +407,11 @@ Dropping, moving or resizing an inactive peer's footprint is refused, and the cr
 it was.
 
 r[crossing.map.drop.overlap]
-A peer's footprint dropped where one of its displays overlaps a display of another active machine
+A peer's footprint dropped where one of its displays overlaps a display of another present machine
 moves to the snap point `crossing.map.snap.choice` picks with a radius of 12 map units, and the
 drop is taken there. The drop is refused, leaving the crossing map as it was, when that point is
 where it was dropped or the crossing map with it there would still be refused. This machine's own
-footprint dropped where one of its displays overlaps an active machine's is refused. An overlap
+footprint dropped where one of its displays overlaps a present machine's is refused. An overlap
 between two other machines refuses no drop.
 
 r[crossing.map.drop.crowded]
@@ -449,16 +466,17 @@ on the crossing map.
 ### Sharing the crossing map
 
 > r[crossing.map.shared.one]
-> Every machine in the cluster has one crossing map: a change to it made on any machine reaches
-> every machine, including machines it has no link with, and all of them end with the same map.
-> Crossings behave the same whichever machine the change was made on.
+> The cluster has one crossing map: a change to it made on any machine reaches every machine,
+> including machines it has no link with, and all of them end with the same map, the footprints each
+> keeps off included. Crossings behave the same whichever machine the change was made on.
 >
 > - model: store
 > - parity: Python sent its whole crossing map in `settings` messages to each peer that advertised the `layout` capability, which relayed a map it took on to its other peers, and set the edge a peer without that capability faced by `arrangement` messages (#14: the store replaces per-feature messages)
 
 > r[crossing.map.shared.newest]
-> When the crossing map is changed on two machines before either change reaches the other, every
-> machine ends with the newer change, and a change older than the one a machine has is ignored.
+> The crossing map is one entry. When it is changed on two machines before either change reaches the
+> other, every machine ends with the newer change whole, even when the two moved different
+> footprints, and a change older than the one a machine has is ignored.
 >
 > - model: store
 > - parity: Python stamped the whole crossing map with the second it changed, or one past the stamp it had when that was not older, and its author's machine id; a map with a newer stamp replaced the one it had, the larger author id winning a tie, and a stamp more than a day ahead of this machine's clock was refused (#14: the store's hybrid logical clock stamps every entry)
@@ -479,10 +497,12 @@ Each machine derives its own zones from the crossing map it has and its own zone
 machine sends its zones to another.
 
 > r[crossing.map.shared.crowded-arrival]
-> When the crossing map changes on another machine so that four or more peers touch one edge of one
-> of this machine's displays, this machine keeps the zones it had.
+> A crossing map that leaves four or more peers touching one edge of one of this machine's
+> displays, as a change arriving from another machine, a restored peer or a default placement can,
+> is taken like any other: that edge's thirds go to peers by `crossing.derive.share.one-peer`, and a
+> peer left with no third there has no zone on that edge.
 >
-> - parity: Python ignored such a crossing map and kept its own (#14: the crossing map is a shared entry and converges, so only the zones derived here stay as they were)
+> - parity: Python ignored a crossing map arriving with such an edge and kept its own, and failed with an error when a restored peer or a default placement crowded an edge (#14: the crossing map is one shared entry and converges, so every machine derives its zones from the same map)
 
 r[crossing.map.saved.derived]
 Zones are never read from what is saved. A machine derives them from the crossing map and its zone
@@ -575,7 +595,7 @@ Deriving zones again from the same crossing map, displays and zone choices gives
 and reports nothing changed.
 
 r[crossing.derive.overlap]
-A peer whose display overlaps another active machine's display on the crossing map, this machine's
+A peer whose display overlaps another present machine's display on the crossing map, this machine's
 included, has no zone derived from the crossing map: no edge, third, corner or wrap-around zone.
 Only a notch zone can lead to it (`crossing.derive.notch.independent`). It keeps its zone choices,
 and peers in no overlap keep their zones.
@@ -644,11 +664,11 @@ already has turns it off.
 
 r[crossing.derive.corner.one]
 Each corner of this machine's displays leads to at most one peer: the first in the peer list's
-order, among active peers, that has it by its display touching that corner while its edge or a
+order, among present peers, that has it by its display touching that corner while its edge or a
 corner is on, or by choice. A peer whose zone choices list one corner twice has one zone there.
 
 r[crossing.derive.corner.taken]
-A corner is taken by an active peer that has chosen it, or whose display touches that corner while
+A corner is taken by a present peer that has chosen it, or whose display touches that corner while
 its edge or a corner is on. Choosing for a peer a corner another peer has taken is refused: turning
 on a single corner changes nothing and writes and sends nothing, and the other peer keeps it, for
 this machine's own pointer and for a driver's. A change naming several corners drops those taken
@@ -661,8 +681,8 @@ Only a Mac derives a notch zone, and only on a Mac can the notch and return thro
 chosen: a change of zone choices made on another machine leaves the notch choices as they were.
 
 r[crossing.derive.notch.one]
-The notch leads to one peer: the first in the peer list's order that is active and has the notch
-chosen. Choosing the notch for a peer clears it for every other peer. While an active peer has the
+The notch leads to one peer: the first in the peer list's order that is present and has the notch
+chosen. Choosing the notch for a peer clears it for every other peer. While a present peer has the
 notch, no other peer has it chosen, an inactive peer included; while none does, an inactive peer
 keeps its notch choice for when it is restored.
 
@@ -715,13 +735,18 @@ corners as they were, except a stretch another peer took meanwhile, which stays 
 
 ### A peer's first zone
 
-r[crossing.derive.first-zone]
-A peer just paired has the default zone choices (`crossing.derive.choices.default`), so its first
-footprint (`crossing.map.place.unplaced`, `crossing.map.place.first-peer`) gives it a zone by every
-third its contact claims: its whole edge when no other peer's display shares that edge, and
-otherwise the thirds that go to it (`crossing.derive.share.one-peer`). Every other peer keeps its
-zone choices, its footprint and its zones, apart from sharing that edge. This is how
-`pairing.peers.first-zone` and `pairing.peers.other-zones` are met.
+> r[crossing.derive.first-zone]
+> A peer just paired has the default zone choices (`crossing.derive.choices.default`), so its first
+> footprint (`crossing.map.place.unplaced`, `crossing.map.place.first-peer`) gives it a zone by
+> every third its contact claims: its whole edge when no other peer's display shares that edge, and
+> otherwise the thirds that go to it (`crossing.derive.share.one-peer`). A first footprint that
+> touches this machine's displays only at a corner, as `crossing.map.place.unplaced` gives a peer
+> paired while another already fills the edge below this machine, gives it a corner zone there
+> (`crossing.derive.corner.contact`) and no edge zone. Every other peer keeps its zone choices, its
+> footprint and its zones, apart from sharing that edge. This is how `pairing.peers.first-zone` and
+> `pairing.peers.other-zones` are met.
+>
+> - parity: Python's Mac gave a peer paired once its crossing map placed others, and facing no edge, no footprint and so no zone, while the PC placed it and derived its zones as this rule does (#16: one crossing engine for every platform; the PC's)
 
 ### What one peer can be given
 
@@ -737,7 +762,7 @@ on, would derive a wrap-around zone to that peer on it.
 
 r[crossing.derive.offer.taken]
 An edge that is not `free` is `taken` by the peer that has an edge or thirds zone on it, or, when
-none has, by an active peer whose display touches it. An edge taken by no peer is `unavailable`.
+none has, by a present peer whose display touches it. An edge taken by no peer is `unavailable`.
 
 r[crossing.derive.offer.corner]
 For one peer, each corner of this machine is `on` when a corner zone to the peer is derived there;
@@ -798,15 +823,15 @@ push in progress keeps the push pressure it has built. Two pushes of 80 px again
 
 > r[crossing.armed.driven-only]
 > A machine arms zones for another machine's pointer only while that machine drives it. With no
-> driver, none is armed, and a change to its zones arms none. When its driving ends, every zone armed
-> for that driver is disarmed (`driving.end.keys-up`).
+> driver, none is armed, and a change to its zones arms none. When its driving ends, every zone
+> armed for that driver is disarmed (`driving.end.keys-up`).
 >
 > - model: driving
 
 > r[crossing.armed.driven-own-zones]
-> The zones a driven machine arms for its driver are its own zones, those its own pointer crosses
-> by at home, derived from its crossing map and its zone choices, never the driver's. Each crosses
-> as its kind does: a whole edge anywhere along it, a thirds zone only from its thirds, a corner only
+> The zones a driven machine arms for its driver are its own zones, those its own pointer crosses by
+> at home, derived from its crossing map and its zone choices, never the driver's. Each crosses as
+> its kind does: a whole edge anywhere along it, a thirds zone only from its thirds, a corner only
 > by a diagonal push, whatever crossing method brought input to the machine.
 >
 > - model: driving
@@ -871,21 +896,24 @@ leading to the driver, so that a push out through the edge the pointer came in b
 > - model: driving
 
 > r[crossing.return.status]
-> Each machine knows, for every peer, whether that peer has a zone leading to it: a whole edge,
-> thirds, a corner or the notch that is not off. When it has none, it knows which machine's
-> whole-edge or thirds zone on the peer covers the edge where this machine sits on the peer's
-> crossing map. A change on the peer that opens or closes its zone to this machine, or changes which
-> machine covers that edge, reaches this machine through the store, including a change made by
+> Core reports, for every peer, whether that peer has a zone leading to this machine: a whole edge,
+> thirds, a corner or the notch that is not off. When it has none, the report names the machine
+> whose whole-edge or thirds zone on the peer covers the edge where this machine sits on the peer's
+> crossing map (`crossing.return.names-holder`); `viewmodel` makes the peer's notice from it. A
+> change on the peer that opens or closes its zone to this machine, or changes which machine covers
+> that edge, changes the report once the store has carried it here, including a change made by
 > moving a different machine on the peer's map.
 >
 > - parity: Python told each peer this status in an `arrangement` message, sent only to the peers whose status the change touched; an `arrangement` without the status kept the last one heard (#14: the store replaces per-feature messages)
 > - model: store
 
-r[crossing.return.names-holder]
-When a peer has no zone leading to this machine, the machine named as covering its edge is one
-whose whole-edge or thirds zone is not off on that edge of the peer, never this machine itself.
-When the peer's zone for this machine is off and no other machine's zone covers that edge, no
-machine is named.
+> r[crossing.return.names-holder]
+> When a peer has no zone leading to this machine, the machine `crossing.return.status` names as
+> covering its edge is one whose whole-edge or thirds zone is not off on that edge of the peer,
+> never this machine itself. When the peer's zone for this machine is off and no other machine's
+> zone covers that edge, the report names no machine.
+>
+> - model: store
 
 ## Push
 
@@ -894,7 +922,8 @@ enough. The platform backend gives Core each pointer motion (its travel across a
 pointer's position after it and the state of the mouse buttons; Core answers with the pointer held
 at edge, the motion delivered as usual, or a crossing. The same rules apply on every machine: to a
 machine's own pointer at its home zones, and to the driver's pointer at the zones armed on a driven
-machine. Push pressure is counted in px of pointer travel.
+machine, apart from the guard against drags, which only a machine's own pointer has. Push pressure
+is counted in px of pointer travel.
 
 r[crossing.push.outward]
 While the pointer is at an armed zone, push pressure grows by the pointer's outward travel: the part
@@ -911,7 +940,7 @@ against.
 > On the motion that brings the pointer to a zone, only its travel beyond the edge counts as outward
 > travel: a pointer that moves 40 px toward a zone from 27 px away starts its push at 13 px.
 >
-> - parity: the PC's zones on a driven machine counted nothing of the motion that reached the edge, and all of the next one (#16: one crossing engine for every platform; the Mac's count)
+> - parity: Python's zones on every driven machine, the Mac included, and the PC's home zones counted nothing of the motion that reached the edge and all of the next one; only the Mac's home zones counted the travel beyond the edge (#16: one crossing engine for every platform; the Mac's at home)
 
 r[crossing.push.inward]
 Inward travel while a push is in progress subtracts from the push pressure, which never falls below
@@ -932,14 +961,26 @@ at a resistance of 120 px and 500 px per second, after 0.6 s and 300 px of trave
 500 px per second, after 2.5 s and 1250 px; at 500 px and 1000 px per second, after 0.71 s and
 714 px, each within 25 ms and 15 px with a motion every 10 ms.
 
-> r[crossing.push.resistance]
-> The resistance, the push pressure at which a zone push crosses, is a whole number of px from 0 to
-> 500, 120 px unless the user sets another, and a change to it applies from the next pointer motion.
-> Every zone a machine arms as home uses that machine's resistance. Every zone armed on a driven
-> machine, the return zone included, uses its driver's, as the driver's latest take or reach update
-> carries it (`driving.take.contents`), whatever the driven machine's own: with the driver's
-> resistance at 500 px, a push of 200 px there keeps the pointer held at edge and does not cross. A
-> take always carries the resistance of the machine that makes it, never one a peer gave it.
+r[crossing.push.resistance]
+The resistance, the push pressure at which a zone push crosses, is a whole number of px from 0 to
+500, 120 px unless the user sets another, and a change to it applies from the next pointer motion.
+
+r[crossing.push.resistance-home]
+Every zone a machine arms as home uses that machine's own resistance, also while the machine is
+driven (`crossing.armed.own-pointer-while-driven`).
+
+> r[crossing.push.resistance-driven]
+> Every zone armed on a driven machine for its driver, the return zone included, uses the push
+> distance the driver's latest take or reach update carries (`driving.take.contents`), whatever the
+> driven machine's own resistance: with 500 px carried, a push of 200 px there keeps the pointer
+> held at edge and does not cross. A push distance from 501 to 1000 px, which a take may carry, is
+> used as it is.
+>
+> - model: driving
+
+> r[crossing.push.resistance-take]
+> The push distance a take or reach update carries (`driving.take.contents`) is the resistance of
+> the machine that makes it, never one a peer gave it.
 >
 > - model: driving
 
@@ -955,24 +996,26 @@ r[crossing.push.zero]
 At a resistance of 0, the first motion with outward travel at a zone crosses.
 
 > r[crossing.push.held-at-edge]
-> A motion at a zone whose push pressure before it, after decay, is at least 3 px is held at edge: it
-> is not delivered, and the pointer stays at the point where the push began, whatever travel along
-> the edge the motion has. The first motion of a push, which starts it, is delivered, so the pointer
-> is seen to reach the edge.
+> A motion at a zone whose push pressure before it, after decay, is at least 3 px is held at edge:
+> it is not delivered, and the pointer stays at the point where the push began, whatever travel
+> along the edge the motion has. The first motion of a push, which starts it, is delivered, so the
+> pointer is seen to reach the edge.
 >
-> - parity: the PC's zones on a driven machine kept the pointer at the edge from the first outward motion and let it slide along the edge with the motion's travel along it (#16: one crossing engine for every platform; the Mac's)
+> - parity: Python's zones on every driven machine, the Mac included, kept the pointer at the edge from the first outward motion there and slid it along the edge with the motion's travel along it, as Windows did at the PC's home zones; only the Mac's home zones held it where the push began, once push pressure was at least 3 px (#16: one crossing engine for every platform; the Mac's at home)
 
 > r[crossing.push.held-at-edge-inward]
-> While a push is in progress, an inward motion leaves the pointer held at edge until push pressure
-> reaches zero. The motion that brings it to zero is delivered, and the pointer is free again.
+> While a push is in progress, an inward motion is held at edge as `crossing.push.held-at-edge`
+> says, while push pressure before it, after decay, is at least 3 px. An inward motion with less
+> push pressure before it is delivered, and the pointer is free again: at 2 px of push pressure, a
+> 1 px inward motion is delivered.
 >
-> - parity: the PC's zones on a driven machine delivered every inward motion, so the pointer left the edge at once with push pressure still counted (#16: one crossing engine for every platform; the Mac's)
+> - parity: Python's zones on every driven machine, the Mac included, and the PC's home zones delivered every inward motion, so the pointer left the edge at once with push pressure still counted; only the Mac's home zones held it (#16: one crossing engine for every platform; the Mac's at home)
 
 > r[crossing.push.leave]
 > A motion that takes the pointer off the zone it was pushing ends the push: push pressure is zero,
 > and the pointer is free.
 >
-> - parity: the PC's zones kept the push pressure, decaying, after the pointer left them, so a return to the edge within 0.4 s went on from it (#16: one crossing engine for every platform; the Mac's)
+> - parity: Python's zones on every driven machine, the Mac included, and the PC's home zones kept the push pressure after the pointer left them, decaying at 300 px per second, so a return to the edge within the resistance divided by 300 px per second (0.4 s at 120 px, 1.67 s at 500 px) could go on from it; only the Mac's home zones ended the push (#16: one crossing engine for every platform; the Mac's at home)
 
 r[crossing.push.per-peer]
 Push pressure built at one peer's zone is not carried to another peer's zone: when the pointer
@@ -1001,14 +1044,20 @@ delivered as usual. Zone pushes stay on, and the next motion with a position car
 ### Guards against accidental crossings
 
 r[crossing.push.drag]
-While a mouse button is down, a push builds no push pressure, leaves nothing held at edge and never
-crosses, and pressing a button ends any push in progress, its push pressure dropped to zero, at home
-and on a driven machine alike, so letting go of the button at the edge does not finish a crossing.
-This is on unless the user turns off blocking crossings while dragging.
+While a mouse button of a machine's own is down, a push of its own pointer at its home zones builds
+no push pressure, leaves nothing held at edge and never crosses, and pressing such a button ends
+any push in progress, its push pressure dropped to zero, so letting go of the button at the edge
+does not finish a crossing. This holds at home and while the machine is driven alike, and is on
+unless the user turns off blocking crossings while dragging on that machine.
 
 r[crossing.push.drag-off]
-With blocking crossings while dragging turned off, a push with a mouse button down crosses as any
-other push.
+With blocking crossings while dragging turned off on a machine, a push of its own pointer with a
+mouse button down crosses as any other push.
+
+r[crossing.push.drag-driver]
+A driver's pointer at the zones armed on a driven machine is not guarded against drags: a push
+with the driver's mouse button down builds push pressure and crosses as any other push, whatever
+either machine's setting for blocking crossings while dragging.
 
 r[crossing.push.drag-unseen-release]
 A mouse button counts as down only while the platform backend still reports it down: a button
@@ -1058,9 +1107,9 @@ instead of building push pressure, so that push never carries on to another mach
 > - model: driving
 
 > r[crossing.arrival.no-landing]
-> A take with no landing point, by the shortcut, a jump key or the menu, starts arrival grace only on
-> the zones that lead to the driver. Input that comes home with no landing point starts no arrival
-> grace.
+> A take with no landing point, by the shortcut, a jump key or the menu, starts arrival grace only
+> on the zones that lead to the driver. Input that comes home with no landing point starts no
+> arrival grace.
 >
 > - model: driving
 
@@ -1114,16 +1163,16 @@ driven machine (`driving.home.send-home`).
 > - model: driving
 
 > r[crossing.landing.offset]
-> A crossing carries the fraction along the zone's edge of the point where the push began, where
-> the pointer is held at edge, not of where it was when the push crossed: along the zone's display's
+> A crossing carries the fraction along the zone's edge of the point where the push began, where the
+> pointer is held at edge, not of where it was when the push crossed: along the zone's display's
 > edge, or, for a zone that names no display, along the edge of the rectangle around all this
 > machine's displays. Without a contact or a named display, it lands at that same fraction of the
 > landing edge: a push at 17 % of this machine's right edge lands at 17 % of the peer's left edge,
-> and 500 px down a 1080 px edge is 0.46. A pixel that leaves at a fraction lands on that fraction of
-> the landing edge: the last pixel of an 8 px edge leaves at 0.875 and lands on the last pixel of an
-> 8 px edge.
+> and 500 px down a 1080 px edge is 0.46. A pixel that leaves at a fraction lands on that fraction
+> of the landing edge: the last pixel of an 8 px edge leaves at 0.875 and lands on the last pixel of
+> an 8 px edge.
 >
-> - parity: Python's Mac measured these fractions over the edge's length less one pixel, both leaving and landing, and the PC's zones on a driven machine took the fraction where the pointer was when it crossed (#16: one crossing engine for every platform; the PC's measure, under which a pixel lands on the pixel it left, and the Mac's point where the push began)
+> - parity: Python measured these fractions over the edge's length less one pixel when input left the Mac at home or came home to it, and over the whole length on every driven machine, the Mac included, and on the PC at home; and its zones on every driven machine and the PC's home zones took the fraction where the pointer was when it crossed, only the Mac's home zones where the push began (#16: one crossing engine for every platform; the whole length, under which a pixel lands on the pixel it left, and the Mac's point where the push began)
 
 r[crossing.landing.contact]
 A crossing through a zone with a contact maps its fraction in proportion: the start of the contact
@@ -1158,7 +1207,7 @@ displays.
 
 r[crossing.landing.clear-of-ends]
 A landing point is kept at least 10 px from both ends of the landing display's edge, when that edge
-is longer than 20 px, so it never lands in a corner zone's box or on the edge beside it. It is not
+is longer than 21 px, so it never lands in a corner zone's box or on the edge beside it. It is not
 moved where that would put it beside another display of the same machine that lies beyond the edge,
 as beside a neighbour staggered by less than 10 px; there it lands at its unmoved place, within the
 stretch with nothing beyond it.
@@ -1172,7 +1221,7 @@ the right end of the peer's bottom edge; likewise for every corner. It is kept c
 > r[crossing.landing.inset]
 > The landing point is 2 px inside the landing edge, so the landing itself is not already a push.
 >
-> - parity: Python's PC landed the pointer on the edge's outermost pixel row or column, its Mac 2 points inside (#16: one crossing engine for every platform; the Mac's inset)
+> - parity: Python landed the pointer on the edge's outermost pixel row or column on every driven machine, the Mac included, and on the PC at home; only input coming home to the Mac landed 2 points inside (#16: one crossing engine for every platform; the Mac's at home)
 
 r[crossing.landing.notch-return]
 On a Mac whose notch zone leads to a peer with return through the notch on, input coming home from
@@ -1207,7 +1256,9 @@ topics of their own.
 ### What a crossing reports
 
 Core reports what a crossing does, for the edge glow, the trackpad's haptics and, later, the
-crossing effects, which `spec/ui.md` draws.
+crossing effects, which `spec/ui.md` draws. These reports are crossing's own. They are apart from
+driving's report that input is home (`driving.home.how`), which every way home makes with the
+landing point or the pointer's position, whatever these reports say.
 
 r[crossing.method.report-pressure]
 Every pointer motion that builds push pressure at a zone, or is held at edge there, reports the edge
@@ -1238,20 +1289,26 @@ A crossing by the shortcut, a jump key or the menu reports no pressure, no cross
 
 r[crossing.method.report-arrival]
 When input comes home through the driven machine's zone, with a landing point, Core reports one
-arrival naming this machine's edge and the point the pointer landed at, and nothing else.
+arrival naming this machine's edge and the point the pointer landed at, and no other report of
+this section.
 
-r[crossing.method.report-arrival-no-point]
-When the driven machine sends input home, which names no landing point, Core reports one arrival
-naming no edge and no point.
+> r[crossing.method.report-arrival-no-point]
+> When the driven machine sends input home, which names no landing point, Core reports one arrival
+> naming no edge and no point, for the edge glow and the trackpad's haptics; driving's report that
+> input is home still gives where the pointer is (`driving.home.how`).
+>
+> - parity: Python's PC filled in the pointer's position for such an arrival, its Mac reported none (#16: one crossing engine for every platform; the Mac's)
 
 r[crossing.method.report-home]
 When this machine's own user brings input home by the shortcut, a jump key or the menu, Core
-reports home, with the pointer's position.
+reports, for the edge glow and the trackpad's haptics, that input came home by this machine's own
+crossing method, with the pointer's position.
 
 r[crossing.method.report-quiet]
 Input that comes home because another machine took the driven machine over, or because the link to
-it was lost, reports no crossing, arrival or home; nor does bringing input home while it is already
-home.
+it was lost, makes none of the reports of this section: no crossing, no arrival and no report that
+it came home by a crossing method. Nor does bringing input home while it is already home. Driving's
+report that input is home is made all the same (`driving.home.how`).
 
 ## The shortcut
 
@@ -1259,8 +1316,8 @@ The shortcut is one key, the shortcut key, used in one of two styles: a double-t
 Where it sends input is its destination, one of three: where input last went, next in order, or
 next among ticked. How the shortcut key's events are captured and kept from an app is `input`'s;
 these rules say when the shortcut fires, where input goes, and which of the key's events reach an
-app or a driven machine. Below, a peer is **ready** while it has a link with this machine and lets
-this machine drive it.
+app or a driven machine. Below, a peer is ready to take while it has a link with this machine and
+lets this machine drive it.
 
 r[crossing.shortcut.defaults]
 Until the user changes them, the shortcut is on, its style is double-tap, its double-tap window is
@@ -1293,9 +1350,11 @@ starts a long press. Keeping the key down in double-tap style fires nothing howe
 down, also after the press that fired a double-tap, and a double-tap after its release fires as
 usual.
 
-r[crossing.shortcut.missed-release]
-A press of the shortcut key that is not a repeat is a tap even when the key's release before it
-was never seen, so a double-tap fires after a release the capture missed.
+> r[crossing.shortcut.missed-release]
+> A press of the shortcut key that is not a repeat is a tap even when the key's release before it
+> was never seen, so a double-tap fires after a release the capture missed.
+>
+> - parity: Python's Windows app took a press of the shortcut key while it believed the key still down for a repeat, so a missed release cost one tap (#16: one crossing engine for every platform; the Mac's)
 
 > r[crossing.shortcut.down-before-on]
 > A press of the shortcut key that began while the shortcut was off is neither a tap nor a long
@@ -1372,15 +1431,15 @@ it is.
 > - model: driving
 
 r[crossing.shortcut.machine]
-The shortcut's machine is the peer input was last on (the last peer this machine's input crossed
-to, by any crossing method or by a pass on) while that peer is ready; else the first ready peer in
-the peer list's order.
+The shortcut's machine is the peer input was last on (the last peer this machine's input crossed to,
+by any crossing method or by a pass on) while that peer is ready to take; else the first peer ready
+to take in the peer list's order.
 
 r[crossing.shortcut.machine-none-ready]
-When no peer the shortcut may go to is ready, the shortcut's machine is the peer input was last on,
-when the shortcut may go to it, else the first peer in the peer list that the shortcut may go to,
-so the crossing's refusal, or its wake (`discovery.wake.crossing`), names it. A peer listed above
-the one input was last on never takes its place.
+When no peer the shortcut may go to is ready to take, the shortcut's machine is the peer input was
+last on, when the shortcut may go to it, else the first peer in the peer list that the shortcut may
+go to, so the crossing's refusal, or its wake (`discovery.wake.crossing`), names it. A peer listed
+above the one input was last on never takes its place.
 
 r[crossing.shortcut.machine-eligible]
 The shortcut's machine is only ever a peer that is in use and that this machine may drive.
@@ -1419,18 +1478,21 @@ first placed peer.
 > - parity: Python's Mac counted as placed only a peer with a zone to it, or one between or set from elsewhere, and put any other placed peer with the unplaced ones (#16: one crossing engine for every platform; the Windows app's)
 
 > r[crossing.shortcut.refused]
-> The shortcut passes over a peer that is out of reach (`driving.take.out-of-reach`) as if it were
-> not in the cycle, and does not report it as skipped. A long press passes over such a peer when it
-> is the last machine input was on. When every peer in the cycle is out of reach, a double-tap with
-> input home crosses to no machine and reports none.
+> With the destination next in order or next among ticked, and for a long press with any
+> destination, the shortcut passes over a peer that is out of reach (`driving.take.out-of-reach`) as
+> if it were not in the cycle, and does not report it as skipped. When every peer in the cycle is
+> out of reach, a double-tap with input home in those destinations crosses to no machine and reports
+> none. With the destination where input last went, a double-tap passes over no peer out of reach:
+> when the shortcut's machine (`crossing.shortcut.machine`) is out of reach, the double-tap picks it
+> all the same, so it sends nothing, reports nothing and moves no input.
 >
 > - model: driving
 
 > r[crossing.shortcut.next]
-> With the destination next in order or next among ticked, a double-tap with input on a peer in
-> the cycle crosses to the first ready peer after it in the cycle, passing over the peers that are
-> not ready. With none after it, the double-tap brings input home. Input's place in the cycle is
-> the machine it is on now, whichever crossing method or pass on brought it there. So each
+> With the destination next in order or next among ticked, a double-tap with input on a peer in the
+> cycle crosses to the first peer ready to take after it in the cycle, passing over the peers that
+> are not ready to take. With none after it, the double-tap brings input home. Input's place in the
+> cycle is the machine it is on now, whichever crossing method or pass on brought it there. So each
 > double-tap while driving moves input to a machine other than the one it is on, and input reaches
 > home within as many double-taps as the cycle has machines.
 >
@@ -1438,36 +1500,39 @@ first placed peer.
 
 > r[crossing.shortcut.next-from-home]
 > With the destination next in order or next among ticked, a double-tap with input home crosses to
-> the first ready peer in the cycle. When none is ready, it crosses to the first peer in the cycle,
-> so the crossing's refusal, or its wake (`discovery.wake.crossing`), names it.
+> the first peer ready to take in the cycle. When none is ready to take, it crosses to the first
+> peer in the cycle, so the crossing's refusal, or its wake (`discovery.wake.crossing`), names it.
 >
 > - model: driving
 
 > r[crossing.shortcut.next-not-in-cycle]
-> With the destination next in order or next among ticked, a double-tap with input on a peer that
-> is not in the cycle crosses to the first ready peer in the cycle, and brings input home when
-> none is ready.
+> With the destination next in order or next among ticked, a double-tap with input on a peer that is
+> not in the cycle crosses to the first peer ready to take in the cycle, and brings input home when
+> none is ready to take.
 >
 > - model: driving
 
 > r[crossing.shortcut.empty-cycle]
-> When the cycle has no peer, or only peers that are out of reach, a double-tap with input home and
-> a long press both move no input.
+> When the cycle has no peer, or only peers that are out of reach, a long press, and a double-tap
+> with input home and the destination next in order or next among ticked, move no input.
 >
 > - parity: Python's Mac sent a long press to the shortcut's machine (`crossing.shortcut.machine`) when the cycle had no peer at all, while its Windows app moved nothing (#16: one crossing engine for every platform; the Windows app's)
 > - model: driving
 
 r[crossing.shortcut.skipped]
-Each peer the shortcut passes over because it is not ready is reported, in cycle order, as
-skipped because it is not connected. When no peer in the cycle is ready, every one is reported so,
-the one the crossing then names included (`crossing.shortcut.next-from-home`).
+Each peer the shortcut passes over because it is not ready to take is reported, in the order the
+shortcut tried them, as skipped because it is not connected: in cycle order, except that a long
+press with the destination where input last went tries the peer input was last on first
+(`crossing.shortcut.long-press-machine`), so that peer is reported first wherever it sits in the
+cycle. When no peer in the cycle is ready to take, every one is reported so, the one the crossing
+then names included (`crossing.shortcut.next-from-home`).
 
 > r[crossing.shortcut.long-press-machine]
-> The long-press machine, with the destination where input last went, is the peer input was last
-> on when it is in the cycle and ready; else, with any destination, the first ready peer in the
-> cycle; else the first peer in the cycle, so the crossing's refusal or wake names it. It is never
-> a peer that is out of reach, and each peer passed over because it is not ready is reported as
-> `crossing.shortcut.skipped` says.
+> The long-press machine, with the destination where input last went, is the peer input was last on
+> when it is in the cycle and ready to take; else, with any destination, the first peer ready to
+> take in the cycle; else the first peer in the cycle, so the crossing's refusal or wake names it.
+> It is never a peer that is out of reach, and each peer passed over because it is not ready to take
+> is reported as `crossing.shortcut.skipped` says.
 >
 > - model: driving
 
@@ -1498,14 +1563,14 @@ the one the crossing then names included (`crossing.shortcut.next-from-home`).
 
 r[crossing.shortcut.key-jump-clash]
 Changing the shortcut key to a key that is in a jump key's chord, as its key or as one of its
-modifiers of either hand, is refused with "That shortcut clashes with the jump key <chord>; the
-jump key has been kept.", and the shortcut key stays as it was.
+modifiers of either hand, is refused, the refusal naming that jump key's chord, and the shortcut key
+stays as it was.
 
 r[crossing.shortcut.shared-key-clash]
 A shortcut key that arrives as a shared setting and clashes with one of this machine's jump keys
 (as `crossing.shortcut.key-jump-clash` says) is not applied here: the jump key is kept, and Core
-reports "That shortcut clashes with the jump key <chord>; the jump key has been kept." The other
-shared shortcut settings that arrived with it are applied.
+reports that the shortcut key clashes with that jump key, naming its chord. The other shared
+shortcut settings that arrived with it are applied.
 
 ## Jump keys
 
@@ -1533,7 +1598,8 @@ machine's keyboard, and is never shared with its peers.
 
 r[crossing.jump-key.kept]
 The press of a jump key's key, its repeats and its release are kept from this machine's apps and
-from every driven machine. Its modifiers are not: they go where input was as ordinary keys.
+from every driven machine. The release is matched to the press by the key, whatever Shift made of
+its name between them. Its modifiers are not kept: they go where input was as ordinary keys.
 
 > r[crossing.jump-key.repeat-no-move]
 > Only the first press of a jump key's chord crosses: its repeats move no input, so a jump key kept
@@ -1638,9 +1704,10 @@ stroke runs from the farthest point of the stroke before it to its own farthest 
 duration and number of motion events are measured between those two points.
 
 r[crossing.shake.fires]
-A shake fires at the motion event that makes the fourth turn of a gesture, when the four strokes
-that turn ends meet every condition below. Three turns, a single flick, a sweep with no turn and a
-circle never fire.
+A shake fires at the first turn of a gesture, from its fourth turn on, whose four latest strokes,
+the four that turn ends, meet every condition below: a gesture whose first stroke fails them and
+whose next four meet them fires at its fifth turn. Three turns, a single flick, a sweep with no
+turn and a circle never fire.
 
 r[crossing.shake.stroke-length]
 Each of the four strokes is at least S long along the axis.
@@ -1658,15 +1725,15 @@ r[crossing.shake.total]
 The four strokes together are at least 5 S long along the axis.
 
 r[crossing.shake.endpoint]
-The end of the fourth stroke is within 2 S, along the axis, of the start of the first.
+The end of the last of the four strokes is within 2 S, along the axis, of the start of the first.
 
 r[crossing.shake.cross-axis]
 The four strokes' travel across the axis, summed as distance, is at most half their travel along
 it.
 
 r[crossing.shake.window]
-The first of the four strokes starts at most 650 ms before the motion event that makes the fourth
-turn.
+The first of the four strokes starts at most 650 ms before the motion event that makes the turn
+they end.
 
 r[crossing.shake.axis]
 A gesture's axis is whichever of horizontal and vertical has more travel over the motion events of
@@ -1702,9 +1769,11 @@ r[crossing.shake.down-fresh]
 A press reported while this machine is reading from the OS which keys and buttons are still down
 stays down, whatever that reading says.
 
-r[crossing.shake.once]
-After a shake fires, no shake fires for 1.5 s, measured from the motion event that fired it, even
-when input leaves home again within that time.
+> r[crossing.shake.once]
+> After a shake fires, no shake fires for 1.5 s, measured from the motion event that fired it, even
+> when input leaves home again, or the shake is turned off and on again, within that time.
+>
+> - parity: Python's Windows app made a new shake detector when the shake was turned on again, which dropped the 1.5 s (#16: one crossing engine for every platform; the Mac's)
 
 r[crossing.shake.sensitivity-change]
 A change of sensitivity that changes S starts any gesture in progress over, and leaves the 1.5 s
@@ -1832,9 +1901,8 @@ driven machine hides its pointer after its driver lets go of it (the idle hide),
 machine in use shows a pointer.
 
 r[crossing.pointer.still-while-driving]
-While a machine drives another, its own pointer stays where it was when input left: every pointer
-motion or drag on it is sent to the driven machine and leaves the pointer there, and a key event
-leaves the pointer alone. Once input is home, whatever brought it home (a crossing method, capture
+A driver's own pointer stays where it was while it drives (`input.capture.pointer-stays`,
+`input.capture.away`). Once input is home, whatever brought it home (a crossing method, capture
 lost, the link lost, settings applied, a failure), the pointer follows its mouse again, and no
 pointer motion is undone.
 
@@ -1895,12 +1963,12 @@ r[crossing.pointer.shown-on-quit]
 When Beamer quits, every pointer hide it made ends, and the pointer is shown.
 
 r[crossing.pointer.setting-default]
-The hide-pointer setting ("Hide the pointer on the machine not in use") is on until the user turns
-it off, and is saved.
+The hide-pointer setting, which hides the pointer on the machine not in use, is on until the user
+turns it off, and is saved.
 
 r[crossing.pointer.setting-per-machine]
-The hide-pointer setting is each machine's own: "Same on all machines" does not carry it to other
-machines.
+The hide-pointer setting is each machine's own, never a shared entry: changing it on one machine
+changes it on no other, even when that machine shares its other settings with the cluster.
 
 r[crossing.pointer.setting-off]
 With the hide-pointer setting off, a driver letting go hides nothing. Turning it off shows an
@@ -1936,11 +2004,16 @@ hide does not apply.
 > - tier: machine (whether the OS pointer is really hidden needs the real window server)
 
 > r[crossing.pointer.mac-background]
-> On the Mac, the pointer stays hidden whichever app is in front. Before its first hide Beamer asks
-> the window server to let it hide the pointer while another app is in front; when that is refused,
-> Beamer still hides the pointer, and crossing goes on.
+> On the Mac, a hidden pointer stays hidden whichever app is in front.
 >
 > - tier: machine (the window server's handling of a background app's hide needs the real Mac)
+
+> r[crossing.pointer.mac-background-ask]
+> On the Mac, Beamer asks the window server once, before its first hide, to let it hide the pointer
+> while another app is in front. When that is refused, Beamer still hides the pointer, and crossing
+> goes on.
+>
+> - tier: machine (the window server's answer comes only from the real Mac)
 
 > r[crossing.pointer.windows-shapes]
 > On Windows, a hidden pointer is hidden in every shape it can take: the arrow, the text cursor,
@@ -1957,7 +2030,7 @@ hide does not apply.
 
 > r[crossing.pointer.crash-windows]
 > If Beamer ends while it has the pointer hidden on Windows, by a crash included, the pointer is
-> shown by the time Beamer next starts, before Beamer does anything else.
+> shown when Beamer next starts, before its window shows and before its first crossing.
 >
 > - tier: machine (a hidden Windows pointer outlives the process that hid it)
 
@@ -2060,7 +2133,8 @@ profile the machine does not have is refused and changes nothing.
 
 > r[crossing.profile.removed]
 > A removed profile is removed on every machine, a machine that was away when it was removed
-> included. It is never made active or renamed again.
+> included. It is never made active or renamed again on this machine; a newer entry making it
+> active that arrives from another machine is `crossing.profile.remove-active`'s.
 >
 > - model: store
 
@@ -2198,11 +2272,18 @@ Taking zone choices that give the notch to several peers leaves them as they arr
 writes and sends no change to them, and its notch zone leads to one of those peers
 (`crossing.derive.notch.one`).
 
-r[crossing.profile.choices.unpaired]
-A machine's zone choices may name peers it is not paired with. It has no zones toward them until it
-pairs with them, and then its zones toward them follow those choices. When a peer is unpaired, the
-machine keeps its zone choices toward it, and pairing with that peer again makes its zones toward
-it follow them.
+> r[crossing.profile.choices.unpaired]
+> A machine's zone choices in a profile may name peers it is not paired with. It has no zones toward
+> them until it pairs with them, and then its zones toward them follow those choices. When a peer is
+> unpaired, the machine keeps its zone choices toward it while any machine in the cluster still
+> lists that peer, and pairing with that peer again makes its zones toward it follow them. Once no
+> machine in the cluster lists the peer, the zone choices toward it in every profile read as unset,
+> as the store reads every shared entry naming a forgotten machine (#14), and a later pairing with
+> it starts from the default zone choices (`crossing.derive.choices.default`). A machine's own zone
+> choices, which are never shared, keep their choices toward it.
+>
+> - model: store
+> - parity: Python kept a machine's zone choices toward an unpaired peer in every profile for good, so pairing with it again, however long after, followed them (#14: shared entries naming a machine no machine in the cluster lists read as unset)
 
 r[crossing.profile.choices.may-not-drive]
 A machine keeps its zone choices toward a peer it may not drive, and any edit made to them
@@ -2214,7 +2295,10 @@ come from pairing alone (`pairing.peers.permissions`).
 
 r[crossing.profile.choices.new-peer]
 A peer newly paired is added to the machine's zone choices with the choices its zones toward it
-have now. Adding it saves nothing to saved zones and does not count as an edit.
+have now. While the machine has own zones, adding it saves nothing to saved zones and does not
+count as an edit. While its zones come from the active profile, adding it is an edit made there: it
+changes its zone choices in the active profile, which reaches every machine, and saves the choices
+before it as `crossing.profile.saved.edit` says.
 
 r[crossing.profile.choices.only]
 Zone choices contain, for each peer, only whether the whole edge leads there, which thirds, which
@@ -2364,12 +2448,12 @@ choices, its zone choices in a profile, or in its saved zones.
 > - model: store
 > - parity: Python stamped each register with whole seconds of wall time raised above the stamp it had, broke ties by the writer's machine id, and ignored a register stamped more than 600 s ahead of its own clock (#14: stamps are a hybrid logical clock, never raw wall time)
 
-> r[crossing.profile.sync.trusted]
-> Profile entries are taken only from a linked peer that may drive this machine and is not dormant.
-> From any other peer they are refused whole: nothing changes and nothing is sent on. Entries
-> relayed by a peer they are taken from are taken whichever machine wrote them.
+> r[crossing.profile.sync.any-machine]
+> Profile entries are taken from every machine in the cluster, whichever machine wrote them and
+> whichever link they came over, whatever this machine and that peer may drive of each other.
 >
 > - model: store
+> - parity: Python took profile entries only from a linked peer that may drive this machine and is not dormant, and refused those from any other peer whole, nothing changing and nothing sent on (#14: the store takes shared entries from every machine, and features declare only their keys and schemas)
 
 > r[crossing.profile.sync.settles]
 > After concurrent changes to profiles from up to four machines, once every change sent has been

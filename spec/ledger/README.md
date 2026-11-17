@@ -23,11 +23,11 @@ no Python test is its own:
 | `audio` | #62 | 148 |
 | `camera` | #63 | 202 |
 | `media` | #64 | 0 |
-| `platform` | #65 | 338 |
+| `platform` | #65 | 339 |
 | `runtime` | #66 | 3 |
 | `app` | #67 | 93 |
 | `viewmodel` | #68 | 1070 |
-| `ui` | #69 | 771 |
+| `ui` | #69 | 770 |
 | `perf` | #70 | 0 |
 | `observability` | #71 | 0 |
 
@@ -70,9 +70,10 @@ no Python test is its own:
 7. **Tests of the Python repo itself** (no duplicate modules, the release-body generator) go to
    `app`.
 
-`store`, `media`, `perf` and `observability` own no Python test: Python had no store (each feature
-flooded its own messages, and those tests went to the feature), the media engine is C++, and
-`perf` and `observability` are written from #4, #14 and the other domains.
+`media`, `perf` and `observability` own no Python test: the media engine is C++, and `perf` and
+`observability` are written from #4, #14 and the other domains. `store` was given none by #51,
+since Python had no store (each feature flooded its own messages, and those tests went to the
+feature); it owns only the 2 the crossing miner moved to it (#57), below.
 
 ## Ambiguous assignments
 
@@ -145,7 +146,7 @@ the class's other tests stay crossing's.
 | `mac_app/tests/test_config_key_map_override.py` | 1 | input | settings | a saved key map override |
 | `mac_app/tests/test_corner_marks.py` | 20 | ui | viewmodel | the crossing map's corner marks; the tests are mostly their pixels and geometry |
 | `mac_app/tests/test_crossing.py`, class `ResistanceTests`: `test_track_endpoints_and_fill_head_share_the_same_coordinate_scale` | 1 | ui | crossing | moved from crossing (#57): the resistance strip's track |
-| `mac_app/tests/test_crossing.py`, class `TickStepsTests` | 1 | ui | crossing | moved from crossing (#57): the haptic ticks while pushing |
+| `mac_app/tests/test_crossing.py`, class `TickStepsTests` | 1 | platform | crossing, ui | moved from crossing (#57): which push-pressure ticks the trackpad's haptics fire, and haptics (F32) are platform's |
 | `mac_app/tests/test_crossing_ledger.py` | 32 | viewmodel | crossing | the ledger's controls on the Crossing page (F6); what they show and change |
 | `mac_app/tests/test_crossing_matrix.py`, class `MacDrivenTests`: `test_a_pc_this_mac_does_not_allow_to_drive_it_is_refused` | 1 | driving | crossing | moved from crossing (#57): a take from a peer that may not drive this machine is refused |
 | `mac_app/tests/test_crossing_matrix.py`, class `WhatIsSharedTests` | 1 | viewmodel | crossing | moved from crossing (#57): what the Crossing page says is shared |

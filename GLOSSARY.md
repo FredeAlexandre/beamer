@@ -131,7 +131,8 @@ One of a display's four boundaries: top, bottom, left or right.
 _Avoid_: side
 
 **Landing point**:
-Where the pointer appears on the driven machine after a crossing.
+Where the pointer appears on the machine input arrives at after a crossing through an edge: the
+driven machine after a take by a zone, or the driver when input comes home through a zone.
 _Avoid_: arrival position, entry point, side
 
 **Held at edge**:
@@ -139,7 +140,7 @@ The pointer pinned at a zone while push pressure builds, or just after it arrive
 _Avoid_: hold, stuck, pinned
 
 **Shortcut**:
-The key the user double-taps or long-presses to cross.
+The crossing method made with the shortcut key: a double-tap or a long press of it.
 _Avoid_: trigger key, switch shortcut, hotkey, hold
 
 **Jump key**:
@@ -222,6 +223,11 @@ _Avoid_: paused edges, held edges
 The one key the shortcut is made with, chosen by the user.
 _Avoid_: trigger
 
+**Ready to take**:
+Said of a peer that has a link with this machine and lets this machine drive it, so a take of it
+can be made now. The shortcut passes over a peer that is not.
+_Avoid_: ready peer (ready is a capability's state)
+
 **Double-tap window**:
 The longest time from one press of the shortcut key to the next for the two to fire the shortcut.
 _Avoid_: tap threshold
@@ -235,7 +241,8 @@ The peers the shortcut steps through in order, followed by home.
 _Avoid_: rotation
 
 **Stroke**:
-One leg of a shake along its axis, from one turn to the next.
+One leg of a shake along its axis, from the farthest point of the stroke before it, or the
+gesture's first motion, to its own farthest point, where the next turn ends it.
 _Avoid_: swing
 
 **Turn**:
@@ -256,11 +263,11 @@ _Avoid_: arrangement, layout, picture, desk, tile
 **Profile**:
 A named, shared crossing map with every machine's zones and the shake settings. One profile is
 active across the cluster.
-_Avoid_: desk, row, preset
+_Avoid_: desk, preset
 
 **Own zones**:
 Zones a machine keeps for itself instead of taking the active profile's.
-_Avoid_: use own, earlier ways
+_Avoid_: use own
 
 **Footprint**:
 The rectangle a machine's displays fill on the crossing map, placed and sized in map units.
@@ -279,6 +286,12 @@ _Avoid_: snap target
 A peer that is not in use, kept off the crossing map, or dormant. Its footprint and zone choices
 are kept, but no zone leads to it and it blocks nothing on the crossing map.
 _Avoid_: shelved peer
+
+**Present**:
+Said of a machine on this machine's crossing map that is not an inactive peer: this machine, a
+peer in use that is neither kept off the crossing map nor dormant, or a third party shown there.
+Only present machines block a footprint, overlap or take a third, a corner or the notch.
+_Avoid_: active machine, active peer (active is the active profile's word)
 
 **Kept off the crossing map**:
 Said of a peer the user has set aside: its zone choices and footprint are kept, but no zone leads
