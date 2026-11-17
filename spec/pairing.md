@@ -78,6 +78,14 @@ The published vectors the CPace rules name are copied as data in
 > A code pairs at most once. When its exchange ends, whatever the outcome, the code ends with it,
 > and a later attempt under it is told no code is shown.
 >
+> The exchange of a shown code also ends when the pairing connection its start bound the code to
+> closes before the showing machine has stored the new peer or sent a refusal, whatever closes it:
+> a message that does not decode (`pairing.connection.malformed`), a message out of order
+> (`pairing.connection.order`), the 10 seconds running out (`pairing.connection.ten-seconds`), or
+> the entering machine. The code then ends, and the showing machine reports that a wrong code was
+> entered. A pairing connection the code is not bound to closes without touching the code.
+>
+> - parity: Python kept a code whose bound TCP connection closed, on a frame that did not decode, a second start, its 10 seconds or the entering machine closing it, until the code expired, and reported it expired; it ended the code at once, as refused, only when that connection was replaced in the instant its start bound the code (#145's review: the bound start has spent the code's one guess, so its code ends at once and says why)
 > - model: pairing
 
 > r[pairing.code.cancel]
@@ -142,7 +150,8 @@ The published vectors the CPace rules name are copied as data in
 
 > r[pairing.connection.ten-seconds]
 > A showing machine closes a pairing connection 10 seconds after accepting it, with nothing more
-> sent, if its exchange has not ended by then.
+> sent, if its exchange has not ended by then. A code bound to that connection ends with it
+> (`pairing.code.single-use`).
 >
 > - model: pairing
 
@@ -160,7 +169,8 @@ The published vectors the CPace rules name are copied as data in
 > The exchange's messages come in one order: the entering machine's start, the showing machine's
 > answer, the entering machine's confirmation, the showing machine's receipt. A message out of that
 > order, a second start on the same connection included, closes the pairing connection with
-> nothing sent. The code and an exchange under way on another connection are untouched.
+> nothing sent. A code not bound to that connection, and an exchange under way on another
+> connection, are untouched; a code bound to it ends (`pairing.code.single-use`).
 >
 > - parity: Python answered a confirmation with no exchange under way with `not_pairing` and left the code shown, and passed over a message of another kind or for another pairing id, still pairing on the right one that came after it (#14: one exchange runs on one stream of its own pairing connection, so a message out of order is never another attempt's)
 > - model: pairing
@@ -171,11 +181,12 @@ The published vectors the CPace rules name are copied as data in
 > connection with nothing sent, before any of it is acted on. A message does not decode when its
 > kind is unknown; when a field is missing, repeated, of the wrong type, or follows the last one;
 > when a share is not 32 bytes; when a tag is not 64 bytes, nor, in a confirmation, empty; or when
-> a name or a platform is not valid UTF-8. A showing machine's code is untouched. An entering
+> a name or a platform is not valid UTF-8. A showing machine's code that is not bound to that
+> connection is untouched; a code bound to it ends (`pairing.code.single-use`). An entering
 > machine reports that the code was not accepted, and may send that code again
 > (`pairing.guess.failed-code`).
 >
-> - parity: Python refused a start whose share, nonce, name or machine id had the wrong type or length with `refused` and ended the code, and took such an answer as a wrong tag, sending an abort and refusing that code for 120 seconds (#14 decodes each message by its type before the exchange sees it, and bytes that are not a pairing message test no guess at the code)
+> - parity: Python refused a start whose share, nonce, name or machine id had the wrong type or length with `refused` and ended the code; refused a confirmation whose tag was not base64 or not 64 bytes with `refused`, as a wrong tag, and ended the code as a wrong code entered; and took such an answer as a wrong tag, sending an abort and refusing that code for 120 seconds (#14 decodes each message by its type before the exchange sees it, and bytes that are not a pairing message test no guess at the code; such a confirmation still ends the code it is bound to as a wrong code entered, but is answered with nothing)
 > - fuzz: pairing-message
 
 > r[pairing.connection.message-size]
@@ -407,8 +418,8 @@ The rules that hold whoever takes part without the code to one guess against eac
 > r[pairing.known.linked-since]
 > When the peer a pairing would replace links before the pairing is stored, the pairing is not
 > stored and that peer is kept as it is. A showing machine then sends a refusal saying refused in
-> place of the receipt, and reports the pairing not saved. An entering machine reports the
-> pairing not saved.
+> place of the receipt, and reports the pairing not saved. An entering machine whose own store
+> meets this keeps nothing and reports the pairing not saved.
 >
 > - model: pairing
 
