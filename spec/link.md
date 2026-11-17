@@ -269,10 +269,12 @@ app is told so. A pointer move that merges into one already waiting counts as no
 
 > r[link.send.quit]
 > When the app quits, it waits up to 0.5 s for what it already gave each link to be sent, then
-> closes the links. This end reports each of them down with the reason that this machine quit, and
-> the peer's end reports down with the reason that the peer closed it (`link.report.peer-closed`).
+> closes the links. Each link that is up when the app quits reports down at this end with the reason
+> that this machine quit, and at the peer's end with the reason that the peer closed it
+> (`link.report.peer-closed`). A link that is down, or being dialled, reports nothing more.
 >
 > - parity: Python's quitting end reported each link down as "{name} closed the connection", or as "The link to {name} failed: …" when closing cut off its read (a reason that says which end closed the link; Python's blamed the peer for a close this machine made)
+> - model: link
 
 ## Traffic classes
 
