@@ -59,7 +59,6 @@ mac_app/tests/test_login_item.py::LoginItemTests::test_a_moved_app_can_remove_bu
 mac_app/tests/test_login_item.py::LoginItemTests::test_non_default_launch_stays_in_the_menu_bar  mined: platform.login.mac-hidden
 mac_app/tests/test_login_item.py::LoginItemTests::test_only_an_applications_bundle_is_eligible_for_login  mined: platform.login.mac-applications
 mac_app/tests/test_login_item.py::LoginItemTests::test_opens_login_items_settings  mined: platform.login.mac-approval
-mac_app/tests/test_login_item.py::LoginItemTests::test_requires_approval_has_a_clear_status  mined: platform.login.mac-approval, platform.login.mac-state
 mac_app/tests/test_notices_mac.py::NoticesTest::test_a_notice_is_one_request_with_its_title_body_and_the_default_sound_and_no_trigger  mined: platform.notify.mac-centre, platform.notify.each
 mac_app/tests/test_notices_mac.py::NoticesTest::test_a_notice_shows_while_beamer_is_in_front_too  mined: platform.notify.front
 mac_app/tests/test_notices_mac.py::NoticesTest::test_asking_requests_alerts_and_sound_once  mined: platform.notify.mac-ask
@@ -86,7 +85,7 @@ win_app/tests/test_admin_mode.py::AdminModeTests::test_replacement_visibility_ma
 win_app/tests/test_admin_mode.py::AdminModeTests::test_shell_execution_failure_balances_com_without_another_launcher  mined: platform.admin.rollback
 win_app/tests/test_admin_mode.py::AdminModeTests::test_shell_unavailable_helper_result_reaches_the_setting_reason  mined: platform.admin.rollback
 win_app/tests/test_admin_mode.py::AdminModeTests::test_standard_account_is_unavailable  mined: platform.admin.administrator
-win_app/tests/test_admin_mode.py::AdminModeTests::test_task_xml_obeys_machine_local_preference  mined: platform.task.run-level, platform.admin.opt-in
+win_app/tests/test_admin_mode.py::AdminModeTests::test_task_xml_obeys_machine_local_preference  mined: platform.task.run-level, platform.admin.kept
 win_app/tests/test_admin_mode.py::AdminModeTests::test_token_query_closes_non_context_manager_pyhandle  python-detail: closing a pywin32 token handle that is not a context manager
 win_app/tests/test_admin_mode.py::AdminModeTests::test_unchanged_selection_does_not_request_relaunch  mined: platform.admin.same
 win_app/tests/test_admin_mode.py::AdminModeTests::test_unelevated_launch_uses_desktop_view_application_and_preserves_arguments  mined: platform.admin.change, platform.task.launch-options
@@ -97,7 +96,7 @@ win_app/tests/test_admin_mode.py::TransitionTests::test_failed_replacement_resto
 win_app/tests/test_admin_mode.py::TransitionTests::test_medium_startup_update_requests_consent_without_relaunching  mined: platform.login.pc-elevated-change
 win_app/tests/test_admin_mode.py::TransitionTests::test_no_task_creates_only_disabled_logon_trigger  mined: platform.admin.no-task
 win_app/tests/test_admin_mode.py::TransitionTests::test_ordinary_upgrade_keeps_opted_in_task_without_registering_it_again  mined: platform.task.unchanged
-win_app/tests/test_admin_mode.py::TransitionTests::test_success_changes_only_runlevel_and_launches_hidden_replacement  mined: platform.admin.change, platform.task.run-level
+win_app/tests/test_admin_mode.py::TransitionTests::test_success_changes_only_runlevel_and_launches_hidden_replacement  mined: platform.task.run-level, platform.task.launch-visible
 win_app/tests/test_admin_mode.py::TransitionTests::test_task_failure_never_changes_preference_or_launches  mined: platform.admin.task-refused
 win_app/tests/test_admin_mode.py::TransitionTests::test_transition_accepts_the_omitted_default_runlevel  mined: platform.admin.change, platform.task.run-level
 win_app/tests/test_admin_mode.py::TransitionTests::test_unrelated_task_is_never_overwritten  mined: platform.task.foreign
@@ -105,7 +104,7 @@ win_app/tests/test_autostart_win.py::InstallerTests::test_inno_setup_keeps_app_o
 win_app/tests/test_autostart_win.py::SwitchTests::test_empty_session_identity_is_reported_as_unavailable  mined: platform.login.pc-no-account
 win_app/tests/test_autostart_win.py::SwitchTests::test_enabling_startup_replaces_the_legacy_task_instead_of_adding_a_second  mined: platform.task.no-migration
 win_app/tests/test_autostart_win.py::SwitchTests::test_off_when_absent_touches_nothing  mined: platform.login.pc-off-absent
-win_app/tests/test_autostart_win.py::SwitchTests::test_on_then_off  mined: platform.login.pc-trigger, platform.login.pc-toggle
+win_app/tests/test_autostart_win.py::SwitchTests::test_on_then_off  mined: platform.login.pc-register, platform.login.pc-toggle
 win_app/tests/test_autostart_win.py::SwitchTests::test_reading_the_switch_migrates_the_legacy_task_before_reporting_state  mined: platform.task.no-migration
 win_app/tests/test_autostart_win.py::SwitchTests::test_refusal_is_raised  mined: platform.capability.error-is-state
 win_app/tests/test_autostart_win.py::SwitchTests::test_refuses_silent_elevation_for_another_users_session  mined: platform.login.pc-account
@@ -220,14 +219,14 @@ win_app/tests/test_input_blocker.py::ForegroundBlockerTests::test_zero_sid_subau
 win_app/tests/test_input_blocker.py::NativePrototypeTests::test_handle_and_sid_results_are_pointer_sized_and_dwords_stay_32_bit  python-detail: ctypes prototypes for the Win32 calls
 win_app/tests/test_installer_maintenance.py::InstallerMaintenanceContractTests::test_both_installers_use_one_narrow_maintenance_entry_point  mined: platform.install.one-setup
 win_app/tests/test_installer_maintenance.py::InstallerMaintenanceContractTests::test_elevation_cannot_launch_the_app_or_accept_an_arbitrary_command  mined: platform.install.setup-starts-nothing, platform.install.one-setup
-win_app/tests/test_installer_maintenance.py::MaintenanceBehaviourTests::test_explicit_administrator_preference_survives_upgrade  mined: platform.task.unchanged
+win_app/tests/test_installer_maintenance.py::MaintenanceBehaviourTests::test_explicit_administrator_preference_survives_upgrade  mined: platform.task.rewrite, platform.task.run-level
 win_app/tests/test_installer_maintenance.py::MaintenanceBehaviourTests::test_firewall_is_fixed_scope_and_service_recovery_is_optional  mined: platform.firewall.rule, platform.install.one-setup
 win_app/tests/test_installer_maintenance.py::MaintenanceBehaviourTests::test_gameinput_recovery_registers_only_fixed_system_action_and_run_permissions  mined: platform.install.one-setup
 win_app/tests/test_installer_maintenance.py::MaintenanceBehaviourTests::test_gameinput_recovery_uninstall_removes_only_fixed_task_and_is_idempotent  mined: platform.install.one-setup
 win_app/tests/test_installer_maintenance.py::MaintenanceBehaviourTests::test_migration_preserves_choices_and_ignores_other_users_and_actions  mined: platform.task.rewrite, platform.task.foreign
 win_app/tests/test_installer_maintenance.py::MaintenanceBehaviourTests::test_uninstall_removes_only_matching_tasks_and_program_rules  mined: platform.install.uninstall, platform.firewall.setup-scope, platform.task.foreign
 win_app/tests/test_installer_maintenance.py::MaintenanceBehaviourTests::test_upgrade_materialises_omitted_runlevel_only_for_administrator_preference  mined: platform.task.rewrite, platform.task.run-level
-win_app/tests/test_installer_maintenance.py::MaintenanceBehaviourTests::test_upgrade_preserves_omitted_default_runlevel_without_registration  mined: platform.task.unchanged, platform.task.run-level
+win_app/tests/test_installer_maintenance.py::MaintenanceBehaviourTests::test_upgrade_preserves_omitted_default_runlevel_without_registration  mined: platform.task.rewrite, platform.task.run-level
 win_app/tests/test_linux_permissions.py::LinuxPermissionsTest::test_ask_again_resets_the_row_and_starts_a_fresh_request  dropped: Linux-only, out of scope (#1)
 win_app/tests/test_linux_permissions.py::LinuxPermissionsTest::test_capture_ask_again_opens_a_fresh_portal_request  dropped: Linux-only, out of scope (#1)
 win_app/tests/test_linux_permissions.py::LinuxPermissionsTest::test_capture_partial_grant_is_refused_and_retryable  dropped: Linux-only, out of scope (#1)

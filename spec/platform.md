@@ -16,13 +16,15 @@ app at `archive/python` (`win_app/firewall_win.py`, `win_app/autostart_win.py`,
 its tests in `spec/ledger/platform.txt`.
 
 What stays elsewhere: what capture and injection do with input is `spec/input.md`'s; the UDP port
-and the link are `spec/link.md`'s; where the identity key pair comes from is `spec/pairing.md`'s
-(`pairing.identity.*`); when a wake happens and what its packet carries is `spec/discovery.md`'s
+and the link are `spec/link.md`'s; where the identity key pair comes from, and that the Keychain or
+a DPAPI file keeps it, is `spec/pairing.md`'s (`pairing.identity.*`), and only what the key store
+adds to those rules is here; when a wake happens and what its packet carries is `spec/discovery.md`'s
 (`discovery.wake.*`); the virtual microphone's and the virtual camera's install steps are
 `spec/audio.md`'s and `spec/camera.md`'s; the `--elevated` command line, `beamer install`,
 `beamer uninstall`, `beamer quit` and the watchdog are `spec/app.md`'s; persistence and logging are
 `spec/runtime.md`'s; and what every page, tray menu and notification says is `spec/viewmodel.md`'s.
-The capabilities here report typed values: a notification's words, and the words that explain a
+The capabilities here are #16's fourteen, one trait each in `beamer-platform`; admin mode is
+reported through Start at login's (`platform.capability.admin-mode`). They report typed values: a notification's words, and the words that explain a
 firewall check or an input blocker, are the view-model's (#16).
 
 Dropped, so no rule here (#11): the portable build (F23), Windows unlock through the RoomDeck
@@ -36,12 +38,18 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 
 ## Capabilities
 
-> r[platform.capability.states]
-> Each capability of a machine reports exactly one of four states at a time: ready, needs
-> permission, refused, or unsupported here with its reason. The capabilities are input capture,
-> input injection, displays and the pointer, the clipboard, audio devices, camera devices, display
-> switching, gestures and haptics, the identity key store, Start at login, the firewall, admin mode,
-> power and wake, notifications, and permissions.
+r[platform.capability.states]
+Each capability of a machine reports exactly one of four states at a time: ready, needs
+permission, refused, or unsupported here with its reason. The capabilities are the fourteen #16
+lists: input capture, input injection, displays and the pointer, the clipboard, audio devices,
+camera devices, display switching, gestures and haptics, the identity key store, Start at login,
+the firewall, power and wake, notifications, and permissions.
+
+r[platform.capability.admin-mode]
+Admin mode is no capability of its own. On a PC, Start at login's capability, which keeps the
+logon task whose run level admin mode is, reports admin mode beside its own state: whether it is
+on, and one of the same four states. Where a rule says that admin mode reports a state, it is this
+report.
 
 > r[platform.capability.never-waits]
 > Asking a capability for something (a firewall check, a change to Start at login, a permission
@@ -61,8 +69,8 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > capability stays at needs permission, and nothing else in Beamer waits on the answer.
 
 > r[platform.capability.unsupported-os]
-> On a Mac, the firewall and admin mode report unsupported here. On a PC, haptics report unsupported
-> here.
+> On a Mac, the firewall reports unsupported here, and so does admin mode
+> (`platform.capability.admin-mode`). On a PC, haptics report unsupported here.
 >
 > - parity: Python's firewall check, run anywhere but Windows, reported a check that failed (#16: a capability the OS has no part for reports unsupported here)
 
@@ -83,7 +91,7 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > Monitoring shows macOS's Input Monitoring prompt. Each asks for its own permission only.
 >
 > - tier: human (a macOS permission prompt is seen on the Mac's display)
-> - do: On a Mac where Beamer has neither permission, ask for Accessibility, then for Input Monitoring, from Beamer's permissions page
+> - do: On the Mac, run `tccutil reset Accessibility uk.co.kalkman.beamer` and `tccutil reset ListenEvent uk.co.kalkman.beamer`, relaunch Beamer, then ask for Accessibility and then for Input Monitoring from Beamer's permissions page, granting each so that Beamer has both again
 > - see: Each time, macOS shows the prompt for exactly that permission, naming Beamer
 
 > r[platform.permissions.relaunch-needed]
@@ -99,7 +107,7 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 
 > r[platform.permissions.change-seen]
 > A Mac permission granted or taken away in System Settings while Beamer runs is reported within
-> 5 s, without Beamer being relaunched.
+> 0.5 s, without Beamer being relaunched.
 >
 > - tier: machine (only a real Mac changes a permission in System Settings)
 
@@ -109,7 +117,7 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > A fresh install turns Start at login on, on a Mac and on a PC. Reinstalling over an earlier
 > install keeps the choice the user made.
 >
-> - parity: Python's Windows installer left Start at login off unless the user ticked it (#21: Start at login is on by default on both OSes)
+> - parity: Python left Start at login off on both: its Windows installer unless the user ticked it, and its Mac app until the user turned on its switch, the one place that registered the login item (#21: Start at login is on by default on both OSes)
 
 > r[platform.login.mac-login-item]
 > On a Mac, Start at login is Beamer.app itself registered with macOS as a login item, which Login
@@ -141,15 +149,20 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > A Mac launch that macOS reports as a login item's launch starts Beamer hidden, in the menu bar
 > only. Any other launch, including one for which macOS gives no launch kind, shows Beamer's window.
 
-> r[platform.login.pc-trigger]
-> On a PC, Start at login is on exactly when Beamer's logon task exists, is enabled, and has an
-> enabled logon trigger.
+r[platform.login.pc-trigger]
+On a PC, Start at login is on exactly when Beamer's logon task is registered, is enabled, and has
+an enabled logon trigger.
 
 > r[platform.login.pc-toggle]
-> Turning Start at login on or off on a PC changes only the enabled state of the logon task's logon
-> trigger: the task stays registered, with its run level and its action unchanged.
+> On a PC with its logon task registered, turning Start at login on enables the task and its logon
+> trigger, and turning it off disables the logon trigger: the task stays registered and enabled,
+> with its run level and its action unchanged.
 >
 > - parity: Python deleted the task to turn Start at login off, and registered it again to turn it on (#21: one logon task, always registered, through which every launch goes)
+
+r[platform.login.pc-register]
+Turning Start at login on on a PC with no logon task registered registers it, as
+`platform.task.definition` and `platform.task.run-level` say, with its logon trigger on.
 
 > r[platform.login.pc-off-absent]
 > Turning Start at login off on a PC with no logon task changes nothing.
@@ -157,7 +170,10 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > r[platform.login.pc-account]
 > When Beamer runs as an account other than the one signed in to Windows, as when another
 > administrator approved a UAC prompt for it, Start at login and admin mode report unsupported here,
-> naming the signed-in account, and a request to change either changes nothing.
+> naming the signed-in account, and a request to change either changes nothing, turning Start at
+> login off included.
+>
+> - parity: Python, run as another account, refused to turn Start at login on but turned it off, deleting the signed-in account's task (one rule for every change: a Beamer run as another account changes no task of the signed-in account's, `platform.task.foreign`)
 
 > r[platform.login.pc-no-account]
 > When Windows names no signed-in account, Start at login and admin mode report unsupported here.
@@ -174,12 +190,13 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > backslash replaced by `-`: `Beamer-STUDIO-PC-alex` for `STUDIO-PC\alex`.
 
 > r[platform.task.definition]
-> The logon task starts `Beamer.exe` at its installed path with `--hidden`, in its own folder,
-> as the signed-in account with its interactive token, at priority 4. It has one logon trigger,
-> for that account. It ignores a new start while it runs, neither stops nor refuses to start on
-> battery, has no time limit, and never restarts Beamer on failure.
+> The logon task starts `Beamer.exe` at its installed path with the arguments
+> `--logon-task $(Arg0)`, in its own folder, as the signed-in account with its interactive token, at
+> priority 4. It is enabled, and has one logon trigger, for that account. It ignores a new start
+> while it runs, neither stops nor refuses to start on battery, has no time limit, and never
+> restarts Beamer on failure.
 >
-> - parity: Python's task ran Beamer at priority 7, a below-normal process (#21: priority 4)
+> - parity: Python's task ran Beamer with the argument `--hidden` at priority 7, a below-normal process (#21: priority 4, and every launch runs the task, so the task's arguments carry what the launch asked for, `platform.task.launch-options`)
 
 > r[platform.task.run-level]
 > The logon task's run level is the highest the account has while admin mode is on, and least
@@ -189,19 +206,27 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > The logon task starts Beamer at any installed path and for any account name, including ones with
 > `&`, apostrophes or characters outside ASCII, such as `C:\A & B\` or `STUDIO-PC\Élodie`.
 
-> r[platform.task.unchanged]
-> Registering the logon task when the registered task already starts this Beamer.exe as
-> `platform.task.definition` and `platform.task.run-level` say changes nothing, so a second install
-> or a second registration writes nothing.
+r[platform.task.unchanged]
+Registering the logon task when the registered task is already as `platform.task.definition` and
+`platform.task.run-level` say, whether its logon trigger is on or off, changes nothing, so a second
+install or a second registration writes nothing.
 
 > r[platform.task.rewrite]
-> When the registered logon task differs from what Beamer would write, Beamer rewrites it and keeps
-> the enabled state of its logon trigger.
+> When the registered logon task differs from what `platform.task.definition` and
+> `platform.task.run-level` say, other than in whether its logon trigger is on, registering it
+> rewrites it as they say and keeps Start at login as `platform.login.pc-trigger` read it: the
+> rewritten task is enabled, and its logon trigger is on exactly when Start at login was on.
+>
+> - parity: Python's installer changed only a task's run level, keeping its arguments, whether the task was enabled and its triggers as the user left them, and left a task whose run level already matched as it was (#21: every launch runs the logon task, so it must be enabled and start Beamer as `platform.task.definition` says; Start at login is the one choice in the task that is the user's)
 
 > r[platform.task.foreign]
-> Beamer never changes or deletes a task that starts another program, belongs to another account,
-> or has more than one action or principal, even one with the logon task's name: a change that
-> would need to reports refused, naming the task.
+> Beamer never changes or deletes a task that starts a program other than `Beamer.exe` at its
+> installed path (one named by a relative path included), runs as another account, runs with a
+> logon type other than the interactive token, or has more than one action or principal, even one
+> with the logon task's name. An install, or a change to Start at login or admin mode, that would
+> need to reports refused, naming the task; uninstall leaves it as it is.
+>
+> - parity: Python's switch for Start at login overwrote and deleted a task with the logon task's name whatever it started, and its installer passed over such a task without a word; only its admin mode refused (one rule for every change to the logon task, as Python's admin mode had it)
 
 > r[platform.task.no-migration]
 > Beamer reads, changes and deletes no task but its own logon task: a task an earlier Beamer
@@ -210,29 +235,44 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > - parity: Python moved the global `Beamer` task of 1.5.1 to the per-account task, keeping its arguments and whether it was on, and deleted it, also on uninstall (#21: no compatibility code goes into the app; `dev/cutover.sh` removes the Python app's leftovers once)
 
 > r[platform.task.launch]
-> On a PC, a launch of Beamer that does not come from its logon task runs the logon task and ends,
-> so Beamer always runs at admin mode's level and no UAC prompt is shown at launch. A launch from
-> the task never shows a UAC prompt.
+> On a PC, a launch of Beamer's app that does not come from its logon task (its first argument is
+> not `--logon-task`) runs the logon task (`platform.task.launch-options`) and ends, so Beamer
+> always runs at admin mode's level and no UAC prompt is shown at launch. A launch from the task
+> never shows a UAC prompt. The commands of `spec/app.md`, such as `beamer install` or
+> `beamer --elevated setup`, are not launches of the app.
 >
 > - parity: Python, launched by hand without administrator rights while admin mode was on, asked for them with a UAC prompt and relaunched itself (#21: every launch that does not come from the task runs the task and exits)
 
-> r[platform.task.launch-visible]
-> The Beamer that the logon task starts for another launch shows its window when that launch would
-> have, as a double-click does, and starts hidden for a launch with `--hidden` or a logon.
+r[platform.task.launch-visible]
+A Beamer that the logon task starts with `$(Arg0)` as written, which is how Task Scheduler leaves
+it when the logon trigger starts the task (MS-TSCH 2.5.9.2: a parameter given no value is not
+replaced), starts hidden. One that it starts with `--launched` shows its window, unless the options
+after `--launched` include `--hidden`.
 
-> r[platform.task.launch-options]
-> The Beamer that the logon task starts for another launch is given that launch's other
-> command-line options.
+r[platform.task.launch-options]
+Whatever runs the logon task (a launch, or a change to admin mode) gives Task Scheduler one value
+for `$(Arg0)`: `--launched`, then the options for the Beamer it starts, which for a launch are that
+launch's own command-line options. Each option is quoted so that the Beamer the task starts
+receives it as the same argument, with its spaces, quotes and characters outside ASCII.
 
 > r[platform.task.launch-failed]
-> When the logon task is missing, or Windows refuses to run it, a launch goes on by itself with the
-> rights it was started with, and admin mode reports refused until install registers the task again.
+> When the logon task is missing, or Windows refuses to run it, a launch that does not come from
+> the task goes on by itself with the rights it was started with, and shows no UAC prompt. While
+> admin mode is on and that Beamer runs without administrator rights, admin mode reports refused for
+> as long as it runs; otherwise nothing is reported for it. Task Scheduler passing over the run
+> because the task's Beamer already runs (`platform.task.definition`) is no refusal: the launch
+> ends, and what a launch does while Beamer runs is `spec/app.md`'s.
 
 ## Admin mode
 
-> r[platform.admin.opt-in]
-> On a PC, admin mode is off until the user turns it on. It belongs to the signed-in Windows account
-> on this PC: it is never sent to a peer, and it stays as chosen across restarts of Beamer.
+r[platform.admin.opt-in]
+On a PC, admin mode is off until the user turns it on.
+
+r[platform.admin.local]
+Admin mode belongs to the signed-in Windows account on this PC: it is never sent to a peer.
+
+> r[platform.admin.kept]
+> Admin mode stays as the user chose it across restarts of Beamer.
 >
 > - parity: Python kept the choice in the registry, under `HKCU\Software\KalkmanCode\Beamer` (#16: it lives in `local.json`; the fresh start reads nothing of the Python app's, so an earlier choice is not carried over)
 
@@ -253,12 +293,13 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > saying they could not be checked.
 
 > r[platform.admin.change]
-> Turning admin mode on or off asks for administrator permission with one UAC prompt. Once given,
-> Beamer sets the logon task's run level for the new choice, changing nothing else in the task,
-> records the choice, then ends the running Beamer, and the logon task starts Beamer again at the
-> new level, showing its window.
+> Turning admin mode on or off asks for administrator permission with one UAC prompt. Once it is
+> given, Beamer sets the logon task's run level for the new choice, changing nothing else in the
+> task, and records the choice. The running Beamer then quits as Quit does (`spec/app.md`), and once
+> it has ended, the logon task is run with `--launched` (`platform.task.launch-options`), starting
+> Beamer at the new level with its window shown.
 >
-> - parity: Python started the elevated Beamer itself, and the unelevated one through Explorer's desktop window (#21: every launch goes through the logon task, which starts Beamer at admin mode's level)
+> - parity: Python started the new Beamer itself, elevated directly and unelevated through Explorer's desktop window, and quit the running one once it had started (#21: every launch goes through the logon task, which ignores a new start while the running Beamer is its own, so the running one ends first)
 
 > r[platform.admin.same]
 > Choosing the state admin mode already has asks for nothing and relaunches nothing.
@@ -272,15 +313,22 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > choice recorded is unchanged, and the running Beamer is not replaced.
 
 > r[platform.admin.rollback]
-> When the Beamer at the new level cannot be started, the logon task and the choice recorded are
-> restored to what they were before the change, the running Beamer goes on, and the change reports
-> that it failed. Beamer tries no other means of starting itself.
+> When the logon task cannot start Beamer at the new level (Windows refuses to run it, or reports
+> that the run did not start Beamer), the task's run level and the choice recorded are restored to
+> what they were before the change, with no second UAC prompt; a task that the change registered
+> (`platform.admin.no-task`) stays registered, with its logon trigger off. The logon task is then
+> run again, starting Beamer at the earlier level with its window shown, given an option that makes
+> it report that the change failed. Beamer tries no other means of starting itself: when that run
+> fails too, the failure is logged, and no Beamer runs until the next launch.
+>
+> - parity: Python restored the task and the choice while the running Beamer still ran, which then reported the failure, and deleted a task that the change had registered (#21: the running Beamer has ended before the logon task can start the new one, `platform.admin.change`, and the one logon task stays registered)
 
 > r[platform.admin.keeps-login]
 > Changing admin mode never changes Start at login: a logon trigger that was off stays off.
 
-> r[platform.admin.no-task]
-> When no logon task is registered, turning admin mode on registers it with its logon trigger off.
+r[platform.admin.no-task]
+When no logon task is registered, a change to admin mode registers it, as `platform.task.definition`
+says, with its logon trigger off.
 
 ## Firewall
 
@@ -310,32 +358,46 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > A firewall rule for any profile covers every profile. A domain-authenticated network is on the
 > Domain profile.
 
-> r[platform.firewall.lan]
-> The LAN is the networks Windows reports with the best connectivity of any, Internet before local
-> network before subnet; when no network has any of these, the LAN is every network. A network
-> outside the LAN, such as a Hyper-V switch with no traffic beside a Wi-Fi with Internet, plays no
-> part in the check.
+r[platform.firewall.lan]
+The LAN is the networks Windows reports with the best connectivity of any, Internet before local
+network before subnet; when no network has any of these, the LAN is every network. Coverage is
+judged on the profiles the LAN is on: a network outside the LAN, such as a Hyper-V switch with no
+traffic beside a Wi-Fi with Internet, plays no part in it. Block rules are judged on every connected
+network (`platform.firewall.blocked`).
 
-> r[platform.firewall.ready]
-> The firewall reports ready when an allow rule that counts covers every profile the LAN is on, and
-> no block rule blocks (`platform.firewall.blocked`).
+> r[platform.firewall.outcome]
+> A firewall check reports the first of these that holds: the check failed, or was refused for lack
+> of permission (`platform.firewall.check-failed`, `platform.firewall.check-permission`); a block
+> rule blocks (`platform.firewall.blocked`); the firewall is ready (`platform.firewall.ready`);
+> Beamer's rule is missing (`platform.firewall.missing`); the LAN's network is public
+> (`platform.firewall.network-public`).
+>
+> - parity: Python checked for a public network before a missing rule, so a LAN on Public and on Private, with an allow rule only for Public, was named public although its Private network had no rule (#21: Repair covers every profile but Public, so it comes first; only the user can change a Public network)
+
+r[platform.firewall.ready]
+The firewall is ready when at least one allow rule counts and each profile the LAN is on is covered
+by an allow rule that counts.
 
 > r[platform.firewall.blocked]
-> A block rule that counts and is on a profile some network is connected on blocks: the firewall
-> reports needs permission, naming a block rule as the cause, whatever allow rules there are. A
-> block rule only on profiles no network is on, or a disabled one, is not reported.
+> A block rule that counts blocks when it is on a profile some connected network is on, or on any
+> profile when no network is connected. The firewall then reports needs permission, naming a block
+> rule as the cause, whatever allow rules there are, and offers Repair, which deletes it
+> (`platform.firewall.setup`). A block rule only on profiles no connected network is on blocks
+> nothing, and a disabled one counts for nothing (`platform.firewall.counts`).
+>
+> - parity: Python told the user to ask an administrator to review Beamer's block rules, and offered only checking again (#21: the elevated setup deletes the block rules Windows writes when its prompt is dismissed)
 
 > r[platform.firewall.missing]
-> When no allow rule that counts covers every profile the LAN is on, and the LAN is not on the
-> Public profile, the firewall reports needs permission, naming Beamer's rule as missing, and offers
-> Repair.
+> When no allow rule counts, or a profile the LAN is on other than Public is covered by no allow
+> rule that counts, the firewall reports needs permission, naming Beamer's rule as missing, and
+> offers Repair.
 >
 > - parity: Python told the user to run the Beamer installer again, and on a domain network to ask an administrator for Domain-profile rules (#21: the app's Repair runs the elevated setup, whose rule covers the Domain profile too)
 
-> r[platform.firewall.network-public]
-> When the LAN is on the Public profile and an allow rule that counts does not cover it, the
-> firewall reports refused, naming the LAN's network as public and its interface, so that the user
-> can make it Private in Windows Settings. It offers no Repair for it.
+r[platform.firewall.network-public]
+When the LAN is on the Public profile and no allow rule that counts covers it, the firewall reports
+refused, naming each network of the LAN on the Public profile and its interface, so that the user
+can make it Private in Windows Settings. It offers no Repair for it.
 
 > r[platform.firewall.port]
 > The check is always for UDP port 24820.
@@ -347,11 +409,13 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > a check that failed, and offers to check again. A check that failed never reports a rule missing
 > or a block rule, and the OS's words reach only the log.
 
-> r[platform.firewall.check-permission]
-> When Windows refuses the check for lack of permission, told by its access-denied error code
-> whatever the language Windows displays, the firewall reports needs permission, naming the check,
-> and offers Repair and checking again. Any other refusal is a check that failed
-> (`platform.firewall.check-failed`), whatever words it carries.
+r[platform.firewall.check-permission]
+When Windows refuses the check for lack of permission, told by its access-denied error code
+whatever the language Windows displays, while Beamer runs without administrator rights, the
+firewall reports needs permission, naming the check, and offers checking again. It offers no
+Repair, which leaves the rights the check runs with as they were. The same refusal while Beamer runs
+with administrator rights, and any other refusal, whatever words it carries, is a check that failed
+(`platform.firewall.check-failed`).
 
 > r[platform.firewall.repair]
 > Repair runs Beamer's elevated setup, which asks for administrator permission with one UAC prompt
@@ -360,20 +424,20 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > - parity: Python's app never changed the firewall, and told the user to run the installer again (#21: the app's Repair calls the same elevated setup as install)
 
 > r[platform.firewall.setup]
-> The elevated setup deletes every inbound block rule for `Beamer.exe` at its installed path, the
-> ones Windows writes when its "allow access" prompt is dismissed included, and any rule named
-> "Beamer (UDP-In)" that differs from `platform.firewall.rule`, then writes that rule when it is
-> missing.
+> The elevated setup deletes every inbound block rule whose program is `Beamer.exe` at its installed
+> path, the ones Windows writes when its "allow access" prompt is dismissed included, and any rule
+> named "Beamer (UDP-In)" for that program that differs from `platform.firewall.rule`, then writes
+> that rule when it is missing.
 >
-> - parity: Python's repair deleted every inbound rule for any `Beamer.exe`, wherever it was, and its installer left block rules for an administrator to review (#21: setup deletes the block rules Windows writes when its prompt is dismissed)
+> - parity: Python's app never changed the firewall; its installer's repair deleted only its own three named rules whose program was exactly the installed path, wrote them again, and left block rules for an administrator to review (#21: setup deletes the block rules Windows writes when its prompt is dismissed)
 
 > r[platform.firewall.setup-unchanged]
-> When Beamer's rule is as `platform.firewall.rule` says and no block rule for `Beamer.exe` exists,
-> the elevated setup changes no firewall rule.
+> When Beamer's rule is as `platform.firewall.rule` says and no block rule for `Beamer.exe` at its
+> installed path exists, the elevated setup changes no firewall rule.
 
-> r[platform.firewall.setup-scope]
-> The elevated setup and uninstall delete only rules for `Beamer.exe` at its installed path or
-> named "Beamer (UDP-In)": never another program's rule, and never every rule.
+r[platform.firewall.setup-scope]
+The elevated setup and uninstall delete only rules whose program is `Beamer.exe` at its installed
+path: never another program's rule, one named "Beamer (UDP-In)" included, and never every rule.
 
 > r[platform.firewall.setup-gone]
 > A rule already gone when the elevated setup deletes it does not stop the setup, which still
@@ -407,9 +471,11 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > whose rights Beamer was not allowed to read is neither, and a confirmed system integrity stands
 > when its elevation could not be read.
 
-> r[platform.blocker.no-foreground]
-> With no foreground window, or one whose process Windows does not name, Beamer inspects no process,
-> and the input blocker is unknown.
+r[platform.blocker.no-foreground]
+With no foreground window, Beamer inspects no process, and the input problem is of the ordinary
+kind, naming the foreground window (`platform.blocker.name`). With a foreground window whose process
+Windows does not name, Beamer opens no process, keeps the window's class, and counts the window as
+one whose process Beamer was not allowed to inspect (`platform.blocker.kind`).
 
 > r[platform.blocker.log]
 > The PC logs one warning for a refusal when the input blocker differs from the last refusal's, or
@@ -419,10 +485,10 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 >
 > - parity: Python logged a refused injection again only for a different blocker, a success between them notwithstanding (one reading for both: the pointer placement's)
 
-> r[platform.blocker.notify]
-> An input problem raises a notification at most once for each input blocker window in a run, a
-> window being its process id, handle and class, and at most once in 30 s whatever the window. A
-> later success does not let a window's notification come again.
+r[platform.blocker.notify]
+An input problem raises a notification, unless one was already raised in this run for the same input
+blocker window, a window being its process id, handle and class, or one was raised for any input
+problem in the last 30 s. A later success does not let a window's notification come again.
 
 > r[platform.blocker.success]
 > An injection or a pointer placement that Windows accepts reports no input problem.
@@ -469,38 +535,47 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > r[platform.notify.undelivered]
 > While macOS refuses Beamer's notifications, or cannot deliver them, notifications report refused,
 > and a notification is logged with its title and body instead. Nothing else in Beamer fails for it.
+>
+> - parity: Python never noticed macOS refusing its notifications: it ignored the answer to its request for permission and posted with no completion handler, logging a notification only when posting it raised (#16: errors are values that set a capability's state)
 
 > r[platform.notify.pc]
 > On a PC, a notification shows as a Windows notification from Beamer, with its title and body.
 >
 > - tier: human (a Windows notification is seen on the PC's display)
-> - do: On the PC, make a crossing to a peer that refuses it
-> - see: A Windows notification from Beamer says the crossing was refused, with a title and a body
+> - do: On the PC, signed in to an administrator account (so that Task Manager runs as administrator), with Do not disturb off and admin mode off, open Task Manager so that it is in front; then, from the Mac, drive the PC, move the pointer over Task Manager and click
+> - see: A Windows notification from Beamer, with a title and a body, naming `Taskmgr.exe` (`platform.blocker.notify`)
 
 ## Haptics
 
 > r[platform.haptics.tick]
-> On a Mac with a Force Touch trackpad, a haptic tick is one level-change click, felt under a
-> finger resting on the trackpad.
+> On a Mac with a Force Touch trackpad, each tick a zone push reports
+> (`crossing.method.report-tick`) gives one level-change click while haptics are on and set to feel
+> that tick, felt under a finger resting on the trackpad.
 >
 > - tier: human (a haptic click is felt)
-> - do: Rest a finger on the Mac's trackpad and push the pointer slowly into a zone
-> - see: Each step of push pressure is one click under the finger
+> - do: With haptics on and every tick felt (the defaults), rest a finger on the Mac's trackpad and push the pointer slowly into a zone until input crosses
+> - see: Three single clicks under the finger as the push builds, before the crossing's own clicks
 
 > r[platform.haptics.breakthrough]
-> The haptic for a breakthrough is two level-change clicks 60 ms apart.
+> With haptics on, a zone push that crosses (`crossing.method.report-cross`) gives two level-change
+> clicks 60 ms apart.
 >
 > - tier: human (a haptic click is felt)
-> - do: Rest a finger on the Mac's trackpad and push the pointer through a zone
-> - see: As input crosses, two clicks close together, unlike a single step
+> - do: With haptics on, rest a finger on the Mac's trackpad and push the pointer through a zone until input crosses
+> - see: As input crosses, two clicks close together, unlike a single tick
+
+r[platform.haptics.arrival]
+With haptics on, input arriving home, through a zone or sent home by the driven machine
+(`crossing.method.report-arrival`, `crossing.method.report-arrival-no-point`), gives the same two
+clicks as a zone push that crosses (`platform.haptics.breakthrough`).
 
 > r[platform.haptics.never-delays]
 > Haptics never delay or stop a crossing: on a Mac with no Force Touch trackpad nothing is felt, and
 > the crossing is as it would be with haptics off.
 
-> r[platform.haptics.failure]
-> When macOS fails a haptic, haptics report refused for the rest of the run, one warning is logged,
-> and no later haptic is tried.
+r[platform.haptics.failure]
+When macOS fails a haptic, haptics report refused for the rest of the run, an error is logged with
+what macOS raised, and no later haptic is tried.
 
 ## Process tuning
 
@@ -516,8 +591,10 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 >
 > - tier: machine (only a real PC reports a process's power throttling)
 
-> r[platform.tuning.refused]
-> When the OS refuses either opt-out, Beamer logs a warning and goes on starting.
+r[platform.tuning.refused]
+When the OS refuses one of process tuning's requests (`platform.tuning.mac-nap`,
+`platform.tuning.pc-throttle`, `platform.tuning.pc-priority`, `platform.tuning.top-priority`),
+Beamer logs a warning naming the request and goes on running at what the OS gave.
 
 > r[platform.tuning.pc-priority]
 > On a PC, Beamer runs in the above-normal priority class.
@@ -529,26 +606,29 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > Mac, time-critical on a PC.
 >
 > - tier: machine (only the real OS reports the priority Beamer runs at)
-> - parity: Python's PC captured at the highest thread priority, below time-critical, and the rest of its work ran at normal priority (#16: capture and the engine run at the top)
+> - parity: Python's PC captured at the highest thread priority, below time-critical, and the rest of its work ran at normal priority; its Mac set no priority class for capture or any other work (#16: capture and the engine run at the top)
 
 ## Identity key store
 
 > r[platform.key-store.mac]
-> On a Mac, the private key is one item in the user's login Keychain, readable by Beamer signed as
-> "Beamer Dev", kept on this Mac only and never synced to another device.
+> On a Mac, the Keychain that keeps the private key (`pairing.identity.keychain`) is the user's
+> login Keychain: the key is one item there, readable by Beamer signed as "Beamer Dev", kept on this
+> Mac only and never synced to another device.
 >
 > - tier: machine (the Keychain is reached only on a real Mac, by the signed app)
 
 > r[platform.key-store.pc]
-> On a PC, the private key is in a file in Beamer's data folder, `%LOCALAPPDATA%\Beamer\`, protected
-> by DPAPI for the signed-in account, so that no other account and no other PC can read it.
+> On a PC, the DPAPI-protected file that keeps the private key (`pairing.identity.dpapi`) is in
+> Beamer's data folder, `%LOCALAPPDATA%\Beamer\`, and no other Windows account can read the key
+> from it.
 >
 > - tier: machine (DPAPI is reached only on a real Windows machine, under the user's account)
 
-> r[platform.key-store.unreadable]
-> When a stored private key exists but the OS will not hand it over (a locked Keychain, access
-> refused, DPAPI failing), the identity key store reports refused, Beamer makes no new key pair,
-> and it neither takes nor dials a link until it has read the key.
+r[platform.key-store.unreadable]
+When a stored private key exists but the OS will not hand it over (a locked Keychain, access
+refused, DPAPI failing), the identity key store reports refused, Beamer makes no new key pair
+(`pairing.identity.key-pair`), and it neither takes nor dials a link for the rest of the run. It
+tries to read the key again at its next start, and at no other time.
 
 > r[platform.key-store.not-a-key]
 > A stored private key that is not a valid Ed25519 private key counts as lost
@@ -559,13 +639,16 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 ## Power and wake
 
 > r[platform.power.sleep]
-> A machine reports the OS going to sleep, and waking from it, as each happens.
+> A machine reports the OS going to sleep when the OS announces it, before the machine sleeps, and
+> reports the wake within 1 s of the OS announcing it.
 >
 > - tier: machine (only a real machine sleeps and wakes)
 
-> r[platform.power.wake-packet]
-> A machine sends a wake's packet (`discovery.wake.packet`) as a UDP broadcast. When the OS refuses
-> the broadcast, power and wake reports it, and the wake ends as `discovery.wake.send-failed` says.
+r[platform.power.wake-packet]
+A machine sends a wake's packet to each destination `discovery.wake.packet` names. When the OS
+refuses the send to 255.255.255.255, power and wake reports it, and the wake ends as
+`discovery.wake.send-failed` says. A send the OS refuses to any other destination does not end the
+wake.
 
 ## Install steps
 
@@ -598,6 +681,7 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > Microphone, system audio capture and Camera access.
 >
 > - tier: machine (only a real Mac shows an installed app's declarations)
+> - parity: Python's app declared macOS 13.0 as its lowest (#21: `LSMinimumSystemVersion` 14.2)
 
 > r[platform.install.check]
 > Each install step tells, without administrator rights, whether what it would write differs from
@@ -614,17 +698,20 @@ a hosted runner of its own OS (#15); a rule that only the real OS can show is `m
 > The elevated setup never starts Beamer and reads none of Beamer's settings: it runs its own fixed
 > steps and ends.
 
-> r[platform.install.task]
-> Install registers the logon task (`platform.task.definition`), with its logon trigger on for a
-> fresh install, and keeps the logon trigger's state when a task is already registered.
+r[platform.install.task]
+On a PC, install registers the logon task (`platform.task.definition`), its logon trigger set as
+`platform.login.default-on` says, and a task already registered is kept or rewritten as
+`platform.task.unchanged` and `platform.task.rewrite` say.
 
-> r[platform.install.uninstall]
-> Uninstall removes Start at login (the Mac's login item, or the PC's logon task), Beamer's firewall
-> rule and the block rules for `Beamer.exe`, and the installed files.
+r[platform.install.uninstall]
+Uninstall removes Start at login (the Mac's login item, or the PC's logon task), Beamer's firewall
+rule, and the installed files.
 
-> r[platform.install.uninstall-keeps]
-> Uninstall keeps Beamer's data folder and the identity key, so that a reinstall is still
-> paired. Uninstall with `--purge` removes them too.
+r[platform.install.uninstall-keeps]
+Uninstall keeps Beamer's data folder and the identity key, so that a reinstall is still paired.
+
+r[platform.install.purge]
+Uninstall with `--purge` also removes Beamer's data folder and the identity key.
 
 > r[platform.install.quit-keeps]
 > Quitting Beamer leaves every install step as it is: Start at login and the firewall rule stay.

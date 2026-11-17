@@ -23,10 +23,10 @@ no Python test is its own:
 | `audio` | #62 | 148 |
 | `camera` | #63 | 202 |
 | `media` | #64 | 0 |
-| `platform` | #65 | 325 |
+| `platform` | #65 | 324 |
 | `runtime` | #66 | 4 |
 | `app` | #67 | 98 |
-| `viewmodel` | #68 | 1050 |
+| `viewmodel` | #68 | 1051 |
 | `ui` | #69 | 741 |
 | `perf` | #70 | 0 |
 | `observability` | #71 | 0 |
@@ -77,7 +77,7 @@ flooded its own messages, and those tests went to the feature), the media engine
 ## Ambiguous assignments
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
-There are 96, covering 1,203 tests. Each row names the other candidates and why the owner won.
+There are 97, covering 1,204 tests. Each row names the other candidates and why the owner won.
 A miner who finds such a test's assertions are all another domain's settles it as
 `.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
 
@@ -136,6 +136,7 @@ fate. Each splits its class, an exception to rule 2's "no assignment finer than 
 | `mac_app/tests/test_idle_refresh.py` | 6 | viewmodel | runtime, ui | how often the window and menu re-read settings and redraw |
 | `mac_app/tests/test_ignored_titles.py` | 16 | viewmodel | input | the names shown for stays-here inputs |
 | `mac_app/tests/test_link_state.py` | 14 | viewmodel | link | the words each link state shows |
+| `mac_app/tests/test_login_item.py`, class `LoginItemTests`: `test_requires_approval_has_a_clear_status` | 1 | viewmodel | platform | moved from platform (#65): the words that name a login item waiting for approval; the class's other tests stay platform's |
 | `mac_app/tests/test_mac_listener_port.py` | 4 | discovery | link | the port the listener and the beacon use |
 | `mac_app/tests/test_mac_loopback.py` | 12 | driving | input, clipboard | the Mac driving a PC and driven by it over loopback, end to end |
 | `mac_app/tests/test_mac_three.py` (its other classes) | 18 | crossing | driving | a push through a zone takes the machine the zone leads to, with three machines |
