@@ -405,13 +405,15 @@ through `beamer-sim`.
 
 > r[driving.home.send-refused]
 > When the link to the machine the input is on refuses a message the driver gives it, the input
-> comes home with the reason that the link was lost, and nothing is sent to that machine, whether
-> the link refused the message because it is full or because it is down. When the link refused the
-> message because it is full (`link.send.full`), the driver closes it (`link.send.app-close`), with
-> the app's reason that the link had too much waiting to send, as it does too when the link refuses
-> as full the releases or let go that `driving.home.how` sends it. When the link refused the message
-> because it is down (`link.send.down`), the driver closes nothing. A refused message is not sent
-> again, and refused input does not act here.
+> comes home with the reason that the link was lost, and coming home sends nothing to that machine,
+> whether the link refused the message because it is full or because it is down. When the link
+> refused the message because it is full (`link.send.full`), the driver closes it
+> (`link.send.app-close`), with the app's reason that the link had too much waiting to send, as it
+> does too when the link refuses as full the releases or let go that `driving.home.how` sends it.
+> Until a link the driver closed this way is up again, that machine is out of reach, and nothing
+> that arrived on the closed link is acted on, a take or a send home included. When the link
+> refused the message because it is down (`link.send.down`), the driver closes nothing. A refused
+> message is not sent again, and refused input does not act here.
 >
 > - parity: Python's Windows app let a key or button act here when it saw, as it captured it, that the link was down, and the Mac app let one act here when its own queue toward the link was full (ADR 0004: capture passes or swallows input from the capture word alone, so the link refuses input only after it was swallowed)
 > - model: driving
