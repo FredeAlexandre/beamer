@@ -192,6 +192,61 @@ _Avoid_: mouse-only
 Moves to whichever machine input is on, as the clipboard does.
 _Avoid_: follows focus
 
+**Capture**:
+A driver reading its own keyboard and pointer from the OS before the input acts, so that while its
+input is on another machine the input acts there and not here. Capture lets input act here or
+swallows it.
+_Avoid_: hook, event tap, grab, intercept
+
+**Capture word**:
+Where a machine's input is, as the rest of Beamer last published it, from which capture decides
+alone whether input acts here or is swallowed (ADR 0004).
+_Avoid_: redirecting flag, capture state
+
+**Injection**:
+A driven machine posting the input it received to its OS, as if from its own keyboard and pointer.
+_Avoid_: synthesis, replay, posting events
+
+**Mark**:
+The value 0xBEA3 that Beamer puts in every input it injects, so that capture tells it from the hand.
+_Avoid_: stamp, tag, injected flag
+
+**Key name**:
+The name a key down or key up gives its key: the character it types, or a name such as `ctrl`,
+`f5`, `numpad_0` or `volume_up`.
+_Avoid_: wire key
+
+**US place**:
+The unshifted character the same physical key types on a US layout, carried beside a character's
+key name, so that a driven machine whose layout cannot type the character can press the key in the
+same place.
+_Avoid_: physical character, fallback character
+
+**Modifier style**:
+How a driver names Control, Command or the Windows key, and Option or Alt, toward a machine of the
+other family (Macs, PCs): Semantic (the default), Positional or Mac keyboard layout.
+_Avoid_: modifier mapping
+
+**Typed text**:
+Characters a driver sends, or a driven machine posts, as the characters themselves rather than as
+keys, so that the driven machine's layout plays no part.
+_Avoid_: unicode input, string input
+
+**Dead key**:
+A key the layout holds back, typing nothing, so that its accent composes with the next character:
+`^` then `e` is `ê`.
+_Avoid_: accent key, compose key, pending accent
+
+**System gesture**:
+A three- or four-finger swipe, or the thumb-and-three-finger spread or pinch, that an OS uses for
+Mission Control, Spaces, Task View or Show Desktop.
+_Avoid_: dock swipe, dock control
+
+**Media key**:
+A key that controls sound or playback: volume up, volume down, mute, play/pause, next, previous,
+stop or microphone mute.
+_Avoid_: system key, aux key
+
 ## Displays
 
 **Display**:
