@@ -10,15 +10,15 @@ no Python test is its own:
 
 | Domain | Task | Tests |
 |---|---|---|
-| `link` | #52 | 321 |
-| `pairing` | #53 | 286 |
+| `link` | #52 | 326 |
+| `pairing` | #53 | 289 |
 | `store` | #54 | 0 |
-| `discovery` | #55 | 116 |
-| `driving` | #56 | 327 |
-| `crossing` | #57 | 1115 |
-| `input` | #58 | 793 |
-| `clipboard` | #59 | 213 |
-| `settings` | #60 | 461 |
+| `discovery` | #55 | 117 |
+| `driving` | #56 | 253 |
+| `crossing` | #57 | 1136 |
+| `input` | #58 | 812 |
+| `clipboard` | #59 | 228 |
+| `settings` | #60 | 471 |
 | `display` | #61 | 31 |
 | `audio` | #62 | 148 |
 | `camera` | #63 | 202 |
@@ -77,9 +77,15 @@ flooded its own messages, and those tests went to the feature), the media engine
 ## Ambiguous assignments
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
-There are 90, covering 1,195 tests. Each row names the other candidates and why the owner won.
+There are 126, covering 1,232 tests. Each row names the other candidates and why the owner won.
 A miner who finds such a test's assertions are all another domain's settles it as
 `.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
+
+Thirty-seven rows record lines that did move, after #51: the driving miner (#56) found their
+assertions all another domain's, and moved them to that domain's slice with no fate, as #147
+decides. Most split a class, an exception to rule 2's "no assignment finer than a class": the
+class's other tests stay where they were. Five tests of `core/tests/test_three_desks.py` moved too,
+though rule 5 named the file for driving: their assertions are the crossing map's and the zones'.
 
 | Tests | Count | Owner | Also a candidate | Why the owner |
 |---|---|---|---|---|
@@ -111,15 +117,28 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `core/tests/test_protocol_v6.py`, class `InputMethodKeyFrames` | 1 | input | link | the v6 input-method key frames |
 | `core/tests/test_protocol_v6.py`, class `Keys` | 9 | input | link | the v6 key frames |
 | `core/tests/test_receiver_backlog.py` | 12 | link | input | receiver backpressure and input order over the link |
+| `core/tests/test_responder_ownership.py`, class `Ending`: `test_each_link_keeps_its_own_seq` | 1 | link | driving | moved from driving (#56): each link counts its own sequence numbers and acknowledgements |
+| `core/tests/test_responder_ownership.py`, class `LeftOutDriverWayHome` | 1 | crossing | driving | moved from driving (#56): the zone a driven machine arms toward a driver kept off its crossing map |
+| `core/tests/test_responder_ownership.py`, class `NonOwners`: `test_a_non_owners_arrangement_settings_and_paired_are_handled`, `test_settings_from_a_peer_without_the_capability_are_ignored` | 2 | settings | driving, store | moved from driving (#56): settings, arrangements and paired lists are taken from any peer, settings only from a peer that keeps them |
+| `core/tests/test_responder_ownership.py`, class `NonOwners`: `test_a_non_owners_clipboard_is_dropped_and_the_owners_is_set`, `test_the_owners_large_clipboard_still_arrives` | 2 | clipboard | driving | moved from driving (#56): a clipboard from a peer that is not the driver is dropped, and the driver's arrives however large |
+| `core/tests/test_responder_ownership.py`, class `NonOwners`: `test_a_non_owners_large_frame_is_authenticated_and_dropped_without_being_parsed` | 1 | link | driving | moved from driving (#56): a large message the app does not expect from a peer is discarded unread, and the link stays up |
 | `core/tests/test_responder_ownership.py`, class `WrapWayBack` | 2 | crossing | driving | the way back from a driven machine |
 | `core/tests/test_responder_ownership.py`, class `ZoneModels` | 5 | crossing | driving | the zones a driven machine arms for its driver |
 | `core/tests/test_responder_ownership.py`, class `Zones` | 8 | crossing | driving | the zones a driven machine arms for its driver |
-| `core/tests/test_three_desks.py` | 15 | driving | crossing | #56's Scope names the three-machine tests for driving |
+| `core/tests/test_three_desks.py` (its other tests) | 10 | driving | crossing | #56's Scope names the three-machine tests for driving |
+| `core/tests/test_three_desks.py`, class `AMachinePairedLate` | 2 | crossing | driving | moved from driving (#56): the edge chosen to face a peer, arriving from it, and the zones the crossing map then gives it |
+| `core/tests/test_three_desks.py`, class `ARow`: `test_an_edge_with_no_zone_leads_nowhere` | 1 | crossing | driving | moved from driving (#56): an edge with no zone leads nowhere |
+| `core/tests/test_three_desks.py`, class `AnL`: `test_the_arms_have_no_border_of_their_own` | 1 | crossing | driving | moved from driving (#56): edges with no zone lead nowhere |
+| `core/tests/test_three_desks.py`, class `SharedEdge` | 1 | crossing | driving | moved from driving (#56): each third of an edge leads to its own peer |
+| `core/tests/test_three_machines.py`, class `AChain`: `test_a_clipboard_copied_on_b_reaches_c_through_the_owner_when_b_is_left` | 1 | clipboard | driving | moved from driving (#56): the clipboard of a machine left in a chain reaches the next one through the driver |
 | `core/tests/test_windows_launch_manifest.py` | 1 | platform | app | the Windows manifest asks for no elevation at launch, an install step (#21) |
 | `mac_app/tests/test_atlas_canvas.py` (its other classes) | 60 | viewmodel | ui, crossing | the crossing map's canvas; its tests are mostly what it shows and what a drag, drop or key does |
 | `mac_app/tests/test_atlas_canvas.py`, class `WrapAroundSeams` | 10 | crossing | viewmodel | wrap-around zones as the map shows them |
 | `mac_app/tests/test_audio_driver.py` | 23 | audio | platform | installing the virtual microphone; audio's scope names it |
-| `mac_app/tests/test_bridge.py`, class `ControllerTests` | 37 | driving | crossing, link | the shortcut, take, refuse and send home, and alerts on a failed link |
+| `mac_app/tests/test_bridge.py`, class `ControllerTests` (its other tests) | 22 | driving | crossing, link | the shortcut, take, refuse and send home, and alerts on a failed link |
+| `mac_app/tests/test_bridge.py`, class `ControllerTests`: `test_a_failed_connection_while_idle_drops_the_link_without_an_alert` | 1 | link | driving | moved from driving (#56): a link whose sending fails while input is home closes, and nothing is said to the user |
+| `mac_app/tests/test_bridge.py`, class `ControllerTests`: `test_a_key_repeating_when_its_modifiers_arrive_is_not_a_jump_and_nothing_jumps_while_recording`, `test_double_tap_right_option_only_flips_redirect_flag`, `test_double_tap_survives_a_missed_key_up`, `test_every_way_home_reassociates_the_cursor`, `test_hold_shortcut_announces_an_unready_last_machine`, `test_holding_a_key_trigger_never_toggles`, `test_jump_chord_for_the_current_peer_returns_input_home_and_is_swallowed`, `test_next_shortcut_moves_from_home_to_the_first_machine`, `test_shortcut_off_passes_the_key_without_switching_in_each_input_state`, `test_switching_shortcut_off_discards_an_unfinished_double_tap` | 10 | crossing | driving | moved from driving (#56): the shortcut's double tap and hold, which machine it picks, jump keys, and the pointer pinned while driving |
+| `mac_app/tests/test_bridge.py`, class `ControllerTests`: `test_an_event_the_tap_had_is_not_unseen_for_reading_the_clocks_apart`, `test_first_input_after_a_pause_is_not_mistaken_for_a_dead_tap`, `test_set_redirecting_off_resets_mouse_accumulators`, `test_the_tap_queues_physical_key_names_and_the_link_gets_the_peers` | 4 | input | driving | moved from driving (#56): when the Mac's capture counts as stopped, sub-pixel pointer motion, and the key names captured and sent |
 | `mac_app/tests/test_bridge.py`, class `CursorPinningTests` | 9 | crossing | input | the pointer held at the edge while pushing |
 | `mac_app/tests/test_bridge.py`, class `RoundTripTests` | 4 | viewmodel | link | when a response-time sample is shown |
 | `mac_app/tests/test_config_key_map_override.py` | 1 | input | settings | a saved key map override |
@@ -131,11 +150,23 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `mac_app/tests/test_idle_refresh.py` | 6 | viewmodel | runtime, ui | how often the window and menu re-read settings and redraw |
 | `mac_app/tests/test_ignored_titles.py` | 16 | viewmodel | input | the names shown for stays-here inputs |
 | `mac_app/tests/test_link_state.py` | 14 | viewmodel | link | the words each link state shows |
+| `mac_app/tests/test_mac_links.py`, class `AnnouncementTests`: `test_a_peers_settings_reach_the_app_with_who_sent_them`, `test_settings_are_not_announced_to_a_peer_that_does_not_keep_them`, `test_settings_go_on_to_every_peer_but_the_one_they_came_from`, `test_the_link_up_announces_the_side_the_settings_and_who_else_is_paired` | 4 | settings | driving, store | moved from driving (#56): settings sent on to every peer but their source and only to peers that keep them, and what a link announces as it comes up |
+| `mac_app/tests/test_mac_links.py`, class `AnnouncementTests`: `test_an_arrangement_from_the_peer_reaches_the_app_as_this_macs_edge`, `test_an_arrangement_made_here_goes_to_the_machine_it_is_for` | 2 | crossing | driving, store | moved from driving (#56): the edge chosen to face a peer, sent to it and taken from it |
+| `mac_app/tests/test_mac_links.py`, class `AnnouncementTests`: `test_the_available_pairing_ids_skip_machines_not_in_use` | 1 | pairing | driving, store | moved from driving (#56): the paired list leaves out peers not in use |
 | `mac_app/tests/test_mac_listener_port.py` | 4 | discovery | link | the port the listener and the beacon use |
-| `mac_app/tests/test_mac_loopback.py` | 12 | driving | input, clipboard | the Mac driving a PC and driven by it over loopback, end to end |
+| `mac_app/tests/test_mac_loopback.py` (its other tests) | 7 | driving | input, clipboard | the Mac driving a PC and driven by it over loopback, end to end |
+| `mac_app/tests/test_mac_loopback.py`, class `MacDrivesPcTests`: `test_a_key_goes_to_the_pc_swallowed_here_with_the_command_key_as_control`, `test_caps_lock_from_the_redirecting_mac_reaches_the_windows_responder` | 2 | input | driving | moved from driving (#56): the keys a PC injects for a Mac driver, Command as Control and Caps Lock |
+| `mac_app/tests/test_mac_loopback.py`, class `MacDrivesPcTests`: `test_the_macs_clipboard_goes_with_the_take_and_the_pcs_comes_back_once_after_the_let_go` | 1 | clipboard | driving | moved from driving (#56): the clipboard follows the take, and comes back once after the let go |
+| `mac_app/tests/test_mac_loopback.py`, class `PcDrivesMacTests`: `test_caps_lock_from_the_windows_peer_reaches_the_mac_injector`, `test_the_pcs_keys_and_pointer_are_injected_on_the_mac_in_order` | 2 | input | driving | moved from driving (#56): Caps Lock and the order of input injected on the Mac |
+| `mac_app/tests/test_mac_review.py`, class `ArrangementOriginTests` | 1 | crossing | driving, store | moved from driving (#56): the edge chosen to face this machine, taken from each peer under its own id |
+| `mac_app/tests/test_mac_review.py`, class `CapabilityAndPairedTests`: `test_a_changed_list_of_peers_is_announced_again`, `test_a_peers_paired_list_is_stored_with_its_entry` | 2 | pairing | driving, store | moved from driving (#56): the paired list sent again when it changes, and each peer's paired list kept |
+| `mac_app/tests/test_mac_review.py`, class `CapabilityAndPairedTests`: `test_settings_from_a_peer_that_does_not_keep_them_are_ignored` | 1 | settings | driving, store | moved from driving (#56): settings from a peer that does not keep them are ignored |
+| `mac_app/tests/test_mac_review.py`, class `StartupTests` | 2 | settings | driving | moved from driving (#56): the settings file read at start, and the defaults when it cannot be read |
 | `mac_app/tests/test_mac_three.py` (its other classes) | 18 | crossing | driving | a push through a zone takes the machine the zone leads to, with three machines |
 | `mac_app/tests/test_mac_to_mac.py` | 4 | input | driving | two Macs on loopback; both classes check which keys arrive |
-| `mac_app/tests/test_mac_wire.py` | 12 | driving | input, link | the Mac's controller against a real responder, end to end |
+| `mac_app/tests/test_mac_wire.py` (its other tests) | 10 | driving | input, link | the Mac's controller against a real responder, end to end |
+| `mac_app/tests/test_mac_wire.py`, class `TakingTheFarMachineTests`: `test_command_arrives_as_control_on_a_pc_and_stays_command_on_a_mac` | 1 | input | driving | moved from driving (#56): Command injected as Control on a PC |
+| `mac_app/tests/test_mac_wire.py`, class `TakingTheFarMachineTests`: `test_the_far_machines_clipboard_follows_the_input_home` | 1 | clipboard | driving | moved from driving (#56): the clipboard copied on the driven machine follows the input home |
 | `mac_app/tests/test_map_ticks.py` | 22 | ui | viewmodel | the crossing map's thirds, badge, fit and seam; the tests are their geometry |
 | `mac_app/tests/test_notices_mac.py` | 11 | platform | viewmodel | notification delivery (F36) is platform's; what a notice says is the viewmodel's |
 | `mac_app/tests/test_part_edge_thirds.py` | 9 | crossing | viewmodel | map hit bands and ledger segments share the saved third |
@@ -144,7 +175,8 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `mac_app/tests/test_settings_v6.py`, class `PairedAndRemovedTests` | 19 | pairing | settings | the peers kept in the settings file |
 | `mac_app/tests/test_sidebar_response.py` | 11 | viewmodel | link | which response time the sidebar shows |
 | `mac_app/tests/test_tile_resize_mac.py` | 13 | viewmodel | crossing, ui | resizing a display's tile on the crossing map |
-| `mac_app/tests/test_update_config_redirecting.py` | 2 | driving | crossing | a settings reload while driving |
+| `mac_app/tests/test_update_config_redirecting.py`: `test_update_config_drops_a_link_dialled_to_an_address_that_is_no_longer_saved` | 1 | discovery | driving, link | moved from driving (#56): a link dialled to an address no longer saved for the peer closes |
+| `mac_app/tests/test_update_config_redirecting.py`: `test_update_config_while_redirecting_restores_cursor_association` | 1 | crossing | driving | moved from driving (#56): the pointer given back to the hand when input comes home on a settings save |
 | `win_app/tests/test_admin_mode_ui.py` | 10 | viewmodel | platform | the admin mode controls and their diagnostics on the Input page |
 | `win_app/tests/test_app_config.py`, class `AppearanceConfigTests` | 3 | ui | settings | the saved appearance choice |
 | `win_app/tests/test_app_config.py`, class `EdgeGlowConfigTests` | 2 | ui | settings | the saved edge glow choice |
@@ -162,9 +194,19 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `win_app/tests/test_hook_key_repeat.py` | 8 | crossing | input | a held shortcut key's repeats in the hook |
 | `win_app/tests/test_idle_refresh.py` | 16 | viewmodel | runtime, ui | how often the window re-reads settings and redraws |
 | `win_app/tests/test_key_up_after_switch_back.py` | 7 | input | driving | a key released after input came home still reaches the peer |
-| `win_app/tests/test_links.py`, class `OnwardTests` | 16 | driving | crossing | pass on, when the driven machine's own zone fires |
+| `win_app/tests/test_links.py`, class `OnwardTests` (its other tests) | 13 | driving | crossing | pass on, when the driven machine's own zone fires |
+| `win_app/tests/test_links.py`, class `OnwardTests`: `test_text_during_chained_handover_brackets_a_modifier_waiting_to_be_replayed`, `test_text_replay_keeps_a_modifier_bracket_when_the_key_repeats_during_handover`, `test_text_replayed_after_a_refused_handover_brackets_the_current_machines_modifier` | 3 | input | driving | moved from driving (#56): text sent with the modifiers held released around it |
+| `win_app/tests/test_links.py`, class `ReviewTests`: `test_a_link_lost_during_a_clipboard_read_drops_what_waited_and_a_retake_sends_the_clipboard_after_its_focus`, `test_a_read_asked_for_again_waits_its_turn_behind_a_write_decided_before_it`, `test_a_slow_clipboard_read_does_not_hold_up_the_take_of_another_peer`, `test_pointer_moves_during_a_clipboard_read_keep_their_relative_travel`, `test_what_follows_a_clipboard_read_for_that_peer_still_goes_after_it` | 5 | clipboard | driving | moved from driving (#56): reading this machine's clipboard for a take, and what waits behind that read |
+| `win_app/tests/test_links.py`, class `ReviewTests`: `test_every_auto_repeat_of_a_key_keeps_the_name_its_press_went_under` | 1 | input | driving | moved from driving (#56): a key's repeats keep the name its press was sent under |
+| `win_app/tests/test_links.py`, class `ReviewTests`: `test_settings_from_a_peer_that_does_not_list_the_capability_are_ignored` | 1 | settings | driving, store | moved from driving (#56): settings from a peer that does not keep them are ignored |
 | `win_app/tests/test_links.py`, class `SettingsTests` | 6 | settings | crossing | settings that change what the sender does |
-| `win_app/tests/test_links_loopback.py` | 9 | driving | input | the PC's input to a real responder on loopback |
+| `win_app/tests/test_links.py`, class `TakingTests`: `test_a_dropped_peer_forgets_held_key_names_before_reconnect`, `test_input_method_keys_send_one_tap_and_never_enter_held_key_state`, `test_noncomposable_dead_key_sequence_is_sent_as_text`, `test_noncomposable_dead_key_text_releases_and_restores_remote_modifiers`, `test_temporary_text_release_keeps_the_held_modifier_wire_name_if_style_changes` | 5 | input | driving | moved from driving (#56): input-method keys, dead keys sent as text, and the names modifiers are sent under |
+| `win_app/tests/test_links.py`, class `TakingTests`: `test_a_peer_without_the_clipboard_capability_is_sent_none`, `test_an_image_too_large_to_decode_is_not_sent_but_the_text_is`, `test_the_clipboard_follows_the_take_and_goes_before_any_input`, `test_the_clipboard_is_not_sent_again_when_nothing_changed_here` | 4 | clipboard | driving | moved from driving (#56): which clipboard a take sends, when, and within which limits |
+| `win_app/tests/test_links_loopback.py` (its other tests) | 4 | driving | input | the PC's input to a real responder on loopback |
+| `win_app/tests/test_links_loopback.py`: `test_a_push_through_the_zone_takes_the_peer_at_the_matching_edge` | 1 | crossing | driving | moved from driving (#56): a push through a zone, and the landing point it gives |
+| `win_app/tests/test_links_loopback.py`: `test_keys_and_the_pointer_reach_the_peers_injector_while_input_is_there` | 1 | input | driving | moved from driving (#56): the keys and pointer moves a peer injects |
+| `win_app/tests/test_links_loopback.py`: `test_the_clipboard_arrives_before_any_input` | 1 | clipboard | driving | moved from driving (#56): the clipboard sent with a take arrives before any input |
+| `win_app/tests/test_links_loopback.py`: `test_the_first_link_learns_the_peers_id_and_says_so`, `test_the_round_trip_is_measured_while_input_is_there` | 2 | link | driving | moved from driving (#56): a link learning its peer's machine id, and its round trip |
 | `win_app/tests/test_map_ticks.py` | 20 | ui | viewmodel | the crossing map's thirds, badge, status dot, fit and seam; the tests are their geometry |
 | `win_app/tests/test_parity.py`, class `AlertAndWakeTests` | 4 | discovery | viewmodel | the alerts and waking the Mac when a switch has no link |
 | `win_app/tests/test_part_edge_corners_qt.py` | 12 | crossing | viewmodel | map thirds, contact geometry and ledger parity |
