@@ -81,6 +81,11 @@ The peers a driver has a link to and may drive right now. A driven machine's zon
 peers in its driver's reach.
 _Avoid_: left out
 
+**Reach update**:
+A driver's message to the machine its input is on that gives it the reach again, with a new move
+number, without moving the input.
+_Avoid_: stay, re-arm
+
 **May drive / may be driven by**:
 A machine's two drive permissions toward a peer: whether it may drive that peer, and whether that
 peer may drive it.
