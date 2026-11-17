@@ -103,8 +103,8 @@ The published vectors the CPace rules name are copied as data in
 ## The pairing connection
 
 > r[pairing.connection.alpn]
-> The entering machine opens a pairing connection to the showing machine: a QUIC connection on the
-> showing machine's link port, with the ALPN `beamer-pair/1`. One exchange runs on one
+> The entering machine opens a pairing connection to the showing machine: a QUIC connection on UDP
+> port 24820 (`link.transport.port`), with the ALPN `beamer-pair/1`. One exchange runs on one
 > bidirectional stream of it, and pairing from a beacon and pairing by address use the same
 > connection.
 >
@@ -231,7 +231,7 @@ The published vectors the CPace rules name are copied as data in
 > - sid: 32 bytes of the pairing connection's TLS exporter, with the label
 >   `EXPORTER-beamer-pair` and an empty context;
 > - ADa: `lv_cat("requester", the entering machine's public key, its name as UTF-8, its platform
->   as ASCII, its link port as 2 bytes big-endian)`;
+>   as ASCII)`;
 > - ADb: the same for the showing machine, starting `"host"`.
 >
 > Each machine builds its own associated data from what it sent and the other's from what it
@@ -270,24 +270,23 @@ The published vectors the CPace rules name are copied as data in
 ## The exchange
 
 > r[pairing.exchange.messages]
-> The start carries the entering machine's share, name, platform and link port. The answer
-> carries the showing machine's share, tag Tb, name, platform and link port. The confirmation
+> The start carries the entering machine's share, name and platform. The answer carries the
+> showing machine's share, tag Tb, name and platform. The confirmation
 > carries tag Ta, and the receipt carries tag Td. A refusal names one of: no code shown, refused,
 > already paired, full.
 >
-> - parity: Python's messages also carried the pairing id, a nonce, a version number, the 16-byte machine id and base64 text (#14: the pairing connection and the TLS handshake carry what those did)
+> - parity: Python's messages also carried the pairing id, a nonce, a version number, the 16-byte machine id, each machine's own link port, chosen by the user, with port 0 taken as a phone saved without an address and never dialled, and base64 text (#14: the pairing connection and the TLS handshake carry what those did, and one UDP port, 24820, serves links, pairing and beacons, so no machine has a port of its own; phone peers are out of scope, #11)
 > - fuzz: pairing-message
 
 > r[pairing.exchange.fields]
-> In a message that decodes (`pairing.connection.malformed`), a name is 1 to 48 code points, a
-> platform is 1 to 16 characters from `a` to `z`, `0` to `9` and `_`, and a link port is 1 to
-> 65535; any other value is out of shape. A platform Beamer does not know, of that shape, pairs
+> In a message that decodes (`pairing.connection.malformed`), a name is 1 to 48 code points and a
+> platform is 1 to 16 characters from `a` to `z`, `0` to `9` and `_`; any other value is out of
+> shape. A platform Beamer does not know, of that shape, pairs
 > like any other. The showing machine refuses a start with any of them out of shape with a refusal
 > saying refused, ends the code, and reports that a wrong code was entered. The entering machine
 > takes an answer with any of them out of shape as a wrong tag Tb
 > (`pairing.exchange.entering-checks-first`).
 >
-> - parity: Python took link port 0 as a phone, saved without an address and never dialled (phone peers are out of scope, #11)
 > - model: pairing
 > - fuzz: pairing-message
 
@@ -298,8 +297,8 @@ The published vectors the CPace rules name are copied as data in
 > r[pairing.exchange.entering-checks-first]
 > The entering machine checks tag Tb before it sends anything more. When Tb does not check out,
 > or the answer's fields are out of shape, it sends an abort, a confirmation with no tag, once,
-> stores nothing, and reports that the code was not accepted. The showing machine answers an abort with a refusal,
-> ends the code, and reports that a wrong code was entered.
+> stores nothing, and reports that the code was not accepted. The showing machine answers an
+> abort with a refusal, ends the code, and reports that a wrong code was entered.
 >
 > - model: pairing
 
@@ -320,7 +319,7 @@ The published vectors the CPace rules name are copied as data in
 > - model: pairing
 
 > r[pairing.exchange.bound-fields]
-> The name, platform and link port each machine sends are proved by the exchange: one changed on
+> The name and platform each machine sends are proved by the exchange: one changed on
 > the way, in either direction, fails the exchange, and neither machine stores anything.
 >
 > - model: pairing
@@ -331,8 +330,8 @@ The published vectors the CPace rules name are copied as data in
 > key, fail the exchange, and neither machine stores anything.
 
 > r[pairing.exchange.proved-name]
-> The entering machine records the showing machine's name, platform and link port from the
-> answer, once its tag Tb checks out, never from a beacon.
+> The entering machine records the showing machine's name and platform from the answer, once its
+> tag Tb checks out, never from a beacon.
 
 > r[pairing.exchange.one-attempt]
 > A machine enters one code at a time. Asked to start a second attempt while one runs, it reports
@@ -477,7 +476,7 @@ The rules that hold whoever takes part without the code to one guess against eac
 
 > r[pairing.peers.entry]
 > After a pairing, each machine has the other as a peer, with: its public key pinned and its
-> machine id computed from it; its name, platform and link port as the exchange proved them; the
+> machine id computed from it; its name and platform as the exchange proved them; the
 > time of the pairing; never linked yet; in use; not dormant; this machine may drive it and may be
 > driven by it; and no edge chosen to face it.
 >
@@ -559,11 +558,12 @@ The rules that hold whoever takes part without the code to one guess against eac
 ## Dormant peers
 
 > r[pairing.dormant.forgotten]
-> A peer becomes dormant as soon as its link reports that the peer no longer has this pairing: the
-> peer proved its pinned key and refused this machine's (`link.auth.forgotten` in
-> `spec/link.md`). Its reason is that the other machine no longer has this pairing.
+> A peer this machine has linked with becomes dormant when a link attempt to it ends with the peer
+> refusing this machine's key (`link.auth.forgotten`). Its reason is that the other machine no
+> longer has this pairing. The peer is then dialled as `link.auth.forgotten-redial` says. A peer
+> that has never linked does not become dormant when it refuses this machine's key.
 >
-> - parity: Python marked a peer dormant only after 60 seconds in which every handshake with a peer that had linked before closed unanswered, and also when its token's link answered under another machine id (#14: links authenticate by pinned keys, so one refusal of this machine's key, made by the peer itself, is the evidence the 60 seconds of silence stood for, and a machine id can no longer differ from its key's)
+> - parity: Python marked a peer it had linked with dormant only after 60 seconds in which every handshake with it closed unanswered, since a peer that no longer had the pairing closed silently and a busy or waking one could look the same, and also when its token's link answered under another machine id (#14: links authenticate by pinned keys, so the refusal is explicit, made by the peer itself, and leaves nothing to wait out; a machine id can no longer differ from its key's)
 > - model: link
 
 > r[pairing.dormant.saved]
@@ -592,7 +592,7 @@ The rules that hold whoever takes part without the code to one guess against eac
 
 > r[pairing.by-beacon.dial]
 > The entering machine can pair with a machine whose beacon says a code is shown: it opens the
-> pairing connection to the address the beacon came from, at the link port the beacon names, and
+> pairing connection to the address the beacon came from, on UDP port 24820, and
 > runs the exchange with the code the user enters. What the beacon says proves nothing: the name
 > recorded is the one the exchange proved.
 
