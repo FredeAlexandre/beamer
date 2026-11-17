@@ -137,9 +137,9 @@ through `beamer-sim`.
 > A landing fraction below 0 is taken as 0, and one above 1 as 1.
 
 > r[driving.take.malformed]
-> A take or reach update is refused as malformed when its landing fraction is not a finite number, its push
-> distance is over 1000 pixels, its reach names more than 32 machines or one machine twice, or
-> its display name is empty, longer than 64 bytes or contains a byte other than an ASCII letter,
+> A take or reach update is refused as malformed when its landing fraction is not a finite number,
+> its push distance is over 1000 pixels, its reach names more than 32 machines or one machine twice,
+> or its display name is empty, longer than 64 bytes or contains a byte other than an ASCII letter,
 > digit, `_`, `.`, `:` or `-`.
 >
 > - parity: Python also refused as malformed a take whose fields had the wrong JSON type, an edge without a fraction or the reverse, or numbers strict JSON does not allow, and ignored one whose move number or machine id would not parse (#14: messages are postcard-encoded enums, and one that does not decode closes the link, `link.frame.undecodable`)
@@ -191,10 +191,10 @@ through `beamer-sim`.
 > - model: driving
 
 > r[driving.take.refused]
-> A refusal from the machine the input is on, with the current move number or, while the take
-> is still awaited, that take's move number, brings the input home with the refusal's reason: driven by another
-> machine, not allowed, driving another machine, this machine sent the driver home, or malformed.
-> When the refusal names the machine in the way, Core reports it too.
+> A refusal from the machine the input is on, with the current move number or, while the take is
+> still awaited, that take's move number, brings the input home with the refusal's reason: driven by
+> another machine, not allowed, driving another machine, this machine sent the driver home, or
+> malformed. When the refusal names the machine in the way, Core reports it too.
 >
 > - parity: Python acted on a refusal whose reason it did not know as a refusal it could not name (#14: an unknown reason does not decode, and the link closes, `link.frame.undecodable`)
 > - model: driving
@@ -359,10 +359,10 @@ through `beamer-sim`.
 > - model: driving
 
 > r[driving.end.refuse]
-> When driving ends by force after a send home, or by turning off may be driven by, and the
-> driver's link is still up, this machine sends the driver a refusal with the move number of the
-> last take or reach update it accepted from it: this machine sent the driver home, or not allowed. Until a take of the driver's is
-> accepted again, its input on that link is not injected.
+> When driving ends by force after a send home, or by turning off may be driven by, and the driver's
+> link is still up, this machine sends the driver a refusal with the move number of the last take or
+> reach update it accepted from it: this machine sent the driver home, or not allowed. Until a take
+> of the driver's is accepted again, its input on that link is not injected.
 >
 > - model: driving
 
@@ -376,22 +376,23 @@ through `beamer-sim`.
 
 > r[driving.home.how]
 > When input comes home, the driver raises the move number and, when the link to the machine the
-> input was on is up, sends it the releases of what it pressed there
+> input was on is up and did not bring the input home by refusing a message
+> (`driving.home.send-refused`), sends it the releases of what it pressed there
 > (`driving.keys.released-on-leaving`) and then a let go naming the driver. The input is home even
-> when the link refuses those messages (`driving.home.send-refused`). The pointer stays where it was captured, unless the move
-> gives a landing point. Core reports that the input is home, the machine it left, why, and the
-> landing point when there is one, or where the pointer is when there is none.
+> when the link refuses those messages (`driving.home.send-refused`). The pointer stays where it was
+> captured, unless the move gives a landing point. Core reports that the input is home, the machine
+> it left, why, and the landing point when there is one, or where the pointer is when there is none.
 >
 > - model: driving
 
 > r[driving.home.reasons]
-> Input comes home, saying why, when: the driver's own crossing method picks home; the machine it
-> is on sends the driver home (`driving.home.send-home`); that machine refuses the take
-> (`driving.take.refused`) or a reach update (`driving.reach.update-answer`), or does not answer
-> the take (`driving.take.no-answer`); another machine takes
-> that machine over (`driving.home.taken-over`); the link to that machine is lost or refuses a
-> message (`driving.home.link-lost`, `driving.home.send-refused`); or this machine can no longer
-> capture input (`driving.home.capture-lost`).
+> Input comes home, saying why, when: the driver's own crossing method picks home; the machine it is
+> on sends the driver home (`driving.home.send-home`); that machine refuses the take
+> (`driving.take.refused`) or a reach update (`driving.reach.update-answer`), or does not answer the
+> take (`driving.take.no-answer`); another machine takes that machine over
+> (`driving.home.taken-over`); the link to that machine is lost or refuses a message
+> (`driving.home.link-lost`, `driving.home.send-refused`); or this machine can no longer capture
+> input (`driving.home.capture-lost`).
 >
 > - model: driving
 
@@ -404,12 +405,13 @@ through `beamer-sim`.
 
 > r[driving.home.send-refused]
 > When the link to the machine the input is on refuses a message the driver gives it, the input
-> comes home with the reason that the link was lost. When the link refused the message because it
-> is full (`link.send.full`), the driver closes it (`link.send.app-close`), with the app's reason
-> that the link had too much waiting to send, as it does too when the link refuses as full the
-> releases or let go that `driving.home.how` sends it. When the link refused the message because
-> it is down (`link.send.down`), the driver closes nothing. A refused message is not sent again,
-> and refused input does not act here.
+> comes home with the reason that the link was lost, and nothing is sent to that machine, whether
+> the link refused the message because it is full or because it is down. When the link refused the
+> message because it is full (`link.send.full`), the driver closes it (`link.send.app-close`), with
+> the app's reason that the link had too much waiting to send, as it does too when the link refuses
+> as full the releases or let go that `driving.home.how` sends it. When the link refused the message
+> because it is down (`link.send.down`), the driver closes nothing. A refused message is not sent
+> again, and refused input does not act here.
 >
 > - parity: Python's Windows app let a key or button act here when it saw, as it captured it, that the link was down, and the Mac app let one act here when its own queue toward the link was full (ADR 0004: capture passes or swallows input from the capture word alone, so the link refuses input only after it was swallowed)
 > - model: driving
@@ -483,11 +485,12 @@ through `beamer-sim`.
 
 > r[driving.take-over.idle]
 > A take from a peer that is not this machine's driver takes this machine over when the driver has
-> had no input injected here for 3 s or more, counted from when its driving began or from its
-> latest input injected. This machine then sends the old driver a send home with the move number
-> of the last take or reach update it accepted from it, naming the old driver and the peer that took over; ends the old driving
-> (`driving.end.keys-up`); refuses the old driver's takes for 5 s as this machine sent the driver
-> home; and accepts the new take. Before 3 s the take is refused as driven by another machine.
+> had no input injected here for 3 s or more, counted from when its driving began or from its latest
+> input injected. This machine then sends the old driver a send home with the move number of the
+> last take or reach update it accepted from it, naming the old driver and the peer that took over;
+> ends the old driving (`driving.end.keys-up`); refuses the old driver's takes for 5 s as this
+> machine sent the driver home; and accepts the new take. Before 3 s the take is refused as driven
+> by another machine.
 >
 > - model: driving
 
