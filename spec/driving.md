@@ -89,8 +89,8 @@ through `beamer-sim`.
 
 > r[driving.permission.off]
 > When the user turns off may be driven by for the driver of this machine, its driving ends
-> (`driving.end.keys-up`), this machine refuses it with the move number of its last take, as not
-> allowed, and tells it that it may not drive this machine.
+> (`driving.end.keys-up`), this machine refuses it with the move number of the last take or reach
+> update it accepted from it, as not allowed, and tells it that it may not drive this machine.
 >
 > - model: driving
 
@@ -118,8 +118,7 @@ through `beamer-sim`.
 > r[driving.move.not-higher]
 > A machine ignores, and does not answer, a take, reach update or let go whose move number is not
 > higher than that of the last take or reach update it accepted, or let go it acted on, on that
-> link. Move numbers on different links are never
-> compared.
+> link. Move numbers on different links are never compared.
 >
 > - model: driving
 
@@ -138,7 +137,7 @@ through `beamer-sim`.
 > A landing fraction below 0 is taken as 0, and one above 1 as 1.
 
 > r[driving.take.malformed]
-> A take is refused as malformed when its landing fraction is not a finite number, its push
+> A take or reach update is refused as malformed when its landing fraction is not a finite number, its push
 > distance is over 1000 pixels, its reach names more than 32 machines or one machine twice, or
 > its display name is empty, longer than 64 bytes or contains a byte other than an ASCII letter,
 > digit, `_`, `.`, `:` or `-`.
@@ -260,27 +259,34 @@ through `beamer-sim`.
 > - model: driving
 
 > r[driving.reach.update-not-take]
-> A reach update from the driver changes its reach and push distance without moving the pointer
-> or ending anything. A reach update from a machine that is not this machine's driver is refused
-> as malformed when this machine has no driver, and as driven by another machine when it has one.
+> A reach update is answered as `driving.accept.order` says. One it accepts, only ever from its
+> driver, changes the driver's reach and push distance, and does not move the pointer, report an
+> arrival, or end or begin driving.
+>
+> - model: driving
+
+> r[driving.reach.update-answer]
+> A driver does not wait for the answer to a reach update. Its accept is ignored
+> (`driving.take.unknown-accept`), and its refusal, when it carries the current move number,
+> brings the input home with the refusal's reason (`driving.take.refused`).
 >
 > - model: driving
 
 ## Accepting a take
 
 > r[driving.accept.order]
-> A machine answers a take whose move number is higher than the last it accepted on that link by
-> the first of these that is true:
+> A machine answers a take or reach update that `driving.move.not-higher` does not ignore by the
+> first of these that is true:
 >
-> 1. the take is malformed: refused as malformed;
+> 1. it is malformed (`driving.take.malformed`): refused as malformed;
 > 2. this machine may not be driven by that peer: refused as not allowed;
 > 3. this machine drives or has a take of its own unanswered (`driving.role.not-both`): refused as
 >    driving another machine;
 > 4. this machine sent that peer home, or ended its driving by force, less than 5 s ago: refused
 >    as this machine sent the driver home;
-> 5. another peer drives this machine, and the take is a reach update or that driver may not be
->    taken over (`driving.take-over.idle`): refused as driven by another machine;
-> 6. the take is a reach update and this machine has no driver: refused as malformed;
+> 5. another peer drives this machine, and it is a reach update or that driver may not be taken
+>    over (`driving.take-over.idle`): refused as driven by another machine;
+> 6. it is a reach update and this machine has no driver: refused as malformed;
 > 7. otherwise accepted, and the peer is this machine's driver.
 >
 > - model: driving
@@ -300,8 +306,8 @@ through `beamer-sim`.
 > take has none, the pointer stays where it is, and Core reports the arrival with where it is.
 
 > r[driving.accept.again]
-> A take from this machine's driver is accepted, moves the pointer to its landing point when it
-> has one, and does not end or begin driving.
+> A take from this machine's driver that `driving.accept.order` accepts moves the pointer to its
+> landing point when it has one, and does not end or begin driving.
 >
 > - model: driving
 
@@ -354,8 +360,8 @@ through `beamer-sim`.
 
 > r[driving.end.refuse]
 > When driving ends by force after a send home, or by turning off may be driven by, and the
-> driver's link is still up, this machine sends the driver a refusal with the move number of its
-> last take: this machine sent the driver home, or not allowed. Until a take of the driver's is
+> driver's link is still up, this machine sends the driver a refusal with the move number of the
+> last take or reach update it accepted from it: this machine sent the driver home, or not allowed. Until a take of the driver's is
 > accepted again, its input on that link is not injected.
 >
 > - model: driving
@@ -372,7 +378,7 @@ through `beamer-sim`.
 > When input comes home, the driver raises the move number and, when the link to the machine the
 > input was on is up, sends it the releases of what it pressed there
 > (`driving.keys.released-on-leaving`) and then a let go naming the driver. The input is home even
-> when the link refuses those messages. The pointer stays where it was captured, unless the move
+> when the link refuses those messages (`driving.home.send-refused`). The pointer stays where it was captured, unless the move
 > gives a landing point. Core reports that the input is home, the machine it left, why, and the
 > landing point when there is one, or where the pointer is when there is none.
 >
@@ -381,7 +387,8 @@ through `beamer-sim`.
 > r[driving.home.reasons]
 > Input comes home, saying why, when: the driver's own crossing method picks home; the machine it
 > is on sends the driver home (`driving.home.send-home`); that machine refuses the take
-> (`driving.take.refused`) or does not answer it (`driving.take.no-answer`); another machine takes
+> (`driving.take.refused`) or a reach update (`driving.reach.update-answer`), or does not answer
+> the take (`driving.take.no-answer`); another machine takes
 > that machine over (`driving.home.taken-over`); the link to that machine is lost or refuses a
 > message (`driving.home.link-lost`, `driving.home.send-refused`); or this machine can no longer
 > capture input (`driving.home.capture-lost`).
@@ -396,13 +403,15 @@ through `beamer-sim`.
 > - model: driving
 
 > r[driving.home.send-refused]
-> When the link to the machine the input is on refuses a message the driver gives it, because the
-> link is down or full (`link.send.down`, `link.send.full`), the driver closes that link
-> (`link.send.app-close`) with the reason that it could not take what this machine sends, and the
-> input comes home with the reason that the link was lost. When the message refused was input,
-> that input acts here. The driven machine releases the keys and buttons it injected for the
-> driver as its link closes (`driving.end.keys-up`).
+> When the link to the machine the input is on refuses a message the driver gives it, the input
+> comes home with the reason that the link was lost. When the link refused the message because it
+> is full (`link.send.full`), the driver closes it (`link.send.app-close`), with the app's reason
+> that the link had too much waiting to send, as it does too when the link refuses as full the
+> releases or let go that `driving.home.how` sends it. When the link refused the message because
+> it is down (`link.send.down`), the driver closes nothing. A refused message is not sent again,
+> and refused input does not act here.
 >
+> - parity: Python's Windows app let a key or button act here when it saw, as it captured it, that the link was down, and the Mac app let one act here when its own queue toward the link was full (ADR 0004: capture passes or swallows input from the capture word alone, so the link refuses input only after it was swallowed)
 > - model: driving
 
 > r[driving.home.capture-lost]
@@ -476,7 +485,7 @@ through `beamer-sim`.
 > A take from a peer that is not this machine's driver takes this machine over when the driver has
 > had no input injected here for 3 s or more, counted from when its driving began or from its
 > latest input injected. This machine then sends the old driver a send home with the move number
-> of its last take, naming the old driver and the peer that took over; ends the old driving
+> of the last take or reach update it accepted from it, naming the old driver and the peer that took over; ends the old driving
 > (`driving.end.keys-up`); refuses the old driver's takes for 5 s as this machine sent the driver
 > home; and accepts the new take. Before 3 s the take is refused as driven by another machine.
 >
@@ -491,7 +500,7 @@ through `beamer-sim`.
 
 > r[driving.take-over.not-by-update]
 > A reach update never takes a machine over: from a peer that is not the driver, it is refused
-> (`driving.reach.update-not-take`).
+> (`driving.accept.order`, steps 5 and 6).
 >
 > - model: driving
 
