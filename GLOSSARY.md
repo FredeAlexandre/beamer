@@ -163,21 +163,21 @@ What a machine has chosen for its zones toward each peer: whether its edge cross
 thirds, its wrap-around edges, its corners and, on a Mac, the notch and return through the notch.
 Zones are derived from the zone choices and the crossing map, and deriving never changes the
 choices.
-_Avoid_: ways, intent, methods, row
+_Avoid_: ways, intent, row
 
 **Armed**:
 Said of a zone that can build push pressure and cross right now. A machine arms its own zones
 while its input is home, and the zones it arms for its driver while it is driven.
-_Avoid_: live, wall, hot
+_Avoid_: live zone, hot zone
 
 **Push pressure**:
 How far the pointer has pushed out through a zone's edge, less inward travel and a decay of 300 px
 per second. A zone push crosses when push pressure reaches the resistance.
-_Avoid_: pressure (alone), travel, force
+_Avoid_: push force
 
 **Resistance**:
 The push pressure, from 0 to 500 px, at which a zone push crosses.
-_Avoid_: threshold, stiffness
+_Avoid_: stiffness
 
 **Arrival grace**:
 The 0.3 s after input lands on a machine through an edge, in which its zones keep the pointer held
@@ -187,12 +187,12 @@ _Avoid_: grace period, landing hold, cooldown
 **Third**:
 One of the three equal stretches of a display's edge: the start (top or left), the middle and the
 end (bottom or right).
-_Avoid_: part, segment, band
+_Avoid_: part of the edge, segment
 
 **Contact**:
 Where a display of this machine touches a display of a peer on the crossing map, along an edge or
 at a corner.
-_Avoid_: seam, contact span
+_Avoid_: touch line
 
 **Wrap-around zone**:
 A zone on an edge of this machine that the peer's displays do not touch on the crossing map, which
@@ -201,7 +201,7 @@ _Avoid_: wrap way, wrap edge
 
 **Notch**:
 The stretch at the top of a Mac's built-in display taken by its camera housing, usable as a zone.
-_Avoid_: island, cutout
+_Avoid_: cutout
 
 **Return through the notch**:
 A Mac's choice, for the peer its notch leads to, to land the pointer just below the notch when
@@ -216,32 +216,32 @@ _Avoid_: way back, way home
 **Crossing pause**:
 A machine's zones turned off from its menu, until the user resumes or Beamer restarts. The
 shortcut, jump keys, the shake and the menu still cross.
-_Avoid_: paused edges, held edges, hold
+_Avoid_: paused edges, held edges
 
 **Shortcut key**:
 The one key the shortcut is made with, chosen by the user.
-_Avoid_: trigger, trigger key, hotkey
+_Avoid_: trigger
 
 **Double-tap window**:
 The longest time from one press of the shortcut key to the next for the two to fire the shortcut.
-_Avoid_: threshold
+_Avoid_: tap threshold
 
 **Shortcut destination**:
 Where the shortcut sends input: where input last went, next in order, or next among ticked.
-_Avoid_: mode, shortcut goes to
+_Avoid_: shortcut mode
 
 **Shortcut's cycle**:
 The peers the shortcut steps through in order, followed by home.
-_Avoid_: order, rotation
+_Avoid_: rotation
 
 **Stroke**:
 One leg of a shake along its axis, from one turn to the next.
-_Avoid_: swing, pass
+_Avoid_: swing
 
 **Turn**:
 The point where the pointer, during a shake, has reversed along the shake's axis by a quarter of a
 stroke length.
-_Avoid_: reversal, flip
+_Avoid_: flip
 
 **Shake sensitivity**:
 How small a shake fires, from 50 % to 200 %: at a higher sensitivity a shorter stroke is enough.
@@ -264,37 +264,37 @@ _Avoid_: use own, earlier ways
 
 **Footprint**:
 The rectangle a machine's displays fill on the crossing map, placed and sized in map units.
-_Avoid_: tile, box, frame, desk, placement
+_Avoid_: tile rectangle
 
 **Map unit**:
 The crossing map's own unit of length, in which footprints, offsets and snap points are whole
 numbers. It is neither a pixel nor a point of any display.
-_Avoid_: pixel, point (for the map)
+_Avoid_: map pixel
 
 **Snap point**:
 A place flush outside this machine's footprint where a dropped footprint may settle.
-_Avoid_: candidate, snap target
+_Avoid_: snap target
 
 **Inactive peer**:
 A peer that is not in use, kept off the crossing map, or dormant. Its footprint and zone choices
 are kept, but no zone leads to it and it blocks nothing on the crossing map.
-_Avoid_: shelved, unavailable, set aside
+_Avoid_: shelved peer
 
 **Kept off the crossing map**:
 Said of a peer the user has set aside: its zone choices and footprint are kept, but no zone leads
 to it until it is restored. Pairing already writes it (`pairing.peers.replace-keeps`).
-_Avoid_: left out, shelved, put back (say restored)
+_Avoid_: shelved, put back
 
 **Own zones on every machine**:
 One setting for the whole cluster: while it is on, every machine's zones follow its own zone
 choices, as if each kept its own zones. It is the inverse of the Python app's "Same ways on every
 machine".
-_Avoid_: same ways, shared zones, sync
+_Avoid_: same ways, shared zones
 
 **Saved zones**:
 Zone choices a machine had in force that something replaced, kept on that machine with when and
 why, so the user can restore them.
-_Avoid_: earlier ways, archive
+_Avoid_: earlier ways
 
 **Profile status**:
 What a machine publishes in its machine record about its zones: whether they come from its own
@@ -340,7 +340,7 @@ _Avoid_: cursor blocker
 **Pointer overlay**:
 The arrow Beamer draws at the pointer of a driven Windows machine that has no mouse, whose own
 pointer Windows does not show.
-_Avoid_: cursor overlay, fallback cursor, fake cursor
+_Avoid_: cursor overlay, fake cursor
 
 ## Displays
 
