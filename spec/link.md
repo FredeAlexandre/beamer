@@ -215,9 +215,9 @@ arriving slowly keeps the link up as long as its pieces keep coming.
 > id, with one reason: unreachable, another machine answered, the peer no longer has this pairing,
 > the peer does not use this machine now, another version, stopped answering, stopped taking what
 > this machine sends, stopped acknowledging input, a message that does not decode, the peer broke
-> the protocol, closed by the peer, replaced, this machine forgot the peer or put it out of use,
-> the peer's pinned key changed, or a reason the app gave. Each rule that closes a link names its
-> reason from this list. A link the app closes by quitting reports nothing (`link.send.quit`).
+> the protocol, closed by the peer, this machine quit, replaced, this machine forgot the peer or put
+> it out of use, the peer's pinned key changed, or a reason the app gave. Each rule that closes a
+> link names its reason from this list.
 >
 > - model: link
 
@@ -267,10 +267,12 @@ app is told so. A pointer move that merges into one already waiting counts as no
 >
 > - model: link
 
-r[link.send.quit]
-When the app quits, it waits up to 0.5 s for what it already gave each link to be sent, then
-closes the links. This end reports nothing for them, and the peer's end reports down with the
-reason that the peer closed it (`link.report.peer-closed`).
+> r[link.send.quit]
+> When the app quits, it waits up to 0.5 s for what it already gave each link to be sent, then
+> closes the links. This end reports each of them down with the reason that this machine quit, and
+> the peer's end reports down with the reason that the peer closed it (`link.report.peer-closed`).
+>
+> - parity: Python's quitting end reported each link down as "{name} closed the connection", or as "The link to {name} failed: …" when closing cut off its read (a reason that says which end closed the link; Python's blamed the peer for a close this machine made)
 
 ## Traffic classes
 
