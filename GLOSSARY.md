@@ -48,14 +48,15 @@ so that the driven machine deals with each once and in order.
 _Avoid_: seq, counter
 
 **Acknowledgement**:
-A driven machine's message to its driver naming the highest sequence number it has dealt with on
-the link, and its delay: how long it waited between dealing with that input message and saying
-so.
+A machine's message to the peer that sent it input on the link, naming the highest sequence
+number it has dealt with on the link, and its delay: how long it waited between dealing with that
+input message and saying so.
 _Avoid_: receipt, confirmation
 
 **Round trip**:
 The time from a driver sending an input message to the acknowledgement naming it arriving, less
-the acknowledgement's delay.
+the acknowledgement's delay. QUIC's own measure of the time its packets take to the peer and back
+is QUIC's RTT, never a round trip.
 _Avoid_: ping, response time
 
 **Capability**:

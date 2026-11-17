@@ -23,9 +23,10 @@ Every rule is `ci` unless it says otherwise.
 > - parity: Python kept two TCP links per pair, one in each direction, plus a UDP flow of its own for media (#14, ADR 0003: one QUIC link per pair)
 
 > r[link.transport.port]
-> A machine takes links on UDP port 24820, and dials each peer on UDP port 24820.
+> A machine takes links on UDP port 24820, and dials every peer on UDP port 24820, at whichever of
+> its addresses. No machine has a port of its own: a link port is never chosen, learnt or stored.
 >
-> - parity: Python took links on TCP port 24820 unless the user chose another port (#14: one UDP port, 24820, for links, pairing and beacons)
+> - parity: Python took links on TCP port 24820 unless the user chose another port, and carried each machine's port in its beacon, its pairing messages and its peer list (#14: one UDP port, 24820, for links, pairing and beacons, so every machine is on the same port)
 
 r[link.transport.no-tcp]
 A machine neither takes nor dials a link over TCP: two peers between which UDP is blocked have no
@@ -46,8 +47,8 @@ A link offers exactly one application protocol, `beamer/1`, and comes up only wi
 offers the same one.
 
 > r[link.version.mismatch]
-> When a peer answers with another protocol version, no link comes up, and the link reports that
-> the two machines run different versions of Beamer, naming the peer.
+> When a peer answers with another protocol version, no link comes up, and the link reports down
+> with the reason that the two machines run different versions of Beamer.
 >
 > - parity: Python said which of the two was older ("Update Beamer on Far: it is older than this one", or that this machine was the older) (#14: exact version match in the protocol name, which tells no order)
 
@@ -60,21 +61,21 @@ offers the same one.
 > - model: link
 
 > r[link.auth.stranger]
-> A machine that dials this one with a key that no peer in use of this machine has is refused in
+> A machine that dials this one with a key that no peer of this machine has is refused in
 > the handshake, and nothing it sends is dealt with.
 >
 > - model: link
 
 > r[link.auth.not-the-peer]
 > When the machine answering at a peer's address does not prove the peer's pinned key, the dialler
-> closes before it sends anything on the link, and the link reports that another machine answered
-> at that address.
+> closes before it sends anything on the link, and the link reports down with the reason that
+> another machine answered at that address.
 >
 > - model: link
 
 > r[link.auth.forgotten]
-> When the peer proves its pinned key but refuses this machine's, the link reports that the peer
-> no longer has this pairing.
+> When the peer proves its pinned key but refuses this machine's, the link reports down with the
+> reason that the peer no longer has this pairing.
 >
 > - parity: Python concluded it only after 60 s in which every handshake with a peer that had linked before closed unanswered, since its peer closed silently on a pairing it no longer had, and never said it of a peer that had not linked (#14: links authenticate by pinned keys, so the refusal is explicit)
 > - model: link
@@ -87,7 +88,7 @@ offers the same one.
 
 > r[link.auth.not-in-use]
 > A link dialled by a peer that is not in use here closes as soon as it has authenticated, and the
-> dialler reports that the peer does not use this machine now.
+> dialler reports down with the reason that the peer does not use this machine now.
 >
 > - parity: Python answered such a peer as if its first message were unreadable, so the dialler said it had sent something the peer could not read (a refusal that names its cause; Python's misled the user)
 > - model: link
@@ -123,14 +124,16 @@ machine has not pinned keep handshakes with it open.
 
 > r[link.dial.backoff]
 > After a dial fails or a link closes, the next dial to that peer comes 0.25 s later, and each
-> further wait doubles, up to 2 s. A link that comes up starts the waits from 0.25 s again.
+> further wait doubles, up to 2 s. A link that comes up starts the waits from 0.25 s again. A dial
+> the peer ended by refusing this machine's key is the exception: `link.auth.forgotten-redial`
+> replaces these waits until a link with that peer comes up.
 >
 > - parity: Python dialled again every 2 s (#14: re-dialling waits from 0.25 s, doubling up to 2 s)
 > - model: link
 
 > r[link.dial.deadline]
-> A dial that has not authenticated 5 s after it began is given up, and the link reports the peer
-> unreachable.
+> A dial that has not authenticated 5 s after it began is given up, and the link reports down with the
+> reason that the peer is unreachable.
 >
 > - parity: Python told a refused TCP dial ("not listening on this port"), an unreachable address ("unreachable from this machine"), 5 s of silence ("a Beamer from before version 4") and an answer that was not a Beamer's ("did not answer as a Beamer") apart (#14: one QUIC handshake over UDP, in which these look alike)
 > - model: link
@@ -153,14 +156,15 @@ from is dialled.
 
 > r[link.pair.redial-replaces]
 > When a link with a peer authenticates while an older one with that peer is up, and the same
-> machine dialled both, the older one closes.
+> machine dialled both, the older one closes, reporting down with the reason that it was replaced.
 >
 > - model: link
 
 > r[link.pair.smaller-id-dials]
 > When a link with a peer authenticates while another with that peer is up, and each machine
 > dialled one of them, the link dialled by the machine with the smaller machine id stays up and
-> the other closes. Machine ids compare byte by byte.
+> the other closes. Machine ids compare byte by byte. The one that closes reports down with the
+> reason that it was replaced.
 >
 > - parity: Python kept both links, one in each direction (#14: when both links come up at once, the one dialled by the smaller machine id survives)
 > - model: link
@@ -181,7 +185,7 @@ from is dialled.
 
 > r[link.alive.idle]
 > A link on which a machine has received nothing from its peer for 2 s closes, and the link
-> reports that the peer stopped answering.
+> reports down with the reason that the peer stopped answering.
 >
 > - parity: Python's dialler waited 2 s and the machine it dialled 2.5 s (#14: an idle timeout of 2 s)
 > - model: link
@@ -192,7 +196,8 @@ arriving slowly keeps the link up as long as its pieces keep coming.
 
 > r[link.alive.not-reading]
 > A link whose control messages have waited 2 s to be sent because the peer reads none of them
-> closes, and the link reports that the peer stopped taking what this machine sends.
+> closes, and the link reports down with the reason that the peer stopped taking what this machine
+> sends.
 >
 > - model: link
 
@@ -200,7 +205,7 @@ arriving slowly keeps the link up as long as its pieces keep coming.
 
 > r[link.report.up]
 > When a link comes up, the link reports it up, naming the peer by machine id and giving the
-> address and port it reaches the peer at.
+> address it reaches the peer at.
 >
 > - model: link
 
@@ -208,8 +213,10 @@ arriving slowly keeps the link up as long as its pieces keep coming.
 > When a link closes, or a dial is given up, the link reports it down, naming the peer by machine
 > id, with one reason: unreachable, another machine answered, the peer no longer has this pairing,
 > the peer does not use this machine now, another version, stopped answering, stopped taking what
-> this machine sends, stopped acknowledging input, a message that does not decode, closed by the
-> peer, replaced, or a reason the app gave.
+> this machine sends, stopped acknowledging input, a message that does not decode, the peer broke
+> the protocol, closed by the peer, replaced, this machine forgot the peer or put it out of use,
+> the peer's pinned key changed, or a reason the app gave. Each rule that closes a link names its
+> reason from this list.
 >
 > - model: link
 
@@ -224,14 +231,16 @@ arriving slowly keeps the link up as long as its pieces keep coming.
 
 > r[link.peer.gone]
 > When this machine forgets a peer or puts it out of use, the peer's link closes at once, without
-> waiting for a dial or handshake in progress. The last thing it reports for that peer is down, and
-> it reports nothing after, even when a handshake in progress then completes.
+> waiting for a dial or handshake in progress. The last thing it reports for that peer is down, with
+> the reason that this machine forgot the peer or put it out of use, and it reports nothing after,
+> even when a handshake in progress then completes.
 >
 > - model: link
 
 > r[link.peer.rekeyed]
 > When this machine pins a new key for a peer, by pairing with it again, the link authenticated
-> with the old key closes, and the peer is dialled with the new one.
+> with the old key closes, reporting down with the reason that the peer's pinned key changed, and
+> the peer is dialled with the new one.
 >
 > - model: link
 
@@ -324,20 +333,22 @@ been dealt with.
 
 > r[link.frame.undecodable]
 > A message that does not decode, on a stream or in a datagram, closes the link, and the link
-> reports why.
+> reports down with the reason that a message did not decode.
 >
 > - parity: Python ignored a message that was JSON but malformed in its fields, unless it was the first message, an acknowledgement or a take (#14: exact version match, with no unknown-field rules, so a message that does not decode is an error)
 > - fuzz: link-frame
 
 > r[link.frame.control-limit]
-> A control message whose length is over 64 KiB closes the link before any of it is read.
+> A control message whose length is over 64 KiB closes the link before any of it is read, and the
+> link reports down with the reason that the peer broke the protocol.
 >
 > - parity: Python read a frame of 64 KiB to 16 MiB that was not a clipboard it expected, discarded it unparsed and kept the link, and ended the link only past 16 MiB (#14: clipboard images and large text go as bulk, so no control message needs more)
 > - fuzz: link-frame
 
 r[link.frame.control-deadline]
 A control message that is not whole 30 s after its first byte arrived closes the link, however
-steadily its bytes keep coming.
+steadily its bytes keep coming, and the link reports down with the reason that the peer broke the
+protocol.
 
 > r[link.frame.bulk-deadline]
 > A bulk message that is not whole 30 s after its first byte arrived is cancelled by its receiver,
@@ -370,8 +381,11 @@ it, from 1 on each new link.
 
 > r[link.input.resend]
 > When no acknowledgement covering the newest input message sent on a link has arrived
-> max(2 × the link's round-trip time, 5 ms) after it was sent, the driver sends an input datagram
+> max(2 × QUIC's RTT for the link, 5 ms) after it was sent, the driver sends an input datagram
 > again, and keeps doing so at that interval until one arrives.
+>
+> QUIC's RTT is the one `link.rtt.reported` reports, which the link has from its handshake on, so
+> a fresh link with no round trip yet resends on it too.
 >
 > - parity: Python left resending to TCP, whose minimum retransmission timeout is 200 ms or more (ADR 0003: a resend after max(2 × RTT, 5 ms))
 
@@ -384,9 +398,11 @@ r[link.input.window]
 At most 32 input messages are sent and unacknowledged on a link at a time. Further input waits to
 be sent until an acknowledgement makes room.
 
-r[link.input.text-split]
-A text input message too long for one datagram is sent as several text input messages, in order,
-each holding whole characters.
+> r[link.input.text-split]
+> A text input message too long for one datagram is sent as several text input messages, in order,
+> each holding whole characters.
+>
+> - parity: Python sent each run of typed text as one message whatever its length, and a driven machine dropped one over 4096 bytes whole and still acknowledged it (#14: datagram payloads ≤ 1200 bytes, and input rides datagrams)
 
 r[link.input.ack]
 An acknowledgement names the highest sequence number the driven machine has dealt with on the
@@ -410,7 +426,8 @@ Input the driven machine discards rather than injects, because its sender is not
 because it cannot act on it, still counts as dealt with, and is acknowledged.
 
 r[link.input.ack-ahead]
-An acknowledgement naming a sequence number higher than any sent on the link closes the link.
+An acknowledgement naming a sequence number higher than any sent on the link closes the link, and
+the link reports down with the reason that the peer broke the protocol.
 
 > r[link.input.ack-older]
 > An acknowledgement naming a lower sequence number than one already received on the link is
@@ -423,12 +440,15 @@ Each acknowledgement naming a higher sequence number than any before it gives on
 the time since the input message it names was first sent, less the delay, and 0 when that is
 below 0. An acknowledgement that names no higher sequence number gives none.
 
-r[link.input.round-trip-recent]
-A link's round trip is the upper median of its round-trip samples from the last 5 s (of an even
-number, the higher middle one), and there is none when there are no such samples.
+> r[link.input.round-trip-recent]
+> Whenever the app asks, the link gives it the link's round trip: the upper median of its
+> round-trip samples from the last 5 s (of an even number, the higher middle one), or none when
+> there are no such samples or the link is down.
+>
+> - parity: Python's Mac app took only the last 8 of those samples, where its Windows app took all of them (one reading for both platforms: the Windows app's)
 
 > r[link.input.stall]
-> A link closes, and reports that the peer stopped acknowledging input, when its oldest
+> A link closes, and reports down with the reason that the peer stopped acknowledging input, when its oldest
 > unacknowledged input message was sent more than 1 s ago and no acknowledgement has named a higher
 > sequence number for 1 s. Nothing else from the peer keeps it open: keep-alives, control
 > messages, bulk messages and repeated acknowledgements do not.
@@ -470,11 +490,11 @@ r[link.input.drain]
 Input that reached the driven machine before its link closed is injected, in order, before the
 link reports down.
 
-## Round-trip time
+## QUIC's RTT
 
 > r[link.rtt.reported]
-> While a link is up, each end reports the link's round-trip time as QUIC measures it, using no
-> clock of the peer's, at least once a second. Once the link has closed, it reports none for it.
+> While a link is up, each end reports QUIC's RTT for the link, QUIC's own measure of the time its
+> packets take to the peer and back, using no clock of the peer's, at least once a second. Once the link has closed, it reports none for it.
 >
 > - parity: Python measured it with probe and echo messages about once a second, only between machines that both announced them, and kept each reading 3 s (#14: QUIC's RTT replaces the probes)
 
