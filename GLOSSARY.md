@@ -32,6 +32,33 @@ One of input, control, media and bulk, in that order of priority. A class never 
 class below it.
 _Avoid_: channel, lane, priority
 
+**In use**:
+Said of a peer this machine links with. The user can put a peer out of use without unpairing it,
+and put it in use again.
+_Avoid_: enabled, active
+
+**Input message**:
+One key down or up, pointer move, button down or up, scroll, gesture or run of typed text, as a
+driver sends it on a link.
+_Avoid_: input event
+
+**Sequence number**:
+The number a driver gives each input message it sends on a link, counting from 1 on each new link,
+so that the driven machine deals with each once and in order.
+_Avoid_: seq, counter
+
+**Acknowledgement**:
+A machine's message to the peer that sent it input on the link, naming the highest sequence
+number it has dealt with on the link, and its delay: how long it waited between dealing with that
+input message and saying so.
+_Avoid_: receipt, confirmation
+
+**Round trip**:
+The time from a driver sending an input message to the acknowledgement naming it arriving, less
+the acknowledgement's delay. QUIC's own measure of the time its packets take to the peer and back
+is QUIC's RTT, never a round trip.
+_Avoid_: ping, response time
+
 **Capability**:
 Something a machine can do, which it reports as ready, needs permission, refused or unsupported
 here.
