@@ -158,6 +158,95 @@ _Avoid_: full-screen hold, held
 Input a driver keeps back while a crossing is under way, then delivers.
 _Avoid_: held input
 
+**Zone choices**:
+What a machine has chosen for its zones toward each peer: whether its edge crosses and by which
+thirds, its wrap-around edges, its corners and, on a Mac, the notch and return through the notch.
+Zones are derived from the zone choices and the crossing map, and deriving never changes the
+choices.
+_Avoid_: ways, intent, methods, row
+
+**Armed**:
+Said of a zone that can build push pressure and cross right now. A machine arms its own zones
+while its input is home, and the zones it arms for its driver while it is driven.
+_Avoid_: live, wall, hot
+
+**Push pressure**:
+How far the pointer has pushed out through a zone's edge, less inward travel and a decay of 300 px
+per second. A zone push crosses when push pressure reaches the resistance.
+_Avoid_: pressure (alone), travel, force
+
+**Resistance**:
+The push pressure, from 0 to 500 px, at which a zone push crosses.
+_Avoid_: threshold, stiffness
+
+**Arrival grace**:
+The 0.3 s after input lands on a machine through an edge, in which its zones keep the pointer held
+at edge instead of building push pressure.
+_Avoid_: grace period, landing hold, cooldown
+
+**Third**:
+One of the three equal stretches of a display's edge: the start (top or left), the middle and the
+end (bottom or right).
+_Avoid_: part, segment, band
+
+**Contact**:
+Where a display of this machine touches a display of a peer on the crossing map, along an edge or
+at a corner.
+_Avoid_: seam, contact span
+
+**Wrap-around zone**:
+A zone on an edge of this machine that the peer's displays do not touch on the crossing map, which
+leads to the peer all the same, on an edge chosen for it.
+_Avoid_: wrap way, wrap edge
+
+**Notch**:
+The stretch at the top of a Mac's built-in display taken by its camera housing, usable as a zone.
+_Avoid_: island, cutout
+
+**Return through the notch**:
+A Mac's choice, for the peer its notch leads to, to land the pointer just below the notch when
+input comes home from that peer.
+_Avoid_: notch home
+
+**Return zone**:
+The zone a driven machine arms, while its driver drives it, on the edge where the driver's pointer
+landed, leading to the driver.
+_Avoid_: way back, way home
+
+**Crossing pause**:
+A machine's zones turned off from its menu, until the user resumes or Beamer restarts. The
+shortcut, jump keys, the shake and the menu still cross.
+_Avoid_: paused edges, held edges, hold
+
+**Shortcut key**:
+The one key the shortcut is made with, chosen by the user.
+_Avoid_: trigger, trigger key, hotkey
+
+**Double-tap window**:
+The longest time from one press of the shortcut key to the next for the two to fire the shortcut.
+_Avoid_: threshold
+
+**Shortcut destination**:
+Where the shortcut sends input: where input last went, next in order, or next among ticked.
+_Avoid_: mode, shortcut goes to
+
+**Shortcut's cycle**:
+The peers the shortcut steps through in order, followed by home.
+_Avoid_: order, rotation
+
+**Stroke**:
+One leg of a shake along its axis, from one turn to the next.
+_Avoid_: swing, pass
+
+**Turn**:
+The point where the pointer, during a shake, has reversed along the shake's axis by a quarter of a
+stroke length.
+_Avoid_: reversal, flip
+
+**Shake sensitivity**:
+How small a shake fires, from 50 % to 200 %: at a higher sensitivity a shorter stroke is enough.
+_Avoid_: shake strength
+
 ## Crossing map
 
 **Crossing map**:
@@ -172,6 +261,46 @@ _Avoid_: desk, row, preset
 **Own zones**:
 Zones a machine keeps for itself instead of taking the active profile's.
 _Avoid_: use own, earlier ways
+
+**Footprint**:
+The rectangle a machine's displays fill on the crossing map, placed and sized in map units.
+_Avoid_: tile, box, frame, desk, placement
+
+**Map unit**:
+The crossing map's own unit of length, in which footprints, offsets and snap points are whole
+numbers. It is neither a pixel nor a point of any display.
+_Avoid_: pixel, point (for the map)
+
+**Snap point**:
+A place flush outside this machine's footprint where a dropped footprint may settle.
+_Avoid_: candidate, snap target
+
+**Inactive peer**:
+A peer that is not in use, kept off the crossing map, or dormant. Its footprint and zone choices
+are kept, but no zone leads to it and it blocks nothing on the crossing map.
+_Avoid_: shelved, unavailable, set aside
+
+**Kept off the crossing map**:
+Said of a peer the user has set aside: its zone choices and footprint are kept, but no zone leads
+to it until it is restored. Pairing already writes it (`pairing.peers.replace-keeps`).
+_Avoid_: left out, shelved, put back (say restored)
+
+**Own zones on every machine**:
+One setting for the whole cluster: while it is on, every machine's zones follow its own zone
+choices, as if each kept its own zones. It is the inverse of the Python app's "Same ways on every
+machine".
+_Avoid_: same ways, shared zones, sync
+
+**Saved zones**:
+Zone choices a machine had in force that something replaced, kept on that machine with when and
+why, so the user can restore them.
+_Avoid_: earlier ways, archive
+
+**Profile status**:
+What a machine publishes in its machine record about its zones: whether they come from its own
+zone choices or a profile, which profile, the stamp of the zone choices it applied, whether it is
+a Mac, and the peers its zone choices name that it is not paired with.
+_Avoid_: status register, desk status
 
 ## Input
 
@@ -191,6 +320,27 @@ _Avoid_: mouse-only
 **Follows input**:
 Moves to whichever machine input is on, as the clipboard does.
 _Avoid_: follows focus
+
+## Pointer
+
+**Driving hide**:
+A driver's own pointer hidden while its input is on another machine.
+_Avoid_: pointer hold
+
+**Idle hide**:
+A driven machine's pointer hidden after its driver lets go, until it moves or a driver takes the
+machine.
+_Avoid_: idle pointer
+
+**Veil**:
+A nearly invisible window a driving Windows machine puts under the point where its pointer stays,
+so that no app's own cursor shows there.
+_Avoid_: cursor blocker
+
+**Pointer overlay**:
+The arrow Beamer draws at the pointer of a driven Windows machine that has no mouse, whose own
+pointer Windows does not show.
+_Avoid_: cursor overlay, fallback cursor, fake cursor
 
 ## Displays
 
