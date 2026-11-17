@@ -14,9 +14,9 @@ no Python test is its own:
 | `pairing` | #53 | 286 |
 | `store` | #54 | 0 |
 | `discovery` | #55 | 116 |
-| `driving` | #56 | 327 |
-| `crossing` | #57 | 1115 |
-| `input` | #58 | 793 |
+| `driving` | #56 | 337 |
+| `crossing` | #57 | 1122 |
+| `input` | #58 | 773 |
 | `clipboard` | #59 | 213 |
 | `settings` | #60 | 461 |
 | `display` | #61 | 31 |
@@ -26,7 +26,7 @@ no Python test is its own:
 | `platform` | #65 | 336 |
 | `runtime` | #66 | 3 |
 | `app` | #67 | 93 |
-| `viewmodel` | #68 | 1046 |
+| `viewmodel` | #68 | 1049 |
 | `ui` | #69 | 741 |
 | `perf` | #70 | 0 |
 | `observability` | #71 | 0 |
@@ -77,9 +77,14 @@ flooded its own messages, and those tests went to the feature), the media engine
 ## Ambiguous assignments
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
-There are 90, covering 1,195 tests. Each row names the other candidates and why the owner won.
+There are 100, covering 1,208 tests. Each row names the other candidates and why the owner won.
 A miner who finds such a test's assertions are all another domain's settles it as
 `.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
+
+Rows marked "moved from input (#58)" record lines that did move, after #51 (#147): the input miner
+found their assertions all another domain's, and moved them to that domain's slice with no fate.
+Each splits its class, an exception to rule 2's "no assignment finer than a class": the class's
+other tests stay where they were.
 
 | Tests | Count | Owner | Also a candidate | Why the owner |
 |---|---|---|---|---|
@@ -111,6 +116,7 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `core/tests/test_protocol_v6.py`, class `InputMethodKeyFrames` | 1 | input | link | the v6 input-method key frames |
 | `core/tests/test_protocol_v6.py`, class `Keys` | 9 | input | link | the v6 key frames |
 | `core/tests/test_receiver_backlog.py` | 12 | link | input | receiver backpressure and input order over the link |
+| `core/tests/test_responder_input.py`, class `Injecting`: `test_a_driven_move_stops_at_the_return_seam_before_injection` | 1 | crossing | input | moved from input (#58): a driven machine's pointer move stops at the seam of a zone leading on, before it is injected |
 | `core/tests/test_responder_ownership.py`, class `WrapWayBack` | 2 | crossing | driving | the way back from a driven machine |
 | `core/tests/test_responder_ownership.py`, class `ZoneModels` | 5 | crossing | driving | the zones a driven machine arms for its driver |
 | `core/tests/test_responder_ownership.py`, class `Zones` | 8 | crossing | driving | the zones a driven machine arms for its driver |
@@ -122,6 +128,7 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `mac_app/tests/test_bridge.py`, class `ControllerTests` | 37 | driving | crossing, link | the shortcut, take, refuse and send home, and alerts on a failed link |
 | `mac_app/tests/test_bridge.py`, class `CursorPinningTests` | 9 | crossing | input | the pointer held at the edge while pushing |
 | `mac_app/tests/test_bridge.py`, class `RoundTripTests` | 4 | viewmodel | link | when a response-time sample is shown |
+| `mac_app/tests/test_bridge.py`, class `TranslatorTests`: `test_right_option_flags_changed_is_the_trigger` | 1 | crossing | input | moved from input (#58): right Option as the shortcut, which sends no key message |
 | `mac_app/tests/test_config_key_map_override.py` | 1 | input | settings | a saved key map override |
 | `mac_app/tests/test_corner_marks.py` | 20 | ui | viewmodel | the crossing map's corner marks; the tests are mostly their pixels and geometry |
 | `mac_app/tests/test_crossing_ledger.py` | 32 | viewmodel | crossing | the ledger's controls on the Crossing page (F6); what they show and change |
@@ -131,6 +138,7 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `mac_app/tests/test_idle_refresh.py` | 6 | viewmodel | runtime, ui | how often the window and menu re-read settings and redraw |
 | `mac_app/tests/test_ignored_titles.py` | 16 | viewmodel | input | the names shown for stays-here inputs |
 | `mac_app/tests/test_link_state.py` | 14 | viewmodel | link | the words each link state shows |
+| `mac_app/tests/test_mac_links.py`, class `ItsOwnKeyboardTests`: `test_a_repair_that_finds_a_new_take_by_the_time_it_runs_leaves_it_alone`, `test_a_take_racing_a_hand_over_from_the_link_never_leaves_the_two_views_apart`, `test_every_change_of_redirecting_and_every_move_applied_is_logged_with_its_thread` | 3 | driving | input | moved from input (#58): a take racing a pass on or a repair ends with input on one machine, and every move is logged |
 | `mac_app/tests/test_mac_listener_port.py` | 4 | discovery | link | the port the listener and the beacon use |
 | `mac_app/tests/test_mac_loopback.py` | 12 | driving | input, clipboard | the Mac driving a PC and driven by it over loopback, end to end |
 | `mac_app/tests/test_mac_three.py` (its other classes) | 18 | crossing | driving | a push through a zone takes the machine the zone leads to, with three machines |
@@ -152,6 +160,7 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `win_app/tests/test_app_config.py`, class `ReadFallbackPeerBookTests` | 4 | pairing | settings | reading the peers from the settings file |
 | `win_app/tests/test_atlas_canvas.py` | 24 | viewmodel | ui, crossing | the crossing map's canvas, as on the Mac |
 | `win_app/tests/test_capture_portal.py` (its other classes) | 62 | input | crossing | Wayland capture, with the barriers that make zones there |
+| `win_app/tests/test_capture_win.py`, class `NameTests`: `test_every_named_key_but_the_undifferentiated_modifiers_has_a_title` | 1 | viewmodel | input | moved from input (#58): every named PC key has a title for the stays-here list |
 | `win_app/tests/test_capture_win_seam.py` | 6 | crossing | input | the capture hook's seam with the crossing engine |
 | `win_app/tests/test_crossing_fix_pass.py` | 11 | ui | viewmodel | regressions on the Crossing page, mostly measured |
 | `win_app/tests/test_crossing_ledger.py` | 14 | viewmodel | crossing | the ledger's controls on the Crossing page (F6) |
@@ -161,9 +170,15 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `win_app/tests/test_dormant_rows.py` | 11 | viewmodel | pairing, crossing | how a dormant peer's rows show |
 | `win_app/tests/test_hook_key_repeat.py` | 8 | crossing | input | a held shortcut key's repeats in the hook |
 | `win_app/tests/test_idle_refresh.py` | 16 | viewmodel | runtime, ui | how often the window re-reads settings and redraws |
-| `win_app/tests/test_key_up_after_switch_back.py` | 7 | input | driving | a key released after input came home still reaches the peer |
+| `win_app/tests/test_ignored_inputs.py`, class `CaptureTests`: `test_entries_are_shown_in_windows_own_words` | 1 | viewmodel | input | moved from input (#58): the title shown for each stays-here entry on the PC, as `mac_app/tests/test_ignored_titles.py` does for the Mac |
+| `win_app/tests/test_ignored_inputs.py`, class `CaptureTests`: `test_every_trigger_key_has_its_virtual_key` | 1 | crossing | input | moved from input (#58): every key the PC offers as the shortcut has a key code its capture names with the same key name |
+| `win_app/tests/test_key_up_after_switch_back.py`: `test_a_held_keys_autorepeat_at_home_is_swallowed_until_its_release`, `test_a_release_still_queued_when_input_comes_home_is_sent_once`, `test_key_released_after_switch_back_is_dropped` | 3 | driving | input | moved from input (#58): the repeats and release of a key the driver released on the machine it left go to no machine, and a release waiting when input comes home is sent once (`driving.keys.*`) |
+| `win_app/tests/test_key_up_after_switch_back.py`: `test_a_key_already_down_when_its_modifiers_arrive_is_not_a_jump`, `test_a_swallowed_key_is_released_by_its_virtual_key_even_when_shift_changed_its_name`, `test_nothing_jumps_while_a_jump_key_is_being_recorded`, `test_the_jump_chord_for_the_current_machine_returns_input_home` | 4 | crossing | input | moved from input (#58): when a jump key fires, is recorded or brings input home, and how its swallowed release is matched |
 | `win_app/tests/test_links.py`, class `OnwardTests` | 16 | driving | crossing | pass on, when the driven machine's own zone fires |
 | `win_app/tests/test_links.py`, class `SettingsTests` | 6 | settings | crossing | settings that change what the sender does |
+| `win_app/tests/test_links.py`, class `KeyTests`: `test_a_key_held_on_the_peer_is_released_there_and_its_physical_release_swallowed`, `test_a_key_pressed_at_home_is_released_at_home` | 2 | driving | input | moved from input (#58): keys released on the machine input leaves, and keys pressed at home released at home (`driving.keys.*`) |
+| `win_app/tests/test_links.py`, class `MouseTests`: `test_a_button_held_on_the_peer_is_released_there`, `test_a_button_pressed_here_is_released_here_after_input_left` | 2 | driving | input | moved from input (#58): buttons released on the machine input leaves, and buttons pressed at home released at home (`driving.keys.*`) |
+| `win_app/tests/test_links.py`, class `MouseTests`: `test_the_round_trip_is_the_links_while_input_is_there_and_none_at_home` | 1 | viewmodel | input, link | moved from input (#58): the round trip shown is the link's to the machine input is on, and none at home |
 | `win_app/tests/test_links_loopback.py` | 9 | driving | input | the PC's input to a real responder on loopback |
 | `win_app/tests/test_map_ticks.py` | 20 | ui | viewmodel | the crossing map's thirds, badge, status dot, fit and seam; the tests are their geometry |
 | `win_app/tests/test_parity.py`, class `AlertAndWakeTests` | 4 | discovery | viewmodel | the alerts and waking the Mac when a switch has no link |
