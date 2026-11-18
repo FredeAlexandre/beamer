@@ -525,11 +525,15 @@ The rules that hold whoever takes part without the code to one guess against eac
 > is accepted, with nothing restarted.
 
 > r[pairing.peers.first-zone]
-> A peer just paired, toward which this machine has no zone, gets the zones
-> `crossing.derive.first-zone` derives from its first place on the crossing map, so input can cross
-> to it before its zones are chosen: on edges of this machine's displays, or at a corner. A peer
-> whose first footprint touches none of this machine's displays, as when no snap point is free for
-> it, gets no zone (`crossing.derive.no-contact`).
+> A peer just paired, toward which no zone choices were ever set, gets the zones
+> `crossing.derive.first-zone` derives from its place on the crossing map after the pairing's first
+> link (`crossing.map.place.default-written`), so input can cross to it before its zones are
+> chosen: on edges of this machine's displays, or at a corner. A peer whose place on the crossing
+> map after the pairing's first link touches none of this machine's displays, as when no snap point
+> is free for it, gets no zone (`crossing.derive.no-contact`). A machine paired again, as one that
+> replaces a peer with the same public key (`pairing.peers.replace-keeps`) or one paired again
+> after it was removed, gets its zones as the second paragraph of `crossing.derive.first-zone`
+> says.
 
 > r[pairing.peers.other-zones]
 > A pairing leaves every other peer's zones as they were, apart from sharing an edge with the new
@@ -557,8 +561,12 @@ The rules that hold whoever takes part without the code to one guess against eac
 ## Removing a peer
 
 > r[pairing.remove.peer]
-> Removing a peer deletes it and its zones. Every other peer, and its zones, stay as they were. The
-> removal writes nothing to the crossing map: the removed machine stays on this machine's crossing
+> Removing a peer deletes it and its zones. Every other peer stays as it was and keeps its zone
+> choices. Its zones stay as they were, apart from what the crossing map gives without the removed
+> peer: a third or a corner that went to the removed peer can go to another peer whose contact or
+> choice claims it (`crossing.derive.share.one-peer`, `crossing.derive.corner.one`), and a peer
+> whose display overlapped only the removed machine's gets its zones from the crossing map again
+> once that footprint reads as unset (`crossing.derive.overlap`). The removal writes nothing to the crossing map: the removed machine stays on this machine's crossing
 > map only as a third party (`crossing.map.members.peers`), and a machine that only it had listed
 > in its paired list leaves this machine's crossing map (`crossing.map.members.third-party`). While
 > no machine in the cluster lists the removed machine as a peer, its footprint and the zone choices
