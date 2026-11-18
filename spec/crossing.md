@@ -277,9 +277,15 @@ name that is blank, or longer than 64 characters, is dropped, and the footprint 
 > r[crossing.map.members.forgotten]
 > The footprint of a machine that no machine in the cluster lists as a peer reads as unset, as the
 > store reads every shared entry naming a forgotten machine (#14): it is on no machine's crossing
-> map and counts for no overlap, contact or snap point anywhere. No machine writes its removal.
+> map and counts for no overlap, contact or snap point anywhere. No machine writes its removal, so
+> when the machine is paired again its footprint reads as set again, where it was, unless another
+> machine was placed over it meanwhile: at the first link after that pairing, a footprint of the
+> machine paired again that overlaps another present machine's counts as none, and the machine is
+> placed by default as one with no footprint (`crossing.map.place.default-written`), so the machine
+> placed meanwhile keeps its place and its zones.
 >
 > - model: store
+> - parity: Python removed an unpaired peer's footprint from its crossing map at once (`core/peerlist.py:209-210` calling `ways.prune_layout`, `core/ways.py:169-185`), so a peer paired again was always placed by default (#14: a footprint is a shared entry that reads as unset while its machine is forgotten and is never written as removed, so a machine paired again keeps its place unless another machine was placed over it meanwhile)
 
 > r[crossing.map.members.retain]
 > A change to the crossing map arriving from another machine replaces only the footprints it
@@ -297,7 +303,7 @@ r[crossing.map.place.kept]
 A footprint on the crossing map stays where it was put, with its size, its displays' offsets and
 its name, until it is dropped, resized or recentred, on this machine or another, or its machine
 leaves the map, even when it touches no display of this machine. Placing another machine never moves
-it, since a machine is placed by default only while it has no footprint
+it, since a machine is placed by default only while it has no footprint, or one that counts as none
 (`crossing.map.place.default-written`), except that a restored peer may re-centre the row it joins
 (`crossing.map.place.restored`), and changes the zones that lead to it only as
 `crossing.derive.first-zone` says.
@@ -338,13 +344,19 @@ it touches this machine's footprint.
 > written, it is only shown there, and showing it writes nothing. A default placement is written
 > when a link comes up, once its two machines have exchanged their stores (#14), the first link
 > after a pairing included (`pairing.peers.at-once`), and only for a machine of those two that has
-> no footprint. So it never moves, replaces or removes a footprint. Of the two machines:
+> no footprint. At the first link after a pairing, a machine that the other had forgotten before
+> that pairing (`crossing.map.members.forgotten`) counts as having no footprint when its footprint
+> overlaps another present machine's on the other's crossing map, and is placed by default as if it
+> had none; when each of the two counts so for the other, the one the second case below names keeps
+> its footprint. So a default placement never moves, replaces or removes a footprint, but one that
+> counts as none. Of the two machines:
 >
 > - when one has a footprint and the other has none, the one with a footprint writes the other's
 >   where its own crossing map places it by default;
 > - when neither has one, the Mac writes both, or, when both or neither are Macs, the one whose
->   machine id is greater, compared as bytes: its own footprint where `crossing.map.members.this`
->   places it, and the other's where its crossing map then places it by default;
+>   machine id is greater, compared as bytes: the other's footprint where its crossing map places it
+>   by default while neither footprint is written, so that `crossing.map.place.first-peer` applies
+>   on a Mac, and its own where `crossing.map.members.this` places it;
 > - when both have one, nothing is written: each footprint stays where it is
 >   (`crossing.map.place.kept`), and each machine derives its zones to the other from there.
 >
@@ -358,6 +370,9 @@ it touches this machine's footprint.
 > - A Mac and a machine that is not a Mac pair, neither with a footprint: on both machines' maps the
 >   other machine ends flush right of the Mac, centred on it, with its zone to the Mac on its left
 >   edge.
+> - Two Macs A and B pair, neither with a footprint, A's machine id the greater: A writes its own
+>   footprint at (0, 0) and B's flush right of it at (160, 0), centred on it, so A's zone to B is on
+>   A's right edge and B's zone to A on B's left edge.
 > - A Mac B and a PC pair first, then a Mac A with no footprint pairs the PC: the PC writes A's
 >   footprint centred under the PC's (`crossing.map.place.unplaced`), A's zone to the PC is on A's
 >   top edge, and B's and the PC's footprints stay where they were.
@@ -365,6 +380,10 @@ it touches this machine's footprint.
 >   then a PC X with no footprint pairs P1: P1 writes X's footprint at (-160, 100), touching P1's
 >   bottom-left corner and P2's left edge, and P1's and P2's footprints, and their zones to each
 >   other, stay as they were.
+> - P1 then removes X, which no other machine lists, and pairs a PC Y with no footprint, which P1
+>   writes at (-160, 100), where X was. When P1 pairs X again, X's footprint overlaps Y's, so it
+>   counts as none: P1 writes X's footprint at (160, 100), touching P1's bottom-right corner and
+>   P2's right edge, and Y keeps its place and its zones.
 >
 > - model: store
 > - parity: Python wrote no default placement but a Mac's first peer on an empty crossing map, written with the Mac's own displays: each machine kept its own default until a footprint for that machine came from elsewhere, so two paired machines that are not Macs each placed the other below itself, and each one's zone to the other was on its own bottom edge (#14: each footprint is a shared entry and converges, so one machine of the two a link joins writes a default placement, and only for a machine with no footprint)
@@ -794,9 +813,10 @@ corners as they were, except a stretch another peer took meanwhile, which stays 
 >
 > When both machines already had footprints, as when a peer is paired again
 > (`pairing.peers.replace-keeps`) or a pairing joins two clusters, neither footprint moves, and the
-> peer's zones come from where its footprint is. Where two clusters' footprints then overlap, each
-> peer whose display overlaps another present machine's display has no zone from the crossing map,
-> a peer paired before included, until a footprint is dropped elsewhere
+> peer's zones come from where its footprint is, unless one is a forgotten machine's that now
+> overlaps another present machine's (`crossing.map.members.forgotten`). Where two clusters'
+> footprints then overlap, each peer whose display overlaps another present machine's display has no
+> zone from the crossing map, a peer paired before included, until a footprint is dropped elsewhere
 > (`crossing.derive.overlap`, `crossing.map.overlap.reported`).
 >
 > - parity: Python's Mac gave a peer paired once its crossing map placed others, and facing no edge, no footprint and so no zone, while the PC placed it and derived its zones as this rule does (#16: one crossing engine for every platform; the PC's)
