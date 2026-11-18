@@ -595,9 +595,9 @@ live, waiting or a fault; how each looks is `spec/ui.md`'s.
 > - parity: Python pinned or released the one address it kept for each peer (#14: a peer has a list of chosen and learnt addresses)
 
 > r[viewmodel.machines.pin.toggle]
-> Turning "Pin address" off asks Core to remove each of the peer's chosen addresses, the one the row
-> shows last: that one stays a learnt address (`discovery.address.unchosen`), and the others are
-> gone from the peer's addresses. Turning it on asks Core to make the address the
+> Turning "Pin address" off asks Core to remove each of the peer's chosen addresses, removing the
+> address the row shows last, so that it alone stays a learnt address (`discovery.address.unchosen`)
+> and the others are gone from the peer's addresses. Turning it on asks Core to make the address the
 > row shows a chosen address (`discovery.address.choose-learnt`). Either changes that peer alone.
 
 ### May drive and may be driven by
