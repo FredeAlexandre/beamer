@@ -9,7 +9,7 @@ core/tests/test_audio_view.py::FixturePages::test_every_fixture_builds_a_page  m
 core/tests/test_audio_view.py::FixturePages::test_mic_streaming_to_the_pc  mined: viewmodel.audio.mic.line-live, viewmodel.audio.tone, viewmodel.audio.mic.meter, viewmodel.audio.mic.closed-title, viewmodel.audio.mic.choices, viewmodel.audio.map.mic-line, viewmodel.audio.map.recording, viewmodel.audio.map.subtitle-peer, viewmodel.audio.map.mic-arrows, viewmodel.audio.map.reading-order, viewmodel.audio.notice.order, viewmodel.audio.notice.echo-cancelled, viewmodel.audio.notice.pick-virtual-mic, viewmodel.audio.devices.active-mic
 core/tests/test_audio_view.py::FixturePages::test_no_peers  mined: viewmodel.audio.map.machines, viewmodel.audio.map.title, viewmodel.audio.names.own, viewmodel.audio.map.subtitle-own, viewmodel.audio.map.output-line, viewmodel.audio.mic.selected, viewmodel.audio.mic.line-off, viewmodel.audio.map.mic-arrows, viewmodel.audio.output.here, viewmodel.audio.output.can-open, viewmodel.audio.output.line-here, viewmodel.audio.devices.headings, viewmodel.audio.devices.detail, viewmodel.audio.devices.headset
 core/tests/test_audio_view.py::FixturePages::test_sound_redirected_with_echo  mined: viewmodel.audio.output.label, viewmodel.audio.output.mute-note, viewmodel.audio.output.line-streaming, viewmodel.audio.output.selected, viewmodel.audio.output.here, viewmodel.audio.map.output-line, viewmodel.audio.map.sound-arrows, viewmodel.audio.map.mic-arrows, viewmodel.audio.notice.echo-cancelled, viewmodel.audio.notice.echo-listener, viewmodel.audio.devices.plays
-core/tests/test_audio_view.py::FixturePages::test_three_machines  mined: viewmodel.audio.map.output-line, viewmodel.audio.output.line-unplugged, viewmodel.audio.output.unplugged, viewmodel.audio.output.can-open, viewmodel.audio.output.choices, viewmodel.audio.map.sound-arrows, viewmodel.audio.map.mic-arrows, viewmodel.audio.map.reading-order
+core/tests/test_audio_view.py::FixturePages::test_three_machines  mined: viewmodel.audio.map.output-line, viewmodel.audio.output.line-unplugged, viewmodel.audio.output.unplugged, viewmodel.audio.output.can-open, viewmodel.audio.output.choices, viewmodel.audio.map.sound-arrows, viewmodel.audio.map.mic-arrows, viewmodel.audio.map.reading-order, viewmodel.audio.output.unknown-machine
 core/tests/test_audio_view.py::LowLatencyVirtualMic::test_nowhere_else  mined: viewmodel.audio.low-latency.shown
 core/tests/test_audio_view.py::LowLatencyVirtualMic::test_on_the_pcs_own_panel  mined: viewmodel.audio.low-latency.shown, viewmodel.audio.low-latency.note, viewmodel.audio.low-latency.state
 core/tests/test_audio_view.py::LowLatencyVirtualMic::test_the_switch_calls_the_service  mined: viewmodel.audio.low-latency.set
@@ -20,7 +20,7 @@ core/tests/test_audio_view.py::States::test_conflict  mined: viewmodel.audio.not
 core/tests/test_audio_view.py::States::test_echo_cross_offers_to_send_the_sound  mined: viewmodel.audio.notice.echo-listener-send, viewmodel.audio.notice.echo-listener-action
 core/tests/test_audio_view.py::States::test_echo_notices_follow_the_aec_rule  mined: viewmodel.audio.notice.echo-not-cancelled, viewmodel.audio.notice.echo-cancelling, viewmodel.audio.notice.echo-listener
 core/tests/test_audio_view.py::States::test_headset_override_silences_the_echo_notices  mined: viewmodel.audio.notice.speakers
-core/tests/test_audio_view.py::States::test_helper_failed_and_permissions  mined: viewmodel.audio.notice.order, viewmodel.audio.notice.audio-stopped, viewmodel.audio.notice.mic-permission, viewmodel.audio.notice.mic-silent, viewmodel.audio.notice.system-permission
+core/tests/test_audio_view.py::States::test_helper_failed_and_permissions  mined: viewmodel.audio.notice.order, viewmodel.audio.notice.mic-permission, viewmodel.audio.notice.mic-silent, viewmodel.audio.notice.system-permission
 core/tests/test_audio_view.py::States::test_howl_notice  mined: viewmodel.audio.notice.feedback, viewmodel.audio.notice.feedback-advice
 core/tests/test_audio_view.py::States::test_layout_tiles  python-detail: parses Python settings dicts into rectangles, skipping malformed entries; Rust hands the page typed footprints
 core/tests/test_audio_view.py::States::test_machines_without_a_tile_go_in_a_row_below  mined: viewmodel.audio.map.place, viewmodel.audio.map.unplaced
@@ -47,7 +47,7 @@ core/tests/test_camera_view.py::MapExtras::test_arrows_only_between_tiles_on_the
 core/tests/test_camera_view.py::MapExtras::test_extras  mined: viewmodel.camera.map.off, viewmodel.camera.map.badge, viewmodel.camera.map.watching, viewmodel.camera.map.arrows
 core/tests/test_camera_view.py::MapExtras::test_page_model_carries_the_extras  mined: viewmodel.camera.map.badge, viewmodel.camera.map.watching, viewmodel.camera.map.arrows
 core/tests/test_camera_view.py::Notices::test_a_pc_without_beamer_camera_is_named  mined: viewmodel.camera.notice.peer-install
-core/tests/test_camera_view.py::Notices::test_no_notices_in_the_ordinary_states  mined: viewmodel.camera.notice.order
+core/tests/test_camera_view.py::Notices::test_no_notices_in_the_ordinary_states  mined: viewmodel.camera.notice.store-unreadable, viewmodel.camera.notice.save-failed, viewmodel.camera.notice.permission, viewmodel.camera.notice.shared-use, viewmodel.camera.notice.peer-install
 core/tests/test_camera_view.py::Notices::test_permission_notice_on_the_mac_only  mined: viewmodel.camera.notice.permission
 core/tests/test_camera_view.py::SelectorAndQuality::test_a_route_to_a_machine_without_a_list  mined: viewmodel.camera.selector.unknown-machine
 core/tests/test_camera_view.py::SelectorAndQuality::test_an_unplugged_camera_stays_selected  mined: viewmodel.camera.selector.unplugged
@@ -130,8 +130,8 @@ core/tests/test_responder_ported.py::StatusText::test_a_version_5_preamble_names
 core/tests/test_responder_ported.py::StatusText::test_a_version_7_preamble_names_the_peer_as_newer  mined: viewmodel.status.version
 core/tests/test_responder_ported.py::StatusText::test_after_start_it_waits_on_the_port  mined: viewmodel.status.order, viewmodel.status.looking
 core/tests/test_responder_ported.py::StatusText::test_an_address_no_peer_has_is_named_as_it_is  dropped: no compatibility with the Python apps (#11 Drop row: the v5 refusal path)
-core/tests/test_responder_ported.py::StatusText::test_closing_the_link_ends_in_waiting  mined: viewmodel.status.no-reply
-core/tests/test_responder_ported.py::StatusText::test_silence_ends_in_waiting  mined: viewmodel.status.no-reply
+core/tests/test_responder_ported.py::StatusText::test_closing_the_link_ends_in_waiting  mined: viewmodel.status.order, viewmodel.status.no-reply
+core/tests/test_responder_ported.py::StatusText::test_silence_ends_in_waiting  mined: viewmodel.status.order, viewmodel.status.no-reply
 core/tests/test_settings_sync.py::WordsTests::test_a_shared_page_says_so_only_while_on  mined: viewmodel.settings.scope-own, viewmodel.settings.scope-design
 core/tests/test_settings_sync.py::WordsTests::test_one_machine_is_named_and_none_or_several_are_every_paired_machine  mined: viewmodel.settings.scope-design
 core/tests/test_settings_sync.py::WordsTests::test_the_switch_note_names_shared_values_and_an_old_peer  mined: viewmodel.settings.state-detail
@@ -184,7 +184,7 @@ mac_app/tests/test_audio_page.py::AudioPageTests::test_low_latency_switch_never_
 mac_app/tests/test_audio_page.py::AudioPageTests::test_low_latency_switch_renders_a_windows_panel  mined: viewmodel.audio.low-latency.shown, viewmodel.audio.low-latency.note, viewmodel.audio.low-latency.state, viewmodel.audio.low-latency.set
 mac_app/tests/test_audio_page.py::AudioPageTests::test_menus_group_choices_by_machine  mined: viewmodel.audio.mic.choices, viewmodel.audio.mic.heading-not-a-choice
 mac_app/tests/test_audio_page.py::AudioPageTests::test_meters_only_while_visible  mined: viewmodel.audio.level.watch
-mac_app/tests/test_audio_page.py::AudioPageTests::test_notice_actions  mined: viewmodel.audio.notice.vmic-install, viewmodel.audio.notice.audio-stopped, viewmodel.audio.notice.mic-permission-open
+mac_app/tests/test_audio_page.py::AudioPageTests::test_notice_actions  mined: viewmodel.audio.notice.vmic-install, viewmodel.audio.notice.mic-permission-open
 mac_app/tests/test_audio_page.py::AudioPageTests::test_selecting_a_machine_on_the_map  mined: viewmodel.audio.map.select-click, viewmodel.audio.output.choose, viewmodel.audio.map.select-keys
 mac_app/tests/test_audio_page.py::AudioPageTests::test_shows_the_model  mined: viewmodel.audio.mic.closed-title, viewmodel.audio.output.closed-title, viewmodel.audio.output.label, viewmodel.audio.output.mute-note, viewmodel.audio.map.reading-order, viewmodel.audio.map.mic-arrows, viewmodel.audio.map.sound-arrows, viewmodel.audio.map.output-line, viewmodel.audio.map.recording, viewmodel.audio.devices.headings, viewmodel.audio.mic.meter, viewmodel.audio.map.meter
 mac_app/tests/test_audio_page.py::AudioPageTests::test_snapshots_wait_while_a_menu_is_open  mined: viewmodel.audio.menu-open
@@ -194,7 +194,7 @@ mac_app/tests/test_bridge.py::RoundTripTests::test_a_sample_is_shown_while_input
 mac_app/tests/test_bridge.py::RoundTripTests::test_nothing_is_shown_when_input_is_not_on_the_other_machine  mined: viewmodel.status.round-trip
 mac_app/tests/test_bridge.py::RoundTripTests::test_nothing_is_shown_when_the_link_is_down  mined: viewmodel.status.round-trip
 mac_app/tests/test_bridge.py::RoundTripTests::test_nothing_is_shown_when_there_are_no_samples  mined: viewmodel.status.round-trip
-mac_app/tests/test_camera_section.py::CameraModuleTests::test_a_camera_change_reaches_the_page  python-detail: the AppKit page redrawing on a service push, and deferring that while one of its menus is open
+mac_app/tests/test_camera_section.py::CameraModuleTests::test_a_camera_change_reaches_the_page  mined: viewmodel.audio.menu-open, viewmodel.camera.status.streaming, viewmodel.camera.status.sharing-off
 mac_app/tests/test_camera_section.py::CameraModuleTests::test_controls_call_the_service  mined: viewmodel.camera.selector.choose, viewmodel.camera.quality.choose, viewmodel.camera.this-machine.sharing
 mac_app/tests/test_camera_section.py::CameraModuleTests::test_hidden_without_the_flag_or_a_camera_part  mined: viewmodel.camera.module.shown
 mac_app/tests/test_camera_section.py::CameraModuleTests::test_off_disables_quality_and_error_offers_retry  mined: viewmodel.camera.quality.off, viewmodel.camera.selector.title, viewmodel.camera.status.retry
@@ -342,6 +342,8 @@ mac_app/tests/test_machines.py::StateTests::test_any_1_4_pairing_is_asked_to_be_
 mac_app/tests/test_machines.py::StateTests::test_faults_say_what_the_link_said  mined: viewmodel.machines.state.refused, viewmodel.machines.state.version, viewmodel.machines.state.unreachable, viewmodel.machines.state.dropped
 mac_app/tests/test_machines.py::StateTests::test_input_here_beats_a_plain_link  mined: viewmodel.machines.state.input-here, viewmodel.machines.state.order
 mac_app/tests/test_machines.py::StateTests::test_the_details_are_the_ones_windows_uses  mined: viewmodel.machines.state.driving, viewmodel.machines.state.input-here, viewmodel.machines.state.linked, viewmodel.machines.state.looking
+mac_app/tests/test_machines_panel.py::CodeBoxCentringTests::test_a_digit_typed_beside_a_held_one_replaces_it_and_leaves_the_next_box  mined: viewmodel.pairing-sheet.code-replace
+mac_app/tests/test_machines_panel.py::CodeBoxCentringTests::test_pasting_digits_into_middle_box_spreads_forward_and_focuses_after  mined: viewmodel.pairing-sheet.code-digits, viewmodel.pairing-sheet.code-spread
 mac_app/tests/test_machines_panel.py::CodeBoxCentringTests::test_pasting_the_whole_code_fills_all_six_boxes  mined: viewmodel.pairing-sheet.code-digits
 mac_app/tests/test_machines_panel.py::DirectionAndRemovalTests::test_a_removal_that_cannot_be_saved_says_so_and_keeps_the_machine  mined: viewmodel.machines.remove.failed
 mac_app/tests/test_machines_panel.py::DirectionAndRemovalTests::test_each_switch_hands_the_handler_its_machine_and_one_change  mined: viewmodel.machines.directions.disclosure, viewmodel.machines.directions.one-peer
@@ -384,6 +386,7 @@ mac_app/tests/test_machines_panel.py::ListTests::test_addresses_are_dots_while_t
 mac_app/tests/test_machines_panel.py::ListTests::test_desktop_row_offers_leave_out_and_names_the_shortcut_when_left_out  mined: viewmodel.machines.kept-off.button, viewmodel.machines.kept-off.note
 mac_app/tests/test_machines_panel.py::ListTests::test_every_paired_machine_is_a_row_and_two_of_one_name_show_the_end_of_their_ids  mined: viewmodel.machines.list.rows, viewmodel.machines.label.shared
 mac_app/tests/test_machines_panel.py::ListTests::test_renaming_a_machine_saves_on_return_and_escape_cancels  mined: viewmodel.machines.rename.open, viewmodel.machines.rename.save, viewmodel.machines.rename.cancel
+mac_app/tests/test_machines_panel.py::ListTests::test_the_machines_lead_the_page_with_and_without_existing_machines  mined: viewmodel.machines.list.first
 mac_app/tests/test_machines_panel.py::ListTests::test_the_migrated_machine_is_listed_by_its_name_and_where_it_is  dropped: the peer migrated from 1.4.x, without the 1.4.x migration (#11, F19)
 mac_app/tests/test_machines_panel.py::ListTests::test_with_machines_paired_the_sheet_waits_for_the_button  mined: viewmodel.pairing-sheet.open, viewmodel.pairing-sheet.open-without-peers
 mac_app/tests/test_machines_panel.py::ListTests::test_with_nothing_paired_the_list_says_so_and_the_sheet_is_open  mined: viewmodel.machines.list.empty
@@ -408,7 +411,7 @@ mac_app/tests/test_mouse_only_page.py::MouseOnlyPageTests::test_load_and_apply_r
 mac_app/tests/test_pages.py::CrossingPageRulesTests::test_a_reason_shows_even_when_only_the_shortcut_is_on  mined: viewmodel.crossing.pause.shown, viewmodel.crossing.pause.first-reason
 mac_app/tests/test_pages.py::CrossingPageRulesTests::test_a_shared_side_names_its_holder_and_uses_plural_when_needed  dropped: an uncalled function, which no screen shows (#11, about 15 uncalled functions)
 mac_app/tests/test_pages.py::CrossingPageRulesTests::test_edge_and_part_of_the_edge_exclude_each_other  dropped: an uncalled function, which no screen shows (#11, about 15 uncalled functions)
-mac_app/tests/test_pages.py::CrossingPageRulesTests::test_parts_are_named_along_the_edge  mined: viewmodel.ledger.thirds.names, viewmodel.ledger.thirds.phrase
+mac_app/tests/test_pages.py::CrossingPageRulesTests::test_parts_are_named_along_the_edge  mined: viewmodel.ledger.thirds.names
 mac_app/tests/test_pages.py::CrossingPageRulesTests::test_rows_follow_the_ways  mined: viewmodel.crossing.settings.shown, viewmodel.crossing.settings.drag-guard
 mac_app/tests/test_pages.py::CrossingPageRulesTests::test_the_crossing_line_gives_the_first_reason_nothing_can_cross  mined: viewmodel.crossing.pause.first-reason, viewmodel.crossing.pause.not-paired, viewmodel.crossing.pause.not-driving, viewmodel.crossing.pause.no-link, viewmodel.crossing.pause.paused, viewmodel.crossing.pause.full-screen, viewmodel.crossing.pause.on
 mac_app/tests/test_pages.py::CrossingPageRulesTests::test_the_last_third_cannot_be_unticked  dropped: an uncalled function, which no screen shows (#11, about 15 uncalled functions)
@@ -535,13 +538,13 @@ mac_app/tests/test_status_memory.py::MenuLifetime::test_discarded_menu_releases_
 mac_app/tests/test_tile_resize_mac.py::TileResizeMac::test_a_tile_inside_the_band_keeps_its_end_third_and_its_grip  mined: viewmodel.map.press-priority
 mac_app/tests/test_tile_resize_mac.py::TileResizeMac::test_grip_drag_clamps_both_limits_without_shelving_or_snapping  mined: viewmodel.map.resize-drag
 mac_app/tests/test_tile_resize_mac.py::TileResizeMac::test_grip_drag_uses_frozen_scale_keeps_aspect_and_commits_one_drop  mined: viewmodel.map.resize-drag, viewmodel.map.announce-resize
-mac_app/tests/test_tile_resize_mac.py::TileResizeMac::test_grip_visibility_on_selection_and_hover_and_read_only  mined: viewmodel.map.resize-offered, viewmodel.map.read-only
+mac_app/tests/test_tile_resize_mac.py::TileResizeMac::test_grip_visibility_on_selection_and_hover_and_read_only  mined: viewmodel.map.resize-offered
 mac_app/tests/test_tile_resize_mac.py::TileResizeMac::test_local_split_tile_can_resize_and_preserves_scaled_offsets  mined: viewmodel.map.resize-own
 mac_app/tests/test_tile_resize_mac.py::TileResizeMac::test_no_grip_for_shelved_or_other_machines_split_displays  mined: viewmodel.map.resize-offered, viewmodel.map.inactive-hidden
 mac_app/tests/test_tile_resize_mac.py::TileResizeMac::test_off_hint_mentions_corner_resize_and_profiles_on_hint_is_preserved  mined: viewmodel.map.hint
 mac_app/tests/test_tile_resize_mac.py::TileResizeMac::test_option_arrows_at_limits_do_not_commit_unchanged_size  mined: viewmodel.map.resize-keys
 mac_app/tests/test_tile_resize_mac.py::TileResizeMac::test_option_arrows_resize_one_eighth_and_keep_origin  mined: viewmodel.map.resize-keys, viewmodel.map.announce-resize
-mac_app/tests/test_tile_resize_mac.py::TileResizeMac::test_read_only_keyboard_and_unchanged_drag_do_not_commit  mined: viewmodel.map.read-only, viewmodel.map.resize-drag
+mac_app/tests/test_tile_resize_mac.py::TileResizeMac::test_read_only_keyboard_and_unchanged_drag_do_not_commit  mined: viewmodel.map.resize-drag
 mac_app/tests/test_tile_resize_mac.py::TileResizeMac::test_small_tile_elides_name_and_keeps_full_tooltip_and_accessibility  mined: viewmodel.map.title, viewmodel.map.footprint-access, viewmodel.map.description
 mac_app/tests/test_tile_resize_mac.py::TileResizeMac::test_this_mac_can_resize_but_stays_fixed_in_position  mined: viewmodel.map.resize-own
 mac_app/tests/test_tile_resize_mac.py::TileResizeMac::test_writable_profiles_grip_keeps_the_viewed_layout  mined: viewmodel.profiles.picker.resize
@@ -578,7 +581,7 @@ win_app/tests/test_atlas_map_feel.py::AtlasMapFeelTests::test_release_commits_th
 win_app/tests/test_audio_page_win.py::InTheWindow::test_audio_follows_crossing_and_opens_with_its_shortcut  mined: viewmodel.pages.order, viewmodel.pages.number-keys
 win_app/tests/test_audio_page_win.py::InTheWindow::test_the_page_finds_the_service_when_the_app_has_one  mined: viewmodel.audio.unavailable, viewmodel.audio.level.watch
 win_app/tests/test_audio_page_win.py::InTheWindow::test_the_page_reads_the_links_of_the_window  mined: viewmodel.audio.notice.peers-without-audio
-win_app/tests/test_audio_page_win.py::LinkedWithoutAudio::test_names_the_links_without_audio  mined: viewmodel.audio.notice.peers-without-audio, viewmodel.audio.notice.peers-unknown
+win_app/tests/test_audio_page_win.py::LinkedWithoutAudio::test_names_the_links_without_audio  mined: viewmodel.audio.notice.peers-without-audio
 win_app/tests/test_audio_page_win.py::LinkedWithoutAudio::test_nothing_known_without_audio_here  python-detail: the PC app without its audio part tracks no peer's capabilities
 win_app/tests/test_audio_page_win.py::Page::test_a_snapshot_from_the_worker_updates_the_page_on_the_qt_thread  python-detail: hops the service's worker-thread callbacks to the Qt thread and coalesces them
 win_app/tests/test_audio_page_win.py::Page::test_clicking_a_tile_selects_it  mined: viewmodel.audio.map.select-click
@@ -588,7 +591,7 @@ win_app/tests/test_audio_page_win.py::Page::test_low_latency_switch_on_this_pcs_
 win_app/tests/test_audio_page_win.py::Page::test_meters_never_block_the_ui_thread  python-detail: the service's level callbacks return within 5 ms on its worker thread while the Qt thread is busy
 win_app/tests/test_audio_page_win.py::Page::test_mic_choice_calls_set_mic  mined: viewmodel.audio.mic.choose-device, viewmodel.audio.mic.choose-off, viewmodel.audio.mic.heading-not-a-choice
 win_app/tests/test_audio_page_win.py::Page::test_no_low_latency_switch_elsewhere  mined: viewmodel.audio.low-latency.shown, viewmodel.audio.low-latency.set
-win_app/tests/test_audio_page_win.py::Page::test_notice_actions_go_through_the_service  mined: viewmodel.audio.notice.audio-stopped
+win_app/tests/test_audio_page_win.py::Page::test_notice_actions_go_through_the_service  python-detail: Retry restarting Python's separate audio helper process, which Beamer does not have (ADR 0004: one process)
 win_app/tests/test_audio_page_win.py::Page::test_notices_sit_right_under_the_microphone  mined: viewmodel.audio.sections, viewmodel.audio.notice.order
 win_app/tests/test_audio_page_win.py::Page::test_output_choice_calls_set_output_for_the_selected_machine  mined: viewmodel.audio.map.select-click, viewmodel.audio.output.choose, viewmodel.audio.output.choose-here
 win_app/tests/test_audio_page_win.py::Page::test_peers_without_audio_are_named  mined: viewmodel.audio.notice.peers-without-audio
@@ -611,7 +614,7 @@ win_app/tests/test_camera_section_win.py::Module::test_install_runs_vcam_install
 win_app/tests/test_camera_section_win.py::Module::test_quality_is_disabled_while_off  mined: viewmodel.camera.quality.off
 win_app/tests/test_camera_section_win.py::Module::test_remove_asks_first_then_runs_vcam_install_remove  mined: viewmodel.camera.install.remove-confirm, viewmodel.camera.install.refused, viewmodel.camera.install.done, viewmodel.camera.this-machine.pc-installed
 win_app/tests/test_camera_section_win.py::Module::test_retry_on_an_error_sets_the_route_again  mined: viewmodel.camera.status.retry, viewmodel.camera.status.error
-win_app/tests/test_camera_section_win.py::Module::test_the_camera_menu_defers_a_refresh  python-detail: the Qt page defers a refresh while the camera list's menu is open
+win_app/tests/test_camera_section_win.py::Module::test_the_camera_menu_defers_a_refresh  mined: viewmodel.audio.menu-open
 win_app/tests/test_camera_section_win.py::Module::test_the_help_line_opens_camera_settings  mined: viewmodel.camera.module.help
 win_app/tests/test_camera_section_win.py::Module::test_the_map_carries_the_camera  mined: viewmodel.camera.map.badge, viewmodel.camera.map.watching, viewmodel.camera.map.arrows, viewmodel.camera.module.shown
 win_app/tests/test_camera_section_win.py::Module::test_the_module_sits_under_the_notices_and_above_the_map  mined: viewmodel.camera.module.place
@@ -724,7 +727,7 @@ win_app/tests/test_pages_win.py::CrossingWaysTest::test_no_parts_reads_as_the_mi
 win_app/tests/test_pages_win.py::CrossingWaysTest::test_the_key_cap_line_says_how_the_key_is_pressed  dropped: the arrangement diagram, dead code (#11, ArrangementDiagram)
 win_app/tests/test_pages_win.py::CrossingWaysTest::test_the_keyboard_page_no_longer_claims_the_switch_key  mined: viewmodel.crossing.intro.pc-purpose
 win_app/tests/test_pages_win.py::CrossingWaysTest::test_the_mac_is_placed_left_right_above_or_below  dropped: an uncalled function, which no screen shows (#11, about 15 uncalled functions)
-win_app/tests/test_pages_win.py::CrossingWaysTest::test_the_parts_are_named_along_the_edge  mined: viewmodel.ledger.thirds.names, viewmodel.ledger.thirds.phrase
+win_app/tests/test_pages_win.py::CrossingWaysTest::test_the_parts_are_named_along_the_edge  mined: viewmodel.ledger.thirds.names
 win_app/tests/test_pages_win.py::CrossingWaysTest::test_the_summary_names_every_way_in_one_sentence  dropped: the arrangement diagram, dead code (#11, ArrangementDiagram)
 win_app/tests/test_pages_win.py::CrossingWaysTest::test_turning_on_a_way_already_on_keeps_one_copy  python-detail: de-duplicating the list of zone kinds Python kept, which no screen reaches with a zone kind
 win_app/tests/test_pages_win.py::CrossingWaysTest::test_with_no_side_learned_the_summary_still_names_the_shortcut_which_needs_none  dropped: the arrangement diagram, dead code (#11, ArrangementDiagram)
@@ -863,7 +866,7 @@ win_app/tests/test_profiles_canvas_qt.py::ProfilesLedgerTests::test_read_only_re
 win_app/tests/test_profiles_canvas_qt.py::ProfilesLedgerTests::test_remote_mac_shows_notch_and_routes_both_flags_through_profile_write  mined: viewmodel.profiles.other.notch, viewmodel.profiles.other.edit
 win_app/tests/test_profiles_canvas_qt.py::ProfilesLedgerTests::test_remote_view_shows_local_machine_destination_but_no_local_controls  mined: viewmodel.profiles.other.no-local-controls
 win_app/tests/test_profiles_canvas_qt.py::ProfilesLedgerTests::test_returning_to_own_ways_restores_keys_and_machine_actions  mined: viewmodel.profiles.other.back
-win_app/tests/test_profiles_labels.py::SavedWaysLabelsTests::test_archive_reasons_and_day_first_date  mined: viewmodel.profiles.saved.entry, viewmodel.profiles.saved.reason-edit, viewmodel.profiles.saved.reason-restore, viewmodel.profiles.saved.reason-every-on, viewmodel.profiles.saved.reason-every-off
+win_app/tests/test_profiles_labels.py::SavedWaysLabelsTests::test_archive_reasons_and_day_first_date  mined: viewmodel.profiles.saved.entry, viewmodel.profiles.saved.reason-edit, viewmodel.profiles.saved.reason-restore, viewmodel.profiles.saved.reason-every-on
 win_app/tests/test_profiles_labels.py::SavedWaysLabelsTests::test_replaced_row_names_the_author  mined: viewmodel.profiles.saved.reason-replaced
 win_app/tests/test_profiles_page_qt.py::ProfilesPageTests::test_invalid_profile_name_and_full_desk_use_page_note  mined: viewmodel.profiles.name.invalid, viewmodel.profiles.name.full
 win_app/tests/test_profiles_page_qt.py::ProfilesPageTests::test_off_keeps_tabs_hidden_and_home_available  mined: viewmodel.profiles.switch.shows, viewmodel.profiles.switch.note, viewmodel.profiles.switch.hidden-while-on, viewmodel.profiles.home.shake, viewmodel.profiles.home.sensitivity
@@ -894,7 +897,7 @@ win_app/tests/test_tile_resize_qt.py::TileResizeQtTests::test_drag_clamps_at_bot
 win_app/tests/test_tile_resize_qt.py::TileResizeQtTests::test_drag_resizes_display_offsets_without_mutating_the_start_tile  mined: viewmodel.map.resize-drag, viewmodel.map.resize-offered
 win_app/tests/test_tile_resize_qt.py::TileResizeQtTests::test_grip_drag_uses_map_scale_keeps_aspect_and_commits_one_drop  mined: viewmodel.map.resize-drag, viewmodel.map.announce-resize
 win_app/tests/test_tile_resize_qt.py::TileResizeQtTests::test_grip_is_visible_for_selection_or_hover_and_clears_on_leave  mined: viewmodel.map.resize-offered
-win_app/tests/test_tile_resize_qt.py::TileResizeQtTests::test_no_grip_or_keyboard_resize_when_read_only_or_shelved  mined: viewmodel.map.read-only, viewmodel.map.inactive-hidden
+win_app/tests/test_tile_resize_qt.py::TileResizeQtTests::test_no_grip_or_keyboard_resize_when_read_only_or_shelved  mined: viewmodel.map.inactive-hidden
 win_app/tests/test_tile_resize_qt.py::TileResizeQtTests::test_own_tile_can_resize_but_plain_arrows_do_not_move_it  mined: viewmodel.map.resize-own, viewmodel.map.own-fixed
 win_app/tests/test_tile_resize_qt.py::TileResizeQtTests::test_profile_resize_is_not_a_profile_click_even_with_a_short_drag  mined: viewmodel.profiles.picker.resize
 win_app/tests/test_tile_resize_qt.py::TileResizeQtTests::test_rejected_resize_is_not_announced_as_success  mined: viewmodel.map.announce-resize

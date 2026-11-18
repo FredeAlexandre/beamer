@@ -37,8 +37,10 @@ with British spelling is the only language (#11, F34); the one function is the r
 > r[viewmodel.words.through-tr]
 > Every string the view-model gives a page, overlay, tray menu, tooltip, accessibility label or
 > notification passes through one translation function, `tr()`, apart from the values put into a
-> template (`viewmodel.words.template-then-values`) and the product's name, "Beamer". A test that
-> swaps that function's catalogue for one that marks every message finds every other string marked.
+> template (`viewmodel.words.template-then-values`), the same values shown alone, such as a peer's
+> label, a profile's name or a key's name (`viewmodel.words.typed-as-typed`), and the product's
+> name, "Beamer". A test that swaps that function's catalogue for one that marks every message
+> finds every other string marked.
 
 > r[viewmodel.words.british]
 > Every string is English with British spelling, as the view-model writes it ("colour", "centre",
@@ -100,7 +102,7 @@ PC one running Windows.
 > |---|---|---|
 > | Overview | "Where input is, whether each link is up, and the controls you reach for every day. Pair your machines here first." | "The machines paired with this PC, where input is right now, and the controls you reach for every day. Pair a machine here first." |
 > | Permissions | "macOS must allow Beamer to read this Mac's input and to move its pointer and type when another machine drives it." | no such page |
-> | Crossing | "Drag a machine on the map to where it sits. The ledger says how each one is reached; click a row to pick it on the map." | "Choose how the pointer or a key moves input to each machine, and how hard the edge pushes back first." |
+> | Crossing | the page's introduction, which follows own zones on every machine (`viewmodel.crossing.intro.own-zones`, `viewmodel.crossing.intro.profile`) | "Choose how the pointer or a key moves input to each machine, and how hard the edge pushes back first." |
 > | Audio & Camera | "Every machine's microphones, speakers and camera. Choose the microphone your apps hear, the camera they see, and where each machine's sound plays." | the same |
 > | Keyboard | "How this Mac's modifier keys arrive on other machines, which keys and buttons stay on this Mac, and how fast another machine's pointer moves here. The switch key is on the Crossing page." | "How this PC's Ctrl and Windows keys arrive on another machine, the keys and buttons that stay here, and how fast another machine's pointer moves here." |
 > | Design | "How crossing looks and feels on this Mac: the edge, the corner, the notch and the trackpad." | "How crossing looks on this PC: the light as you push toward another machine, and where the pointer lands." |
@@ -128,23 +130,25 @@ PC one running Windows.
 > - parity: Python's PC went round from the last page to the first and back (one behaviour for both machines, the Mac's)
 
 > r[viewmodel.pages.dot-permissions]
-> On a Mac, while Accessibility or Input Monitoring is not granted, the sidebar puts an amber dot on
+> On a Mac, while Accessibility or Input Monitoring is not granted, the sidebar puts a waiting dot on
 > Permissions.
 
 > r[viewmodel.pages.dot-dormant]
-> While any peer is a dormant peer, the sidebar puts an amber dot on Overview and on Crossing.
+> While any peer is a dormant peer, the sidebar puts a waiting dot on Overview and on Crossing.
 >
-> - parity: Python's Mac also put a fault dot on Overview while the link reported that the peer refused this Mac's token (that refusal is what makes a peer dormant, `link.report.down`, so the dormant peer's amber dot stands for it)
+> - parity: Python's Mac also put a fault dot on Overview while a peer's link reported that the peer refused this Mac's token, answered under another machine id, sent an unreadable first message or no longer had the pairing (only `link.auth.forgotten` makes a peer dormant, `pairing.dormant.forgotten`, so its waiting dot stands for that case; the others become refusals that name their cause, `link.auth.not-the-peer` and `link.auth.not-in-use`, which the link status and the peer's row say, `viewmodel.machines.state.refused`, with no dot, as on the PC)
 
 > r[viewmodel.pages.dot-firewall]
 > On a PC, the sidebar's dot on Connection follows the firewall check (`platform.firewall.*`): none
-> while the firewall is ready or a check is running; an amber dot while a block rule blocks, Beamer's
+> while the firewall is ready or a check is running; a waiting dot while a block rule blocks, Beamer's
 > rule is missing or the LAN is on the Public profile; a fault dot while the check failed or was
 > refused for lack of permission.
 
 > r[viewmodel.pages.dot-settings]
 > On a PC, while Core reports that this machine's settings could not be read, the sidebar puts a
 > fault dot on Connection, whatever the firewall check says.
+>
+> - parity: Python's PC also put the fault dot on Connection while no peer was paired (pairing is on Overview, `viewmodel.pages.purpose`, and the link status says "Not paired" there, `viewmodel.status.not-paired`; one behaviour on both machines, as the Mac put no dot for it)
 
 > r[viewmodel.pages.no-dots]
 > With none of the cases of `viewmodel.pages.dot-permissions`, `viewmodel.pages.dot-dormant`,
@@ -156,6 +160,12 @@ PC one running Windows.
 > Beamer running in the tray." on a PC, on every page but Connection, where it says only "Closing this
 > window keeps Beamer running in the menu bar." on a Mac and "Closing this window keeps Beamer running
 > in the tray." on a PC.
+
+> r[viewmodel.pages.footer-message]
+> The settings window's footer is also where a page's message shows: a message a rule gives the
+> footer, such as "Paired with Laptop.", takes the place of the footer's words
+> (`viewmodel.pages.footer`) until another message takes its place or a page is shown, when the
+> footer's words for that page come back.
 
 > r[viewmodel.pages.follows-snapshot]
 > Every page of an open settings window shows the settings and states of the latest snapshot Core
@@ -172,6 +182,9 @@ PC one running Windows.
 The window's link status, the sidebar's link block and the round trip shown while input is on a
 peer. Each is the view-model's reading of what the link reports (`spec/link.md`).
 
+Dropped, so no rule here (#11): the Mac's "Unlocking" state, shown while a linked PC unlocked
+itself at its lock screen (F21, Windows unlock through the RoomDeck credential provider).
+
 > r[viewmodel.status.peer]
 > The link status speaks of one peer, the status peer: the peer this machine's input is on; else
 > the shortcut's machine (`crossing.shortcut.machine`); else the first peer in the peer list that is
@@ -181,7 +194,7 @@ peer. Each is the view-model's reading of what the link reports (`spec/link.md`)
 
 > r[viewmodel.status.parts]
 > The link status shows a word, a caption beside its light, a sentence, the word's tone and the
-> light's tone, each tone one of signal, amber, fault and ink. The light blinks in the waking and
+> light's tone, each tone one of live, waiting, fault and plain. The light blinks in the waking and
 > looking states only.
 
 > r[viewmodel.status.order]
@@ -199,51 +212,51 @@ peer. Each is the view-model's reading of what the link reports (`spec/link.md`)
 > r[viewmodel.status.driven]
 > While a peer drives this machine, the link status's word is "From {name}" naming the driver, its
 > caption "Live", its sentence "{name}'s keyboard and pointer are on this Mac. Push its pointer back
-> through the edge it arrived by to send them home." ("this PC" on a PC), and both tones signal.
+> through the edge it arrived by to send them home." ("this PC" on a PC), and both tones live.
 
 > r[viewmodel.status.waking]
 > While the status peer is being woken (`discovery.wake.status`), the word and the caption are
-> "Waking", the sentence "Waking {name}. It connects on its own once it is up.", both tones amber,
+> "Waking", the sentence "Waking {name}. It connects on its own once it is up.", both tones waiting,
 > and the light blinks.
 
 > r[viewmodel.status.on-peer]
 > While this machine's input is on the status peer, the word is "On {name}", the caption "Live", the
 > sentence "Keyboard and pointer are on {name}. Do the same again to bring them home." and both
-> tones signal.
+> tones live.
 
 > r[viewmodel.status.paused]
 > While the status peer's link is up, input is home, a crossing pause is on (`crossing.pause.zones`)
 > and this machine has a zone, the word is "Paused", the caption "Held", the sentence "Connected to
-> {name}. Crossing is held, so you can lean on an edge.", the word's tone ink and the light's
-> signal.
+> {name}. Crossing is held, so you can lean on an edge.", the word's tone plain and the light's
+> live.
 
 > r[viewmodel.status.full-screen]
 > While the status peer's link is up, input is home, no crossing pause is on, a full-screen pause
 > is (`crossing.full-screen.zones`) and this machine has a zone, the word and the caption are "Held",
-> the sentence "Held: an app is full screen.", the word's tone ink and the light's signal.
+> the sentence "Held: an app is full screen.", the word's tone plain and the light's live.
 
 > r[viewmodel.status.linked]
 > While the status peer's link is up, input is home, and neither `viewmodel.status.paused` nor
-> `viewmodel.status.full-screen` holds, the word is "On this Mac" ("On this PC" on a PC), the caption "Linked", the sentence "Connected to {name}.", the word's tone ink
-> and the light's signal.
+> `viewmodel.status.full-screen` holds, the word is "On this Mac" ("On this PC" on a PC), the caption "Linked", the sentence "Connected to {name}.", the word's tone plain
+> and the light's live.
 >
 > - parity: Python's Mac said "On Mac" (the word names this machine as the Windows app's "On this PC" did)
 
 > r[viewmodel.status.not-paired]
 > With no peer paired, the word is "Not paired", the caption "Setup", the sentence "Pair a machine on
-> Overview and Beamer connects on its own." and both tones amber.
+> Overview and Beamer connects on its own." and both tones waiting.
 
 > r[viewmodel.status.none-in-use]
 > With peers paired but none in use that this machine may drive, the word is "Not connected", the
 > caption "Setup", the sentence "Put a machine in use on Overview and Beamer connects on its own." and
-> both tones amber.
+> both tones waiting.
 >
 > - parity: Python's Mac named its first peer even when it was not in use, and its Windows app said only "Not connected" (#11's standing decision, N machines: a peer not in use is never the status peer)
 
 > r[viewmodel.status.looking]
 > While the status peer's link has reported nothing since Beamer started or since the peer was put
 > in use, the word is "Waiting", the caption "Looking", the sentence "Looking for {name}. It connects on
-> its own once Beamer is open there.", both tones amber, and the light blinks.
+> its own once Beamer is open there.", both tones waiting, and the light blinks.
 
 > r[viewmodel.status.unreachable]
 > When the status peer's link last reported down as unreachable, the word is "Unreachable", the caption
@@ -310,7 +323,8 @@ peer. Each is the view-model's reading of what the link reports (`spec/link.md`)
 > The sidebar's link block names one peer: the peer this machine's input is on, else this machine's
 > driver, when that peer's link is up; else the status peer, when its link is up; else, of the
 > peers whose link is up, the one with the smallest machine id. With no peer's link up it names the
-> status peer, and with no peer paired it shows "—" in place of a name.
+> status peer, and with no status peer, as when no peer is paired or none is in use that this
+> machine may drive (`viewmodel.status.peer`), it shows "—" in place of a name.
 
 > r[viewmodel.status.sidebar-word]
 > The sidebar's link block shows the link status's word in the word's tone, and its light in the
@@ -352,32 +366,38 @@ rules wherever an address appears here.
 
 ### What a machine is called
 
-Every page, status, notice and menu names a machine by its label, as these rules give it. A
-machine's id tail is the last four characters of its machine id written in unpadded URL-safe
-base64 (RFC 4648, section 5), the 16 bytes of the id making 22 characters.
+Every page, status, notice and menu names a machine by its label, as these rules give it.
+
+> r[viewmodel.machines.label.id-tail]
+> A machine's id tail is the last four characters of its machine id (`pairing.identity.machine-id`)
+> written in unpadded URL-safe base64 (RFC 4648, section 5), in which the id's 16 bytes make 22
+> characters: the id of fifteen zero bytes and then the byte 0x70 is "AAAAAAAAAAAAAAAAAAAAcA", and
+> its id tail is "AAcA".
 
 > r[viewmodel.machines.label.name]
-> A peer's base name is the label the user gave it, without leading or trailing blanks, or, with no
-> label or a blank one, the peer's name, without leading or trailing blanks. A peer's label is its
-> base name, unless `viewmodel.machines.label.shared` or `viewmodel.machines.label.no-name` says
-> otherwise: a peer named "Desk" with the label "  Work Mac  " is "Work Mac", and with the label
-> "  " is "Desk".
+> A peer's base name is its given name, without leading or trailing blanks, or, with no given name
+> or a blank one, the peer's name, without leading or trailing blanks. A peer's label is its base
+> name, unless `viewmodel.machines.label.shared` or `viewmodel.machines.label.no-name` says
+> otherwise: a peer named "Desk" with the given name "  Work Mac  " is "Work Mac", and with the
+> given name "  " is "Desk".
 
 > r[viewmodel.machines.label.cut]
 > A base name longer than 64 characters, once its leading and trailing blanks are gone, is cut to
-> its first 64: a label of 70 "X" between blanks is shown as 64 "X".
+> its first 64: a given name of 70 "X" between blanks is shown as 64 "X".
 
 > r[viewmodel.machines.label.no-name]
-> A peer whose base name is blank is labelled "Machine · " followed by its id tail, such as
-> "Machine · BBBw". Its label never shows any of its addresses.
+> A peer whose base name is blank is labelled "Machine · " followed by its id tail
+> (`viewmodel.machines.label.id-tail`), such as "Machine · BBBw". Its label never shows any of its
+> addresses.
 >
 > - parity: Python called such a peer by its saved address, and with none "Unnamed machine", while its Audio page and crossing map called a machine they had no name for "Machine · " and the last six characters of its id (one name for a nameless machine on every page, with the id tail `viewmodel.machines.label.shared` uses)
 
 > r[viewmodel.machines.label.shared]
 > When two or more peers share a base name, each of their labels is the base name followed by a
-> space and its id tail between parentheses: two peers labelled "Desk" are "Desk (AAAA)" and
-> "Desk (BBBw)", while a third labelled "Laptop" stays "Laptop". A blank base name is shared with
-> no one (`viewmodel.machines.label.no-name`).
+> space and its id tail (`viewmodel.machines.label.id-tail`) between parentheses: two peers whose
+> base name is "Desk" are "Desk (AAAA)" and "Desk (BBBw)", while a third whose base name is
+> "Laptop" stays "Laptop". A blank base name is shared with no one
+> (`viewmodel.machines.label.no-name`).
 
 > r[viewmodel.machines.label.shared-compare]
 > Two base names are shared when they are equal once letter case is ignored: "Desk" and " desk "
@@ -393,7 +413,8 @@ base64 (RFC 4648, section 5), the 16 bytes of the id making 22 characters.
 > A machine that is not one of this machine's peers, such as a driver just removed from the peer
 > list or a machine on the crossing map that only a peer has paired with, is labelled by the name
 > Core reports for it, without leading or trailing blanks and cut to its first 64 characters, or,
-> with no name or a blank one, "Machine · " followed by its id tail. Where a string names no
+> with no name or a blank one, "Machine · " followed by its id tail
+> (`viewmodel.machines.label.id-tail`). Where a string names no
 > machine at all, because Core gives no machine id, `viewmodel.words.unknown-machine` says what it
 > says.
 >
@@ -413,13 +434,21 @@ base64 (RFC 4648, section 5), the 16 bytes of the id making 22 characters.
 > With no peer, the Machines list has no row and says "No machines paired yet." Whether the
 > pairing sheet then shows is `viewmodel.pairing-sheet.open-without-peers`.
 
+> r[viewmodel.machines.list.first]
+> On the Overview page, the Machines list comes first under the page's name and purpose, and the
+> pairing sheet, while it shows, straight after it, before every other module, whether or not any
+> peer is paired.
+>
+> - parity: Python's PC put the module naming this PC between the Machines list and the pairing sheet (one behaviour on both machines, the Mac's)
+
 ### What a row says
 
 > r[viewmodel.machines.row.platform]
-> A row names the peer's platform as the pairing proved it: `macos` as "Mac", `windows` as
-> "Windows", `linux` as "Linux", and any other platform, or none, as "Other".
+> A row names the peer's platform as the pairing proved it: `macos` as "macOS", `windows` as
+> "Windows", and any other platform, or none, as "Machine", as the crossing map and the crossing
+> ledger name it (`viewmodel.map.status-peer`, `viewmodel.ledger.status`).
 >
-> - parity: Python also named `ios` "iPhone" and `android` "Android" (phone peers are out of scope, #11)
+> - parity: Python named `macos` "Mac", `linux` "Linux", `ios` "iPhone", `android` "Android" and any other platform "Other" (one naming of a peer's platform on every page, the crossing map's; Linux is out of scope, #1, and phone peers, #11)
 
 > r[viewmodel.machines.row.address]
 > A peer's address, as the Machines list shows it, is its first chosen address, or with none, the
@@ -430,7 +459,7 @@ base64 (RFC 4648, section 5), the 16 bytes of the id making 22 characters.
 
 > r[viewmodel.machines.row.where]
 > Under its label, a row says the peer's platform and its address, joined by " · ", such as
-> "Mac · 192.0.2.10", or "Mac · No address" when the peer has no address.
+> "macOS · 192.0.2.10", or "macOS · No address" when the peer has no address.
 >
 > - parity: Python's Mac app joined the platform and the address with two spaces, and both apps added " · port 24820" (#16: one viewmodel for every machine, with the Windows app's separator; #14: no port)
 
@@ -502,9 +531,13 @@ live, waiting or a fault; how each looks is `spec/ui.md`'s.
 > - parity: Python showed "Not listening" for a dial the peer's machine refused, and the Mac app "Blocked" for its macOS 27 tunnel (#14: one QUIC handshake over UDP, in which a refused dial looks unreachable; #11 drops the tunnel, F42)
 
 > r[viewmodel.machines.state.dropped]
-> A peer whose link last reported down for any other reason (`link.report.down`), such as the peer
-> stopped answering or closed it, shows "Dropped", as a fault, with the sentence the status gives
-> that reason, less its final full stop, followed by ". Beamer keeps trying to reconnect.".
+> A peer whose link last reported down for any other reason (`link.report.down`) shows "Dropped",
+> as a fault. Its sentence is "{label} did not answer like Beamer. Beamer keeps trying to
+> reconnect." when the reason is a message that does not decode or a peer that broke the protocol,
+> and "{label} stopped responding. Beamer keeps trying to reconnect." for every other reason, such
+> as the peer stopped answering, stopped taking what this machine sends or closed the link.
+>
+> - parity: Python's sentence was the link's own last status text, less its final full stop, followed by ". Beamer keeps trying to reconnect." (#16 and ADR 0004: Core reports a typed reason, never text; the words are those of `viewmodel.status.no-reply` and `viewmodel.status.disconnected`)
 
 ### Renaming a peer
 
@@ -515,19 +548,19 @@ live, waiting or a fault; how each looks is `spec/ui.md`'s.
 > cluster, when there is no note.
 
 > r[viewmodel.machines.rename.save]
-> Pressing Return in the rename field asks Core to give the peer the field's text as its label,
-> closes the field, and shows the new label (`viewmodel.machines.label.name`): "  Work Mac  " is
-> saved and shown as "Work Mac".
+> Pressing Return in the rename field asks Core to give the peer the field's text as its given
+> name, closes the field, and shows the new label (`viewmodel.machines.label.name`): "  Work Mac  "
+> is saved and shown as "Work Mac".
 
 > r[viewmodel.machines.rename.cancel]
 > Pressing Escape in the rename field closes it and changes nothing. Opening it again shows the
-> saved label, not the text that was discarded.
+> base name as saved (`viewmodel.machines.rename.start`), not the text that was discarded.
 
 > r[viewmodel.machines.rename.start]
 > Wherever Beamer lets the user rename a peer, on its row or on the Crossing page, the field starts
 > with the peer's base name (`viewmodel.machines.label.name`), never with the id tail
 > `viewmodel.machines.label.shared` adds: a peer shown as "Studio (BBBw)" because another peer
-> shares its label "Studio" is renamed starting from "Studio", and saving it unchanged saves
+> shares its base name "Studio" is renamed starting from "Studio", and saving it unchanged saves
 > "Studio".
 
 ### Kept off the crossing map
@@ -562,8 +595,9 @@ live, waiting or a fault; how each looks is `spec/ui.md`'s.
 > - parity: Python pinned or released the one address it kept for each peer (#14: a peer has a list of chosen and learnt addresses)
 
 > r[viewmodel.machines.pin.toggle]
-> Turning "Pin address" off asks Core to remove each of the peer's chosen addresses, which stay
-> learnt addresses (`discovery.address.unchosen`). Turning it on asks Core to make the address the
+> Turning "Pin address" off asks Core to remove each of the peer's chosen addresses, the one the row
+> shows last: that one stays a learnt address (`discovery.address.unchosen`), and the others are
+> gone from the peer's addresses. Turning it on asks Core to make the address the
 > row shows a chosen address (`discovery.address.choose-learnt`). Either changes that peer alone.
 
 ### May drive and may be driven by
@@ -641,12 +675,12 @@ pairing version 2 exchange and its "Older Beamer" machines, and the portable bui
 ### Opening and closing
 
 > r[viewmodel.pairing-sheet.open]
-> Pressing "Pair a machine" on the Machines page opens the pairing sheet, headed "Pair a machine".
+> Pressing "Pair a machine" on the Machines list opens the pairing sheet, headed "Pair a machine".
 > While the sheet is open, that button says "Cancel", and pressing it closes the sheet.
 
 > r[viewmodel.pairing-sheet.open-without-peers]
-> On a Mac, while this machine has no peers, the pairing sheet shows on the Machines page without
-> being opened, and the button above it says "Pair a machine". On a PC the sheet shows only once
+> On a Mac, while this machine has no peers, the pairing sheet shows on Overview without being
+> opened, and the button above it says "Pair a machine". On a PC the sheet shows only once
 > opened.
 
 > r[viewmodel.pairing-sheet.close-ends-code]
@@ -669,8 +703,10 @@ pairing version 2 exchange and its "Older Beamer" machines, and the portable bui
 
 > r[viewmodel.pairing-sheet.show-half]
 > The sheet's first half is headed "Show a code on this Mac" on a Mac and "Show a code on this PC"
-> on a PC, and offers "Show a code". On a Mac it also says "On the other machine, open Beamer,
+> on a PC, and offers "Show a code". On a Mac it also says "On another machine, open Beamer,
 > choose this Mac in its list and type the code."
+>
+> - parity: Python's Mac said "On the other machine, open Beamer, …" (`viewmodel.words.unknown-machine`: no string pictures exactly one other machine)
 
 > r[viewmodel.pairing-sheet.show-code]
 > Pressing "Show a code" asks Core to show a code (`pairing.code.one-at-a-time`) and clears the
@@ -709,9 +745,9 @@ pairing version 2 exchange and its "Older Beamer" machines, and the portable bui
 > code" until the user shows a new code, cancels or closes the sheet.
 
 > r[viewmodel.pairing-sheet.showing-paired]
-> When another machine pairs with the code shown, the pairing sheet closes and the window's
-> message line says "Paired with Laptop.", naming the new peer by its label, which is its name
-> until the user renames it.
+> When another machine pairs with the code shown, the pairing sheet closes and the settings
+> window's footer says "Paired with Laptop." (`viewmodel.pages.footer-message`), naming the new
+> peer by its label, which is its name until the user renames it.
 >
 > - parity: Python's PC kept the sheet open and said it under "Show a code" (one behaviour on both machines, the Mac's, as entering a code does)
 
@@ -760,10 +796,10 @@ pairing version 2 exchange and its "Older Beamer" machines, and the portable bui
 > r[viewmodel.pairing-sheet.enter-half]
 > The sheet's second half is headed "Enter a code from another machine". It lists the machines
 > heard under "On this network", offers an address field under "Not listed? Type its address.",
-> six digits under "Code shown on the other machine", and "Pair". Until the user acts, its status
+> six digits under "Code shown on that machine", and "Pair". Until the user acts, its status
 > line says "Choose a machine, or type its address, then type the code it shows."
 >
-> - parity: Python's PC said nothing in its status line until the user acted (one behaviour on both machines, the Mac's)
+> - parity: Python's PC said nothing in its status line until the user acted, and the Mac headed the digits "Code shown on the other machine" (one behaviour on both machines, the Mac's, in words that picture no single other machine, `viewmodel.words.unknown-machine`)
 
 > r[viewmodel.pairing-sheet.heard-showing-only]
 > The list shows each machine heard whose latest beacon says a code is shown
@@ -776,7 +812,7 @@ pairing version 2 exchange and its "Older Beamer" machines, and the portable bui
 > Each machine in the list shows the address its beacons come from, "192.168.50.22", and two
 > machines heard are never shown alike while Hide addresses is off.
 >
-> - parity: Python showed each machine by the name and platform its beacon gave, "Studio · Windows · showing a code", adding the address only when another machine heard had the same name, compared ignoring case and surrounding blanks (#14: a beacon carries no name and no platform, only that a code is shown)
+> - parity: Python showed each machine by the name and platform its beacon gave, "Studio · Windows · showing a code"; the Mac added the address it was heard at to every machine showing a code, and the PC only when another machine heard had the same name, compared ignoring case and surrounding blanks (#14: a beacon carries no name and no platform, only that a code is shown)
 
 > r[viewmodel.pairing-sheet.heard-item-hidden]
 > While Hide addresses is on, each machine in the list shows `•••` in place of its address.
@@ -787,11 +823,12 @@ pairing version 2 exchange and its "Older Beamer" machines, and the portable bui
 > - parity: Python's Mac said "Looking for machines running Beamer. Open it on the other machine and it appears here; across a VPN or on guest Wi-Fi it may not, so type its address below." (one wording on both machines, the PC's, since only machines showing a code are listed)
 
 > r[viewmodel.pairing-sheet.heard-failure]
-> While this machine lacks its UDP port and hears no beacons (`discovery.beacon.port-failure`), the
-> sheet says "Beamer cannot look for machines: address already in use" in place of the list, with
-> the error Core reports.
+> While this machine lacks its UDP port and hears no beacons, the sheet says in place of the list
+> "Beamer cannot look for machines: another program has UDP port 24820." when another program has
+> the port (`link.transport.port-taken`), and "Beamer cannot look for machines: UDP port 24820
+> stopped working." when receiving on it failed otherwise (`discovery.beacon.port-failure`).
 >
-> - parity: Python's PC said nothing of it (one behaviour on both machines, the Mac's)
+> - parity: Python's Mac said "Beamer cannot look for machines: {reason}", with the system's error, such as "address already in use", and its PC said nothing of it (one behaviour on both machines, the Mac's; #16 and ADR 0004: Core reports a typed failure, never the system's text)
 
 > r[viewmodel.pairing-sheet.select]
 > Pressing a machine in the list selects it, and only it. Selecting a machine clears an address
@@ -843,6 +880,20 @@ pairing version 2 exchange and its "Older Beamer" machines, and the portable bui
 > The code typed keeps only the digits of what is typed or pasted, and at most six: pasting
 > "482 913" or "482-913" gives 482913.
 
+> r[viewmodel.pairing-sheet.code-spread]
+> The code is typed in six boxes of one digit each. Digits pasted into a box fill it and the boxes
+> after it, one digit each, skipping other characters, and the keyboard's focus goes to the box
+> after the last one filled: pasting "4-5-6" into the third box puts 4, 5 and 6 in the third,
+> fourth and fifth boxes and focuses the sixth. Six digits or more fill every box from the first.
+>
+> - parity: Python's PC took the code in one field drawn as six cells, which typed and pasted as any text field does (one behaviour on both machines, the Mac's)
+
+> r[viewmodel.pairing-sheet.code-replace]
+> A digit typed into a box that holds one replaces it, wherever the caret is in the box, and leaves
+> the next box as it was: typing 7 into the third box of 408819 gives 407819.
+>
+> - parity: Python's PC took the code in one field drawn as six cells, in which a digit typed went in at the caret and the code kept its first six digits (one behaviour on both machines, the Mac's)
+
 > r[viewmodel.pairing-sheet.pair-pressable]
 > "Pair" can be pressed only while a machine is selected or an address is typed, the code typed
 > has six digits, and no attempt is in progress.
@@ -883,8 +934,9 @@ pairing version 2 exchange and its "Older Beamer" machines, and the portable bui
 
 > r[viewmodel.pairing-sheet.entering-paired]
 > When an attempt pairs, the code typed, the address typed and the selection are cleared, the
-> pairing sheet closes, and the window's message line says "Paired with Laptop. Connecting…",
-> naming the new peer as the Machines page names it, from the name the exchange proved.
+> pairing sheet closes, and the settings window's footer says "Paired with Laptop. Connecting…"
+> (`viewmodel.pages.footer-message`), naming the new peer as the Machines list names it, from the
+> name the exchange proved.
 >
 > - parity: Python's PC kept the sheet open and said "Paired with Laptop." in its status line (one behaviour on both machines, the Mac's, since a peer is linked with at once, `pairing.peers.at-once`)
 
@@ -955,9 +1007,8 @@ is "this Mac" on a Mac and "this PC" on a PC.
 > the map to set its ways. The ledger says how it reaches each other machine."
 
 > r[viewmodel.crossing.intro.pc-purpose]
-> On a PC, the Crossing page's purpose, above its introduction, says "Choose how the pointer or a key
-> moves input to each machine, and how hard the edge pushes back first." On a Mac, the introduction
-> is the page's only purpose line.
+> On a PC, the Crossing page's purpose (`viewmodel.pages.purpose`) stands above its introduction. On
+> a Mac, the introduction is the page's only purpose line.
 
 > r[viewmodel.crossing.scope.pc]
 > On a PC, while own zones on every machine is on and "Same on all machines" is off, the Crossing
@@ -995,17 +1046,17 @@ is "this Mac" on a Mac and "this PC" on a PC.
 > touches the edge. Each screen supplies its own zones.", with "this PC's" for "this Mac's" on a PC.
 
 > r[viewmodel.crossing.settings.resistance-edge]
-> At a resistance above 0, while the selected peer's displays touch an edge of this machine's
-> displays on the crossing map, the note under the resistance says "Follows this Mac's mouse or
+> At a resistance above 0, while the selected peer faces an edge of this machine
+> (`crossing.map.facing`), the note under the resistance says "Follows this Mac's mouse or
 > trackpad on every screen; each screen supplies its own zones. This screen's {edge} edge lights to
-> show the resistance.", {edge} being that edge's name in lowercase ("left", "right", "top" or
-> "bottom"), with "this PC's" for "this Mac's" on a PC.
+> show the resistance.", {edge} being the name of the edge it faces in lowercase ("left", "right",
+> "top" or "bottom"), with "this PC's" for "this Mac's" on a PC.
 
 > r[viewmodel.crossing.settings.resistance-no-edge]
-> At a resistance above 0, while the selected peer's displays touch no edge of this machine's
-> displays, or no peer is selected, the note under the resistance says "Follows this Mac's mouse or
-> trackpad on every screen; each screen supplies its own zones.", with "this PC's" for "this Mac's"
-> on a PC.
+> At a resistance above 0, while the selected peer faces no edge of this machine
+> (`crossing.map.facing`), or no peer is selected, the note under the resistance says "Follows this
+> Mac's mouse or trackpad on every screen; each screen supplies its own zones.", with "this PC's" for
+> "this Mac's" on a PC.
 
 ### The crossing line and Pause crossing
 
@@ -1078,8 +1129,9 @@ Each peer's row in the ledger has a Keys column: the peer's tick for the shortcu
 > as their symbols, ⌃ for `ctrl`, ⌥ for `alt`, ⇧ for `shift` and ⌘ for `cmd`, then a space and the
 > key's name (`viewmodel.shortcut.key-names-mac`); on a PC, the modifiers as "Ctrl" for `ctrl`,
 > "Alt" for `alt`, "Shift" for `shift` and "Win" for `cmd`, then the key, a single character in
-> capitals or else the key's name (`viewmodel.shortcut.key-names-pc`), all separated by spaces. A
-> Clear button, named "Clear jump key" for accessibility, shows beside it.
+> capitals or else the key's name (`viewmodel.shortcut.key-names-pc`), all separated by spaces, the
+> modifiers in the order `viewmodel.ledger.keys.jump-shown` gives on each. A Clear button, named
+> "Clear jump key" for accessibility, shows beside it.
 
 > r[viewmodel.crossing.jump-key.tooltip]
 > A peer's jump key is described as "Press {key} to send input to {name}; press again to bring it
@@ -1097,13 +1149,14 @@ Each peer's row in the ledger has a Keys column: the peer's tick for the shortcu
 > it that peer's jump key. Clear asks Core to clear the peer's jump key (`crossing.jump-key.clear`).
 
 > r[viewmodel.crossing.jump-key.refused]
-> When Core refuses a recorded chord, the window's message line says why, and the peer's jump key
+> When Core refuses a recorded chord, the settings window's footer says why
+> (`viewmodel.pages.footer-message`), and the peer's jump key
 > stays as it was: "choose a modifier and one non-modifier key" for a chord that is not a jump key's
 > (`crossing.jump-key.chord`), "that key is the trigger shortcut's: pick a chord without it" for one
 > that holds the shortcut key (`crossing.jump-key.shortcut-clash`), and "that key is already
 > assigned to another machine" for another peer's chord (`crossing.jump-key.unique`).
 >
-> - parity: Python's PC said it only to a screen reader, in the map canvas's announcement, while its Mac showed it in the window's message line (#16: one viewmodel for every platform; the Mac's)
+> - parity: Python's PC said it only to a screen reader, in the map canvas's announcement, while its Mac showed it in the window's footer (#16: one viewmodel for every platform; the Mac's)
 
 ### Way home
 
@@ -1171,7 +1224,7 @@ ledger and the rest of the page show.
 
 > r[viewmodel.map.title]
 > Each footprint is titled with its machine's name: "This Mac" for this machine, for a peer the name
-> the Machines page gives it, and for a machine that is not a peer the name the crossing map carries
+> the Machines list gives it, and for a machine that is not a peer the name the crossing map carries
 > with its footprint (`crossing.map.members.name`). Where the name does not fit the footprint, the footprint's tooltip
 > and accessible name still carry it whole.
 
@@ -1270,10 +1323,11 @@ ledger and the rest of the page show.
 > and the Crossing page shows that peer as its chosen peer.
 
 > r[viewmodel.map.select-default]
-> When the Crossing page opens, or the chosen peer leaves the peer list, the first peer in the peer
-> list's order becomes the chosen peer, and the map shows its footprint selected; with one peer, that
-> peer is selected. A peer chosen in the ledger or on the map stays selected on the map until another
-> is chosen.
+> While the Crossing page has no chosen peer, as when it is first shown in a run of Beamer, and when
+> the chosen peer leaves the peer list, the first peer in the peer list's order becomes the chosen
+> peer, an inactive one included, and the map shows its footprint selected while it has one. A peer
+> chosen in the ledger or on the map stays the chosen peer, also when the page is shown again, until
+> another is chosen or it leaves the peer list. With no peer, no peer is chosen.
 
 > r[viewmodel.map.select-own]
 > A click on this machine's footprint changes no selection: the peer selected on the map stays
@@ -1299,18 +1353,19 @@ ledger and the rest of the page show.
 > is refused without asking `Core`. It can still be resized (`viewmodel.map.resize-own`).
 
 > r[viewmodel.map.snap-radius]
-> A drop asked by a drag carries the snap radius of `crossing.map.snap.drop-radius` in map units: 12
-> divided by the map's scale, in points per map unit, as drawn when the drag began; on a map drawn
+> A drop asked by a drag carries the snap radius of `crossing.map.snap.drop-radius` in map units: its
+> points turned into map units at the map's scale as drawn when the drag began, so on a map drawn
 > at half a point per map unit it is 24. A drop asked by an arrow key, by a recentre or by a resize
 > carries no snap radius.
 >
 > - parity: the PC's arrow keys and Recentre asked for their drops with the snap radius too (`crossing.map.recentre` and `crossing.map.resize.taken` take no snap radius; #16: one viewmodel for both machines)
 
 > r[viewmodel.map.snap-preview]
-> While a peer's footprint is dragged, the map shows a snap preview at the free snap point
-> `crossing.map.snap.choice` picks with the snap radius, only while that point differs from where the
-> footprint is and lies within the snap radius of it, or within 1.5 times the snap radius for a
-> centred point; the dragged footprint itself stays under the pointer. With the snap radius 12, a
+> While a peer's footprint is dragged, the map shows a snap preview at the free snap point a drop
+> where it is would move to (`crossing.map.snap.drop-radius`, with the snap radius of
+> `viewmodel.map.snap-radius`), only while there is one within that radius and it differs from where
+> the footprint is, whether or not the drop would be refused; the dragged footprint itself stays
+> under the pointer. With the snap radius 12, a
 > footprint 16 map units right of a centred point shows a preview there, and one 19 units right shows
 > none. No snap preview is shown while a footprint is resized, while a display is dragged, or for
 > this machine's footprint.
@@ -1375,9 +1430,9 @@ ledger and the rest of the page show.
 > r[viewmodel.map.resize-keys]
 > While the map has keyboard focus and a footprint is selected, Option-Right or Option-Down on a Mac,
 > Alt-Right or Alt-Down on a PC, asks `Core` for one resize step up, and Option-Left or Option-Up,
-> Alt-Left or Alt-Up, one step down (`crossing.map.resize.step`), its top-left where it was. A footprint
-> 160 by 100 steps to 180 by 112 and to 140 by 88. A step that leaves the size as it was, at 40 or
-> 480 map units, asks nothing.
+> Alt-Left or Alt-Up, one step down (`crossing.map.resize.step`, `crossing.map.resize.proportional`).
+> A footprint 160 by 100 steps to 180 by 112 and to 140 by 88. A step that leaves the size as it
+> was, at a limit of `crossing.map.resize.clamp`, asks nothing.
 
 > r[viewmodel.map.resize-own]
 > This machine's footprint can be resized by its handle and by the keys like a peer's, and stays
@@ -1413,7 +1468,7 @@ ledger and the rest of the page show.
 > r[viewmodel.map.rename-start]
 > Double-clicking a peer's footprint, or pressing Return or F2 while the map has keyboard focus and a
 > peer's footprint is selected, starts renaming that peer: a rename field opens holding the peer's
-> label, or its name when it has no label.
+> base name, as `viewmodel.machines.rename.start` says.
 
 > r[viewmodel.map.rename-own]
 > Double-clicking this machine's footprint renames nothing and says "Rename this Mac on Overview." on
@@ -1421,8 +1476,8 @@ ledger and the rest of the page show.
 
 > r[viewmodel.map.rename-finish]
 > While a peer is being renamed from the map, Return asks `Core` to rename the peer to the field's
-> text, as renaming does on the Machines page, an empty text included, which clears the peer's label.
-> Escape closes the field and asks nothing.
+> text, as renaming does on the Machines list, an empty text included, which clears the peer's given
+> name. Escape closes the field and asks nothing.
 
 ### The tick for the shortcut's cycle
 
@@ -1479,11 +1534,6 @@ ledger and the rest of the page show.
 >
 > - parity: the PC's map exposed no accessible element for each footprint or tick, only its description (#16 and ADR 0004: one viewmodel for both machines, taking the Mac's)
 
-> r[viewmodel.map.read-only]
-> While the map is read-only, as when it shows another machine's crossing map that this machine may
-> not edit, no press, drag or key on it asks anything of `Core`: no drop, resize, toggled third or
-> tick, rename or recentre. It offers no resize handle and no "Recentre".
-
 ## Crossing ledger
 
 The crossing ledger is the table on the Crossing page, under the crossing map, with one row per
@@ -1504,13 +1554,15 @@ the states `contact`, `on`, `kept`, `free`, `taken` and `unavailable`, and each 
 
 Dropped, so no rule here (#11): phone peers, which had no row; the status "Beamer {version} · only
 sees which side" of a peer running Beamer 1.5.0 or 1.5.1, and the single edge and corner it could
-take, since there is no compatibility with the Python apps; and a read-only ledger for a machine
-that could not take profile edits, since every machine can.
+take, since there is no compatibility with the Python apps; and a read-only ledger and map for a
+machine that could not take profile edits, since every machine can
+(`crossing.profile.choices.edit-other`).
 
 ### Rows
 
 > r[viewmodel.ledger.rows]
-> The crossing ledger has one row for each peer, an inactive peer included, and no other row.
+> While this machine is the viewed machine, the crossing ledger has one row for each peer, an
+> inactive peer included, and no other row (another machine's rows are `viewmodel.profiles.other.rows`).
 > Pairing a machine adds its row, and removing a pairing removes that peer's row and leaves every
 > other row as it was.
 
@@ -1518,10 +1570,10 @@ that could not take profile edits, since every machine can.
 > With no peer, the crossing ledger shows no row and no column header.
 
 > r[viewmodel.ledger.order]
-> Rows are in the order of their peers' footprints on the crossing map, or of the footprint a peer
-> with none would be given (`crossing.derive.offer.unplaced`): by the footprint's left edge, left
-> to right, then by its top edge, top to bottom, and in the peer list's order where both are
-> equal. A peer set aside keeps its row in that order, by its kept footprint: with Sea's footprint
+> While this machine is the viewed machine, rows are in the order of their peers' footprints on the
+> crossing map, or of the footprint a peer with none would be given
+> (`crossing.derive.offer.unplaced`): by the footprint's left edge, left to right, then by its top
+> edge, top to bottom, and in the peer list's order where both are equal. A peer set aside keeps its row in that order, by its kept footprint: with Sea's footprint
 > at x = -160 and Bee's at x = 160, Sea's row comes first, and stays first when Sea is kept off the
 > crossing map.
 
@@ -1558,8 +1610,9 @@ that could not take profile edits, since every machine can.
 > can be selected like any other.
 
 > r[viewmodel.ledger.columns]
-> On a Mac, the crossing ledger's columns are headed "Machine", "Edges", "Corners", "Notch" and
-> "Keys", in that order. On a PC they are headed "Machine", "Edges", "Corners" and "Keys".
+> While this machine is the viewed machine, on a Mac, the crossing ledger's columns are headed
+> "Machine", "Edges", "Corners", "Notch" and "Keys", in that order, and on a PC "Machine", "Edges",
+> "Corners" and "Keys". While another machine is viewed, they are `viewmodel.ledger.other.cells`'s.
 
 > r[viewmodel.ledger.table-name]
 > The crossing ledger is presented to assistive technology as a table, with a row for each of its
@@ -1575,12 +1628,12 @@ that could not take profile edits, since every machine can.
 > - parity: Python's PC named it "Rename" alone (one wording on both machines, the Mac's, which says which machine)
 
 > r[viewmodel.ledger.rename.field]
-> Pressing "Rename" puts a text field in the place of the row's name, holding the peer's label, or
-> its name when it has no label, and says "Return saves, Escape cancels" under it.
+> Pressing "Rename" puts a text field in the place of the row's name, holding the peer's base name
+> (`viewmodel.machines.rename.start`), and says "Return saves, Escape cancels" under it.
 
 > r[viewmodel.ledger.rename.save]
 > Return in the rename field asks `Core` to rename the peer to the text in it, as renaming does on
-> the Machines page, closes the field, and the row then shows the new name. Escape closes the field
+> the Machines list, closes the field, and the row then shows the new name. Escape closes the field
 > and asks for nothing, and the row keeps its name.
 
 > r[viewmodel.ledger.rename.scope]
@@ -1710,24 +1763,20 @@ that could not take profile edits, since every machine can.
 > The thirds of a left or right edge are named, in the order start, middle, end, "Top", "Middle"
 > and "Bottom"; those of a top or bottom edge "Left", "Middle" and "Right".
 
-> r[viewmodel.ledger.thirds.phrase]
-> A sentence names the picked thirds of an edge as "the {thirds} of the {edge} edge", where {edge}
-> is "left", "right", "top" or "bottom" and {thirds} the picked thirds' names in lower case, in the
-> order start, middle, end, joined as "top", "top and bottom" or "left, middle and right". When no
-> picked third is known, it names the middle: "the middle of the top edge". With the end and start
-> thirds of a left edge picked, it says "the top and bottom of the left edge".
-
 ### Corners
 
 > r[viewmodel.ledger.corner.buttons]
 > A row's Corners cell has four corner buttons, in the order top left, top right, bottom left,
 > bottom right. Each is on while its corner is `on` for the peer, and off otherwise; a `taken` or
-> `unavailable` corner's button is disabled.
+> `unavailable` corner's button is disabled, except an `unavailable` corner that
+> `viewmodel.ledger.corner.kept-removable` shows as `on`.
 
 > r[viewmodel.ledger.corner.kept-removable]
 > A corner in the peer's zone choices whose state is `unavailable`, as when the peer's footprint
 > has moved away from this machine's, shows as `on` and stays enabled, so that clicking it removes
-> it.
+> it: its button is on, and its accessible name, tooltip and click are those of an `on` corner
+> (`viewmodel.ledger.corner.names`, `viewmodel.ledger.corner.tooltips`,
+> `viewmodel.ledger.corner.click`).
 
 > r[viewmodel.ledger.corner.names]
 > A corner button's accessible name is "{Corner} corner, on" while `on`, "{Corner} corner, off"
@@ -1745,7 +1794,7 @@ that could not take profile edits, since every machine can.
 > Clicking an `on` corner button asks `Core` to remove that corner from the peer's corners, and a
 > `free` one to add it, keeping the peer's other corners (`crossing.derive.corner.independent`),
 > so the top-left and bottom-right corners can both be on. Clicking a `taken` or `unavailable`
-> button asks `Core` for nothing.
+> button asks `Core` for nothing, but for one `viewmodel.ledger.corner.kept-removable` shows as `on`.
 
 ### Notch
 
@@ -1786,8 +1835,9 @@ that could not take profile edits, since every machine can.
 > Beside the caption "Jump", a row's jump key control reads "Set a key" while the peer has no jump
 > key. With one, it shows its chord: on a Mac, the symbols of its modifiers in the order ⌃ ⌥ ⇧ ⌘,
 > with no space between them, then a space and the key's name, as "⌘ F18"; on a PC, the names of
-> its modifiers, "Ctrl", "Win", "Alt" and "Shift", then the key's name, each apart from the next by
-> a space, as "Alt F18". A key's name is one character in upper case, or the key's name with each
+> its modifiers in the order "Win", "Alt", "Shift", "Ctrl", "Win" for `cmd` and "Ctrl" for `ctrl`,
+> then the key's name, each apart from the next by a space, as "Alt F18" and, for Ctrl+Win+F18,
+> "Win Ctrl F18". A key's name is one character in upper case, or the key's name with each
 > word capitalised, as "F18" or "Page Down".
 
 > r[viewmodel.ledger.keys.jump-words]
@@ -1927,9 +1977,12 @@ shortcut moves input is crossing's (`crossing.shortcut.defaults` and the rules a
 
 > r[viewmodel.shortcut.key-clash]
 > When Core refuses a new shortcut key because it clashes with a jump key
-> (`crossing.shortcut.key-jump-clash`), the Shortcut section shows Core's message "That shortcut
-> clashes with the jump key <chord>; the jump key has been kept.", on a Mac in place of the hint under
-> "How you press it" and on a PC under the key, until a shortcut key is next taken.
+> (`crossing.shortcut.key-jump-clash`), the Shortcut section says "That shortcut clashes with the
+> jump key {chord}; the jump key has been kept.", on a Mac in place of the hint under "How you press
+> it" and on a PC under the key, until a shortcut key is next taken. {chord} is the chord the refusal
+> names, as the ledger shows a jump key (`viewmodel.ledger.keys.jump-shown`): "⌘ F18" on a Mac.
+>
+> - parity: Python put the chord as it was stored, as "cmd+f18" (#16 and ADR 0004: Core reports the chord as a typed value, and the viewmodel words it as the ledger does)
 
 > r[viewmodel.shortcut.order]
 > The Shortcut section shows, from top to bottom: the Shortcut switch, the shortcut key, "How you
@@ -2055,14 +2108,16 @@ Mac and "This PC" on a PC name this machine wherever a rule quotes "This Mac".
 > r[viewmodel.profiles.tabs.listed]
 > While own zones on every machine is off, the page shows one tab for each profile `Core` lists
 > (`crossing.profile.listed`), oldest made first, and between profiles made at the same stamp, the
-> lower profile id first.
+> lower profile id first. A profile was made at the oldest stamp among its entries this machine
+> holds.
 >
 > - parity: Python listed profiles in the order this machine first held them, which differs between machines (an order every machine shares, from what the store holds, #14)
 
 > r[viewmodel.profiles.tabs.label]
 > A profile's tab, its item in the Delete… menu and its item in the tray menu are labelled with its
 > name; when two or more listed profiles have the same name, each of them is labelled "{name} ·
-> {date}", the date it was made in this machine's local time as DD-MM-YYYY.
+> {date}", the date it was made (`viewmodel.profiles.tabs.listed`) in this machine's local time as
+> DD-MM-YYYY.
 
 > r[viewmodel.profiles.tabs.active]
 > The active profile's tab is marked as chosen, and no other tab is.
@@ -2119,6 +2174,8 @@ Mac and "This PC" on a PC name this machine wherever a rule quotes "This Mac".
 
 > r[viewmodel.profiles.name.limit]
 > The "Profile name" field takes at most 32 characters.
+>
+> - parity: Python's Mac field took a name of any length (#16: one viewmodel for every machine, the PC's)
 
 > r[viewmodel.profiles.name.submit]
 > "Add", "Save", or Return in the field, asks `Core` to make the profile, or to rename it, with the
@@ -2133,6 +2190,8 @@ Mac and "This PC" on a PC name this machine wherever a rule quotes "This Mac".
 > r[viewmodel.profiles.name.invalid]
 > When `Core` refuses a profile name (`crossing.profile.name`), the page note says "Give the profile a
 > name of 1 to 32 characters."
+>
+> - parity: Python's Mac said nothing when a name was refused (#16: one viewmodel for every machine, the PC's)
 
 > r[viewmodel.profiles.name.full]
 > When `Core` refuses to make a profile because 8 exist (`crossing.profile.make-limit`), the page
@@ -2143,10 +2202,14 @@ Mac and "This PC" on a PC name this machine wherever a rule quotes "This Mac".
 > r[viewmodel.profiles.refused]
 > When `Core` refuses any other profile change from the page, the page note says "These ways could
 > not be changed."
+>
+> - parity: Python's Mac said nothing for most refused changes, and showed the error's own text, as a fault, for the others (#16: one viewmodel for every machine, the PC's, and ADR 0004: Core reports a typed refusal, never text)
 
 > r[viewmodel.profiles.not-saved]
 > When `Core` reports that a profile change could not be saved, the page note says "These ways could
 > not be saved. Try again."
+>
+> - parity: Python's Mac showed the system's error text, as a fault (#16: one viewmodel for every machine, the PC's, and ADR 0004: Core reports a typed failure, never the system's text)
 
 > r[viewmodel.profiles.note-cleared]
 > The page note left by a refused profile change is gone once `Core` takes the next profile change
@@ -2212,8 +2275,9 @@ Mac and "This PC" on a PC name this machine wherever a rule quotes "This Mac".
 
 > r[viewmodel.profiles.keys.order]
 > While own zones on every machine is off, Tab and Shift-Tab move keyboard focus over every footprint,
-> this machine's included, in reading order: rows of footprints top to bottom, and left to right
-> within a row. Moving focus views no machine.
+> this machine's included, in the reading order `crossing.shortcut.cycle-rows` gives the centres of
+> the footprints shown, this machine's counted before any peer whose centre is at the same left-right
+> position in its row. Moving focus views no machine.
 
 > r[viewmodel.profiles.keys.leave]
 > Tab on the last footprint in reading order, or Shift-Tab on the first, moves keyboard focus off the
@@ -2227,8 +2291,8 @@ Mac and "This PC" on a PC name this machine wherever a rule quotes "This Mac".
 ### Viewing another machine
 
 > r[viewmodel.profiles.other.ledger-heading]
-> While own zones on every machine is off, the ledger's heading is "{name}'s ways", named for the
-> viewed machine.
+> While own zones on every machine is off, the ledger's heading is "{name}'s ways", {name} being the
+> viewed machine's name, and "This Mac" while this machine is viewed: "This Mac's ways".
 
 > r[viewmodel.profiles.other.header]
 > While another machine is viewed, the ledger shows "Editing {name}'s ways ·" followed on the same line
@@ -2251,7 +2315,9 @@ Mac and "This PC" on a PC name this machine wherever a rule quotes "This Mac".
 > r[viewmodel.profiles.other.rows]
 > While another machine is viewed, the ledger has one row for each machine on the viewed machine's
 > map but itself, this machine's row named "This Mac", each showing the viewed machine's zone
-> choices toward that machine (`crossing.profile.view.other-zones`).
+> choices toward that machine (`crossing.profile.view.other-zones`). The rows are in the order
+> `viewmodel.ledger.order` gives, this machine's row by this machine's footprint and before any
+> peer's row whose footprint has the same left and top edges.
 >
 > - parity: Python's PC named this machine's row with this machine's own name (the Mac's words are kept for both)
 
@@ -2311,6 +2377,8 @@ Mac and "This PC" on a PC name this machine wherever a rule quotes "This Mac".
 > r[viewmodel.profiles.status.shown]
 > While own zones on every machine is off, the ledger shows a status line for the viewed machine, this
 > machine included; while it is on, none.
+>
+> - parity: Python's PC showed it only while another machine was viewed (#16: one viewmodel for every machine, the Mac's)
 
 > r[viewmodel.profiles.status.offline]
 > The status line of a viewed peer with no link says "Offline. It takes these when it next connects".
@@ -2369,6 +2437,9 @@ Mac and "This PC" on a PC name this machine wherever a rule quotes "This Mac".
 
 ### Saved zones
 
+Turning own zones on every machine off saves no zone choices (`crossing.own-zones.every-machine-off`),
+so no saved zones give Python's reason for it, "When Same ways went on".
+
 > r[viewmodel.profiles.saved.toggle]
 > While own zones on every machine is off, this machine is viewed and it has saved zones, the page
 > shows the toggle "Earlier ways ▾", closed, which opens the list of saved zones and then reads
@@ -2409,13 +2480,6 @@ Mac and "This PC" on a PC name this machine wherever a rule quotes "This Mac".
 >
 > - parity: Python said "When Same ways went off" (#154 makes the setting own zones on every machine, the inverse)
 
-> r[viewmodel.profiles.saved.reason-every-off]
-> Zone choices saved because own zones on every machine turned off
-> (`crossing.own-zones.every-machine-off`) give the reason "When Own zones on every machine went
-> off".
->
-> - parity: Python said "When Same ways went on" (#154 makes the setting own zones on every machine, the inverse)
-
 ### Way home
 
 > r[viewmodel.profiles.home.shake]
@@ -2446,8 +2510,8 @@ Mac and "This PC" on a PC name this machine wherever a rule quotes "This Mac".
 > r[viewmodel.profiles.home.no-way-back]
 > The "Way home" section shows one line "{name} has no way back to {machine} except the shortcut and a
 > shake." for each machine the viewed machine's zones lead to that has no zone leading back to it
-> (`crossing.profile.no-zone-home`), {machine} being the viewed machine's name, and shows nothing
-> there when there is none.
+> (`crossing.profile.no-zone-home`), {machine} being the viewed machine's name, or "This Mac" while
+> this machine is viewed. It shows nothing there when there is none.
 
 ### Profiles in the tray menu
 
@@ -2642,7 +2706,7 @@ its entries, and pointer and scroll speed. What each setting does to input is `s
 > r[viewmodel.input.stays-here-refused]
 > When Core reports that a stays-here list could not be saved (`input.stays-here.refused`), as one of
 > 65 entries is, the page shows the list as last saved and, on a PC, says "That could not be saved, so
-> the list is unchanged." in the amber tone.
+> the list is unchanged." in the waiting tone.
 
 > r[viewmodel.input.record-mac-key]
 > On a Mac, a recorded key press is a key entry for its Mac key code: Right Option records key 0x3D.
@@ -2764,17 +2828,17 @@ A PC's admin mode switch, showing what `platform.admin.*` reports. A Mac has no 
 > Windows permission prompts locally."
 
 > r[viewmodel.input.admin-note]
-> On a PC, under the switch, a note says why admin mode cannot be changed, and the switch cannot be
-> changed while it does:
+> On a PC, under the switch, a note says why admin mode cannot be changed, the first of these that
+> holds, and the switch cannot be changed while it does:
 >
 > | Admin mode reports | Words |
 > |---|---|
+> | its state could not be read | "Beamer could not read this PC's administrator setting. Restart Beamer to try again." |
 > | unsupported, not the installed Beamer (`platform.admin.installed`) | "Install Beamer to control administrator windows." |
 > | unsupported, not the signed-in account (`platform.login.pc-account`, `platform.login.pc-no-account`) | "This setting needs Beamer to run as the signed-in account." |
 > | unsupported, a standard account (`platform.admin.administrator`) | "This setting needs a Windows administrator account." |
 > | unsupported, User Account Control off (`platform.admin.uac`) | "Enable Windows User Account Control to use this setting." |
 > | unsupported, rights not checked (`platform.admin.unchecked`) | "Windows could not check this account's administrator permission." |
-> | its state could not be read | "Beamer could not read this PC's administrator setting. Restart Beamer to try again." |
 >
 > Otherwise the note says "Beamer will run as administrator on this PC. Changing this restarts
 > Beamer; Windows may ask for permission."
@@ -2833,8 +2897,8 @@ them and relaunching are `platform.permissions.*`.
 > this keyboard and trackpad, to send them to another machine."
 
 > r[viewmodel.permissions.state]
-> Each row says "Granted" in the signal tone while its permission is granted and "Required" in the
-> amber tone while it is not, as `platform.permissions.mac-input` reports it.
+> Each row says "Granted" in the live tone while its permission is granted and "Required" in the
+> waiting tone while it is not, as `platform.permissions.mac-input` reports it.
 
 > r[viewmodel.permissions.grant]
 > While a row's permission is not granted, the row shows a "Grant" button; pressing it asks Core to
@@ -2848,7 +2912,7 @@ them and relaunching are `platform.permissions.*`.
 > r[viewmodel.permissions.capture-relaunch]
 > While both permissions are granted but were not both granted when this run of Beamer started
 > (`platform.permissions.relaunch-needed`), the page says "Both granted. Relaunch Beamer so macOS
-> passes it the keyboard." in the amber tone and shows the button "Relaunch Beamer". In every other
+> passes it the keyboard." in the waiting tone and shows the button "Relaunch Beamer". In every other
 > state it shows no such button.
 
 > r[viewmodel.permissions.relaunch]
@@ -2856,7 +2920,7 @@ them and relaunching are `platform.permissions.*`.
 > (`platform.permissions.relaunch`).
 
 > r[viewmodel.permissions.capture-ready]
-> While input capture runs, the page says "Input capture ready." in the signal tone.
+> While input capture runs, the page says "Input capture ready." in the live tone.
 
 > r[viewmodel.permissions.capture-retrying]
 > While both permissions are granted, no relaunch is needed and input capture is not running, the
@@ -2887,8 +2951,8 @@ The Connection page (F39) and Hide addresses. The firewall check and its repair 
 
 > r[viewmodel.connection.address]
 > The Connection page shows "This Mac's address" on a Mac and "This PC's address" on a PC, with the
-> address Core gives to pair with this machine by address (`discovery.own-address.offered`), or "Not
-> known yet" when it gives none.
+> address to pair with this machine by address, chosen as `discovery.own-address.offered` chooses it,
+> or "Not known yet" when that gives none. The page shows it whether or not a code is shown.
 >
 > - parity: Python's Mac showed the first paired machine's address instead, and the PC showed the address it faced its peers on (#14: a peer's addresses are kept for each peer; the address shown is the one another machine types to pair)
 
@@ -2935,8 +2999,11 @@ The Connection page (F39) and Hide addresses. The firewall check and its repair 
 
 > r[viewmodel.connection.firewall-blocked]
 > On a PC whose firewall reports a block rule (`platform.firewall.blocked`), the module says "Windows
-> Firewall has a block rule affecting Beamer's input or pairing traffic; ask your administrator to
-> review Beamer's inbound block rules in Windows Firewall."
+> Firewall has a block rule affecting Beamer. Repair removes it; Windows asks for administrator
+> permission." and offers the button "Repair", which asks Core to repair the firewall
+> (`platform.firewall.repair`).
+>
+> - parity: Python said "Windows Firewall has a block rule affecting Beamer's input or pairing traffic; ask your administrator to review Beamer's inbound block rules in Windows Firewall." and offered only Check again (#21: the app's Repair runs the elevated setup, which deletes Beamer's block rules, `platform.firewall.blocked`; #14: one UDP port carries input and pairing)
 
 > r[viewmodel.connection.firewall-missing]
 > On a PC whose firewall reports Beamer's rule missing (`platform.firewall.missing`), on any profile,
@@ -2959,11 +3026,10 @@ The Connection page (F39) and Hide addresses. The firewall check and its repair 
 > r[viewmodel.connection.firewall-permission]
 > On a PC whose firewall check was refused for lack of permission (`platform.firewall.check-permission`)
 > while Beamer runs without administrator rights, the module says "Beamer cannot check Windows
-> Firewall without administrator permission. Repair asks for it." in the fault tone and offers
-> "Repair". While Beamer runs with administrator rights, the same refusal is said in the words of
-> `viewmodel.connection.firewall-failed`, never asking for a permission Beamer has.
->
-> - parity: Python said "Beamer cannot check Windows Firewall without administrator permission; run the Beamer installer again to repair its rules." and offered only Check again (#21: the app's Repair runs the elevated setup)
+> Firewall without administrator permission; run the Beamer installer again to repair its rules."
+> in the fault tone and offers no "Repair", only "Check again". While Beamer runs with administrator
+> rights, the same refusal is said in the words of `viewmodel.connection.firewall-failed`, never
+> asking for a permission Beamer has.
 
 ## Start at login
 
@@ -3002,16 +3068,25 @@ The Overview page's Start at login module, showing the state `platform.login.*` 
 >
 > | State | Words |
 > |---|---|
+> | not run from its installed path | "Only the installed app can start at sign-in." |
 > | Windows names no signed-in account (`platform.login.pc-no-account`) | "Windows could not identify the signed-in account, so start at sign-in is unavailable." |
 > | Beamer runs as another account (`platform.login.pc-account`) | "Start at sign-in needs Beamer to run as the signed-in account." |
 > | on, admin mode on | "Starts in the tray when you sign in, as administrator." |
 > | on, admin mode off | "Starts in the tray when you sign in, without an administrator prompt." |
 > | off, admin mode on | "When enabled, Beamer starts in the tray as administrator." |
 > | off, admin mode off | "When enabled, Beamer starts in the tray with your normal permissions." |
-> | not run from its installed path | "Only the installed app can start at sign-in." |
 
 > r[viewmodel.settings.login-pc-changed]
 > On a PC, once a change to Start at login succeeds, the module says "In the tray, with no window."
+
+> r[viewmodel.settings.login-refused]
+> When the OS refuses a change to Start at login, so that Start at login reports refused
+> (`platform.capability.error-is-state`), the switch shows Start at login as it then is, and in
+> place of the status (`viewmodel.settings.login-mac-status`, `viewmodel.settings.login-pc-hint`)
+> the module says "macOS refused to change Start at login." on a Mac and "Windows refused to change
+> Start at login." on a PC, until Start at login next reports another state.
+>
+> - parity: Python said "macOS refused: {reason}" and "Windows refused: {error}", with the OS's own words (#16: the platform crates report typed values, and the OS's words reach only the log, `platform.capability.error-is-state`)
 
 ## Design page
 
@@ -3021,12 +3096,14 @@ and beam (F31) come later (#11), so the page offers the Light styles only.
 
 > r[viewmodel.design.modules]
 > The Design page shows, in this order: "On screen", "Style", "Colour", on a Mac "Trackpad", then
-> "Appearance" and "Match design with".
+> "Appearance" and "Match design with", "Style" and "Colour" only while animating crossings is on
+> (`viewmodel.design.animate`).
 
 > r[viewmodel.design.animate]
 > "On screen" offers the switch "Animate crossings on this Mac" on a Mac and "Animate crossings on this
 > PC" on a PC, with the note "Turns crossing and landing animations on or off on this screen. Saved
-> style choices stay in place." Turning it off keeps the chosen style and colour.
+> style choices stay in place." Turning it off keeps the chosen style and colour. While it is off, the
+> page shows neither "Show where the pointer lands" nor the "Style" and "Colour" modules.
 
 > r[viewmodel.design.landing]
 > "On screen" also offers the switch "Show where the pointer lands", with the note "For shortcut, menu
@@ -3044,15 +3121,19 @@ and beam (F31) come later (#11), so the page offers the Light styles only.
 > "Style" says "Hover to preview" above its tiles.
 
 > r[viewmodel.design.style-for]
-> "Style" offers "Style for": "Crossing" or "Shortcut and menu", Crossing when the page opens. Each
-> choice shows only its own tiles: the crossing styles for Crossing, the switch styles for Shortcut
-> and menu, every time it is chosen.
+> While "Show where the pointer lands" is on, "Style" offers "Style for": "Crossing" or "Shortcut and
+> menu", Crossing when the page opens. Each choice shows only its own tiles: the crossing styles for
+> Crossing, the switch styles for Shortcut and menu, every time it is chosen. While it is off,
+> "Style" offers no "Style for" and shows the crossing styles, and "Style for" reads Crossing when it
+> is next offered.
+>
+> - parity: Python's Mac kept the choice made while "Style for" was hidden and showed it again (#16: one viewmodel for every machine, the PC's)
 
 > r[viewmodel.design.switch-styles]
 > Under Shortcut and menu, "Style" offers one group, headed "Simple": "Same as crossing", with the
-> detail "Plays Glow", and "Ring", with the detail "Closes onto the pointer", and says "What plays
-> around the pointer for shortcut, menu and jump arrivals. Same as crossing uses this screen's
-> crossing style."
+> detail "Plays {name}", {name} being the crossing style chosen, "Glow" or "Beam", and "Ring", with
+> the detail "Closes onto the pointer", and says "What plays around the pointer for shortcut, menu
+> and jump arrivals. Same as crossing uses this screen's crossing style."
 >
 > - parity: Python also offered Aperture and the crossing effects' groups as switch styles (#11: the crossing effects, F30, are Later)
 
@@ -3061,8 +3142,9 @@ and beam (F31) come later (#11), so the page offers the Light styles only.
 > chosen. Setting the chosen style from a snapshot shows it chosen without asking Core for a change.
 
 > r[viewmodel.design.show-at]
-> "Style" offers "Show at": "Edge" and "Corner", and on a Mac "Notch" too. Every tile shows its style
-> at the place chosen.
+> While "Style" shows the crossing styles, it offers "Show at": "Edge" and "Corner", and on a Mac
+> "Notch" too. Every tile shows its style at the place chosen. Under Shortcut and menu it offers no
+> "Show at".
 
 > r[viewmodel.design.preview-place]
 > When the Design page opens, and whenever this machine's zone choices change, "Show at" chooses the
@@ -3086,10 +3168,30 @@ and beam (F31) come later (#11), so the page offers the Light styles only.
 > r[viewmodel.design.colours]
 > "Colour" offers two groups of five colours: "Light", with "Signal", "Colourful", "Ocean", "Sunset"
 > and "Aurora", and "Mono", with "White", "Silver", "Graphite", "Ink" and "Warm grey". One colour is
-> chosen across both groups. The module says "Any colour works with any style." on a Mac and "For the
-> crossing and the shortcut alike" on a PC.
+> chosen across both groups. The module says "Any colour works with any style." on a Mac and, while
+> "Show where the pointer lands" is on, "For the crossing and the shortcut alike" on a PC.
 >
 > - parity: Python also offered the Membrane, Sparks, Instrument, Folio, Selvedge and Bright colour packs, and the Mac's note added "The notch's Outline uses it too; Island keeps Beamer's own cyan." (#11: the colour packs, F30, and the notch island and beam, F31, are Later)
+
+> r[viewmodel.design.length]
+> "Style" offers "Length", a ruler from 0.25 to 2.5 times each style's own play time, in steps of
+> 0.05, with the note "Sets the effect's playback time." Beside the ruler, and as its accessible
+> value, it shows how long the style its tiles show plays at that length (`spec/ui.md`), as
+> "{seconds} s" to one decimal place. While the ruler is dragged, a value within 0.045 of 0.5, 1 or
+> 2 is set to that value. Setting it asks Core to save it. It cannot be changed while the style
+> cannot (`viewmodel.design.follow-lock`).
+>
+> - parity: Python's PC gave the ruler the description "Sets the effect's playback time. Current value: {value}." in place of an accessible value (#16: one viewmodel for every machine, the Mac's)
+
+> r[viewmodel.design.size]
+> "Style" offers "Size", a ruler from 2 % to 25 % of a display's shorter edge, in steps of 0.1 %,
+> with the note "Sets effect depth relative to the shorter screen edge." Beside the ruler, and as
+> its accessible value, it shows the depth the styles are drawn at with that size on this machine's
+> main display (`spec/ui.md`), as "{depth} pt" rounded to a whole number. While the ruler is
+> dragged, a value within 0.46 % of 3 %, 4.5 % or 6 % is set to that value. Setting it asks Core to
+> save it. It cannot be changed while the style cannot (`viewmodel.design.follow-lock`).
+>
+> - parity: Python's PC said "Sets depth relative to the shorter screen edge." under it, and gave the ruler the description "Sets effect depth relative to the shorter screen edge. Current value: {value}." in place of an accessible value (#16: one viewmodel for every machine, the Mac's)
 
 > r[viewmodel.design.frame-rate]
 > "Style" offers "Frame rate": "Match display", "Half" or "Quarter", in this order, the saved one
@@ -3140,19 +3242,20 @@ is the settings domain's (#60).
 
 > r[viewmodel.design.follow-lock]
 > While this machine follows a peer's design and the Design group of Same on all machines is off, the
-> style, the switch style, the colour, the frame rate and "Show where the pointer lands" cannot be
-> changed, and "Style" shows the banner "Following {name}'s design" with the button "Stop following",
-> which asks Core to stop following. Otherwise those can be changed and no banner shows.
+> style, the switch style, the colour, "Length", "Size", the frame rate and "Show where the pointer
+> lands" cannot be changed, and "Style" shows the banner "Following {name}'s design" with the
+> button "Stop following", which asks Core to stop following. Otherwise those can be changed and no
+> banner shows.
 
 > r[viewmodel.design.follow-follows]
 > "Match design with" follows the snapshot: a peer whose link comes up is added, one whose link goes
 > down is taken off unless it is followed, a peer's design arriving makes it choosable, and a peer
 > renamed shows its new name.
 
-## Audio page
+## Audio
 
-The Audio page (F43) shows every machine's microphones and outputs, the shared microphone, and
-where each machine's sound plays. It is drawn from `Core`'s audio state: the audio routes, each
+The Audio & Camera page (F43) shows every machine's microphones and outputs, the shared
+microphone, and where each machine's sound plays. It is drawn from `Core`'s audio state: the audio routes, each
 machine's devices, and the status of each audio route. Until `spec/audio.md` (#62) names those
 states, the rules below describe them in glossary words. The Camera section and the camera's marks
 on the audio map are `viewmodel.camera`'s; the page's place in the page list is
@@ -3161,23 +3264,23 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 ### Sections and words
 
 > r[viewmodel.audio.sections]
-> The Audio page shows, from top to bottom: the "Microphone" section, the Audio page's notices, the
+> The Audio & Camera page shows, from top to bottom: the "Microphone" section, the Audio & Camera page's notices, the
 > Camera section, the "Machines" section with the audio map, and the selected machine's section,
 > headed by that machine's name.
 
 > r[viewmodel.audio.unavailable]
-> While `Core` reports that audio is not running on this machine yet, the Audio page shows only an
+> While `Core` reports that audio is not running on this machine yet, the Audio & Camera page shows only an
 > "Audio" section saying "Audio is not running in this Beamer yet. Microphones and speakers show
 > here once it is.", and shows the other sections as soon as audio runs.
 >
 > - parity: the Mac's page showed every section with this machine marked "No audio" instead; only the PC's page showed this sentence (#16: one viewmodel for both machines, taking the PC's words)
 
 > r[viewmodel.audio.names.own]
-> The Audio page names this machine "This Mac" on a Mac and "This PC" on a PC, wherever it names a
+> The Audio & Camera page names this machine "This Mac" on a Mac and "This PC" on a PC, wherever it names a
 > machine.
 
 > r[viewmodel.audio.names.peer]
-> The Audio page names every other machine by its label (`viewmodel.machines.label.name`,
+> The Audio & Camera page names every other machine by its label (`viewmodel.machines.label.name`,
 > `viewmodel.machines.label.shared`, `viewmodel.machines.label.no-name`,
 > `viewmodel.machines.label.unknown`): a machine it has no name for is "Machine · " followed by its
 > id tail, the last four characters of its machine id in unpadded URL-safe base64.
@@ -3185,11 +3288,11 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 > - parity: Python's Audio page used the last six characters of the machine id (one naming on every page, `viewmodel.machines.label.no-name`)
 
 > r[viewmodel.audio.names.list]
-> Where the Audio page names several machines in one phrase, it joins their names as
+> Where the Audio & Camera page names several machines in one phrase, it joins their names as
 > `viewmodel.words.joined` says: one name alone, two as "A and B", and three or more as "A, B and C".
 
 > r[viewmodel.audio.tone]
-> Each status line and notice of the Audio page carries a tone: quiet, plain, live, waiting or
+> Each status line and notice of the Audio & Camera page carries a tone: quiet, plain, live, waiting or
 > fault.
 
 ### The shared microphone
@@ -3225,8 +3328,9 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 
 > r[viewmodel.audio.mic.found-by-name]
 > When no microphone of the shared microphone's machine has the audio route's device key, the
-> selector marks the microphone of that machine with the audio route's device name, and it can be
-> chosen.
+> selector marks the one microphone of that machine with the audio route's device name, and it can
+> be chosen. When none has that name, or two or more do, the shared microphone counts as one its
+> machine no longer lists (`viewmodel.audio.mic.unplugged`).
 
 > r[viewmodel.audio.mic.unplugged]
 > While the shared microphone is a named microphone its machine no longer lists, the selector shows
@@ -3242,7 +3346,7 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 > Mac · Default (MacBook Air Microphone)", and "Off" as "Off".
 
 > r[viewmodel.audio.mic.stable-entries]
-> Each entry of the Audio page's selectors keeps one identity, made from its machine and device,
+> Each entry of the Audio & Camera page's selectors keeps one identity, made from its machine and device,
 > across every new state `Core` reports, so the marked entry remains marked while the audio route is
 > unchanged. No two entries of one selector share an identity.
 
@@ -3280,7 +3384,8 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 
 > r[viewmodel.audio.mic.line-ready]
 > While the shared microphone is ready, or streams to no machine, the Microphone section says
-> "<microphone> on <machine> is ready. It turns on when an app starts recording." in the plain tone.
+> "<microphone> on <machine> is ready. It turns on when an app starts recording.", in the plain
+> tone while it is ready and in the live tone while it streams.
 
 > r[viewmodel.audio.mic.line-unplugged]
 > While the shared microphone waits for its device, the Microphone section says "<microphone> is
@@ -3307,18 +3412,20 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 > start." when `Core` gives a reason the page has no words for.
 
 > r[viewmodel.audio.reasons]
-> The Audio page words the reasons an audio route could not start as: the device is gone "the
+> The Audio & Camera page words the reasons an audio route could not start as: the device is gone "the
 > device is gone"; a device Beamer leaves alone "Beamer does not use that device"; no virtual
 > microphone "no virtual microphone there"; the device taken by another app "another app holds the
 > device"; permission refused "the system does not allow it"; not supported "that machine cannot do
-> it"; the port taken "the network port is taken"; audio stopped on the machine "the audio helper
-> stopped"; the output muted "its output is muted there"; the machine's sound cannot be recorded
-> "that machine cannot capture its sound".
+> it"; the port taken "the network port is taken"; the output muted "its output is muted there";
+> the machine's sound cannot be recorded "that machine cannot capture its sound".
+>
+> - parity: Python also said "the audio helper stopped" when a machine's separate audio process had stopped (ADR 0004: Beamer is one process, with no audio helper)
 
 > r[viewmodel.audio.mic.device-name]
 > In the Microphone section's line and on the audio map, the shared microphone is named by the
-> device it resolves to on its machine, else by the audio route's device name, else as "its default
-> microphone".
+> device it resolves to on its machine (the machine's default microphone, or a named microphone
+> found as `viewmodel.audio.mic.found-by-name` says), else by the audio route's device name, else
+> as "its default microphone".
 
 ### The audio map
 
@@ -3420,9 +3527,12 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 
 > r[viewmodel.audio.map.spoken]
 > The audio map is named "Machines and where their sound goes" for a screen reader, and its spoken
-> value is every machine's sentence in reading order, then every arrow's sentence.
+> value is every machine's sentence in reading order, then every arrow's sentence: the microphone
+> arrows in the order of their listeners (`viewmodel.audio.mic.listeners`), then the sound arrows in
+> the reading order of their sending machines, then the camera arrows by the machine id of the
+> machine seeing the camera.
 >
-> - parity: the PC's map was named "Machines" (#16: one viewmodel for both machines, taking the Mac's name)
+> - parity: the PC's map was named "Machines", and both spoke the sound arrows in an order that could change from one run to the next (#16: one viewmodel for both machines, taking the Mac's name; a fixed order, which a test can decide)
 
 > r[viewmodel.audio.map.mic-arrows]
 > The audio map draws a microphone arrow from the shared microphone's machine to each other machine
@@ -3463,13 +3573,21 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 > r[viewmodel.audio.output.selected]
 > The output selector marks "Here" while the selected machine's sound plays on it, the other
 > machine's default entry while its sound is sent to that machine's default output, and the
-> output's own entry while it is sent to a named output, found by device key and else by name.
+> output's own entry while it is sent to a named output, found among that machine's outputs by
+> device key, else as the one output with the audio route's device name. When none has that name,
+> or two or more do, the output counts as one its machine no longer lists
+> (`viewmodel.audio.output.unplugged`).
 
 > r[viewmodel.audio.output.unplugged]
-> While the selected machine's sound is sent to a named output its machine no longer lists, the
-> output selector shows it under that machine's heading as "<name> (not connected)", disabled and
-> still marked. When that machine has no heading in the selector, the selector ends with its heading
-> and that one disabled, marked entry ("<name> (not connected)", or "Default output").
+> While the selected machine's sound is sent to a named output its machine no longer lists, and
+> that machine has a heading in the output selector, the selector shows the output under that
+> heading as "<name> (not connected)", disabled and still marked.
+
+> r[viewmodel.audio.output.unknown-machine]
+> While the selected machine's sound is sent to a machine that has no heading in the output
+> selector, whether to a named output or to its default output, the selector ends with that
+> machine's heading and one disabled, marked entry: "<name> (not connected)" for a named output, or
+> "Default output".
 
 > r[viewmodel.audio.output.can-open]
 > The output selector can be opened while the selected machine's sound is sent elsewhere, so "Here"
@@ -3495,7 +3613,7 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 > r[viewmodel.audio.output.line-cannot-send]
 > While the selected machine is in the cluster with its devices known but cannot send its sound to
 > another machine, and the page has no other sound line for it, its section says "<machine> cannot
-> send its sound to another machine."
+> send its sound to another machine." in the plain tone.
 
 > r[viewmodel.audio.output.line-streaming]
 > While the selected machine's sound streams to another machine, its section says "Playing on
@@ -3527,9 +3645,10 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 > tone, or without the reason in brackets when the page has no words for it.
 
 > r[viewmodel.audio.output.device-name]
-> In the selected machine's sound line and the Audio page's notices, the output a machine's sound
-> is sent to is named by the device it resolves to on that machine, else by the audio route's
-> device name, else as "its default output".
+> In the selected machine's sound line and the Audio & Camera page's notices, the output a machine's sound
+> is sent to is named by the device it resolves to on that machine (its default output, or a named
+> output found as `viewmodel.audio.output.selected` says), else by the audio route's device name,
+> else as "its default output".
 
 ### The selected machine's devices
 
@@ -3594,9 +3713,9 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 
 > r[viewmodel.audio.low-latency.note]
 > Under the low-latency toggle the section says "About 35 ms instead of 70 ms, but no other app can
-> play into CABLE Input meanwhile.", followed by " This version of the audio helper cannot do it."
-> while the toggle is on, this machine's audio runs, and its audio reports it cannot render the
-> virtual microphone exclusively.
+> play into CABLE Input meanwhile."
+>
+> - parity: Python added " This version of the audio helper cannot do it." while the toggle was on and its separate audio process, started without that ability, could not do it (ADR 0004: Beamer is one process, with no audio helper of another version)
 
 > r[viewmodel.audio.low-latency.state]
 > The low-latency toggle is on while this machine's low-latency virtual microphone setting is on,
@@ -3616,28 +3735,25 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 > A level meter for which `Core` reports no level shows no reading.
 
 > r[viewmodel.audio.level.watch]
-> While the Audio page is visible, the viewmodel asks `Core` to report audio levels, and once it is
+> While the Audio & Camera page is visible, the viewmodel asks `Core` to report audio levels, and once it is
 > hidden, or another page is shown, it asks `Core` to stop; it asks once per change.
 
 > r[viewmodel.audio.menu-open]
-> While a selector of the Audio page is open, the page keeps showing what it showed when the
-> selector opened, and shows `Core`'s newest audio state as soon as the selector closes.
+> While a selector of the Audio & Camera page is open, the Camera module's "Camera your apps see" list among
+> them, the whole page, its Camera module included, keeps showing what it showed when the selector
+> opened, and shows `Core`'s newest audio and camera state as soon as the selector closes.
 
 ### Notices
 
 > r[viewmodel.audio.notice.order]
-> The Audio page's notices come in this order: audio stopped, the virtual microphone's install,
-> VB-CABLE missing, microphone permission, system sound permission, muted outputs, feedback, the
-> shared microphone's echo, echo on listening machines, choosing the virtual microphone, and
-> machines without audio.
-
-> r[viewmodel.audio.notice.audio-stopped]
-> While this machine's audio has stopped and did not start again, the Audio page says "Beamer's
-> audio helper stopped and did not start again." in the fault tone, with a "Retry" button that asks
-> `Core` to start this machine's audio again.
+> The Audio & Camera page's notices come in this order: the virtual microphone's install, VB-CABLE missing,
+> microphone permission, system sound permission, muted outputs, feedback, the shared microphone's
+> echo, echo on listening machines, choosing the virtual microphone, and machines without audio.
+>
+> - parity: Python's notices began with "Beamer's audio helper stopped and did not start again." in the fault tone, with a "Retry" that restarted its separate audio process (ADR 0004: Beamer is one process, with no audio helper to stop)
 
 > r[viewmodel.audio.notice.vmic-missing]
-> On a Mac whose virtual microphone is not installed, the Audio page says "Beamer Microphone is not
+> On a Mac whose virtual microphone is not installed, the Audio & Camera page says "Beamer Microphone is not
 > installed, so apps on this Mac cannot hear another machine's microphone." in the waiting tone,
 > followed by " Every app on this Mac goes quiet for about a second while it installs." and an
 > "Install Beamer Microphone" button while no audio stream runs or starts.
@@ -3645,14 +3761,15 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 > r[viewmodel.audio.notice.vmic-busy]
 > While an audio stream runs or starts, the virtual microphone's install or update notice says
 > instead " Beamer is sending or playing sound now; it can be installed once that stops." and has
-> no button.
+> no button, unless this Beamer does not carry the virtual microphone
+> (`viewmodel.audio.notice.vmic-not-carried`).
 
 > r[viewmodel.audio.notice.vmic-not-carried]
 > When this Beamer does not carry the virtual microphone, its install notice ends with " This build
 > of Beamer does not carry it." and has no button.
 
 > r[viewmodel.audio.notice.vmic-outdated]
-> On a Mac whose virtual microphone is older than the one this Beamer carries, the Audio page says
+> On a Mac whose virtual microphone is older than the one this Beamer carries, the Audio & Camera page says
 > "This Beamer carries a newer Beamer Microphone." in the plain tone, followed by the same sentence
 > and button as the install notice, the button reading "Update Beamer Microphone".
 
@@ -3670,12 +3787,12 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 > nothing if it was installed or the user cancelled.
 
 > r[viewmodel.audio.notice.vbcable-missing]
-> On a PC without VB-CABLE, the Audio page says "To use another machine's mic here, install
+> On a PC without VB-CABLE, the Audio & Camera page says "To use another machine's mic here, install
 > VB-CABLE (vb-audio.com), then choose 'CABLE Output' as the microphone in your apps." in the
 > waiting tone.
 
 > r[viewmodel.audio.notice.mic-permission]
-> While the OS refuses Beamer this machine's microphones, the Audio page says, in the fault tone, on
+> While the OS refuses Beamer this machine's microphones, the Audio & Camera page says, in the fault tone, on
 > a Mac "Beamer may not use this Mac's microphones. Allow it in System Settings, Privacy & Security,
 > Microphone." and on a PC "Beamer may not use this PC's microphones. Allow it in Settings, Privacy
 > & security, Microphone.", with an "Open privacy settings" button.
@@ -3691,19 +3808,19 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 
 > r[viewmodel.audio.notice.system-permission]
 > While the OS refuses Beamer the recording of this Mac's sound, or that recording delivers only
-> silence, the Audio page says "Beamer may not record this Mac's sound, so it cannot play on another
+> silence, the Audio & Camera page says "Beamer may not record this Mac's sound, so it cannot play on another
 > machine. Allow it in System Settings, Privacy & Security, Screen & System Audio Recording." in the
 > fault tone, with an "Open privacy settings" button that opens
 > `x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture`.
 
 > r[viewmodel.audio.notice.muted-output]
 > For each machine whose sound is sent to an output that is muted because its machine sends its own
-> sound elsewhere, in machine id order, the Audio page says "<machine>'s sound cannot play on
+> sound elsewhere, in machine id order, the Audio & Camera page says "<machine>'s sound cannot play on
 > <output> on <machine>: <machine> sends its own sound elsewhere, which mutes that output." in the
 > fault tone.
 
 > r[viewmodel.audio.notice.feedback]
-> For each sound stream in which `Core` reports feedback, once per pair of machines, the Audio page
+> For each sound stream in which `Core` reports feedback, once per pair of machines, the Audio & Camera page
 > says, in the waiting tone and without a button, "Beamer heard what sounds like feedback in
 > <machine>'s sound playing on <machine>, and turned it down." followed by one of the advice
 > sentences of `viewmodel.audio.notice.feedback-advice`.
@@ -3726,12 +3843,12 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 
 > r[viewmodel.audio.notice.echo-cancelled]
 > While the shared microphone streams to another machine and its machine has speakers, and Beamer
-> cancels echo there, the Audio page says "Beamer cancels the echo of <machine>'s speakers. A
+> cancels echo there, the Audio & Camera page says "Beamer cancels the echo of <machine>'s speakers. A
 > headset on <machine> sounds better." in the plain tone.
 
 > r[viewmodel.audio.notice.echo-not-cancelled]
 > While the shared microphone streams to another machine and its machine has speakers, and Beamer
-> does not cancel echo there, the Audio page says "<machine>'s microphone can hear its speakers, and
+> does not cancel echo there, the Audio & Camera page says "<machine>'s microphone can hear its speakers, and
 > Beamer does not cancel that echo there. Use a headset on <machine>." in the waiting tone.
 
 > r[viewmodel.audio.notice.echo-cancelling]
@@ -3741,11 +3858,11 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 > no other machine's sound streams to that output.
 
 > r[viewmodel.audio.notice.echo-listener]
-> For each machine that hears the streaming shared microphone and plays its own sound on a default
-> output that is not headphones or a headset, the Audio page says, in the waiting tone, "If
-> <listener>'s speakers can be heard by <microphone>, people in a call on <listener> hear
-> themselves. Use a headset on <listener>." while Beamer does not cancel echo on the microphone's
-> machine.
+> For each machine other than the shared microphone's own machine that hears the streaming shared
+> microphone and plays its own sound on a default output that is not headphones or a headset, the
+> Audio & Camera page says, in the waiting tone, "If <listener>'s speakers can be heard by <microphone>,
+> people in a call on <listener> hear themselves. Use a headset on <listener>." while Beamer does
+> not cancel echo on the microphone's machine.
 
 > r[viewmodel.audio.notice.echo-listener-send]
 > While Beamer cancels echo on the shared microphone's machine, the listening machine's echo notice
@@ -3761,12 +3878,12 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 
 > r[viewmodel.audio.notice.pick-virtual-mic]
 > While a microphone is shared and its audio route is neither off nor waiting for its machine, and
-> this machine has its virtual microphone but no app records it, the Audio page says in the plain
+> this machine has its virtual microphone but no app records it, the Audio & Camera page says in the plain
 > tone "In your call app on this Mac, choose Beamer Microphone as the microphone." on a Mac and
 > "In your call app on this PC, choose CABLE Output as the microphone." on a PC.
 
 > r[viewmodel.audio.notice.peers-without-audio]
-> While peers this machine has a link to report no audio capability, the Audio page says in the
+> While peers this machine has a link to report no audio capability, the Audio & Camera page says in the
 > plain tone "<name> runs a Beamer without audio. Update Beamer there to use its microphones and
 > speakers." for one, and "<names> run a Beamer without audio. Update Beamer there to use their
 > microphones and speakers." for several, naming only the peers that have a name, and shows no such
@@ -3779,7 +3896,7 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 ## Camera
 
 The Camera module of the Audio & Camera page on a Mac and on a PC, the camera's marks on that
-page's machine map, and the camera items of the Mac's menu bar menu (F44). They show Core's camera
+page's audio map, and the camera items of the Mac's tray menu (F44). They show Core's camera
 state, which `spec/camera.md` (#63) defines. Until it does, these rules name that state in plain
 words:
 
@@ -3808,13 +3925,25 @@ The virtual camera's product name, which every string here uses, is Beamer Camer
 > PC, and a peer is its label (`viewmodel.machines.label.name`, `viewmodel.machines.label.shared`).
 
 > r[viewmodel.camera.names.capital]
-> A camera status line that starts with a machine's name or with "an app" starts with a capital
-> letter: "This Mac and lebig are not linked directly.", "An app on lebig is using it.".
+> A camera status line that starts with this machine's name in a sentence ("this Mac", "this PC")
+> or with "an app" starts with a capital letter: "This Mac and lebig are not linked directly.",
+> "An app on lebig is using it.". A line that starts with a peer's label, an app's name or a
+> camera's name keeps its first letter as it is: "mini is offline." for a peer labelled "mini".
+>
+> - parity: Python capitalised the first letter of the *waiting for the machine* and *unreachable* lines whatever started them, so a peer labelled "mini" read "Mini is offline." (`viewmodel.words.typed-as-typed`: a name the user typed shows exactly as typed)
 
 > r[viewmodel.camera.names.apps]
 > The camera status lines name each machine that has the virtual camera open as "{app} on
 > {machine}" when the OS gave the app's name, and as "an app on {machine}" when it did not. Two or
 > more are joined as a list: "Microsoft Teams on lebig and Zoom on asusrog".
+
+> r[viewmodel.camera.names.in-state]
+> Where a camera line names the machines in given states ("the machines whose state is *idle*"),
+> it names each machine once, in this order: first the machines the camera's overall state
+> concerns, in the order `Core` gives them, whose own state is one of those, a machine with no
+> state of its own counting as in the overall state; then every other machine whose own state is
+> one of those, in machine id order. When that names none, it names the machines the overall state
+> concerns, in the order `Core` gives them; when there are none either, it names none.
 
 ### The module
 
@@ -3825,7 +3954,7 @@ The virtual camera's product name, which every string here uses, is Beamer Camer
 
 > r[viewmodel.camera.module.place]
 > The Camera module, headed "Camera", sits on the Audio & Camera page after the page's notices and
-> before the machine map.
+> before the audio map.
 
 > r[viewmodel.camera.module.hint]
 > Under its status line the Camera module always says "Apps on a PC choose 'Beamer Camera'. Macs
@@ -3854,7 +3983,9 @@ The virtual camera's product name, which every string here uses, is Beamer Camer
 > r[viewmodel.camera.selector.selected]
 > The "Camera your apps see" list selects "Off" while the camera route is off, the machine's
 > "Default camera" entry while the camera route follows that machine's default camera, and the
-> named camera while the camera route names one.
+> named camera while the camera route names one, found among its machine's cameras by key, else as
+> the one camera with the camera route's camera name. When none has that name, or two or more do,
+> the camera counts as one its machine no longer lists (`viewmodel.camera.selector.unplugged`).
 
 > r[viewmodel.camera.selector.unplugged]
 > While the camera route names a camera its machine no longer lists, the "Camera your apps see"
@@ -3899,17 +4030,21 @@ The virtual camera's product name, which every string here uses, is Beamer Camer
 
 > r[viewmodel.camera.status.idle]
 > While the camera's state is *idle*, the status line says "Ready. No app on {machines} is using
-> Beamer Camera.", naming the machines whose state is *idle*, or "Ready. No app is using Beamer
-> Camera." when it names none, in the plain tone.
+> Beamer Camera.", naming the machines whose state is *idle* (`viewmodel.camera.names.in-state`),
+> or "Ready. No app is using Beamer Camera." when it names none, in the plain tone.
 
 > r[viewmodel.camera.status.starting]
 > While the camera's state is *starting*, the status line says "Starting for {apps}…", naming the
-> apps on the machines whose state is *starting*, in the live tone.
+> apps on the machines whose state is *starting* (`viewmodel.camera.names.in-state`), or "Starting
+> for an app…" when it names none, in the live tone.
+>
+> - parity: Python left the names empty when none was named ("Starting for …"), a case its own planner never reported (a line needs words for every state `Core` may report)
 
 > r[viewmodel.camera.status.streaming]
 > While the camera's state is *streaming*, the status line says "{apps} is using it." for one
 > machine and "{apps} are using it." for two or more, naming the apps on the machines whose state
-> is *streaming* or *reduced*, or "An app is using it." when it names none, in the live tone.
+> is *streaming* or *reduced* (`viewmodel.camera.names.in-state`), or "An app is using it." when it
+> names none, in the live tone.
 
 > r[viewmodel.camera.status.reduced]
 > While the camera's state is *reduced*, or any machine the streaming line names is *reduced*, the
@@ -3948,19 +4083,23 @@ The virtual camera's product name, which every string here uses, is Beamer Camer
 > r[viewmodel.camera.status.unreachable]
 > While the camera's state is *unreachable*, the status line says "{machine} and {machines} are not
 > linked directly.", naming the camera route's machine, then the machines whose state is
-> *unreachable*, or "the machine using it" when it names none, in the waiting tone.
+> *unreachable* (`viewmodel.camera.names.in-state`), or "the machine using it" when it names none,
+> in the waiting tone.
 
 > r[viewmodel.camera.status.no-direct-path]
 > While the camera's state is *no direct path*, the status line says "Video needs a direct network
 > path between {machine} and {machines}.", naming the camera route's machine, then the machines
-> whose state is *no direct path*, or "the machine using it" when it names none, in the waiting
-> tone.
+> whose state is *no direct path* (`viewmodel.camera.names.in-state`), or "the machine using it"
+> when it names none, in the waiting tone.
 
 > r[viewmodel.camera.status.install]
 > While the camera's state is *not installed*, *outdated* or *damaged*, the status line says
 > "Beamer Camera is not installed on {machines}.", "Beamer Camera needs an update on {machines}."
-> or "Beamer Camera is damaged on {machines}.", naming the machines in that state, in the waiting
+> or "Beamer Camera is damaged on {machines}.", naming the machines whose state is that one
+> (`viewmodel.camera.names.in-state`), or "the machine using it" when it names none, in the waiting
 > tone.
+>
+> - parity: Python left the names empty when none was named ("Beamer Camera is not installed on ."), a case its own planner never reported (a line needs words for every state `Core` may report)
 
 > r[viewmodel.camera.status.no-virtual-camera]
 > While the camera's state is *no virtual camera*, the status line says "No linked PC can show it:
@@ -3975,8 +4114,8 @@ The virtual camera's product name, which every string here uses, is Beamer Camer
 > the video failed to decode, "the picture could not be shown"; the video never reached the
 > machine using it, "the picture did not arrive"; the camera choice changed under it, "the camera
 > choice changed"; another app holds the camera, "another app holds the camera"; a fault in
-> Beamer, "something went wrong in Beamer". An error without a reason says "The camera stopped on
-> {machine}.".
+> Beamer, "something went wrong in Beamer". An error without a reason, or with one the page has no
+> words for, says "The camera stopped on {machine}.".
 >
 > - parity: Python also said "Beamer's media helper stopped" for a fault of its separate media process (ADR 0004: Beamer is one process, with no media helper)
 
@@ -4093,8 +4232,7 @@ The virtual camera's product name, which every string here uses, is Beamer Camer
 > r[viewmodel.camera.notice.order]
 > The Camera module's notices come in this order: the camera store notice, the permission notice,
 > the notice of another app on this Mac, then one notice for each PC whose virtual camera is not
-> ready. In the ordinary states, *off*, *idle*, *streaming*, *reduced*, *sharing off* and *denied*
-> on a Mac whose camera choices were read and saved, there is none.
+> ready.
 
 > r[viewmodel.camera.notice.store-unreadable]
 > While this machine can share its camera and Beamer could not read its saved camera choices, so
@@ -4109,9 +4247,10 @@ The virtual camera's product name, which every string here uses, is Beamer Camer
 
 > r[viewmodel.camera.notice.permission]
 > While Beamer needs camera access on this Mac, because the camera route names it, its camera
-> sharing is on and macOS has not asked yet, the Camera module shows "Beamer needs camera access to
-> share this Mac's camera." in the waiting tone, with an "Allow Camera Access…" button that asks
-> Core to have macOS ask for camera access. A peer's page never shows it.
+> sharing is on or unknown, it shares its camera rather than a test image, and macOS has not asked
+> yet, the Camera module shows "Beamer needs camera access to share this Mac's camera." in the
+> waiting tone, with an "Allow Camera Access…" button that asks Core to have macOS ask for camera
+> access. A peer's page never shows it.
 
 > r[viewmodel.camera.notice.shared-use]
 > While this Mac's camera is streaming or reduced and another app on this Mac uses the camera at
@@ -4127,17 +4266,18 @@ The virtual camera's product name, which every string here uses, is Beamer Camer
 > tone, with no button. This machine's own virtual camera is never one: its "Beamer Camera" line
 > says it.
 
-### The machine map
+### The audio map
 
 > r[viewmodel.camera.map.off]
-> While the camera route is off, the Audio & Camera page's machine map shows no camera marks.
+> While the camera route is off, the Audio & Camera page's audio map shows no camera marks.
 
 > r[viewmodel.camera.map.badge]
 > While the camera route names a machine, that machine's card on the map shows the camera's name:
-> the camera the camera route names, or the default camera its machine's OS prefers when the
-> camera route follows it; the camera route's camera by name when its machine no longer lists it;
-> "Default camera" when neither is known. The name is marked live while at least one camera arrow
-> is live. The card's accessible description adds "Its {camera} is the shared camera.".
+> the camera the camera route names, found as `viewmodel.camera.selector.selected` says, or the
+> default camera its machine's OS prefers when the camera route follows it; the camera route's
+> camera by name when its machine no longer lists it; "Default camera" when neither is known. The
+> name is marked live while at least one camera arrow is live. The card's accessible description
+> adds "Its {camera} is the shared camera.".
 
 > r[viewmodel.camera.map.watching]
 > While the camera route names a machine, the card of each other machine whose virtual camera is
@@ -4154,25 +4294,26 @@ The virtual camera's product name, which every string here uses, is Beamer Camer
 > r[viewmodel.camera.map.on-map]
 > A camera arrow is drawn only between two different machines that both have a card on the map.
 
-### The Mac's menu bar menu
+### The Mac's tray menu
 
 > r[viewmodel.camera.menu.shown]
-> The Mac's menu bar menu shows its camera items only while this Mac can share its camera. A PC's
+> The Mac's tray menu shows its camera items only while this Mac can share its camera. A PC's
 > menu has none.
 
 > r[viewmodel.camera.menu.line]
 > While the camera route names this Mac and the camera's state is *starting*, *streaming* or
-> *reduced*, the Mac's menu shows under the drive status "Camera: {users}", each machine using it
+> *reduced*, the Mac's menu shows under the drive status "Camera: {users}", naming the machines
+> whose state is *starting*, *streaming* or *reduced* (`viewmodel.camera.names.in-state`), each
 > named "{app} on {machine}", or "in use on {machine}" when the OS gave no app name, joined as a
-> list. Otherwise the line is hidden.
+> list. Otherwise, and when it names none, the line is hidden.
 
 > r[viewmodel.camera.menu.tooltip]
-> While the Mac's menu shows its camera line, the menu bar icon's tooltip ends with the same line,
+> While the Mac's menu shows its camera line, the tray icon's tooltip ends with the same line,
 > on a line of its own.
 
 > r[viewmodel.camera.menu.sharing]
-> The Mac's menu shows "Stop Sharing the Camera" while this Mac's camera sharing is on and "Share
-> the Camera" while it is off, whatever the camera route.
+> The Mac's menu shows "Stop Sharing the Camera" while this Mac's camera sharing is on or unknown
+> and "Share the Camera" while it is off, whatever the camera route.
 
 > r[viewmodel.camera.menu.sharing-click]
 > Choosing "Stop Sharing the Camera" asks Core to turn this Mac's camera sharing off, and choosing
@@ -4423,19 +4564,25 @@ What each notification says, and what raises each one, F36. Delivering them is
 > wake-up packet".
 
 > r[viewmodel.notice.permissions]
-> On a Mac without both of its input permissions (`platform.permissions.mac-input`), choosing a
-> peer's input item in the tray menu moves no input and raises "Grant both Mac permissions first.".
+> On a Mac while input capture is not running, whether a permission is not granted
+> (`platform.permissions.mac-input`), Beamer must be relaunched for it
+> (`platform.permissions.relaunch-needed`) or capture is being retried (`input.capture.retry`),
+> choosing a peer's input item in the tray menu moves no input and raises "Grant both Mac
+> permissions first.".
 
 > r[viewmodel.notice.not-saved]
-> When a change made from the tray menu cannot be saved, a notification says "Could not save the
-> change: {error}", and the tray menu and the window show what is stored again.
+> When a change made from the tray menu cannot be saved, a notification says "Beamer could not save
+> the change. Try again in a moment.", and the tray menu and the window show what is stored again.
+>
+> - parity: Python said "Could not save the change: {error}", with the system's error (#16 and ADR 0004: Core reports a typed failure, never the system's text)
 
 > r[viewmodel.notice.reload]
 > Choosing "Reload configuration" raises a notification titled "Configuration reloaded" saying
 > "Beamer is using the config on disk." when the settings read, and one titled "Configuration not
-> reloaded" whose body is the error when they do not.
+> reloaded" saying "Beamer could not read the config on disk, so it keeps the settings it had."
+> when they do not.
 >
-> - parity: Python's Windows app raised nothing on success, and "Could not reload the configuration: {error}" titled "Beamer" on failure (one view-model for every platform: the Mac app's)
+> - parity: Python's Mac gave the system's error as the failure's body, and its Windows app raised nothing on success, and "Could not reload the configuration: {error}" titled "Beamer" on failure (one view-model for every platform: the Mac app's titles; #16 and ADR 0004: Core reports a typed failure, never the system's text)
 
 > r[viewmodel.notice.input-problem]
 > On a PC, an input problem that raises a notification (`platform.blocker.notify`) says, by its

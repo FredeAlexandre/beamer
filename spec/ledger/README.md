@@ -26,8 +26,8 @@ no Python test is its own:
 | `platform` | #65 | 337 |
 | `runtime` | #66 | 3 |
 | `app` | #67 | 95 |
-| `viewmodel` | #68 | 911 |
-| `ui` | #69 | 814 |
+| `viewmodel` | #68 | 914 |
+| `ui` | #69 | 811 |
 | `perf` | #70 | 0 |
 | `observability` | #71 | 0 |
 
@@ -77,7 +77,7 @@ flooded its own messages, and those tests went to the feature), the media engine
 ## Ambiguous assignments
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
-There are 137, covering 1,281 tests. Each row names the other candidates and why the owner won.
+There are 136, covering 1,278 tests. Each row names the other candidates and why the owner won.
 A miner who finds such a test's assertions are all another domain's settles it as
 `.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
 
@@ -152,9 +152,8 @@ class's other tests stay viewmodel's.
 | `mac_app/tests/test_mac_three.py` (its other classes) | 18 | crossing | driving | a push through a zone takes the machine the zone leads to, with three machines |
 | `mac_app/tests/test_mac_to_mac.py` | 4 | input | driving | two Macs on loopback; both classes check which keys arrive |
 | `mac_app/tests/test_mac_wire.py` | 12 | driving | input, link | the Mac's controller against a real responder, end to end |
-| `mac_app/tests/test_machines_panel.py`, class `CodeBoxCentringTests`: `test_a_digit_typed_beside_a_held_one_replaces_it_and_leaves_the_next_box`, `test_each_typed_digit_sits_in_the_middle_of_its_box`, `test_pasting_digits_into_middle_box_spreads_forward_and_focuses_after` | 3 | ui | viewmodel | moved from viewmodel (#68): typing and pasting into the code boxes, and the digits centred in them |
+| `mac_app/tests/test_machines_panel.py`, class `CodeBoxCentringTests`: `test_each_typed_digit_sits_in_the_middle_of_its_box` | 1 | ui | viewmodel | moved from viewmodel (#68): the digits centred in the code boxes |
 | `mac_app/tests/test_machines_panel.py`, class `EnteringACodeTests`: `test_long_discovery_name_keeps_room_and_full_name_tooltip_at_900_points` | 1 | ui | viewmodel | moved from viewmodel (#68): a long name in the pairing sheet's list is cut, with its whole text as tooltip |
-| `mac_app/tests/test_machines_panel.py`, class `ListTests`: `test_the_machines_lead_the_page_with_and_without_existing_machines` | 1 | ui | viewmodel | moved from viewmodel (#68): where the Machines section and the pairing sheet sit on the Overview page |
 | `mac_app/tests/test_map_ticks.py` | 22 | ui | viewmodel | the crossing map's thirds, badge, fit and seam; the tests are their geometry |
 | `mac_app/tests/test_notices_mac.py` | 11 | platform | viewmodel | notification delivery (F36) is platform's; what a notice says is the viewmodel's |
 | `mac_app/tests/test_pages.py`, class `DesignChoicesTest`: `test_the_notch_style_only_matters_under_glow_and_beam` | 1 | ui | viewmodel | moved from viewmodel (#68): the notch style under glow and beam (F31, Later) |

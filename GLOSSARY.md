@@ -225,8 +225,10 @@ An audio device that plays, such as speakers or headphones.
 _Avoid_: sink, playback device
 
 **Virtual microphone**:
-The microphone Beamer adds to the Mac, where an audio route delivers another machine's microphone.
-Its product name is Beamer Microphone.
+The microphone apps on a machine record to hear another machine's microphone, where an audio route
+delivers it. On a Mac it is the one Beamer adds, whose product name is Beamer Microphone. On a PC
+it is VB-CABLE, which the user installs: Beamer plays into its CABLE Input, and apps record its
+CABLE Output.
 _Avoid_: driver, HAL driver, mac driver
 
 **Virtual camera**:
@@ -251,9 +253,14 @@ _Avoid_: kill switch, sharing switch
 ## Screens
 
 **Label**:
-The name every screen shows for a machine: the name the user gave a peer, or else its own name,
-with the last four characters of its machine id added when two peers share a name.
+The name every screen shows for a machine: a peer's given name, or else its own name, with its id
+tail (`viewmodel.machines.label.id-tail`) added when two peers share a name.
 _Avoid_: display name, title
+
+**Given name**:
+The name the user gives a peer on this machine, in place of the name the peer has for itself. A
+peer's label is made from it.
+_Avoid_: label, nickname, alias
 
 **Tone**:
 The kind of state a line or notice on a screen reports: quiet, plain, live, waiting or fault. The
@@ -261,8 +268,8 @@ look gives each tone its colour.
 _Avoid_: ink, colour, severity
 
 **Pairing sheet**:
-The part of the Machines page where the user pairs this machine: one half shows a code here, the
-other enters a code another machine shows.
+The part of the Overview page, under the Machines list, where the user pairs this machine: one
+half shows a code here, the other enters a code another machine shows.
 _Avoid_: pairing dialog, pairing window, pair panel
 
 **Crossing ledger**:
@@ -288,7 +295,8 @@ _Avoid_: tile word, status word
 
 **Audio map**:
 The Audio & Camera page's map of this machine and every machine whose audio devices are known, each
-at its footprint on the crossing map, with an arrow for each microphone or sound sent between them.
+at its footprint on the crossing map, with an arrow for each microphone, sound or camera sent between
+them.
 _Avoid_: machines map, audio diagram
 
 **Status peer**:
