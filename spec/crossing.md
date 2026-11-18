@@ -2352,12 +2352,19 @@ writes and sends no change to them, and its notch zone leads to one of those pee
 > unpaired, the machine keeps its zone choices toward it while any machine in the cluster still
 > lists that peer, and pairing with that peer again makes its zones toward it follow them. Once no
 > machine in the cluster lists the peer, the zone choices toward it in every profile read as unset,
-> as the store reads every shared entry naming a forgotten machine (#14), and a later pairing with
-> it starts from the default zone choices (`crossing.derive.choices.default`). A machine's own zone
-> choices, which are never shared, keep their choices toward it.
+> as the store reads every shared entry naming a forgotten machine (#14). No machine writes their
+> removal, and a change to a machine's zone choices meanwhile keeps its choices toward the forgotten
+> peer, so when the peer is paired again they read as set again, as they were, as its footprint
+> does (`crossing.map.members.forgotten`), and the zones toward it follow them. When, at the first
+> link after that pairing, its footprint counts as none and it is placed by default
+> (`crossing.map.members.forgotten`), it starts from the default zone choices
+> (`crossing.derive.choices.default`), as a peer just paired does (`crossing.derive.first-zone`):
+> the machine that writes that default placement writes, in the same change, the default zone
+> choices toward it in every profile, in the zone choices of each machine paired with it. A
+> machine's own zone choices, which are never shared, keep their choices toward it.
 >
 > - model: store
-> - parity: Python kept a machine's zone choices toward an unpaired peer in every profile for good, so pairing with it again, however long after, followed them (#14: shared entries naming a machine no machine in the cluster lists read as unset)
+> - parity: Python kept a machine's zone choices toward an unpaired peer in every profile for good: they stayed readable while no machine listed it, the peer still named in the profile status as one waiting for a pairing (`core/profiles.py:358-362`), and pairing with it again followed them even though it always placed the peer by default (#14: shared entries naming a forgotten machine read as unset while it is forgotten and are never written as removed, and a machine paired again over another starts over as one just paired)
 
 r[crossing.profile.choices.may-not-drive]
 A machine keeps its zone choices toward a peer it may not drive, and any edit made to them
