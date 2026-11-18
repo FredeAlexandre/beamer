@@ -191,8 +191,9 @@ where it meets it, so the pointer never passes through a zone onto a display bey
 ## The crossing map
 
 Each machine has a footprint on the crossing map, and its displays fill it. Footprints are placed
-and sized in map units. The crossing map is one shared entry in the store (#14), the same on every
-machine; this machine's crossing map is the part of it this machine shows and derives its zones from
+and sized in map units. Each footprint, with its displays' offsets and its name, is one shared entry
+in the store (#14), so the crossing map, made of them, is the same on every machine; this machine's
+crossing map is the part of it this machine shows and derives its zones from
 (Which machines are on the crossing map, below). An inactive peer is a peer that is not in use,
 kept off the crossing map, or dormant (`pairing.dormant.kept`); every other machine on the crossing
 map is present.
@@ -226,7 +227,7 @@ Rejoining a display to its machine removes its offset, so it sits again where
 > a machine has at most 16 of them. An offset that does not count is ignored, and the rest of the
 > crossing map is taken as it is.
 >
-> - parity: Python refused the whole crossing map a peer sent when one offset named a display its machine did not report or was not whole, and removed the offsets of displays a machine no longer reported when its displays changed (#14: the crossing map is a shared entry, so one bad offset does not keep out the rest)
+> - parity: Python refused the whole crossing map a peer sent when one offset named a display its machine did not report or was not whole, and removed the offsets of displays a machine no longer reported when its displays changed (#14: each footprint is a shared entry, so one bad offset does not keep out the rest)
 
 > r[crossing.map.displays.record]
 > A machine's displays on the crossing map are those in its machine record, as its platform
@@ -248,8 +249,9 @@ Rejoining a display to its machine removes its offset, so it sits again where
 ### Which machines are on the crossing map
 
 r[crossing.map.members.this]
-This machine is always on its crossing map. When the map has no footprint for it, its footprint is
-placed at (0, 0), 160 by 100 map units, before any contact is found or zone derived.
+This machine is always on its crossing map. While the crossing map has no footprint for it, it is
+placed at (0, 0), 160 by 100 map units, before any contact is found or zone derived. That footprint
+is written only as `crossing.map.place.default-written` says.
 
 r[crossing.map.members.peers]
 Every peer of this machine is on its crossing map, an inactive peer included. A peer whose pairing
@@ -266,7 +268,7 @@ is removed stays on this machine's crossing map only as a third party
 > crossing map keeps it.
 >
 > - model: store
-> - parity: Python removed from its crossing map every footprint it kept off, an unpaired peer's included, and sent the map, so its peers removed it too, even those that still showed it (#14: the crossing map is one shared entry, and a machine leaves it only when the cluster forgets that machine, so keeping a footprint off is a filter that writes nothing)
+> - parity: Python removed from its crossing map every footprint it kept off, an unpaired peer's included, and sent the map, so its peers removed it too, even those that still showed it (#14: each footprint is a shared entry, and a machine leaves the crossing map only when the cluster forgets that machine, so keeping a footprint off is a filter that writes nothing)
 
 r[crossing.map.members.name]
 The crossing map carries a name with a machine's footprint, without leading or trailing blanks. A
@@ -280,23 +282,25 @@ name that is blank, or longer than 64 characters, is dropped, and the footprint 
 > - model: store
 
 > r[crossing.map.members.retain]
-> A change to the crossing map arriving from another machine replaces this machine's whole crossing
-> map, every footprint in it, an inactive peer's included: a footprint the change lacks is gone here
-> too, and a machine on this machine's crossing map left with no footprint is placed by default
-> (`crossing.map.place.facing`, `crossing.map.place.unplaced`,
-> `crossing.map.place.default-written`).
+> A change to the crossing map arriving from another machine replaces only the footprints it
+> changed, as `crossing.map.shared.newest` orders them. Every other footprint on this machine's
+> crossing map, an inactive peer's included, stays as it was. No change removes a footprint: a
+> machine's footprint leaves the crossing map only when the cluster forgets that machine
+> (`crossing.map.members.forgotten`).
 >
 > - model: store
-> - parity: Python kept the footprint it had for a machine on its crossing map that an arriving map lacked, and took only the footprints the arriving map carried (#14: the crossing map is one shared entry, the newest winning whole, so every machine ends with the same map)
+> - parity: Python stamped the whole crossing map, took every footprint a newer arriving map carried, even one it had not changed, and kept the footprint it had for a machine the arriving map lacked (`ways.retain_held_peer_tiles`, `core/ways.py:145-164`) (#14: each footprint is its own shared entry, the newest stamp winning entry by entry, so a change carries only the footprints it changed and no footprint goes missing)
 
 ### Where a machine sits
 
 r[crossing.map.place.kept]
 A footprint on the crossing map stays where it was put, with its size, its displays' offsets and
-its name, until it is dropped, resized or recentred or its machine leaves the map, even when it
-touches no display of this machine. Placing another machine never moves it, nor changes the zones
-that lead to it, except that a restored peer may re-centre the row it joins
-(`crossing.map.place.restored`).
+its name, until it is dropped, resized or recentred, on this machine or another, or its machine
+leaves the map, even when it touches no display of this machine. Placing another machine never moves
+it, since a machine is placed by default only while it has no footprint
+(`crossing.map.place.default-written`), except that a restored peer may re-centre the row it joins
+(`crossing.map.place.restored`), and changes the zones that lead to it only as
+`crossing.derive.first-zone` says.
 
 r[crossing.map.facing]
 A peer faces the edge of this machine on which its footprint first touches one of this machine's
@@ -321,35 +325,49 @@ Each then moves to the nearest free snap point (`crossing.map.snap.choice`, with
 it touches this machine's footprint.
 
 > r[crossing.map.place.first-peer]
-> On a Mac whose crossing map has no footprint but its own, the first peer paired gets its footprint
-> flush against the right edge of the Mac's footprint, centred on it, in place of the footprint
-> `crossing.map.place.facing` or `crossing.map.place.unplaced` would give it.
+> While the crossing map has a footprint neither for a Mac nor for a peer it has just paired, the
+> Mac places that peer flush against the right edge of its own footprint, centred on it, in place of
+> the place `crossing.map.place.facing` or `crossing.map.place.unplaced` would give it.
 >
-> - parity: Python placed it so only while the Mac's saved crossing map held no footprint at all and the peer was its only peer (`core/crossing_state.py:328`) (#14: the Mac's own footprint is a default placement written to the crossing map, `crossing.map.place.default-written`, so a Mac's crossing map is never empty once the Mac is on it)
+> - parity: Python placed it so whenever the Mac's saved crossing map had no footprint at all and the peer was its only peer (`core/crossing_state.py:328`), whatever the peer's own crossing map had (#14: each footprint is a shared entry, written by default only for a machine with no footprint, so a Mac places its first peer so only while that peer has no footprint either)
 
 > r[crossing.map.place.default-written]
-> A footprint placed by default, this machine's own (`crossing.map.members.this`) or a peer's
-> (`crossing.map.place.first-peer`, `crossing.map.place.facing`, `crossing.map.place.unplaced`), is
-> a change to the crossing map that reaches every machine, so two machines that pair end with one
-> map, each facing the other's facing edge. A machine is placed by default only while the crossing
-> map has no footprint for it. Of two crossing maps, the newer, which `crossing.map.shared.newest`
-> keeps, is first the one whose newest change that is not a default placement is newer; a crossing
-> map changed only by default placements is older than every map with such a change. With the same
-> such change, or none, it is then the one on which a Mac placed a peer by
-> `crossing.map.place.first-peer` since that change, if any, and then the one whose newest default
-> placement is newer. Changes are newer in the order the store's stamps give them, the greater machine id
-> breaking a tie. So a default placement is newer than the crossing map it was placed on, and older
-> than every change that is not a default placement made since, on any machine: such a change wins
-> over it, and a machine the winning map leaves with no footprint is placed by default again on that
-> map. A machine new to the cluster, whose crossing map is changed only by default placements, takes
-> over its own a cluster's crossing map that has any other change. When a Mac whose crossing map has
-> no footprint but its own pairs its first peer, a machine that is not a Mac and whose crossing map
-> is changed only by default placements, the Mac's crossing map wins over the peer's whatever their
-> stamps: the peer ends flush right of the Mac on both machines' maps, and its zone to the Mac is on
-> its left edge.
+> A machine the crossing map has no footprint for is placed by default: this machine by
+> `crossing.map.members.this`, a peer by `crossing.map.place.first-peer`,
+> `crossing.map.place.facing` or `crossing.map.place.unplaced`. Until a footprint for it is
+> written, it is only shown there, and showing it writes nothing. A default placement is written
+> when a link comes up, once its two machines have exchanged their stores (#14), the first link
+> after a pairing included (`pairing.peers.at-once`), and only for a machine of those two that has
+> no footprint. So it never moves, replaces or removes a footprint. Of the two machines:
+>
+> - when one has a footprint and the other has none, the one with a footprint writes the other's
+>   where its own crossing map places it by default;
+> - when neither has one, the Mac writes both, or, when both or neither are Macs, the one whose
+>   machine id is greater, compared as bytes: its own footprint where `crossing.map.members.this`
+>   places it, and the other's where its crossing map then places it by default;
+> - when both have one, nothing is written: each footprint stays where it is
+>   (`crossing.map.place.kept`), and each machine derives its zones to the other from there.
+>
+> The other machine writes nothing for that link. A written default placement reaches every machine
+> (`crossing.map.shared.one`), so two machines that pair end with one map, each facing the other's
+> facing edge (`crossing.map.shared.facing`). Two writes of one machine's footprint made before
+> either reaches the other, as when a machine with no footprint links to two machines at once, or a
+> default placement and a drop of the footprint it placed, are ordered as any two changes to that
+> footprint are (`crossing.map.shared.newest`). For example:
+>
+> - A Mac and a machine that is not a Mac pair, neither with a footprint: on both machines' maps the
+>   other machine ends flush right of the Mac, centred on it, with its zone to the Mac on its left
+>   edge.
+> - A Mac B and a PC pair first, then a Mac A with no footprint pairs the PC: the PC writes A's
+>   footprint centred under the PC's (`crossing.map.place.unplaced`), A's zone to the PC is on A's
+>   top edge, and B's and the PC's footprints stay where they were.
+> - A PC P1 at (0, 0) and a PC P2 flush under it, 160 by 100 each, are paired and never changed,
+>   then a PC X with no footprint pairs P1: P1 writes X's footprint at (-160, 100), touching P1's
+>   bottom-left corner and P2's left edge, and P1's and P2's footprints, and their zones to each
+>   other, stay as they were.
 >
 > - model: store
-> - parity: Python wrote no default placement but a Mac's first peer on an empty crossing map, written with the Mac's own displays: each machine kept its own default until a footprint for that machine came from elsewhere, so two paired machines that are not Macs each placed the other below itself, and each one's zone to the other was on its own bottom edge (#14: the crossing map is one shared entry and converges)
+> - parity: Python wrote no default placement but a Mac's first peer on an empty crossing map, written with the Mac's own displays: each machine kept its own default until a footprint for that machine came from elsewhere, so two paired machines that are not Macs each placed the other below itself, and each one's zone to the other was on its own bottom edge (#14: each footprint is a shared entry and converges, so one machine of the two a link joins writes a default placement, and only for a machine with no footprint)
 
 r[crossing.map.place.inactive]
 An inactive peer's footprint stays on the crossing map where it was, but never blocks another
@@ -383,7 +401,7 @@ the move is taken as a drop without `crossing.map.snap.drop-radius`.
 > and its zones are derived there. Choosing the edge the peer's footprint is already against
 > changes nothing on the crossing map.
 >
-> - parity: Python also kept, per peer, the edge it faced with a stamp and the id of the machine that set it, written whenever that edge changed (#14: the crossing map is a shared entry, and the edge a peer faces is read off it)
+> - parity: Python also kept, per peer, the edge it faced with a stamp and the id of the machine that set it, written whenever that edge changed (#14: a footprint is a shared entry, and the edge a peer faces is read off the crossing map)
 
 ### Snapping
 
@@ -404,7 +422,10 @@ Snapping a footprint with a radius r moves it to a free snap point: the nearest 
 where it is, or within 1.5 r for a centred point, distance taken in a straight line between top-left
 corners; or, when none is that near, the nearest free snap point of all. Nearest means the least
 horizontal plus vertical distance, then a centred point before another, then the least horizontal
-distance, then the least vertical one. With no free snap point the footprint stays where it is.
+distance, then the least vertical one, and then the first in this order: the edges left, right, top
+and bottom in turn, along each the points centred on the marks at 0, 1/3, 2/3 and the whole, then
+the centred point, then flush with the edge's start and with its end; then the corners top left, top
+right, bottom left and bottom right. With no free snap point the footprint stays where it is.
 
 r[crossing.map.snap.drop-radius]
 A peer's footprint dropped within the snap radius of a free snap point moves to the one
@@ -487,12 +508,17 @@ on the crossing map.
 > - parity: Python sent its whole crossing map in `settings` messages to each peer that advertised the `layout` capability, which relayed a map it took on to its other peers, and set the edge a peer without that capability faced by `arrangement` messages (#14: the store replaces per-feature messages)
 
 > r[crossing.map.shared.newest]
-> The crossing map is one entry. When it is changed on two machines before either change reaches the
-> other, every machine ends with the newer change whole, even when the two moved different
-> footprints, and a change older than the one a machine has is ignored.
+> Each footprint is one entry, and a change to the crossing map writes only the footprints it
+> places, moves or resizes, or whose displays' offsets or name it changes. When one footprint is
+> changed on two machines before either change reaches the other, every machine ends with the newer
+> change to it, in the order the store's stamps give them (#14), and a change to a footprint older
+> than the one a machine has for it is ignored. Changes to different footprints are all kept, even
+> when they are made at once on two machines, so a change that moves several footprints, such as
+> `crossing.map.place.restored`'s row, loses to a newer change only for the footprints that
+> newer change wrote.
 >
 > - model: store
-> - parity: Python stamped the whole crossing map with the second it changed, or one past the stamp it had when that was not older, and its author's machine id; a map with a newer stamp replaced the one it had, the larger author id winning a tie, and a stamp more than a day ahead of this machine's clock was refused (#14: the store's hybrid logical clock stamps every entry)
+> - parity: Python stamped the whole crossing map with the second it changed, or one past the stamp it had when that was not older, and its author's machine id; a map with a newer stamp replaced the one it had, the larger author id winning a tie, and a stamp more than a day ahead of this machine's clock was refused (#14: the store's hybrid logical clock stamps every entry, and the newest stamp wins entry by entry, each footprint being an entry)
 
 > r[crossing.map.shared.facing]
 > Placing a peer against an edge of this machine on the crossing map, on either machine, places
@@ -515,7 +541,7 @@ machine sends its zones to another.
 > is taken like any other: that edge's thirds go to peers by `crossing.derive.share.one-peer`, and a
 > peer left with no third there has no zone on that edge.
 >
-> - parity: Python ignored a crossing map arriving with such an edge and kept its own, and failed with an error when a restored peer or a default placement crowded an edge (#14: the crossing map is one shared entry and converges, so every machine derives its zones from the same map)
+> - parity: Python ignored a crossing map arriving with such an edge and kept its own, and failed with an error when a restored peer or a default placement crowded an edge (#14: the crossing map's footprints are shared entries and converge, so every machine derives its zones from the same map)
 
 r[crossing.map.saved.derived]
 Zones are never read from what is saved. A machine derives them from the crossing map and its zone
@@ -658,11 +684,14 @@ within another peer's edge zone.
 ### Corners
 
 r[crossing.derive.corner.contact]
-A peer's display that touches one of this machine's displays only at a corner gives a corner zone
-at that corner of that display, naming the peer's display it touches, while the peer has its edge or
-a corner on, unless that corner leads to another peer (`crossing.derive.corner.one`). A peer that
-touches this machine only at corners has no edge or thirds zone, and is still reached through such
-corner zones and the notch.
+A peer's display that touches one of this machine's displays only at a corner has a corner contact
+there, and gives a corner zone at that corner of that display, naming the peer's display it
+touches, while the peer has its edge or a corner on, unless that corner leads to another peer
+(`crossing.derive.corner.one`). A display that shares a stretch of an edge with one of this
+machine's displays touches that display along the edge and has no corner contact with it, even
+where the stretch ends at a corner: a peer flush under this machine's only display, as wide as it,
+has no corner contact at its bottom corners. A peer that touches this machine only at corners has
+no edge or thirds zone, and is still reached through such corner zones and the notch.
 
 r[crossing.derive.corner.chosen]
 A corner chosen for a peer gives a corner zone only while one of the peer's displays touches an
@@ -677,12 +706,12 @@ already has turns it off.
 
 r[crossing.derive.corner.one]
 Each corner of this machine's displays leads to at most one peer: the first in the peer list's
-order, among present peers, that has it by its display touching that corner while its edge or a
-corner is on, or by choice. A peer whose zone choices list one corner twice has one zone there.
+order, among present peers, that has it by a corner contact there (`crossing.derive.corner.contact`)
+while its edge or a corner is on, or by choice. A peer whose zone choices list one corner twice has one zone there.
 
 r[crossing.derive.corner.taken]
-A corner is taken by a present peer that has chosen it, or whose display touches that corner while
-its edge or a corner is on. Choosing for a peer a corner another peer has taken is refused: turning
+A corner is taken by a present peer that has chosen it, or that has a corner contact there
+(`crossing.derive.corner.contact`) while its edge or a corner is on. Choosing for a peer a corner another peer has taken is refused: turning
 on a single corner changes nothing and writes and sends nothing, and the other peer keeps it, for
 this machine's own pointer and for a driver's. A change naming several corners drops those taken
 and keeps the others, in the order top left, top right, bottom left, bottom right.
@@ -749,15 +778,26 @@ corners as they were, except a stretch another peer took meanwhile, which stays 
 ### A peer's first zone
 
 > r[crossing.derive.first-zone]
-> A peer just paired has the default zone choices (`crossing.derive.choices.default`), so its first
-> footprint (`crossing.map.place.unplaced`, `crossing.map.place.first-peer`) gives it a zone by
-> every third its contact claims: its whole edge when no other peer's display shares that edge, and
-> otherwise the thirds that go to it (`crossing.derive.share.one-peer`). A first footprint that
-> touches this machine's displays only at a corner, as `crossing.map.place.unplaced` gives a peer
-> paired while another already fills the edge below this machine, gives it a corner zone there
-> (`crossing.derive.corner.contact`) and no edge zone. Every other peer keeps its zone choices, its
-> footprint and its zones, apart from sharing that edge. This is how `pairing.peers.first-zone` and
-> `pairing.peers.other-zones` are met.
+> A peer just paired has the default zone choices (`crossing.derive.choices.default`), so its zones
+> come from where the pairing leaves its footprint and this machine's
+> (`crossing.map.place.default-written`): every third its contact claims, its whole edge when no
+> other peer's display shares that edge, and otherwise the thirds that go to it
+> (`crossing.derive.share.one-peer`). A footprint that touches this machine's displays only at a
+> corner, as `crossing.map.place.unplaced` gives a peer paired while another already fills the edge
+> below this machine, gives it a corner zone there (`crossing.derive.corner.contact`) and no edge
+> zone; the peer below has no corner contact there, so the corner is free for it. A footprint that
+> touches none of this machine's displays gives the peer no zone (`crossing.derive.no-contact`), as
+> `crossing.map.place.unplaced` leaves a ninth peer placed by default around a machine whose eight
+> places touching it, centred on its four edges and at its four corners, are taken by footprints of
+> its size. Every other peer keeps its zone choices, its footprint and its zones, apart from sharing
+> that edge. This is how `pairing.peers.first-zone` and `pairing.peers.other-zones` are met.
+>
+> When both machines already had footprints, as when a peer is paired again
+> (`pairing.peers.replace-keeps`) or a pairing joins two clusters, neither footprint moves, and the
+> peer's zones come from where its footprint is. Where two clusters' footprints then overlap, each
+> peer whose display overlaps another present machine's display has no zone from the crossing map,
+> a peer paired before included, until a footprint is dropped elsewhere
+> (`crossing.derive.overlap`, `crossing.map.overlap.reported`).
 >
 > - parity: Python's Mac gave a peer paired once its crossing map placed others, and facing no edge, no footprint and so no zone, while the PC placed it and derived its zones as this rule does (#16: one crossing engine for every platform; the PC's)
 
@@ -792,8 +832,9 @@ For a machine that is not a peer, a dormant peer, a peer whose display overlaps 
 and every peer while the crossing map is refused, every edge and every corner is `unavailable`.
 
 r[crossing.derive.offer.unplaced]
-A peer with no footprint on the crossing map is answered at the footprint it would be given
-(`crossing.map.place.first-peer`, `crossing.map.place.facing`, `crossing.map.place.unplaced`).
+A peer with no footprint on the crossing map is answered at the place it is given by default
+(`crossing.map.place.default-written`: `crossing.map.place.first-peer`,
+`crossing.map.place.facing`, `crossing.map.place.unplaced`).
 
 ## Armed zones
 
