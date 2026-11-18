@@ -533,7 +533,10 @@ The rules that hold whoever takes part without the code to one guess against eac
 
 > r[pairing.peers.other-zones]
 > A pairing leaves every other peer's zones as they were, apart from sharing an edge with the new
-> peer's zone as the crossing map lays them out.
+> peer's zone as the crossing map lays them out, and apart from an overlap. When a pairing joins two
+> clusters whose footprints overlap, neither footprint moves, and every peer whose display overlaps
+> another present machine's display, a peer paired before included, has no zone from the crossing
+> map until a footprint is dropped elsewhere (`crossing.derive.first-zone`).
 
 > r[pairing.peers.concurrent-save]
 > A change to this machine's settings saved while a pairing or a removal completes never undoes
@@ -554,9 +557,17 @@ The rules that hold whoever takes part without the code to one guess against eac
 ## Removing a peer
 
 > r[pairing.remove.peer]
-> Removing a peer deletes it, its zones and its place on the crossing map, together with the
-> place of any machine on the crossing map that only it had listed in its paired list. Every other
-> peer, and its zones, stay as they were.
+> Removing a peer deletes it and its zones. Every other peer, and its zones, stay as they were. The
+> removal writes nothing to the crossing map: the removed machine stays on this machine's crossing
+> map only as a third party (`crossing.map.members.peers`), and a machine that only it had listed
+> in its paired list leaves this machine's crossing map (`crossing.map.members.third-party`). While
+> no machine in the cluster lists the removed machine as a peer, its footprint and the zone choices
+> toward it in every profile read as unset. When it is paired again, they read as set again, as
+> they were, unless its footprint then overlaps another present machine's and it is placed by
+> default as a peer just paired is (`crossing.map.members.forgotten`,
+> `crossing.profile.choices.unpaired`).
+>
+> - parity: Python deleted the peer's footprint from the crossing map at once, with the footprint of any machine only it had listed, so a peer paired again was always placed by default (`core/peerlist.py:198-211`) (#14: a footprint and the zone choices in a profile are shared entries, which read as unset while their machine is forgotten and are never written as removed)
 
 > r[pairing.remove.link]
 > Removing a peer closes its link at once, and a link it opens afterwards is refused.
