@@ -37,10 +37,13 @@ with British spelling is the only language (#11, F34); the one function is the r
 > r[viewmodel.words.through-tr]
 > Every string the view-model gives a page, overlay, tray menu, tooltip, accessibility label or
 > notification passes through one translation function, `tr()`, apart from the values put into a
-> template (`viewmodel.words.template-then-values`), the same values shown alone, such as a peer's
-> label, a profile's name or a key's name (`viewmodel.words.typed-as-typed`), and the product's
-> name, "Beamer". A test that swaps that function's catalogue for one that marks every message
-> finds every other string marked.
+> template (`viewmodel.words.template-then-values`), the same values shown alone, such as a
+> machine's given name or name, a profile's name or a key's name (`viewmodel.words.typed-as-typed`),
+> and the product's name, "Beamer". A machine's label is such a value only where it is a name
+> alone: "Machine · {tail}" (`viewmodel.machines.label.no-name`, `viewmodel.machines.label.unknown`)
+> and "{name} ({tail})" (`viewmodel.machines.label.shared`) are templates, and pass through `tr()`
+> as `viewmodel.words.template-then-values` says. A test that swaps that function's catalogue for
+> one that marks every message finds every other string marked.
 
 > r[viewmodel.words.british]
 > Every string is English with British spelling, as the view-model writes it ("colour", "centre",
@@ -59,8 +62,11 @@ with British spelling is the only language (#11, F34); the one function is the r
 > page's name in "{name}, needs attention", goes into its template as it is.
 
 > r[viewmodel.words.typed-as-typed]
-> A name the user typed, such as a peer's or a profile's, shows exactly as typed wherever it
-> appears, alone or inside a template: a peer named "Colourful" is "Colourful" everywhere.
+> A name the user typed, such as a peer's or a profile's, is never translated and keeps its own
+> case and spelling wherever it appears, alone or inside a template, apart from the blanks
+> `viewmodel.machines.label.name` takes off a peer's name and the cut
+> `viewmodel.machines.label.cut` makes to it: a peer named "Colourful" is "Colourful" everywhere,
+> and one given the name "  Work Mac  " is "Work Mac".
 
 > r[viewmodel.words.joined]
 > Names listed in a string read "Mac" for one, "Mac and PC" for two, and "Mac, PC and Laptop" for
@@ -202,10 +208,10 @@ itself at its lock screen (F21, Windows unlock through the RoomDeck credential p
 > (`viewmodel.status.driven`); the status peer is being woken (`viewmodel.status.waking`); the
 > status peer's link is up (`viewmodel.status.on-peer`, `viewmodel.status.paused`,
 > `viewmodel.status.full-screen`, `viewmodel.status.linked`, in that order); no peer is paired
-> (`viewmodel.status.not-paired`); no peer is in use (`viewmodel.status.none-in-use`); the status
-> peer's link has reported nothing yet (`viewmodel.status.looking`); and the reason the status
-> peer's link last reported down (`link.report.down`). A reason reported down earlier is never
-> shown while the link is up.
+> (`viewmodel.status.not-paired`); no peer is in use that this machine may drive
+> (`viewmodel.status.none-in-use`); the status peer's link has reported nothing yet
+> (`viewmodel.status.looking`); and the reason the status peer's link last reported down
+> (`link.report.down`). A reason reported down earlier is never shown while the link is up.
 >
 > - parity: Python's Windows app showed its receiver's state instead, "Waiting for a machine" ("Waiting on port {port}"), "Machine connected", "Receiver needs attention" or "Receiver stopped", with the words "Waiting", "Connected", "Error" and "Stopped" (#14: one link per pair, and no receiver apart from it; one view-model for every platform, the Mac app's states)
 
@@ -475,10 +481,10 @@ live, waiting or a fault; how each looks is `spec/ui.md`'s.
 > up shows driving this machine, not linked.
 
 > r[viewmodel.machines.state.dormant]
-> A dormant peer (`pairing.dormant.forgotten`) shows "Needs re-pair" and the sentence "The other
-> machine no longer has this pairing.", as waiting, whatever its link reports.
+> A dormant peer (`pairing.dormant.forgotten`) shows "Needs re-pair" and the sentence "{label} no
+> longer has this pairing.", as waiting, whatever its link reports.
 >
-> - parity: Python also said "The saved pairing now identifies a different machine." for a peer whose link answered under another machine id, and "This pairing needs to be set up again." for any other reason (ADR 0003: a machine id is derived from the pinned key, so a peer is dormant for one reason only)
+> - parity: Python said "The other machine no longer has this pairing.", and also "The saved pairing now identifies a different machine." for a peer whose link answered under another machine id, and "This pairing needs to be set up again." for any other reason (#11's standing decision, N machines: a string about a peer names it by its label, `viewmodel.words.peer-named`; ADR 0003: a machine id is derived from the pinned key, so a peer is dormant for one reason only)
 
 > r[viewmodel.machines.state.not-in-use]
 > A peer that is not in use shows "NOT IN USE" and the sentence "{label} is not in use on this
@@ -883,8 +889,10 @@ pairing version 2 exchange and its "Older Beamer" machines, and the portable bui
 > r[viewmodel.pairing-sheet.code-spread]
 > The code is typed in six boxes of one digit each. Digits pasted into a box fill it and the boxes
 > after it, one digit each, skipping other characters, and the keyboard's focus goes to the box
-> after the last one filled: pasting "4-5-6" into the third box puts 4, 5 and 6 in the third,
-> fourth and fifth boxes and focuses the sixth. Six digits or more fill every box from the first.
+> after the last one filled, or to the sixth box when the sixth is filled: pasting "4-5-6" into the
+> third box puts 4, 5 and 6 in the third, fourth and fifth boxes and focuses the sixth, and pasting
+> "12" into the fifth box fills the fifth and sixth and focuses the sixth. Six digits or more fill
+> every box from the first and focus the sixth.
 >
 > - parity: Python's PC took the code in one field drawn as six cells, which typed and pasted as any text field does (one behaviour on both machines, the Mac's)
 
@@ -1767,7 +1775,8 @@ machine that could not take profile edits, since every machine can
 
 > r[viewmodel.ledger.corner.buttons]
 > A row's Corners cell has four corner buttons, in the order top left, top right, bottom left,
-> bottom right. Each is on while its corner is `on` for the peer, and off otherwise; a `taken` or
+> bottom right. Each is on while its corner is `on` for the peer or
+> `viewmodel.ledger.corner.kept-removable` shows it as `on`, and off otherwise; a `taken` or
 > `unavailable` corner's button is disabled, except an `unavailable` corner that
 > `viewmodel.ledger.corner.kept-removable` shows as `on`.
 
@@ -2278,6 +2287,8 @@ Mac and "This PC" on a PC name this machine wherever a rule quotes "This Mac".
 > this machine's included, in the reading order `crossing.shortcut.cycle-rows` gives the centres of
 > the footprints shown, this machine's counted before any peer whose centre is at the same left-right
 > position in its row. Moving focus views no machine.
+>
+> - parity: Python's Mac ordered the footprints at one left-right position in a row by centre from top to bottom, then by height, then by machine id (one reading order with the shortcut's cycle, `crossing.shortcut.cycle-rows`, which orders them by the peer list)
 
 > r[viewmodel.profiles.keys.leave]
 > Tab on the last footprint in reading order, or Shift-Tab on the first, moves keyboard focus off the
@@ -2833,7 +2844,7 @@ A PC's admin mode switch, showing what `platform.admin.*` reports. A Mac has no 
 >
 > | Admin mode reports | Words |
 > |---|---|
-> | its state could not be read | "Beamer could not read this PC's administrator setting. Restart Beamer to try again." |
+> | refused (`platform.capability.error-is-state`, `platform.task.launch-failed`), other than as a change's outcome (`viewmodel.input.admin-failed`) | "Beamer could not read this PC's administrator setting. Restart Beamer to try again." |
 > | unsupported, not the installed Beamer (`platform.admin.installed`) | "Install Beamer to control administrator windows." |
 > | unsupported, not the signed-in account (`platform.login.pc-account`, `platform.login.pc-no-account`) | "This setting needs Beamer to run as the signed-in account." |
 > | unsupported, a standard account (`platform.admin.administrator`) | "This setting needs a Windows administrator account." |
@@ -2857,7 +2868,7 @@ A PC's admin mode switch, showing what `platform.admin.*` reports. A Mac has no 
 
 > r[viewmodel.input.admin-failed]
 > On a PC, when the change reports that it failed or was refused (`platform.admin.task-refused`,
-> `platform.admin.rollback`), the switch shows admin mode's earlier state and can be changed again,
+> `platform.admin.rollback`, `platform.task.foreign`), the switch shows admin mode's earlier state and can be changed again,
 > and the note says "The administrator setting could not be changed. Your previous setting has been
 > kept."
 
@@ -2964,8 +2975,8 @@ The Connection page (F39) and Hide addresses. The firewall check and its repair 
 > or not any peer is paired.
 
 > r[viewmodel.connection.hide-text]
-> While Hide addresses is on, every text that the settings window, the menu bar menu or the tray
-> menu, their tooltips and Beamer's notifications show has each IPv4 address in it (four groups of one
+> While Hide addresses is on, every text that the settings window and the tray menu, their
+> tooltips and Beamer's notifications show has each IPv4 address in it (four groups of one
 > to three digits joined by dots) and each hardware address in it (six groups of two hexadecimal
 > digits joined by `:` or `-`) replaced by "•••", and nothing else changed: "Desktop PC at
 > 192.168.1.20:24820, woken by 02:1A:2B:3C:0D:4E" reads "Desktop PC at •••:24820, woken by •••", and
@@ -3080,11 +3091,13 @@ The Overview page's Start at login module, showing the state `platform.login.*` 
 > On a PC, once a change to Start at login succeeds, the module says "In the tray, with no window."
 
 > r[viewmodel.settings.login-refused]
-> When the OS refuses a change to Start at login, so that Start at login reports refused
-> (`platform.capability.error-is-state`), the switch shows Start at login as it then is, and in
-> place of the status (`viewmodel.settings.login-mac-status`, `viewmodel.settings.login-pc-hint`)
-> the module says "macOS refused to change Start at login." on a Mac and "Windows refused to change
-> Start at login." on a PC, until Start at login next reports another state.
+> While Start at login reports refused, whatever the cause, the switch shows Start at login as it
+> then is, and in place of the status (`viewmodel.settings.login-mac-status`,
+> `viewmodel.settings.login-pc-hint`) the module says, until Start at login next reports another
+> state: on a PC, while the refusal names a task Beamer does not change (`platform.task.foreign`),
+> "Start at sign-in could not be changed. Your previous setting has been kept."; otherwise, as when the OS refuses the change (`platform.capability.error-is-state`),
+> "macOS refused to change Start at login." on a Mac and "Windows refused to change Start at
+> login." on a PC.
 >
 > - parity: Python said "macOS refused: {reason}" and "Windows refused: {error}", with the OS's own words (#16: the platform crates report typed values, and the OS's words reach only the log, `platform.capability.error-is-state`)
 
@@ -3176,7 +3189,8 @@ and beam (F31) come later (#11), so the page offers the Light styles only.
 > r[viewmodel.design.length]
 > "Style" offers "Length", a ruler from 0.25 to 2.5 times each style's own play time, in steps of
 > 0.05, with the note "Sets the effect's playback time." Beside the ruler, and as its accessible
-> value, it shows how long the style its tiles show plays at that length (`spec/ui.md`), as
+> value, it shows how long the style chosen for the "Style for" choice shown plays at that length
+> (`spec/ui.md`), "Same as crossing" playing the crossing style chosen, as
 > "{seconds} s" to one decimal place. While the ruler is dragged, a value within 0.045 of 0.5, 1 or
 > 2 is set to that value. Setting it asks Core to save it. It cannot be changed while the style
 > cannot (`viewmodel.design.follow-lock`).
@@ -3328,9 +3342,9 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 
 > r[viewmodel.audio.mic.found-by-name]
 > When no microphone of the shared microphone's machine has the audio route's device key, the
-> selector marks the one microphone of that machine with the audio route's device name, and it can
-> be chosen. When none has that name, or two or more do, the shared microphone counts as one its
-> machine no longer lists (`viewmodel.audio.mic.unplugged`).
+> selector marks the one microphone of that machine with the audio route's device name, which can
+> be chosen as `viewmodel.audio.mic.offered` says. When none has that name, or two or more do, the
+> shared microphone counts as one its machine no longer lists (`viewmodel.audio.mic.unplugged`).
 
 > r[viewmodel.audio.mic.unplugged]
 > While the shared microphone is a named microphone its machine no longer lists, the selector shows
@@ -3741,7 +3755,9 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 > r[viewmodel.audio.menu-open]
 > While a selector of the Audio & Camera page is open, the Camera module's "Camera your apps see" list among
 > them, the whole page, its Camera module included, keeps showing what it showed when the selector
-> opened, and shows `Core`'s newest audio and camera state as soon as the selector closes.
+> opened, and shows `Core`'s newest audio and camera state as soon as the selector closes. Its level
+> meters are the exception: they keep showing `Core`'s newest levels while a selector is open
+> (`viewmodel.audio.mic.meter`, `viewmodel.audio.map.meter`, `viewmodel.audio.devices.meters`).
 
 ### Notices
 
@@ -3754,9 +3770,11 @@ on the audio map are `viewmodel.camera`'s; the page's place in the page list is
 
 > r[viewmodel.audio.notice.vmic-missing]
 > On a Mac whose virtual microphone is not installed, the Audio & Camera page says "Beamer Microphone is not
-> installed, so apps on this Mac cannot hear another machine's microphone." in the waiting tone,
-> followed by " Every app on this Mac goes quiet for about a second while it installs." and an
-> "Install Beamer Microphone" button while no audio stream runs or starts.
+> installed, so apps on this Mac cannot hear another machine's microphone." in the waiting tone.
+> Unless this Beamer does not carry the virtual microphone
+> (`viewmodel.audio.notice.vmic-not-carried`), that is followed by " Every app on this Mac goes
+> quiet for about a second while it installs." and an "Install Beamer Microphone" button while no
+> audio stream runs or starts (`viewmodel.audio.notice.vmic-busy` while one does).
 
 > r[viewmodel.audio.notice.vmic-busy]
 > While an audio stream runs or starts, the virtual microphone's install or update notice says
