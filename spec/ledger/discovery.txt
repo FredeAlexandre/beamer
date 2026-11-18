@@ -116,3 +116,4 @@ win_app/tests/test_parity.py::AlertAndWakeTests::test_a_dead_link_sending_input_
 win_app/tests/test_parity.py::AlertAndWakeTests::test_a_mac_that_refused_the_token_is_not_woken
 win_app/tests/test_parity.py::AlertAndWakeTests::test_a_switch_with_no_link_and_no_address_says_why
 win_app/tests/test_parity.py::AlertAndWakeTests::test_a_switch_with_no_link_wakes_a_mac_whose_address_is_known
+win_app/tests/test_parity.py::ReviewFixTests::test_the_subnet_broadcast_of_a_home_address
