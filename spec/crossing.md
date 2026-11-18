@@ -814,7 +814,16 @@ corners as they were, except a stretch another peer took meanwhile, which stays 
 > When both machines already had footprints, as when a peer is paired again
 > (`pairing.peers.replace-keeps`) or a pairing joins two clusters, neither footprint moves, and the
 > peer's zones come from where its footprint is, unless one is a forgotten machine's that now
-> overlaps another present machine's (`crossing.map.members.forgotten`). Where two clusters'
+> overlaps another present machine's (`crossing.map.members.forgotten`). That peer is placed by
+> default as a peer just paired is. A machine whose zones come from the active profile has the
+> default zone choices toward it, written there with that placement
+> (`crossing.profile.choices.unpaired`), so its zones toward it are those of the first paragraph. A
+> machine with own zones keeps its own zone choices toward it as they were before it was forgotten,
+> and its zones toward it are derived from them at its new place. In the last example of
+> `crossing.map.place.default-written`, P1 turns X's edge off before removing it, and pairs X again
+> at (160, 100): with its zones from the active profile, P1 has a corner zone to X at its
+> bottom-right corner (`crossing.derive.corner.contact`); with own zones, X's edge stays off with
+> no corner chosen, so P1 has no zone to X. Where two clusters'
 > footprints then overlap, each peer whose display overlaps another present machine's display has no
 > zone from the crossing map, a peer paired before included, until a footprint is dropped elsewhere
 > (`crossing.derive.overlap`, `crossing.map.overlap.reported`).
@@ -2357,11 +2366,13 @@ writes and sends no change to them, and its notch zone leads to one of those pee
 > peer, so when the peer is paired again they read as set again, as they were, as its footprint
 > does (`crossing.map.members.forgotten`), and the zones toward it follow them. When, at the first
 > link after that pairing, its footprint counts as none and it is placed by default
-> (`crossing.map.members.forgotten`), it starts from the default zone choices
-> (`crossing.derive.choices.default`), as a peer just paired does (`crossing.derive.first-zone`):
-> the machine that writes that default placement writes, in the same change, the default zone
-> choices toward it in every profile, in the zone choices of each machine paired with it. A
-> machine's own zone choices, which are never shared, keep their choices toward it.
+> (`crossing.map.members.forgotten`), the zone choices toward it in every profile start from the
+> default zone choices (`crossing.derive.choices.default`), as a peer just paired does
+> (`crossing.derive.first-zone`): the machine that writes that default placement writes, in the
+> same change, the default zone choices toward it in every profile, in the zone choices of each
+> machine paired with it. This resets only zone choices in profiles. A machine's own zone choices,
+> which are never shared, keep their choices toward it as they were, so a machine with own zones
+> derives its zones toward it at its new place from them (`crossing.derive.first-zone`).
 >
 > - model: store
 > - parity: Python kept a machine's zone choices toward an unpaired peer in every profile for good: they stayed readable while no machine listed it, the peer still named in the profile status as one waiting for a pairing (`core/profiles.py:358-362`), and pairing with it again followed them even though it always placed the peer by default (#14: shared entries naming a forgotten machine read as unset while it is forgotten and are never written as removed, and a machine paired again over another starts over as one just paired)
