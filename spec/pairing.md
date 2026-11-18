@@ -564,16 +564,19 @@ The rules that hold whoever takes part without the code to one guess against eac
 > Removing a peer deletes it and its zones. Every other peer stays as it was and keeps its zone
 > choices. Its zones stay as they were, apart from what the crossing map gives without the removed
 > peer: a third or a corner that went to the removed peer can go to another peer whose contact or
-> choice claims it (`crossing.derive.share.one-peer`, `crossing.derive.corner.one`), and a peer
-> whose display overlapped only the removed machine's gets its zones from the crossing map again
-> once that footprint reads as unset (`crossing.derive.overlap`). The removal writes nothing to the crossing map: the removed machine stays on this machine's crossing
-> map only as a third party (`crossing.map.members.peers`), and a machine that only it had listed
-> in its paired list leaves this machine's crossing map (`crossing.map.members.third-party`). While
-> no machine in the cluster lists the removed machine as a peer, its footprint and the zone choices
-> toward it in every profile read as unset. When it is paired again, they read as set again, as
-> they were, unless its footprint then overlaps another present machine's and it is placed by
-> default as a peer just paired is (`crossing.map.members.forgotten`,
-> `crossing.profile.choices.unpaired`).
+> choice claims it (`crossing.derive.share.one-peer`, `crossing.derive.corner.one`), and a peer gets
+> its zones from the crossing map again once its display overlaps no present machine's display
+> (`crossing.derive.overlap`). The removed machine, and each machine that only it had listed in its
+> paired list, stops counting for an overlap here when it is kept off this machine's crossing map
+> (`crossing.map.members.third-party`) or when its footprint reads as unset
+> (`crossing.map.members.forgotten`). The removal writes nothing to the crossing map: the removed
+> machine stays on this machine's crossing map only as a third party (`crossing.map.members.peers`),
+> and a machine that only it had listed in its paired list leaves this machine's crossing map
+> (`crossing.map.members.third-party`). While no machine in the cluster lists the removed machine as
+> a peer, its footprint and the zone choices toward it in every profile read as unset. When it is
+> paired again, they read as set again, as they were, unless its footprint then overlaps another
+> present machine's and it is placed by default as a peer just paired is
+> (`crossing.map.members.forgotten`, `crossing.profile.choices.unpaired`).
 >
 > - parity: Python deleted the peer's footprint from the crossing map at once, with the footprint of any machine only it had listed, so a peer paired again was always placed by default (`core/peerlist.py:198-211`) (#14: a footprint and the zone choices in a profile are shared entries, which read as unset while their machine is forgotten and are never written as removed)
 
