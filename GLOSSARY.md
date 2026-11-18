@@ -225,12 +225,15 @@ An audio device that plays, such as speakers or headphones.
 _Avoid_: sink, playback device
 
 **Virtual microphone**:
-The microphone Beamer adds to the Mac, where an audio route delivers another machine's microphone.
-Its product name is Beamer Microphone.
+The microphone apps on a machine record to hear another machine's microphone, where an audio route
+delivers it. On a Mac it is the one Beamer adds, whose product name is Beamer Microphone. On a PC
+it is VB-CABLE, which the user installs: Beamer plays into its CABLE Input, and apps record its
+CABLE Output.
 _Avoid_: driver, HAL driver, mac driver
 
 **Virtual camera**:
 The camera Beamer adds to Windows, where a camera route delivers another machine's camera.
+Its product name is Beamer Camera.
 _Avoid_: vcam, camera source, driver
 
 **Audio route**:
@@ -242,3 +245,69 @@ _Avoid_: audio follows input
 A shared entry saying which machine's camera another machine sees.
 _Avoid_: camera follows input
 
+**Camera sharing**:
+A Mac's own choice to let its camera be shared at all. While it is off, a camera route may still
+name the Mac, but its camera is never opened for Beamer.
+_Avoid_: kill switch, sharing switch
+
+## Screens
+
+**Label**:
+The name every screen shows for a machine: a peer's given name, or else its own name, with its id
+tail (`viewmodel.machines.label.id-tail`) added when two peers share a name.
+_Avoid_: display name, title
+
+**Given name**:
+The name the user gives a peer on this machine, in place of the name the peer has for itself. A
+peer's label is made from it.
+_Avoid_: label, nickname, alias
+
+**Tone**:
+The kind of state a line or notice on a screen reports: quiet, plain, live, waiting or fault. The
+look gives each tone its colour.
+_Avoid_: ink, colour, severity
+
+**Pairing sheet**:
+The part of the Overview page, under the Machines list, where the user pairs this machine: one
+half shows a code here, the other enters a code another machine shows.
+_Avoid_: pairing dialog, pairing window, pair panel
+
+**Crossing ledger**:
+The table on the Crossing page with one row per peer, which shows and changes that peer's zone
+choices, its tick for the shortcut's cycle and its jump key. "The ledger" in the spec means this
+table, except in `spec/ledger/`, the Python test ledger.
+_Avoid_: ways table, machine list
+
+**Snap preview**:
+Where the crossing map shows, while a footprint is dragged, the snap point it would settle at if
+released now.
+_Avoid_: ghost, snap ghost
+
+**Viewed machine**:
+The machine whose zone choices the Crossing page shows and edits: this machine, or, while own
+zones on every machine is off, a machine picked on the crossing map.
+_Avoid_: edited machine, remote machine, profile machine
+
+**Profile word**:
+The word on a machine's footprint, while own zones on every machine is off, that says where its
+zones come from: "Desk", "Own" or "Offline".
+_Avoid_: tile word, status word
+
+**Audio map**:
+The Audio & Camera page's map of this machine and every machine whose audio devices are known, each
+at its footprint on the crossing map, with an arrow for each microphone, sound or camera sent between
+them.
+_Avoid_: machines map, audio diagram
+
+**Status peer**:
+The peer a machine's link status speaks of: the peer its input is on, else the shortcut's machine,
+else the first peer in use that it may drive.
+_Avoid_: primary peer, machine in question, first machine
+
+**Tray icon**:
+Beamer's icon in a Mac's menu bar or a PC's notification area. Its menu is the tray menu.
+_Avoid_: status item, menu bar item, tray glyph
+
+**Notification**:
+A message Beamer shows through the OS's notifications, with a title and a body.
+_Avoid_: alert, balloon, toast
