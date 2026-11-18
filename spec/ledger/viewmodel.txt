@@ -112,6 +112,8 @@ core/tests/test_peerlist.py::RefusalTextTests::test_a_repeated_refusal_notice_is
 core/tests/test_peerlist.py::RefusalTextTests::test_other_reasons_are_left_to_the_apps_own_words
 core/tests/test_peerlist.py::RefusalTextTests::test_owned_and_busy_name_the_machine_in_the_way
 core/tests/test_peerlist.py::RefusalTextTests::test_with_no_machine_named_it_is_another_machine
+core/tests/test_peerlist.py::SharingANameTests::test_a_lone_machine_shares_with_nobody
+core/tests/test_peerlist.py::SharingANameTests::test_names_are_compared_as_labels_compares_them
 core/tests/test_peerlist.py::WordsTests::test_a_code_that_ended_without_an_outcome_says_nothing
 core/tests/test_peerlist.py::WordsTests::test_a_reason_nobody_has_seen_is_still_said
 core/tests/test_peerlist.py::WordsTests::test_an_old_beamer_is_told_to_update_to_1_5_0
