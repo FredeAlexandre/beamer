@@ -9,12 +9,28 @@ app at `archive/python`: `core/crash_log.py`, the logging and settings-file code
 (`mac_app/kvm_bridge_app.py`, `mac_app/settings_store.py`, `win_app/kvm_bridge_win.py`,
 `win_app/app_config.py`), and their tests.
 
-The other domains decide what the runtime carries out: the timers are theirs (the link's
-keep-alive and idle timeout in `spec/link.md`, say), and so are the socket's port
-(`link.transport.port`), what the capture word holds (`spec/input.md`), what the store and
-`local.json` hold (`spec/store.md`, `spec/settings.md`), and every platform call
-(`spec/platform.md`). What the watchdog does with the heartbeat, and the Quit that says "bye" to
-it, are `spec/app.md`'s. The events the machine tier reads in the log are `spec/observability.md`'s.
+The other domains decide what the runtime carries out, and this file does not repeat them:
+
+- **Deadlines** are theirs, such as the link's keep-alive and idle timeout (`link.alive.keep-alive`,
+  `link.alive.idle`), the beacon (`discovery.beacon.every-two-seconds`) and a take's answer
+  (`driving.take.no-answer`).
+- **The socket**: one UDP port, 24820, for links, pairing and the beacon
+  (`link.transport.port`, `pairing.connection.alpn`, `discovery.beacon.bytes`), and what happens
+  when it is taken (`link.transport.port-taken`, `discovery.beacon.port-failure`).
+- **The capture word**: what it holds, and that capture decides from it alone, never waiting on the
+  rest of Beamer (`input.capture.word`).
+- **Platform calls**: that none makes the rest of Beamer wait on the OS
+  (`platform.capability.never-waits`), and the priority capture and the engine run at
+  (`platform.tuning.top-priority`).
+- **What the data files hold**: the store and this machine's own settings (`spec/store.md`,
+  `spec/settings.md`), and what links do while the peer list cannot be read
+  (`pairing.peers.unreadable`).
+- **Log lines**: each domain's own (`link.log.*`, `driving.log.*`, `crossing.log.*`), and the events
+  the machine tier reads (`spec/observability.md`).
+- **Quit and crashes**: what Quit sends before Beamer ends (`driving.home.quit`, `link.send.quit`),
+  the pointer shown again after a crash (`crossing.pointer.crash-mac`,
+  `crossing.pointer.crash-windows`), and what the watchdog does with the heartbeat and with "bye"
+  (`spec/app.md`).
 
 ## Engine
 
@@ -26,8 +42,8 @@ A deadline `Core` asks for while the engine waits for a later one is kept: `Core
 its time, not at the later one.
 
 r[runtime.engine.time-only-forward]
-The times the engine gives `Core` never go backwards, and setting the machine's clock moves none of
-them.
+Each time the engine gives `Core` is no earlier than the one before, whatever happens to the
+machine's clock.
 
 r[runtime.engine.wake]
 An event from the UI, a capture thread, a platform worker or a media thread reaches `Core` while
@@ -44,10 +60,9 @@ data file) are carried out in the order `Core` gave them.
 r[runtime.engine.injection-inline]
 An injection `Core` asks for is posted to the OS before `Core` is given its next event.
 
-r[runtime.engine.blocking-calls]
-While a platform call that blocks is under way (a DDC/CI exchange, a permission probe, a file
-write), `Core` goes on receiving datagrams, deadlines and input, and the call's outcome reaches
-`Core` as an event when it ends.
+r[runtime.engine.call-outcome]
+The outcome of a platform call that blocks (a DDC/CI exchange, a permission probe, a file write)
+reaches `Core` as an event when the call ends.
 
 r[runtime.engine.socket]
 The engine sends every datagram `Core` gives it from the one UDP socket bound on the link's port,
@@ -58,10 +73,6 @@ and hands `Core` every datagram that socket receives, with the address it came f
 r[runtime.capture-word.published]
 When a step of `Core` changes the capture word, the new word is published before the engine gives
 `Core` its next event: every pass-or-swallow decision from then on reads it.
-
-r[runtime.capture-word.never-waits]
-A capture thread decides pass or swallow without waiting for the engine: while the engine is busy
-or stuck, the capture thread decides from the last capture word published.
 
 ## UI
 
@@ -136,8 +147,8 @@ With no data file, Beamer starts from the defaults, logs one line saying it is a
 creates the data folder and the files at their first write.
 
 > r[runtime.files.any-bytes]
-> Whatever bytes a data file holds, Beamer either loads it or refuses it at startup, and never
-> crashes on it.
+> Whatever bytes a data file holds, Beamer either loads it or refuses it each time it reads it, and
+> never crashes on it.
 >
 > - fuzz: store-file
 
@@ -147,8 +158,9 @@ is taken as missing: Beamer starts from the defaults for it, and logs a line nam
 why it was refused.
 
 r[runtime.files.refused-kept]
-A data file refused at startup is never written over while Beamer runs, so it stays as it was for
-the user to move aside.
+A data file refused when it is read, at startup or at Reload configuration
+(`viewmodel.notice.reload`), is not written over until a later read of it succeeds, so it stays as
+it was for the user to mend or move aside.
 
 > r[runtime.files.debounced]
 > A change to the store or to `local.json` is written to its file 0.5 s after the last change before
