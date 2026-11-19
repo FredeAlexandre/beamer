@@ -1279,13 +1279,13 @@ How the crossing ledger (`viewmodel.ledger.*`) is laid out at any width and how 
 > - see: The on chips are tinted cyan, the free one has a dashed outline, a hovered chip lights up and a pressed one turns cyan
 
 > r[ui.ledger.chips.disabled]
-> A chip or a corner button that cannot be used, as in a row of a peer set aside, or a corner
+> A chip or a corner button that cannot be used, as in a row of a peer set aside or for a corner
 > `taken` or `unavailable` (`viewmodel.ledger.corner.buttons`), is drawn with a solid 1 pt
 > `hairline` border, no fill and its words, icon, thirds and bracket in `text-3`, whatever its
 > state, and never with a dashed or `signal` border.
 >
 > - tier: human (a disabled control's look is judged by eye)
-> - do: Press "Leave out" in the peer's ledger row and look at the row; then press "Put back", drag the peer's footprint on the map so it touches nothing and look at its corner squares
+> - do: Press "Leave out" in the peer's ledger row and look at the row; then press "Put back", turn off any of its corners that is on, drag its footprint on the map so it touches nothing and look at its corner squares
 > - see: First its chips and corner squares are plain grey outlines with grey words and brackets, none dashed or cyan; then its four corner squares are drawn the same way
 
 > r[ui.ledger.corners.grid]
@@ -1301,8 +1301,8 @@ How the crossing ledger (`viewmodel.ledger.*`) is laid out at any width and how 
 > Each corner button draws a 7 pt L bracket, 1.8 pt wide, pointing to its corner and centred in its
 > square, with the same margin on all four sides to within 1 pt and at least 3 pt. Free, it has a
 > dashed `outline` border and a `text-2` bracket; on, it is filled `signal` with a `ground` bracket.
-> A `taken` or `unavailable` corner's button is disabled and drawn as `ui.ledger.chips.disabled`
-> says.
+> A corner button disabled because its corner is `taken` or `unavailable`
+> (`viewmodel.ledger.corner.buttons`) is drawn as `ui.ledger.chips.disabled` says.
 >
 > - tier: human (a bracket's place is judged by eye)
 > - parity: Python's Mac drew an unavailable corner's disabled look at 40 % (ADR 0001: one Rune UI draws both machines, the PC's)
