@@ -248,7 +248,7 @@ mac_app/tests/test_identify_screens.py::OverlayTests::test_numbered_panels_ignor
 mac_app/tests/test_identify_screens.py::OverlayTests::test_repeat_does_not_replace_panels_or_extend_expiry_and_reopens_at_boundary  mined: ui.identify.repeat, ui.identify.three-seconds
 mac_app/tests/test_identify_screens.py::OverlayTests::test_stale_request_is_replaced_by_numbers_for_all_current_displays  mined: ui.identify.every-display
 mac_app/tests/test_identify_screens.py::OverlayTests::test_timeout_hides_and_releases_all_panels_after_three_seconds  mined: ui.identify.three-seconds
-mac_app/tests/test_jump_key_recorder_layout.py::JumpKeyRecorderLayoutTests::test_empty_key_uses_body_type_and_the_hint_sits_below  mined: ui.ledger.jump-look
+mac_app/tests/test_jump_key_recorder_layout.py::JumpKeyRecorderLayoutTests::test_empty_key_uses_body_type_and_the_hint_sits_below  dropped: uncalled code (#11): the Mac's jump key recorder at full size, which nothing builds; the ledger's is the compact one
 mac_app/tests/test_map_ticks.py::MapTicks::test_a_corner_where_two_displays_meet_beside_a_side_contact_is_not_drawn  mined: ui.map.seam.corner-contact
 mac_app/tests/test_map_ticks.py::MapTicks::test_a_name_that_fits_stays_centred_and_a_long_one_takes_the_room_left_of_the_badge  mined: ui.map.footprint.name
 mac_app/tests/test_map_ticks.py::MapTicks::test_an_unlit_third_breaks_the_same_way_as_a_lit_one  mined: ui.map.third.breaks, ui.map.third.track

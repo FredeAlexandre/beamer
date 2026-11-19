@@ -1241,8 +1241,8 @@ How the crossing ledger (`viewmodel.ledger.*`) is laid out at any width and how 
 > tallest of them.
 >
 > - tier: human (how the ledger is laid out is judged by eye)
-> - do: Narrow the window to 640 pt with two peers on the Crossing page
-> - see: Each peer is a block: its name on top, its edge chips across the block below, and the corners, notch and keys side by side at the bottom, nothing reaching past the ledger's edge
+> - do: Narrow the window to 640 pt on the Crossing page
+> - see: The peer's row is a block: its name on top, its edge chips across the block below, and the corners, notch and keys side by side at the bottom, nothing reaching past the ledger's edge
 
 > r[ui.ledger.selected]
 > Rows are parted by a 1 pt `hairline` along each row's top. The row of the peer selected on the
@@ -1279,13 +1279,14 @@ How the crossing ledger (`viewmodel.ledger.*`) is laid out at any width and how 
 > - see: The on chips are tinted cyan, the free one has a dashed outline, a hovered chip lights up and a pressed one turns cyan
 
 > r[ui.ledger.chips.disabled]
-> A chip or a corner button that cannot be used, as in a row of a peer set aside, is drawn with a
-> solid 1 pt `hairline` border, no fill and its words, icon, thirds and bracket in `text-3`,
-> whatever its state, and never with a dashed or `signal` border.
+> A chip or a corner button that cannot be used, as in a row of a peer set aside, or a corner
+> `taken` or `unavailable` (`viewmodel.ledger.corner.buttons`), is drawn with a solid 1 pt
+> `hairline` border, no fill and its words, icon, thirds and bracket in `text-3`, whatever its
+> state, and never with a dashed or `signal` border.
 >
 > - tier: human (a disabled control's look is judged by eye)
-> - do: Leave a peer out of pointer crossings and look at its ledger row
-> - see: Its chips and corner squares are plain grey outlines with grey words and brackets, none dashed or cyan
+> - do: Press "Leave out" in the peer's ledger row and look at the row; then press "Put back", drag the peer's footprint on the map so it touches nothing and look at its corner squares
+> - see: First its chips and corner squares are plain grey outlines with grey words and brackets, none dashed or cyan; then its four corner squares are drawn the same way
 
 > r[ui.ledger.corners.grid]
 > A row's four corner buttons (`viewmodel.ledger.corner.buttons`) are 28 pt squares in a grid of two
@@ -1299,10 +1300,12 @@ How the crossing ledger (`viewmodel.ledger.*`) is laid out at any width and how 
 > r[ui.ledger.corners.bracket]
 > Each corner button draws a 7 pt L bracket, 1.8 pt wide, pointing to its corner and centred in its
 > square, with the same margin on all four sides to within 1 pt and at least 3 pt. Free, it has a
-> dashed `outline` border and a `text-2` bracket; on, it is filled `signal` with a `ground` bracket;
-> taken, a `signal` border at 35 % and a `signal` bracket at 50 %; unavailable, it is drawn at 40 %.
+> dashed `outline` border and a `text-2` bracket; on, it is filled `signal` with a `ground` bracket.
+> A `taken` or `unavailable` corner's button is disabled and drawn as `ui.ledger.chips.disabled`
+> says.
 >
 > - tier: human (a bracket's place is judged by eye)
+> - parity: Python's Mac drew an unavailable corner's disabled look at 40 % (ADR 0001: one Rune UI draws both machines, the PC's)
 > - do: Turn a peer's top-left corner on and look at all four corner squares
 > - see: Each bracket sits in the middle of its square pointing at its own corner, the top-left one dark on a cyan square
 
@@ -1327,13 +1330,12 @@ How the crossing ledger (`viewmodel.ledger.*`) is laid out at any width and how 
 
 > r[ui.ledger.jump-look]
 > A peer's jump key with none set shows its words (`viewmodel.crossing.jump-key.empty`) as plain
-> 11.5 pt Hanken Grotesk `text-2` words with no box; a set one shows the chord in B612 Mono `text`
+> 12.5 pt Hanken Grotesk `text-2` words with no box; a set one shows the chord in B612 Mono `text`
 > in a keycap box filled `well` with an `outline` border and 4 pt corners. While it records, its
 > words are `signal` and its hint shows under them; when the recording ends, by a chord, a click or
 > Esc, it shows the empty words or the keycap again and the hint hides.
 >
 > - tier: human (the jump key is judged by eye)
-> - parity: Python's PC set the empty words at the note size, 12.5 pt (ADR 0001: one Rune UI draws both machines, the Mac's)
 > - do: Click a peer's "Set a key", press Esc, click it again and press Option-F18
 > - see: "Set a key" is plain grey words, turns cyan with a hint under it while recording, goes back after Esc, and after the chord shows "⌥ F18" in a small key box
 
@@ -1343,8 +1345,8 @@ How the crossing ledger (`viewmodel.ledger.*`) is laid out at any width and how 
 > growing 74 pt to hold them, inside the ledger at every width.
 >
 > - tier: human (how the ledger is laid out is judged by eye)
-> - do: At 640 pt, rename a dormant peer named "Office studio PC" from its ledger row
-> - see: The field spans the name's cell with the hint below it, and nothing spills out of the ledger
+> - do: At 640 pt, press "Rename" in the peer's ledger row and type "Office studio PC"
+> - see: The field spans the name's cell with "Return saves, Escape cancels" below it, and nothing spills out of the ledger
 
 ## The crossing map
 
