@@ -1,3 +1,5 @@
 # The perf domain's slice of the Python ledger, laid out by #51.
 # Owner domains and the ambiguous assignments: spec/ledger/README.md.
-# No Python test is assigned to this domain.
+# Tests moved here by other domains' miners (#147): spec/ledger/README.md.
+mac_app/tests/test_design_offscreen.py::DesignOffscreenTests::test_native_cursor_resets_do_not_stall_scrolling
+mac_app/tests/test_design_offscreen.py::DesignOffscreenTests::test_resize_callbacks_fit_a_frame_budget

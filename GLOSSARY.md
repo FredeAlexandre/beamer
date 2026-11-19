@@ -242,3 +242,59 @@ _Avoid_: audio follows input
 A shared entry saying which machine's camera another machine sees.
 _Avoid_: camera follows input
 
+
+## Drawing
+
+**Appearance**:
+Whether the settings window draws in its light or its dark colours: "System" follows the OS, and
+"Light" and "Dark" are fixed.
+_Avoid_: colour scheme
+
+**Colour role**:
+A named colour of the look, such as `ground`, `panel` or `signal`, with one value for Light and one
+for Dark. A tone is drawn in a colour role.
+_Avoid_: token, palette entry
+
+**Keyboard navigation**:
+The state in which the user moves the OS's keyboard focus with Tab, Shift-Tab or the arrow keys. It
+shows focus rings, and a mouse press ends it. "Keyboard focus" never means a machine taking input.
+_Avoid_: focus mode, keyboard mode
+
+**Overlay**:
+A window Beamer draws over the desktop on one display, which takes no input and is transparent
+outside what it draws. The edge glow, the Ring, the numbers of identify displays and the pointer
+overlay are drawn in overlays.
+_Avoid_: effect window, HUD
+
+**Frame clock**:
+What paces an overlay's frames: the refresh rate of the display it draws on, divided by the Frame
+rate setting.
+_Avoid_: display link, frame timer
+
+**Edge glow**:
+The light Beamer draws along a zone while the pointer pushes it, in the crossing style chosen.
+_Avoid_: push strip
+
+**Crossing style**:
+What plays at a zone as it is pushed and crossed, chosen on the Design page: Glow or Beam.
+_Avoid_: glow style
+
+**Ring**:
+What plays around the pointer where it lands after a crossing by the shortcut, the menu or a jump
+key, while "Show where the pointer lands" is on.
+_Avoid_: locator, switch arrival
+
+**Stop**:
+One of a colour's hues, in order. Glow and Beam lay a colour's stops evenly along the stretch
+pushed; the Ring runs them round its line.
+_Avoid_: shade
+
+**Style tile**:
+One of the Design page's choices of a crossing style or a Shortcut-and-menu style, shown as a card
+that previews the style above its name.
+_Avoid_: effect tile, preview tile
+
+**Still**:
+The one frame of its loop that a style tile shows while it is not playing, the same every time it
+is drawn.
+_Avoid_: thumbnail, resting frame
