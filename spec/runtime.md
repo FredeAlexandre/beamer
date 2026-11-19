@@ -181,7 +181,7 @@ it was for the user to mend or move aside. No change, Quit or retry writes it me
 > that file, unless `runtime.files.max-wait` writes it sooner: a burst of changes, each within
 > 300 ms of the one before, that ends within 1.7 s of its first change is written once.
 >
-> - parity: Python's PC wrote a switched toggle at once, without the 300 ms wait its other changes had (#16: `Core` debounces its writes, every change alike)
+> - parity: Python waited 300 ms only after the PC's sliders and Reverse scroll and after the Mac's controls that go through `_changed`; it wrote every other change at once on both OSes, such as the PC's Show in tray, Hold full screen and Appearance, the Mac's update checking, Hide addresses, this Mac's name and Same on all machines, Language on both, pairings and what links learned (#16: `Core` debounces its writes, every change alike)
 
 > r[runtime.files.max-wait]
 > No change to a data file waits more than 2 s to be written. While changes keep coming, the file is
@@ -215,7 +215,7 @@ the new one, never a partial or empty file.
 > disk stays as it was, a line naming the file and the OS's error is logged, and `Core` is told of
 > the failure.
 >
-> - parity: Python's PC logged the failure ("Setting could not be saved") and showed a "Save failed" dialog only for the Connection page's port, and the Mac showed the error as a note in its window (#16: errors that aren't bugs are values, logged and passed on, and what a screen says of them is `spec/viewmodel.md`'s)
+> - parity: Python's PC logged the failure ("Setting could not be saved") and showed a "Save failed" dialog only for the Connection page's port, and the Mac showed a note in its window only when its debounced controls, the Connection page, this Mac's or another machine's name, a jump key or the removal of a machine could not be saved, posted a notification when a change to a peer's drive permissions or its other on-off choices could not be, and ended a pairing it could not save; every other failed save, such as update checking, pointer hiding, Hide addresses, Language or Same on all machines, was only logged as a warning (#16: errors that aren't bugs are values, logged and passed on, and what a screen says of them is `spec/viewmodel.md`'s)
 
 r[runtime.files.write-retried]
 After a failed write, the newest content of that data file is tried again with its next change and
