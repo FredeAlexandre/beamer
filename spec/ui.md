@@ -2082,15 +2082,16 @@ Sizes are in pt, Rune's logical units, which a PC's px equal at 100 % scaling.
 ### The frame clock
 
 > r[ui.overlay.frame-rate]
-> An overlay draws its frames at the refresh rate of the display it draws on (120 a second on a
-> ProMotion display, and 60 when the OS gives no rate) divided by the Frame rate setting
-> (`viewmodel.design.frame-rate`): by 1 for "Match display", 2 for "Half" and 4 for "Quarter",
-> rounded down to a whole number of frames a second. The Design page's previews draw at the same
-> rate for the display the window is on, capped at 60 before the division.
+> An overlay draws its frames at the refresh rate of the display it draws on (60 a second when the
+> OS gives no rate) divided by "Frame rate" (`viewmodel.design.frame-rate`): by 1 for "Match
+> display", 2 for "Half" and 4 for "Quarter", rounded down to a whole number of frames a second. So
+> a 60 Hz display draws 60, 30 or 15 frames a second, and a 144 Hz display 144, 72 or 36. The Design
+> page's previews draw at the same rate for the display the window is on, capped at 60 before the
+> division.
 >
 > - tier: human (smoothness is judged by eye)
-> - do: On a Mac with a ProMotion display, choose Beam and push steadily against an edge with Frame rate on "Match display", then on "Quarter"
-> - see: The comet glides at "Match display" and moves in visible steps at "Quarter"
+> - do: On the Mac's built-in display, which runs at 60 Hz, choose Beam, set "Frame rate" to "Quarter" and push steadily against an edge toward the PC without crossing; then set it to "Match display" and push again
+> - see: At "Quarter" the comet jumps along in clear steps, about 15 a second; at "Match display" it glides, 60 a second, over the same time
 > - parity: Python's Mac paced every overlay to the fastest display's rate, wherever it drew (ADR 0001: one Rune UI draws both machines; the PC's, each overlay at the rate of the display it draws on)
 
 > r[ui.overlay.paced]
@@ -2466,8 +2467,8 @@ said under "When feedback plays". The crossing effects (F30) are Later, their ro
 > On a Mac, where the full depth is greater than the height of the menu bar across the top of the
 > display pushed, Glow along the top edge, and along the top wall of a top corner, is scaled by the
 > menu bar's height over the full depth, so a push at the resistance fills the menu bar exactly. Beam,
-> the bottom edge, the bottom corners, and a display whose menu bar is hidden or absent keep the
-> depth of `ui.glow.band`. The menu bar is that display's own.
+> the bottom edge, the bottom corners, the notch (`ui.glow.notch`), and a display whose menu bar is
+> hidden or absent keep the depth of `ui.glow.band`. The menu bar is that display's own.
 >
 > - tier: human (filling the menu bar is judged by eye)
 > - do: On a Mac with its menu bar showing, choose Glow, turn on a top corner toward a peer and push hard into it
@@ -2475,12 +2476,15 @@ said under "When feedback plays". The crossing effects (F30) are Later, their ro
 
 > r[ui.glow.notch]
 > At the notch, Glow and Beam light the notch's span of the top edge as they light a third
-> (`ui.glow.third`).
+> (`ui.glow.third`), but hung from the notch's lower edge rather than from the top of the display,
+> so that all of their light shows below the camera housing: Glow's band grows downward from the
+> notch's lower edge, and Beam's bright line lies along it. The menu bar's height does not scale
+> them there (`ui.glow.menu-bar`).
 >
 > - tier: human (the light at the notch is judged by eye)
-> - do: On a Mac with a notch, turn on the notch toward a peer and push up into it
-> - see: Light spreads along the top edge under the notch's width, fading out at both ends
-> - parity: Python drew no Glow or Beam at the notch: the notch island or notch beam played there (#11: the notch island and beam, F31, are Later; their room is `ui.later.notch`)
+> - do: On the Mac, turn on the notch toward the PC, choose Glow and push up into the notch without crossing; then choose Beam and push again
+> - see: Glow's light hangs just below the notch, as wide as it, fading out at both ends and reaching further down the harder you push; Beam's thin bright line runs along the notch's lower edge with its comet travelling from left to right
+> - parity: Python drew no Glow or Beam at the notch: the notch island or notch beam played there (#11: the notch island and beam, F31, are Later, their room `ui.later.notch`; hung below the notch, the light shows where the camera housing would hide it)
 
 > r[ui.glow.drain]
 > While pressure reports keep coming, Glow and Beam show the push pressure reported. After the last,

@@ -170,7 +170,7 @@ mac_app/tests/test_effect_layouts.py::AuditFindingTests::test_a_gauge_switch_nea
 mac_app/tests/test_effect_layouts.py::AuditFindingTests::test_a_push_draining_between_events_stays_on_its_display  mined: ui.feedback.one-display
 mac_app/tests/test_effect_layouts.py::ClassicPreviewTests::test_a_corner_lights_both_its_walls_on_the_mac_screen  mined: ui.glow.corner
 mac_app/tests/test_effect_layouts.py::ClassicPreviewTests::test_aperture_is_a_light_effect_and_has_a_preview  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
-mac_app/tests/test_effect_layouts.py::ClassicPreviewTests::test_glow_and_beam_play_at_every_place_the_preview_shows  mined: ui.glow.corner, ui.glow.notch
+mac_app/tests/test_effect_layouts.py::ClassicPreviewTests::test_glow_and_beam_play_at_every_place_the_preview_shows  mined: ui.glow.corner
 mac_app/tests/test_effect_layouts.py::ClassicPreviewTests::test_only_the_styles_have_a_preview  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 mac_app/tests/test_effect_layouts.py::CornerSideTests::test_a_corner_draws_the_same_whichever_of_its_sides_leads_to_the_other_machine  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 mac_app/tests/test_effect_layouts.py::DisplayForTests::test_a_point_on_a_display_stays_where_it_is  mined: ui.feedback.one-display
@@ -478,7 +478,7 @@ win_app/tests/test_effect_layouts.py::AuditFindingTests::test_a_departure_carrie
 win_app/tests/test_effect_layouts.py::AuditFindingTests::test_a_gauge_switch_near_a_corner_draws_no_corner_register  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 win_app/tests/test_effect_layouts.py::AuditFindingTests::test_a_push_draining_between_events_stays_on_its_display  mined: ui.feedback.one-display
 win_app/tests/test_effect_layouts.py::ClassicPreviewTests::test_a_corner_lights_both_its_walls_on_the_mac_screen  mined: ui.glow.corner
-win_app/tests/test_effect_layouts.py::ClassicPreviewTests::test_glow_and_beam_play_at_every_place_the_preview_shows  mined: ui.glow.corner, ui.glow.notch
+win_app/tests/test_effect_layouts.py::ClassicPreviewTests::test_glow_and_beam_play_at_every_place_the_preview_shows  mined: ui.glow.corner
 win_app/tests/test_effect_layouts.py::ClassicPreviewTests::test_only_the_styles_have_a_preview  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 win_app/tests/test_effect_layouts.py::CornerSideTests::test_a_corner_draws_the_same_whichever_of_its_sides_leads_to_the_other_machine  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 win_app/tests/test_effect_layouts.py::DisplayForTests::test_a_point_on_a_display_stays_where_it_is  mined: ui.feedback.one-display
