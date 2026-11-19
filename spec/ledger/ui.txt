@@ -188,20 +188,20 @@ mac_app/tests/test_effect_layouts.py::LengthTests::test_the_push_follows_the_han
 mac_app/tests/test_effect_parity.py::MacEffectParityTests::test_beam_edge_alpha_profile_matches_windows_across_every_stage  mined: ui.preview.same-on-both
 mac_app/tests/test_effect_parity.py::MacEffectParityTests::test_each_effect_matches_its_windows_reference_frame  mined: ui.preview.same-on-both
 mac_app/tests/test_effect_size_settings.py::EffectSizeSettingsTests::test_top_edge_band_never_exceeds_the_selected_depth  mined: ui.glow.menu-bar
-mac_app/tests/test_effects_overlay.py::ColourFillTest::test_evenodd_fill_uses_the_eo_variant  mined: ui.overlay.draw.shapes
+mac_app/tests/test_effects_overlay.py::ColourFillTest::test_evenodd_fill_uses_the_eo_variant  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 mac_app/tests/test_effects_overlay.py::ColourFillTest::test_nonzero_fill_sets_colour_and_fills  mined: ui.overlay.draw.shapes, ui.overlay.draw.colour
-mac_app/tests/test_effects_overlay.py::ColourStrokeTest::test_every_cap_and_join_maps_to_its_cg_constant  mined: ui.overlay.draw.strokes
+mac_app/tests/test_effects_overlay.py::ColourStrokeTest::test_every_cap_and_join_maps_to_its_cg_constant  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 mac_app/tests/test_effects_overlay.py::ColourStrokeTest::test_stroke_sets_width_cap_join_and_colour  mined: ui.overlay.draw.strokes
 mac_app/tests/test_effects_overlay.py::DisplayClipTest::test_a_pen_that_names_its_display_is_drawn_inside_it  mined: ui.overlay.clip
 mac_app/tests/test_effects_overlay.py::EdgeGlowDisplayTest::test_a_strip_along_the_whole_desktop_is_cut_to_the_pointers_display  mined: ui.feedback.one-display
 mac_app/tests/test_effects_overlay.py::EdgeGlowDisplayTest::test_the_macs_own_push_uses_the_engines_pressure_again  mined: ui.glow.drain, ui.feedback.one-display
 mac_app/tests/test_effects_overlay.py::EdgeGlowDisplayTest::test_the_push_home_while_the_pc_drives_lights_the_band_and_drains  mined: ui.feedback.push, ui.glow.drain, ui.glow.flash
-mac_app/tests/test_effects_overlay.py::GradientFillTest::test_evenodd_gradient_fill_clips_with_the_eo_variant  mined: ui.overlay.draw.shapes, ui.overlay.draw.linear
+mac_app/tests/test_effects_overlay.py::GradientFillTest::test_evenodd_gradient_fill_clips_with_the_eo_variant  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 mac_app/tests/test_effects_overlay.py::GradientFillTest::test_nonzero_gradient_fill_clips_then_draws  mined: ui.overlay.draw.shapes, ui.overlay.draw.linear
-mac_app/tests/test_effects_overlay.py::GradientStopsTest::test_a_single_stop_becomes_flat_colour_at_both_ends  mined: ui.overlay.draw.stops
-mac_app/tests/test_effects_overlay.py::GradientStopsTest::test_an_empty_gradient_draws_nothing  mined: ui.overlay.draw.stops
+mac_app/tests/test_effects_overlay.py::GradientStopsTest::test_a_single_stop_becomes_flat_colour_at_both_ends  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
+mac_app/tests/test_effects_overlay.py::GradientStopsTest::test_an_empty_gradient_draws_nothing  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 mac_app/tests/test_effects_overlay.py::GradientStopsTest::test_one_gradient_build_per_pen_object_even_when_two_ops_share_it  python-detail: how many Core Graphics gradient objects a frame builds; nothing drawn changes
-mac_app/tests/test_effects_overlay.py::GradientStopsTest::test_stops_are_sorted_by_offset  mined: ui.overlay.draw.stops
+mac_app/tests/test_effects_overlay.py::GradientStopsTest::test_stops_are_sorted_by_offset  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 mac_app/tests/test_effects_overlay.py::GradientStrokeTest::test_gradient_stroke_replaces_path_then_clips_then_draws  mined: ui.overlay.draw.strokes
 mac_app/tests/test_effects_overlay.py::OverlayFeedTest::test_a_display_unplugged_mid_effect_shows_nothing_and_the_effect_still_ends  mined: ui.overlay.display-gone
 mac_app/tests/test_effects_overlay.py::OverlayFeedTest::test_a_notch_push_with_no_notch_plays_as_the_top_edge  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
@@ -510,11 +510,11 @@ win_app/tests/test_effect_overlay.py::OverlayTests::test_the_app_shows_a_switch_
 win_app/tests/test_effect_overlay.py::OverlayTests::test_the_event_that_starts_an_effect_draws_its_first_frame  mined: ui.overlay.paced
 win_app/tests/test_effect_overlay.py::OverlayTests::test_the_window_margin_stops_at_a_pens_display  mined: ui.overlay.clip
 win_app/tests/test_effect_overlay.py::OverlayTests::test_the_window_never_takes_input_focus_or_a_taskbar_button  mined: ui.overlay.no-input, ui.overlay.not-listed, ui.overlay.on-top-pc, ui.overlay.transparent
-win_app/tests/test_effect_overlay.py::ReplayTests::test_a_hard_stop_keeps_both_colours  mined: ui.overlay.draw.stops
-win_app/tests/test_effect_overlay.py::ReplayTests::test_a_line_after_a_close_carries_on_from_the_subpath_start  mined: ui.overlay.draw.shapes
+win_app/tests/test_effect_overlay.py::ReplayTests::test_a_hard_stop_keeps_both_colours  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
+win_app/tests/test_effect_overlay.py::ReplayTests::test_a_line_after_a_close_carries_on_from_the_subpath_start  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 win_app/tests/test_effect_overlay.py::ReplayTests::test_a_real_effect_replays_into_a_real_painter  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 win_app/tests/test_effect_overlay.py::ReplayTests::test_a_stroke_carries_width_cap_and_join  mined: ui.overlay.draw.strokes
-win_app/tests/test_effect_overlay.py::ReplayTests::test_every_op_restores_opacity_and_composition  mined: ui.overlay.draw.alpha, ui.overlay.draw.shapes
+win_app/tests/test_effect_overlay.py::ReplayTests::test_every_op_restores_opacity_and_composition  mined: ui.overlay.draw.alpha
 win_app/tests/test_effect_overlay.py::ReplayTests::test_every_paint_kind  mined: ui.overlay.draw.colour, ui.overlay.draw.linear, ui.overlay.draw.radial, ui.overlay.draw.conic
 win_app/tests/test_effect_overlay.py::ReplayTests::test_every_path_segment  mined: ui.overlay.draw.shapes
 win_app/tests/test_effect_overlay.py::ReplayTests::test_one_qt_gradient_per_gradient_per_frame  python-detail: how many Qt gradient objects a frame builds; nothing drawn changes

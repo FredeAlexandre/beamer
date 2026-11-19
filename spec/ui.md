@@ -2105,23 +2105,23 @@ Sizes are in pt, Rune's logical units, which a PC's px equal at 100 % scaling.
 
 ### Drawing
 
-What an overlay can draw: what Glow, Beam, the Ring and identify displays use, and the drawing the
-crossing effects (F30) would build on. Each applies wherever an overlay draws; its check looks at whichever
-of them shows it best.
+What an overlay draws for Glow, Beam, the Ring and the identify cards, the same on a Mac and a PC.
+Each applies wherever an overlay draws; its check looks at whichever of them shows it best. The
+crossing effects (F30) and the notch island and beam (F31) will need more than this, which "Rooms
+for what comes Later" names.
 
 > r[ui.overlay.draw.shapes]
-> An overlay draws shapes made of straight lines, quadratic and cubic curves and circular arcs, in
-> one or more outlines, open or closed; a line drawn after an outline is closed starts from that
-> outline's first point. A shape is filled by the nonzero rule or the even-odd rule, as asked: under
-> even-odd, an outline inside another cuts a hole in it.
+> An overlay fills and strokes the shapes Glow, Beam, the Ring and the identify cards are made of:
+> rectangles, rectangles with rounded corners, and circles. Their edges are smooth at the display's
+> scaling, and a circle is round all the way, with no flat spots or corners.
 >
 > - tier: human (shapes are judged by eye)
-> - do: With "Show where the pointer lands" on, bring input home by the shortcut
-> - see: The Ring is a smooth, even circle all round, with no flat spots or kinks
+> - do: With "Show where the pointer lands" on, bring input home by the shortcut; then press "Identify screens"
+> - see: The Ring is a smooth, even circle all round, and each number card's corners are smooth even curves, with no steps or kinks
 
 > r[ui.overlay.draw.strokes]
-> A stroke draws a shape's outline at the width asked for, centred on the outline, with butt, round
-> or square ends and mitred, round or bevelled corners. A stroke painted with a gradient shows the
+> A stroke draws a shape's outline at the width asked for, centred on the outline: the Ring's line,
+> the dark halo under it, and an identify card's border. A stroke painted with a gradient shows the
 > gradient on the stroke alone.
 >
 > - tier: human (line widths are judged by eye)
@@ -2137,43 +2137,39 @@ of them shows it best.
 > - see: The Ring's dark halo is a soft translucent grey through which the window shows, not solid black
 
 > r[ui.overlay.draw.linear]
-> A linear gradient runs its stops from its start point to its end point, and keeps its first
-> stop's colour before the start and its last stop's after the end.
+> A linear gradient blends smoothly from each of its stops to the next, colour and opacity alike,
+> along the line from its start point to its end point, with no visible bands or steps. Glow and
+> Beam are drawn with linear gradients: the colour's stops along the stretch, and their light fading
+> inward from the edge and, for Beam's comet, along it.
 >
 > - tier: human (colour is judged by eye)
-> - do: Choose Colourful and push against a left edge toward a peer
-> - see: The colours run smoothly from red-pink at the top to green at the bottom, solid to both ends of the edge
+> - do: Choose Colourful and Beam, and push steadily against a left edge toward the PC without crossing
+> - see: The colours run smoothly from red-pink at the top to green at the bottom, the light fades smoothly inward from the edge, and the comet's tails fade smoothly, with no bands or steps anywhere
 
 > r[ui.overlay.draw.radial]
-> A radial gradient runs its stops from a start circle to an end circle, either of which may have a
-> radius of 0, and keeps its end stops' colours beyond them.
+> A radial gradient runs its stops outward from a centre point to a circle round it, the same in
+> every direction: the soft glow that swells at the Ring's tip (`ui.ring.closes`).
 >
 > - tier: human (colour is judged by eye)
 > - do: In dark mode, bring input home by the shortcut with "Show where the pointer lands" on
 > - see: As the Ring closes, a soft round glow swells at the pointer's tip, brightest at its middle and fading evenly to nothing at its rim
 
 > r[ui.overlay.draw.conic]
-> A conic gradient runs its stops once round a centre point, clockwise as seen from its start
-> angle. One whose last stop is its first colour shows no seam, and translucent stops show no
-> spokes or brighter lines anywhere round it.
+> A conic gradient runs its stops once round a centre point, clockwise from the angle it starts at,
+> as the Ring's colours run round it (`ui.ring.colours`). One whose last stop is its first colour
+> shows no seam, and drawn at part opacity, as the Ring fades in and out, it shows no spokes or
+> brighter lines anywhere round it.
 >
 > - tier: human (colour is judged by eye)
 > - do: Choose Colourful and bring input home by the shortcut with "Show where the pointer lands" on
 > - see: The colours run evenly round the Ring as it closes and fades, with no seam and no spokes
 
-> r[ui.overlay.draw.stops]
-> A gradient's stops are drawn in the order of their offsets, whatever order they were given in. Two
-> stops at the same offset make a hard edge between their colours, in the order given. A gradient
-> of one stop draws that colour flat, and one of no stops draws nothing.
->
-> - tier: human (colour is judged by eye)
-> - do: Choose Signal, push against an edge toward a peer, then bring input home by the shortcut with "Show where the pointer lands" on
-> - see: The band and the Ring are one flat blue, with no other colour anywhere along or round them
-
 > r[ui.overlay.draw.alpha]
 > Each shape is drawn at its own opacity and with its own compositing, normal or additive, and
 > neither carries over to the next shape. Additive drawing adds its light to what is under it, so
-> it brightens and never darkens; normal drawing covers what is under it by its opacity.
+> it brightens and never darkens; normal drawing covers what is under it by its opacity. The glow at
+> the Ring's tip is additive while the OS is in dark mode (`ui.palette.os-mode`), and normal in
+> light mode; the Ring's line and halo are normal.
 >
 > - tier: human (brightness is judged by eye)
 > - do: In dark mode, choose Colourful and bring input home by the shortcut with "Show where the pointer lands" on
@@ -3036,27 +3032,31 @@ Glow, Beam and the Ring as the desktop does (`ui.glow.*`, `ui.beam.*`, `ui.ring.
 
 The crossing effects (F30) and the notch island and notch beam (F31) are Later in #11: neither is
 built in 2.0, and the Design page offers neither (`viewmodel.design.styles`). What ships for Glow,
-Beam, the Ring and identify displays is the room left for them.
+Beam, the Ring and identify displays is the room left for them: the overlay, its frame clock and
+its drawing (`ui.overlay.*`). They will need more of that drawing than 2.0 uses, which a later
+version adds to it: for F30, shapes of any outline of lines and quadratic and cubic curves, with
+holes cut by the even-odd rule, strokes with butt or square ends and mitred or bevelled corners,
+and gradients whose stops come out of order, share an offset or are missing; for F31, a Gaussian
+blur that softens what is drawn into a bloom.
 
 > r[ui.later.effects]
-> Glow, Beam and the Ring are drawn by one overlay drawing, the same on a Mac and a PC, which draws
-> any figure of lines, curves and arcs, filled or stroked, in flat colour or in linear or radial
-> gradients, at any opacity, laid over what is under it or added to it as light, and plays it on
-> the overlay's frame clock at the display's refresh rate divided by 1, 2 or 4, as "Frame rate"
-> chooses (`ui.overlay.frame-rate`): 120 Hz on a ProMotion display at "Match display". This drawing
-> and frame clock are the room left for the crossing effects (F30), Later in #11.
+> Glow, Beam and the Ring are drawn by one overlay drawing, the same on a Mac and a PC
+> (`ui.overlay.draw.*`), on the overlay's frame clock (`ui.overlay.frame-rate`): on displays of the
+> same size in pt, at the same colour, Size and Length, a push or a Ring draws the same light on
+> either machine. This one drawing and its frame clock are the room left for the crossing effects
+> (F30), Later in #11.
 >
-> - tier: human (drawing and motion are judged by eye)
-> - do: On a Mac with a ProMotion display, with "Frame rate" on "Match display", choose Colourful and push slowly against an edge with Beam; then choose "Quarter" and push again
-> - see: The light shades smoothly through Colourful's hues and the comet runs fluidly the first time; the second time the comet visibly steps, over the same time
+> - tier: human (drawing is judged by eye)
+> - do: With GN10 at its full 2560 × 1440 on both machines and the same colour, Size and Length on both, choose Colourful and Beam and turn on "Show where the pointer lands"; with GN10 showing the Mac, push against its edge toward the PC without crossing, then, with the pointer on GN10, cross by the shortcut and come home by it; then do the same with GN10 showing the PC
+> - see: The light along GN10's edge and the Ring round the pointer look the same from the Mac and from the PC: the same colours, depth, line and comet
 
 > r[ui.later.notch]
-> On a Mac, the overlay draws above the menu bar, on every Space and over an app in full screen, so
-> Glow and Beam along the top edge and at the notch show over the menu bar (`ui.glow.menu-bar`,
-> `ui.glow.notch`). Its drawing is `ui.later.effects`' with one more step, a Gaussian blur that
-> softens what it draws into a bloom. This is the room left for the notch island and notch beam
-> (F31), Later in #11.
+> On a Mac with a notch, the overlay draws round the notch at its true size and place on its display,
+> whatever resolution the display is set to: the light at the notch (`ui.glow.notch`) spans the
+> notch's width and hangs from its lower edge. This, with the drawing of `ui.later.effects` and the
+> overlay above the menu bar on every Space (`ui.overlay.on-top-mac`), is the room left for the
+> notch island and notch beam (F31), Later in #11.
 >
-> - tier: human (what is on top is judged by eye)
-> - do: On a Mac with a notch, turn on the notch toward a peer, put an app in full screen in another Space, and push up into the notch there
-> - see: The light shows along the top edge under the notch, over the menu bar, in that Space as in the first
+> - tier: human (placement is judged by eye)
+> - do: On the Mac, with the notch on toward the PC and Glow chosen, set the built-in display to "More Space" in Displays settings and push up into the notch; then set it back to "Default" and push again
+> - see: Both times the light hangs just below the notch and spans exactly its width
