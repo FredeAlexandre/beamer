@@ -142,9 +142,20 @@ outside ASCII, such as a user folder named `José`.
 r[runtime.files.round-trip]
 What Beamer writes to a data file, it loads back unchanged at its next start.
 
-r[runtime.files.first-run]
-With no data file, Beamer starts from the defaults, logs one line saying it is a first run, and
-creates the data folder and the files at their first write.
+> r[runtime.files.first-run]
+> When neither data file is on disk at startup, Beamer starts from the defaults, logs one line saying
+> it is a first run, and creates the data folder and both data files, holding the defaults, before
+> `Core` is given its first event.
+>
+> - parity: Python also wrote its settings file at once on a first run, but logged no line for it: the Mac's "first run: no settings yet" came only when loading failed and no file was there (a first run is named in the log, for whoever reads a report)
+
+> r[runtime.files.one-missing]
+> When one data file is on disk at startup and the other is not, it is not a first run: no first-run
+> line is logged, the missing file starts from its defaults and is created holding them before
+> `Core` is given its first event, and the file on disk is loaded, or refused as
+> `runtime.files.refused-defaults` says.
+>
+> - parity: Python kept one file, so it could not be missing beside another (#16: the store's copy and this machine's own settings are two files)
 
 > r[runtime.files.any-bytes]
 > Whatever bytes a data file holds, Beamer either loads it or refuses it each time it reads it, and
@@ -152,30 +163,39 @@ creates the data folder and the files at their first write.
 >
 > - fuzz: store-file
 
-r[runtime.files.refused-defaults]
-A data file that is there but is refused at startup (damaged, or not a version this build reads)
-is taken as missing: Beamer starts from the defaults for it, and logs a line naming the file and
-why it was refused.
+> r[runtime.files.refused-defaults]
+> A data file that is on disk but is refused at startup (damaged, or not a version this build reads)
+> is not a first run: Beamer starts from the defaults for that file alone, logs a line naming the
+> file and why it was refused, and leaves the file as `runtime.files.refused-kept` says. No
+> first-run line is logged, and the file is not created again.
+>
+> - parity: Python's PC started with no settings at all, its window showing none, and only the Mac started from the defaults (one rule for both OSes, from the Mac's)
 
 r[runtime.files.refused-kept]
 A data file refused when it is read, at startup or at Reload configuration
 (`viewmodel.notice.reload`), is not written over until a later read of it succeeds, so it stays as
-it was for the user to mend or move aside.
+it was for the user to mend or move aside. No change, Quit or retry writes it meanwhile.
 
 > r[runtime.files.debounced]
-> A change to the store or to `local.json` is written to its file 0.5 s after the last change before
-> it: a burst of changes, each within 0.5 s of the one before, is written once.
+> A change to the store or to `local.json` is written to its file 300 ms after the last change to
+> that file, unless `runtime.files.max-wait` writes it sooner: a burst of changes, each within
+> 300 ms of the one before, that ends within 1.7 s of its first change is written once.
 >
-> - parity: Python wrote the settings file at once on every change (#16: `Core` debounces its writes)
+> - parity: Python's PC wrote a switched toggle at once, without the 300 ms wait its other changes had (#16: `Core` debounces its writes, every change alike)
 
 > r[runtime.files.max-wait]
-> While changes keep coming, a data file is written at least every 2 s, so no change waits longer
-> than that.
+> No change to a data file waits more than 2 s to be written. While changes keep coming, the file is
+> written 2 s after its first change not yet written, and the next change starts a new wait: a
+> burst of changes 0.1 s apart that lasts 3 s is written twice, at 2 s and 300 ms after its last
+> change.
 >
-> - parity: Python wrote the settings file at once on every change (#16: `Core` debounces its writes)
+> - parity: Python had no maximum: a change waited as long as further changes kept coming within 300 ms (2 s is a value no decision sets; #16 decides only that writes are debounced)
 
-r[runtime.files.quit]
-A change not yet written when Beamer quits is written before the process ends.
+> r[runtime.files.quit]
+> A change not yet written when Beamer quits is written before the process ends, unless its file is
+> refused (`runtime.files.refused-kept`).
+>
+> - parity: Python dropped a change still waiting out its 300 ms when it quit: the Mac's Quit never wrote it, and the PC's stopped its pending timer (a change made just before Quit is kept)
 
 r[runtime.files.newest-wins]
 When several writes of one data file are pending, the file ends holding the newest content.
@@ -184,16 +204,18 @@ r[runtime.files.whole]
 A data file is replaced whole: a process killed at any moment of a write leaves the previous file or
 the new one, never a partial or empty file.
 
-r[runtime.files.leftovers]
-A temporary file that an interrupted write left in the data folder is never loaded, and is gone
-after the next write of its data file.
+> r[runtime.files.leftovers]
+> A temporary file that an interrupted write left in the data folder is never loaded, and is gone
+> after the next write of its data file.
+>
+> - parity: Python removed a temporary file only when its own write failed, so one left by a killed process stayed for good (a leftover is cleared at the next write)
 
 > r[runtime.files.write-failed]
 > When a data file cannot be written (the disk is full, the folder is not writable), the file on
 > disk stays as it was, a line naming the file and the OS's error is logged, and `Core` is told of
 > the failure.
 >
-> - parity: Python raised the error to the window that saved, which showed a "Save failed" dialog on the PC (#16: errors that aren't bugs are values, logged and passed on, and what a screen says of them is `spec/viewmodel.md`'s)
+> - parity: Python's PC logged the failure ("Setting could not be saved") and showed a "Save failed" dialog only for the Connection page's port, and the Mac showed the error as a note in its window (#16: errors that aren't bugs are values, logged and passed on, and what a screen says of them is `spec/viewmodel.md`'s)
 
 r[runtime.files.write-retried]
 After a failed write, the newest content of that data file is tried again with its next change and
@@ -249,11 +271,16 @@ Every thread Beamer starts has a name, and each line it logs carries that name a
 > - parity: Python's PC logged "Starting Beamer Windows receiver" and the log's path, and the Mac logged neither (one start line on both OSes, naming the version the machine tier's reports need, ADR 0005)
 
 r[runtime.log.written-within-a-second]
-A line is in the log file within 1 s of being logged.
+A line logged and not dropped under `runtime.log.never-waits` is in the log file within 1 s of
+being logged.
 
-r[runtime.log.never-waits]
-A thread that logs never waits for the log file. When lines come faster than the file takes them,
-the excess is dropped, and one line says how many were dropped once there is room again.
+> r[runtime.log.never-waits]
+> A thread that logs never waits for the log file, except a panicking thread writing its own line
+> (`runtime.crash.logged`). When lines come faster than the file takes them, the lines that find no
+> room are dropped, and once there is room again one line says how many were dropped. No other line
+> is ever dropped.
+>
+> - parity: Python wrote each line on the thread that logged it, which waited for the file, and dropped none (#16: real-time threads never take locks, and their events reach the logging worker through a ring)
 
 ## Crash
 
@@ -264,10 +291,11 @@ the excess is dropped, and one line says how many were dropped once there is roo
 
 r[runtime.crash.logged]
 Before the process ends, a panic logs an error line naming the thread, the panic's message and the
-place in the source it came from.
+place in the source it came from. This line is never dropped.
 
 r[runtime.crash.log-kept]
-Every line logged before a panic is in the log file when the process ends.
+When a panic ends the process, the log file holds every line logged before it and not dropped
+under `runtime.log.never-waits`, and the panic's own line (`runtime.crash.logged`).
 
 > r[runtime.crash.crash-log]
 > A panic adds an entry to `crash.log`, in the log's folder: the time, Beamer's version, the
@@ -281,4 +309,4 @@ Every line logged before a panic is in the log file when the process ends.
 > entry to `crash.log` naming the signal or exception and the thread it hit, then ends the process
 > as the OS would, so its own crash report is still made.
 >
-> - parity: Python wrote every thread's Python stack on a fatal signal on the Mac, and nothing on the PC, where its handler also saw exceptions that were then handled (a Rust app has no interpreter stack, and an unhandled-exception filter on the PC sees only crashes)
+> - parity: Python wrote every thread's Python stack on a fatal signal on the Mac, and nothing on the PC: it left faulthandler off there because it also reports access violations that are then handled (a Rust app has no interpreter stack, and an unhandled-exception filter on the PC sees only the crashes no handler caught)
