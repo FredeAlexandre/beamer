@@ -156,8 +156,8 @@ word or a light carries one.
 > A line, word or light in the waiting tone is drawn in `amber`.
 >
 > - tier: human (colour is judged by eye)
-> - do: Quit Beamer on a paired peer and look at the link status here while it looks for that peer
-> - see: Its word and its light are amber
+> - do: Quit Beamer on the peer, then quit and restart Beamer here and open Overview at once, before the link reports anything (`viewmodel.status.looking`)
+> - see: The link status's word, "Waiting", and its light are amber
 
 > r[ui.look.tone.fault]
 > A line, word or light in the fault tone is drawn in `fault`.
@@ -573,7 +573,8 @@ each.
 > until it stops blinking.
 >
 > - tier: human (a blink is judged by eye)
-> - do: Quit Beamer on a paired peer and watch the sidebar's light while this machine looks for it
+> - parity: Python's PC drew the light steady, never blinking (ADR 0001: one Rune UI draws both machines, the Mac's)
+> - do: Quit Beamer on the peer, then quit and restart Beamer here and watch the sidebar's light at once, while the link status says "Waiting" (`viewmodel.status.looking`)
 > - see: The amber light pulses gently, dimming and brightening about once a second
 
 ### Placing controls
