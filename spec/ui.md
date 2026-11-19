@@ -2113,7 +2113,7 @@ for what comes Later" names.
 > r[ui.overlay.draw.shapes]
 > An overlay fills and strokes the shapes Glow, Beam, the Ring and the identify cards are made of:
 > rectangles, rectangles with rounded corners, and circles. Their edges are smooth at the display's
-> scaling, and a circle is round all the way, with no flat spots or corners.
+> scaling, and a circle is evenly round, with no flat spots or corners.
 >
 > - tier: human (shapes are judged by eye)
 > - do: With "Show where the pointer lands" on, bring input home by the shortcut; then press "Identify screens"
@@ -2329,12 +2329,12 @@ How the banner "Following {name}'s design" is drawn; when it shows and what it s
 
 ## Edge glow
 
-The edge glow is what plays along a zone while the pointer pushes it (F29), in the crossing style
-chosen on the Design page (`viewmodel.design.styles`): Glow, a band of light that deepens with push
-pressure, or Beam, a thin line with a comet of light running along it. Both draw in the colour
-chosen (`ui.palette.stops`), at the depth the Size gives the display pushed (`ui.size.depth`), and
-play their crossing for the time the Length gives (`ui.length.play-time`). When they play is
-said under "When feedback plays". The crossing effects (F30) are Later, their room `ui.later.effects`.
+The edge glow is what plays along a zone while the pointer pushes it and as the push crosses (F29),
+in the crossing style chosen on the Design page (`viewmodel.design.styles`): Glow, a band of light
+that deepens with push pressure, or Beam, a thin line with a comet of light running along it. Both
+draw in the colour chosen (`ui.palette.stops`), at the depth the Size gives the display pushed
+(`ui.size.depth`), and play their crossing for the time the Length gives (`ui.length.play-time`).
+When they play is said under "When feedback plays". The crossing effects (F30) are Later, their room `ui.later.effects`.
 
 ### Glow
 
@@ -2741,7 +2741,8 @@ machine's displays, and only while crossings are animated on it.
 > On a Mac with "Tick as the push builds" on, a crossing report (`crossing.method.report-cross`) and
 > an arrival (`crossing.method.report-arrival`, `crossing.method.report-arrival-no-point`) are felt
 > as two ticks 60 ms apart, whatever "Ticks at" says. Input coming home by this machine's own
-> shortcut, jump key or menu (`crossing.method.report-home`) is not felt.
+> shortcut, jump key, shake or menu (`crossing.method.report-home`, `crossing.shake.home`) is not
+> felt.
 >
 > - tier: human (ticks are felt)
 > - do: On a Mac's trackpad, with "Ticks at" on "Only when through", push through an edge to a peer
@@ -3058,5 +3059,5 @@ blur that softens what is drawn into a bloom.
 > notch island and notch beam (F31), Later in #11.
 >
 > - tier: human (placement is judged by eye)
-> - do: On the Mac, with the notch on toward the PC and Glow chosen, set the built-in display to "More Space" in Displays settings and push up into the notch; then set it back to "Default" and push again
+> - do: On the Mac, with the notch on toward the PC and Glow chosen, set the built-in display to "More Space" in Displays settings and push up into the notch; then return it to "Default" and push again
 > - see: Both times the light hangs just below the notch and spans exactly its width
