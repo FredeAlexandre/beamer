@@ -877,12 +877,13 @@ scrolling only downwards. "The page's width" is the window's width less the side
 
 > r[ui.page.tab-reach]
 > On every page, Tab and Shift-Tab reach every control that can be used, in the order the page
-> reads, one stop each, from the Camera section's menus and buttons to a module's help button; a
-> group of options or tiles is one stop, taken at its chosen one, whose others the arrow keys reach.
+> reads, one stop each, the Camera module's "Camera your apps see" list, its "Quality" choice and
+> its "Camera settings" button included; a group of options or tiles is one stop, taken at its
+> chosen one, whose others the arrow keys reach.
 >
 > - tier: human (keyboard reach is judged by hand)
-> - do: On the PC, open Audio & Camera with the camera's helper missing, click the page's first menu, then press Tab repeatedly until the focus comes round again, using the arrow keys inside "Quality"
-> - see: The focus ring visits every menu, button and choice of the page once, in reading order, and the arrow keys move it to the other quality
+> - do: On the PC, with Beamer Camera installed, open Audio & Camera and choose the Mac's "Default camera" under "Camera your apps see" (`viewmodel.camera.quality.off`); click the page's first menu, then press Tab repeatedly until the focus comes round again, using the arrow keys inside "Quality"
+> - see: The focus ring visits every menu, button and choice of the page once, in reading order, "Camera settings" included, and the arrow keys move it between "720p" and "1080p"
 
 ### Width thresholds
 
