@@ -325,8 +325,8 @@ How each kind of control is drawn. Every control here behaves the same on a Mac 
 > r[ui.widget.button.size]
 > A button is at least 30 pt tall (40 pt for a big one) and as wide as its words plus 24 pt, never
 > narrower than 64 pt nor wider than 240 pt; words longer than 240 pt allows wrap onto more lines
-> and the button grows taller. At any window width a button is at least as wide as its words plus
-> 16 pt.
+> and the button grows taller. At any window width a button is at least as wide as its longest line
+> of words plus 16 pt.
 >
 > - tier: human (a control's size is judged by eye)
 > - do: Narrow the settings window to its minimum width and look at the buttons on each machine's line of Overview
@@ -367,7 +367,7 @@ How each kind of control is drawn. Every control here behaves the same on a Mac 
 > its track stays 34 by 18 pt, centred on the words' height.
 >
 > - tier: human (a switch is judged by eye)
-> - do: On the PC, narrow the window to its minimum and look at "Hold this PC's edges while an app on it is full screen" on Crossing
+> - do: On the PC, narrow the window to its minimum and look at "Hold this PC's edges while an app on it is full screen" on Overview
 > - see: The words run onto two lines, and the track keeps its size, centred beside them
 
 ### Rulers
@@ -440,7 +440,7 @@ rate" or "This window".
 > option of the group grows to the same height.
 >
 > - tier: human (an option's size is judged by eye)
-> - do: Look at "Style for" on the Design page with the window at its widest
+> - do: On the Design page, turn on "Show where the pointer lands", then look at "Style for" with the window at its widest
 > - see: "Crossing" and "Shortcut and menu" are two options of the same width and height, the group compact rather than stretched across the card, each option's words whole
 
 > r[ui.widget.option.stack]
@@ -452,8 +452,10 @@ rate" or "This window".
 > - see: "Same shortcuts", "Same positions" and "Mac keyboard layout" stack in one column, each showing all its words
 
 > r[ui.widget.menu.keeps-choice]
-> A menu whose choices change while it is shown keeps the same choice chosen and shows that choice's
-> new words; when the chosen choice is no longer offered, the menu shows its first choice.
+> A menu shows the choice it has chosen in that choice's words as they are now: when its choices
+> change while it is shown, closed or open, it redraws the chosen one's words in place, without
+> closing an open list or showing words it had before. Which choice is chosen, and what it says, are
+> viewmodel's (`viewmodel.design.follow-follows`, `viewmodel.camera.selector.unplugged`).
 >
 > - tier: human (a menu is judged by eye)
 > - do: On the Design page, choose a peer under "Match design with", then rename that peer on the Crossing page and return to Design
@@ -506,8 +508,8 @@ each.
 > - see: The colours go from five to three to two a line and the styles from three to two to one, the same at each width in both directions, every line edge to edge
 
 > r[ui.widget.tiles.one-chosen]
-> Exactly one tile of a group, or one colour across a group of colours, is chosen at a time. Choosing
-> the chosen one again, by a click, a key or an accessibility action, keeps it chosen.
+> Exactly one tile of a group, or one colour across all the groups of colours, is chosen at a time.
+> Choosing the chosen one again, by a click, a key or an accessibility action, keeps it chosen.
 >
 > - tier: human (the chosen tile is judged by eye)
 > - do: Click the chosen style tile on the Design page again, then press Space on it after Tab
@@ -524,11 +526,12 @@ each.
 > r[ui.widget.swatch.look]
 > A colour is a chip 28 pt tall with 4 pt corners and a 1 pt `hairline` outline, filled with its
 > colours as a gradient from left to right (one flat colour for a colour of one value), with its
-> name under it in 11.5 pt `text-2`, centred. The five colours of a group fill one line with no
-> empty place at its end.
+> name under it in 11.5 pt `text-2`, centred. Where the page column is at least 600 pt wide
+> (`ui.widget.tiles.columns`), the five colours of a group fill one line with no empty place at its
+> end.
 >
 > - tier: human (a colour chip is judged by eye)
-> - do: Open the Colour module on the Design page at a wide window
+> - do: Open the Colour module on the Design page with the window at its widest
 > - see: The Light and Mono groups each show five chips across, each a smooth band of its colours, names under them, with no blank space after the fifth
 
 > r[ui.widget.swatch.visible]
