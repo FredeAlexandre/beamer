@@ -833,7 +833,7 @@ How big the settings window is, where it opens and how it resizes. What it shows
 > r[ui.window.drag-strip]
 > On a Mac, an 18 pt strip runs across the top of the settings window's content, filled with `ground`
 > with a 1 pt `hairline` along its bottom, under the transparent title bar. Pressing it and dragging
-> moves the window, as the title bar does; a double-click on it is `ui.look.titlebar.double-click`'s.
+> moves the window, as the title bar does; a double-click on it is `ui.look.titlebar.*`'s.
 >
 > - tier: human (window behaviour is judged by hand)
 > - do: On the Mac, press just above the sidebar's link block and drag
