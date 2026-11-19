@@ -26,8 +26,8 @@ no Python test is its own:
 | `platform` | #65 | 336 |
 | `runtime` | #66 | 3 |
 | `app` | #67 | 93 |
-| `viewmodel` | #68 | 1064 |
-| `ui` | #69 | 700 |
+| `viewmodel` | #68 | 1065 |
+| `ui` | #69 | 699 |
 | `perf` | #70 | 2 |
 | `observability` | #71 | 0 |
 
@@ -77,7 +77,7 @@ flooded its own messages, and those tests went to the feature), the media engine
 ## Ambiguous assignments
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
-There are 114, covering 1,228 tests. Each row names the other candidates and why the owner won.
+There are 115, covering 1,229 tests. Each row names the other candidates and why the owner won.
 A miner who finds such a test's assertions are all another domain's settles it as
 `.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
 
@@ -95,6 +95,7 @@ tests stay ui's.
 | `core/tests/test_camera_texts.py` | 8 | camera | viewmodel | the placeholder text is shown in the virtual camera's picture, not on a screen of Beamer's |
 | `core/tests/test_camera_view.py` | 33 | viewmodel | camera | the Camera module's model, what each state shows |
 | `core/tests/test_colour_packs.py`, class `ColourPacksTests`: `test_new_colours_survive_both_sync_envelopes`, `test_unknown_peer_colour_retains_the_current_choice_and_other_fields_apply` | 2 | settings | ui | moved from ui (#69): a followed design carrying a colour id, and keeping the colour chosen when the id is unknown |
+| `core/tests/test_colour_packs.py`, class `ColourPacksTests`: `test_each_chromatic_group_offers_five_and_mono_has_a_neutral_home` | 1 | viewmodel | ui | moved from ui (#69): which colours each colour group offers |
 | `core/tests/test_dormant_repair.py` | 19 | pairing | discovery | dormant repair is in both scopes; these tests check the peer entry, re-pairing and capacity, not address probing |
 | `core/tests/test_feature_flags.py` | 1 | pairing | app | its one test checks that phone pairing is hidden by default |
 | `core/tests/test_flatpak_libei_path.py` | 1 | input | platform | where Linux input capture finds libei |

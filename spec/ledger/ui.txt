@@ -1,7 +1,6 @@
 # The ui domain's slice of the Python ledger, laid out by #51.
 # Owner domains and the ambiguous assignments: spec/ledger/README.md.
 core/tests/effect_size_probe.py::NativeSizeRasterTests::test_native_marks_grow_at_one_and_two_device_pixels_per_point  mined: ui.size.scales
-core/tests/test_colour_packs.py::ColourPacksTests::test_each_chromatic_group_offers_five_and_mono_has_a_neutral_home  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 core/tests/test_colour_packs.py::ColourPacksTests::test_mono_stops_and_shared_resolver_preserve_the_spec  mined: ui.palette.stops, ui.palette.dark-lift, ui.palette.dark-ink
 core/tests/test_colour_packs.py::ColourPacksTests::test_new_packs_keep_three_to_one_contrast_on_light_and_dark  mined: ui.palette.light-aurora
 core/tests/test_colour_packs.py::ColourPacksTests::test_saved_original_palettes_and_packs_resolve_to_the_same_stops  mined: ui.palette.stops
@@ -152,7 +151,7 @@ mac_app/tests/test_effect_fires.py::DrivenReturnEdgeTest::test_a_driven_crossing
 mac_app/tests/test_effect_fires.py::DrivenReturnEdgeTest::test_a_driven_switch_with_no_edge_shows_where_the_pointer_landed  mined: ui.ring.when
 mac_app/tests/test_effect_fires.py::DrivenReturnEdgeTest::test_a_return_push_lights_the_edge_glow_under_glow  mined: ui.feedback.push
 mac_app/tests/test_effect_fires.py::DrivenReturnEdgeTest::test_a_return_push_reaches_the_effects_overlay_when_wanted  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
-mac_app/tests/test_effect_fires.py::DrivenReturnEdgeTest::test_a_third_of_the_edge_plays_as_the_edge  mined: ui.glow.third
+mac_app/tests/test_effect_fires.py::DrivenReturnEdgeTest::test_a_third_of_the_edge_plays_as_the_edge  mined: ui.feedback.push
 mac_app/tests/test_effect_fires.py::DrivenReturnEdgeTest::test_a_way_home_through_a_corner_plays_its_corner_form  mined: ui.feedback.push, ui.glow.corner
 mac_app/tests/test_effect_fires.py::EdgeGlowDrawTest::test_a_push_and_its_breakthrough_draw_without_failing  mined: ui.feedback.push, ui.feedback.cross
 mac_app/tests/test_effect_fires.py::HomeArrivalTest::test_home_does_nothing_when_the_switch_locator_is_off  mined: ui.ring.off
@@ -271,10 +270,10 @@ mac_app/tests/test_notch_beam.py::ApproachTest::test_rises_faster_than_it_fades_
 mac_app/tests/test_notch_beam.py::CometTest::test_nothing_shows_at_either_end_of_a_lap  dropped: the notch island and beam (F31), Later in #11: not built in 2.0, room in ui.later.notch
 mac_app/tests/test_notch_beam.py::CometTest::test_segments_nest_around_the_head_mid_lap  dropped: the notch island and beam (F31), Later in #11: not built in 2.0, room in ui.later.notch
 mac_app/tests/test_notch_beam.py::CometTest::test_travels_the_border_at_an_even_pace  dropped: the notch island and beam (F31), Later in #11: not built in 2.0, room in ui.later.notch
-mac_app/tests/test_notch_beam.py::EdgeCometTest::test_edge_is_brightest_at_the_comet_and_all_lit_at_breakthrough  dropped: the notch island and beam (F31), Later in #11: not built in 2.0, room in ui.later.notch
+mac_app/tests/test_notch_beam.py::EdgeCometTest::test_edge_is_brightest_at_the_comet_and_all_lit_at_breakthrough  mined: ui.beam.comet, ui.beam.comet-speed, ui.beam.through
 mac_app/tests/test_notch_beam.py::LapFinishTest::test_leaves_by_the_far_end_of_a_lap  dropped: the notch island and beam (F31), Later in #11: not built in 2.0, room in ui.later.notch
 mac_app/tests/test_notch_beam.py::LapFinishTest::test_longer_durations_run_more_laps  dropped: the notch island and beam (F31), Later in #11: not built in 2.0, room in ui.later.notch
-mac_app/tests/test_notch_beam.py::PaletteTest::test_every_colour_choice_is_a_palette_a_gradient_can_use  dropped: the notch island and beam (F31), Later in #11: not built in 2.0, room in ui.later.notch
+mac_app/tests/test_notch_beam.py::PaletteTest::test_every_colour_choice_is_a_palette_a_gradient_can_use  mined: ui.glow.colours, ui.palette.stops, ui.ring.colours
 mac_app/tests/test_notch_beam.py::TurnTest::test_travel_quickens_with_pressure_and_stays_in_range  dropped: the notch island and beam (F31), Later in #11: not built in 2.0, room in ui.later.notch
 mac_app/tests/test_notch_island.py::BreakthroughPhaseTest::test_flash_fades_while_the_island_holds_full_size  dropped: the notch island and beam (F31), Later in #11: not built in 2.0, room in ui.later.notch
 mac_app/tests/test_notch_island.py::BreakthroughPhaseTest::test_full_size_from_the_first_frame_even_after_a_flick  dropped: the notch island and beam (F31), Later in #11: not built in 2.0, room in ui.later.notch
@@ -675,7 +674,7 @@ win_app/tests/test_style_tiles.py::StyleTileTests::test_custom_pace_and_size_kee
 win_app/tests/test_style_tiles.py::StyleTileTests::test_real_tile_previews_reach_contrast_and_coverage_in_both_appearances_and_scales  mined: ui.preview.legible
 win_app/tests/test_style_tiles.py::StyleTileTests::test_selected_tile_has_a_badge_before_its_name_without_a_wash_or_picture_overlap  mined: ui.widget.tiles.chosen
 win_app/tests/test_style_tiles.py::StyleTileTests::test_still_time_is_inside_the_loop_and_deterministic  mined: ui.preview.still
-win_app/tests/test_theme.py::SetDarkTests::test_stylesheet_carries_the_light_palette_when_light  python-detail: the Qt stylesheet's text
+win_app/tests/test_theme.py::SetDarkTests::test_stylesheet_carries_the_light_palette_when_light  mined: ui.theme.fixed
 win_app/tests/test_theme.py::SetDarkTests::test_swaps_the_palette_and_back  mined: ui.theme.fixed
 win_app/tests/test_theme.py::StylesheetApplicationTests::test_identical_application_stylesheet_is_not_repolished  python-detail: Qt stylesheet application skips an unchanged stylesheet
 win_app/tests/test_theme.py::WantsDarkTests::test_dark_and_light_are_absolute  mined: ui.theme.fixed
