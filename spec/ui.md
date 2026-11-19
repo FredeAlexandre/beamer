@@ -655,11 +655,12 @@ How text fits the space it has.
 > - see: The tooltip shows the whole name
 
 > r[ui.text.elide.own-tooltip]
-> A text given a tooltip of its own keeps that tooltip whether or not it is cut with "…".
+> A one-line text whose place has a tooltip of its own keeps that tooltip whether or not the text is
+> cut with "…": the whole text does not take its place.
 >
 > - tier: human (a tooltip is judged by eye)
-> - do: With a peer of a very long name, narrow the window until the crossing ledger's "Leave out" button for it is cut with "…", and hover it
-> - see: The tooltip says "Leave this machine out of pointer crossings", not the button's whole words
+> - do: Rename the peer "A very long machine name that its audio map card cannot hold", open Audio & Camera, narrow the window until that name on its audio map card ends in "…", and rest the pointer on the name
+> - see: The tooltip is the card's sentence (`viewmodel.audio.map.description`), the whole name followed by ", online." and the rest, not the name alone
 
 ## Keyboard focus
 

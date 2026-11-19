@@ -660,7 +660,7 @@ win_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptance::test
 win_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptance::test_segmented_controls_and_menu_controls_obey_their_caps  mined: ui.widget.option.size, ui.page.menu-width
 win_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptance::test_selected_style_detail_and_length_size_stay_with_style_group  mined: ui.page.design.order
 win_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptance::test_selected_tile_has_a_separate_keyboard_ring_that_pointer_input_clears  mined: ui.focus.ring, ui.focus.keys, ui.focus.click-ends
-win_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptance::test_send_destination_refits_when_the_column_shrinks_and_grows  mined: ui.text.elide.end, ui.text.elide.own-tooltip
+win_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptance::test_send_destination_refits_when_the_column_shrinks_and_grows  mined: ui.text.elide.end, ui.text.elide.tooltip
 win_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptance::test_sidebar_selection_tracks_keyboard_focus_and_mouse_click  mined: ui.sidebar.selection
 win_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptance::test_window_accepts_320_dip_minimum_at_every_matrix_cell  mined: ui.window.minimum, ui.sidebar.width, ui.sidebar.collapsed
 win_app/tests/test_sidebar_lifecycle.py::SidebarLifecycleTests::test_destroyed_sidebars_leave_no_application_hooks  python-detail: Qt event filters a destroyed sidebar leaves on the application
