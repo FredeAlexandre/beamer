@@ -268,7 +268,7 @@ mac_app/tests/test_map_ticks.py::MapTicks::test_nothing_for_the_thirds_is_drawn_
 mac_app/tests/test_map_ticks.py::MapTicks::test_partial_contact_breaks_at_this_macs_own_third_boundaries  mined: ui.map.third.breaks, ui.map.seam.lit
 mac_app/tests/test_map_ticks.py::MapTicks::test_the_join_between_a_machines_displays_is_not_a_break  mined: ui.map.seam.join
 mac_app/tests/test_map_ticks.py::MapTicks::test_titles_draw_above_their_tiles_displays  mined: ui.map.footprint.name-above
-mac_app/tests/test_map_ticks.py::MapTicks::test_unselected_peer_seam_is_one_unbroken_line  mined: ui.map.seam.other-peer
+mac_app/tests/test_map_ticks.py::MapTicks::test_unselected_peer_seam_is_one_unbroken_line  mined: ui.map.third.breaks
 mac_app/tests/test_map_ticks.py::MapTicks::test_with_displays_the_breaks_are_at_that_displays_thirds_inside_the_contact  mined: ui.map.third.breaks, ui.map.third.band
 mac_app/tests/test_map_ticks.py::MapTicks::test_with_displays_the_seam_runs_only_where_a_display_edge_touches_the_machine  mined: ui.map.seam.display-edge
 mac_app/tests/test_notch_beam.py::ApproachTest::test_a_released_push_fades_out_within_half_a_second  dropped: the notch island and beam (F31), Later in #11: not built in 2.0, room in ui.later.notch
@@ -607,7 +607,7 @@ win_app/tests/test_map_ticks.py::MapTicks::test_nothing_for_the_thirds_is_drawn_
 win_app/tests/test_map_ticks.py::MapTicks::test_partial_contact_keeps_one_continuous_seam_across_lit_thirds  mined: ui.map.third.breaks, ui.map.seam.lit
 win_app/tests/test_map_ticks.py::MapTicks::test_status_dot_sits_at_the_left_of_the_detail_line  mined: ui.map.footprint.status-dot
 win_app/tests/test_map_ticks.py::MapTicks::test_the_join_between_a_machines_displays_is_not_a_break  mined: ui.map.seam.join, ui.map.third.breaks
-win_app/tests/test_map_ticks.py::MapTicks::test_unselected_peer_seam_is_one_unbroken_line  mined: ui.map.seam.other-peer
+win_app/tests/test_map_ticks.py::MapTicks::test_unselected_peer_seam_is_one_unbroken_line  mined: ui.map.third.breaks
 win_app/tests/test_map_ticks.py::MapTicks::test_with_displays_adjacent_lit_thirds_stay_continuous_inside_the_contact  mined: ui.map.third.breaks, ui.map.third.band, ui.map.seam.display-edge
 win_app/tests/test_map_ticks.py::MapTicks::test_with_displays_the_seam_runs_only_where_a_display_edge_touches_the_machine  mined: ui.map.seam.display-edge
 win_app/tests/test_motion.py::MotionTest::test_a_change_of_mind_turns_the_row_round  mined: ui.motion.interrupt

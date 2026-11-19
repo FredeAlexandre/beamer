@@ -1368,7 +1368,7 @@ dark palette the window uses.
 > machine's footprint is at.
 >
 > - tier: human (how the crossing map is drawn is judged by eye)
-> - do: On the Crossing page with two peers, place their footprints in a line left to right, then in a column, then move a display of one peer apart and drag it far out
+> - do: On the Crossing page, place the peer's footprint to the right of This Mac's, then under it, then Option-drag one of the peer's displays (Alt-drag on a PC) far out and release it
 > - see: Every time, the footprints and displays all fit in the map with an even margin and the group sits in the middle of it
 > - parity: Python's Mac kept a 14 pt margin and drew up to 1.15 pt per map unit, its PC a 12 px margin and up to 1 px per map unit (ADR 0001: one Rune UI draws both machines)
 
@@ -1409,8 +1409,8 @@ How each machine's footprint, its displays, its name and its lines are drawn.
 > bordered 1 pt in `outline`, and each peer's is filled with `panel` and bordered 1 pt in `outline`.
 >
 > - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Look at the map with one peer, its footprint not selected
-> - see: This machine's footprint and the peer's are filled in two different shades, both with a thin grey border and softly rounded corners
+> - do: Look at the map, then turn "Own zones on every machine" off and look again, This Mac viewed
+> - see: This Mac's footprint and the peer's are filled in two different shades, both with softly rounded corners; This Mac's border is thin and grey at first, and the peer's is once the switch is off
 > - parity: Python's Mac rounded footprints by 4 pt (ADR 0001: one Rune UI draws both machines)
 
 > r[ui.map.footprint.selected]
@@ -1426,17 +1426,17 @@ How each machine's footprint, its displays, its name and its lines are drawn.
 > A peer's footprint under the pointer that is not selected is bordered 1 pt in `text-3`, and returns
 > to its own border when the pointer leaves it.
 >
-> - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Move the pointer over a peer's footprint that is not selected, then off it
-> - see: Its border brightens slightly while the pointer is over it and returns when it leaves
+> - tier: human (how the crossing map is drawn is judged by eye; the border of a peer not selected under the pointer, which the desk's one peer can't show, stays out of the check)
+> - do: Move the pointer over the peer's footprint, then over This Mac's, then off the map
+> - see: Neither border changes while the pointer is over it
 
 > r[ui.map.footprint.amber]
 > A peer's footprint that is not selected and whose outcome is "Drag to connect" or "Overlaps"
 > (`viewmodel.map.outcome`) is bordered 1 pt in `amber`.
 >
-> - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Drag a peer's footprint away so that it touches nothing, release it, then select another peer
-> - see: The moved footprint has a thin amber border
+> - tier: human (how the crossing map is drawn is judged by eye; the amber border of a peer not selected, which the desk's one peer can't show, stays out of the check)
+> - do: Drag the peer's footprint away so that it touches nothing and release it
+> - see: Its outcome reads "Drag to connect" in amber while its border stays the selected footprint's thick grey one, never amber
 > - parity: Python's Mac drew that border 2 pt wide and the footprint's status line in `amber` as well (ADR 0001: one Rune UI draws both machines)
 
 > r[ui.map.footprint.displays]
@@ -1468,8 +1468,8 @@ How each machine's footprint, its displays, its name and its lines are drawn.
 > in from the left edge and ends 6 pt short of the tick.
 >
 > - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Choose "next among ticked" for where the shortcut goes, and give one peer a short name and another a long one
-> - see: The short name sits centred on its footprint; the long one starts near the left edge and is cut with an ellipsis just before the tick, never under it
+> - do: On the Crossing page, under "Shortcut goes to", choose "Next among ticked"; rename the peer to a short name, then to one too long for its footprint
+> - see: The short name sits centred on the footprint; the long one starts near the left edge and is cut with an ellipsis just before the tick, never under it
 > - parity: Python's Mac drew the name's line 20 pt tall, 10 pt below the top (ADR 0001: one Rune UI draws both machines)
 
 > r[ui.map.footprint.name-numbers]
@@ -1516,8 +1516,8 @@ How each machine's footprint, its displays, its name and its lines are drawn.
 > word takes the status line's place, the dot's colour follows `ui.map.picker.word-dot`.
 >
 > - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Look at the map with one peer linked and one asleep
-> - see: This machine's and the linked peer's status lines start with a coloured dot; the asleep peer's dot is grey
+> - do: Look at the map with the peer linked, then quit Beamer on the peer
+> - see: This Mac's and the peer's status lines start with an accent-coloured dot; once Beamer on the peer has quit, the peer's dot is grey and This Mac's stays coloured
 > - parity: Python's Mac drew this machine's dot in `text-3` and hid any dot that met a display number (ADR 0001: one Rune UI draws both machines)
 
 > r[ui.map.footprint.outcome]
@@ -1593,7 +1593,7 @@ press.
 > just outside that square goes to the footprint.
 >
 > - tier: human (how a press lands is judged by hand)
-> - do: Click just outside the corner of a peer's tick, then rest the pointer there
+> - do: On the Crossing page, under "Shortcut goes to", choose "Next among ticked"; click on the map just outside the corner of the peer's tick, then rest the pointer there
 > - see: The click toggles the tick and the tooltip "In the shortcut's cycle" appears, while a click a little further away selects the footprint instead
 
 ### Seams and thirds
@@ -1637,21 +1637,15 @@ How the contacts between this machine's footprint and its peers' are drawn
 > - do: Put a linked peer to sleep while its edge crosses
 > - see: Its seam stays where it was, visibly fainter
 
-> r[ui.map.seam.other-peer]
-> Each contact of a peer that is not selected on the map is drawn as one unbroken line, with no
-> break at any third, from 2 pt inside one end of its lit stretch to 2 pt inside the other.
->
-> - tier: human (how the crossing map is drawn is judged by eye)
-> - do: With two peers, one left and one below this machine's footprint, select the one below
-> - see: The left peer's seam is one solid line from end to end, with no gaps
-
 > r[ui.map.third.breaks]
 > For the peer selected on the map, a contact's lit thirds that meet are drawn as one continuous
 > seam; where a lit third meets an unlit one, and where two unlit thirds meet, the line breaks with a
 > 2 pt clear gap centred on the boundary between the two thirds. The boundaries are the thirds of
-> this machine's display edge (`crossing.zone.thirds`), wherever the contact starts and ends.
+> this machine's display edge (`crossing.zone.thirds`), wherever the contact starts and ends. Each
+> lit stretch of a peer that is not selected is drawn as one unbroken line, with no break at any
+> third, from 2 pt inside one end of that stretch to 2 pt inside the other.
 >
-> - tier: human (how the crossing map is drawn is judged by eye)
+> - tier: human (how the crossing map is drawn is judged by eye; the seam of a peer not selected, which the desk's one peer can't show, stays out of the check)
 > - do: Select a peer flush under this machine's footprint, all thirds lit, then click its middle third to leave it out
 > - see: First one continuous seam; then a seam, a small gap, a thin faint track, a small gap and a seam, each gap exactly at a third of This Mac's edge
 > - parity: Python's Mac broke the selected peer's seam at every third boundary, between two lit thirds too (ADR 0001: one Rune UI draws both machines; the PC's, from Beamer 1.5.6, is the later)
@@ -1675,9 +1669,9 @@ How the contacts between this machine's footprint and its peers' are drawn
 > and one for the middle third over 33 to 50. A contact at a corner has no band, and neither has any
 > contact of a peer that is not selected.
 >
-> - tier: human (how a press lands is judged by hand)
-> - do: Select a peer and move the pointer slowly outward across the shared edge, then do the same over another peer's contact
-> - see: The pointer turns into a pointing hand a few points before the edge and stays one until a few points past it, over the selected peer's contact only
+> - tier: human (how a press lands is judged by hand; a contact of a peer not selected, which the desk's one peer can't show, stays out of the check)
+> - do: Move the pointer slowly outward across the edge This Mac shares with the peer, then turn the peer's edge off in its ledger row and do the same again
+> - see: Both times the pointer turns into a pointing hand a few points before the edge and stays one until a few points past it
 
 > r[ui.map.third.band-over-grip]
 > Where a click band overlaps a resize grip, a press in the band goes to the third and the pointer
@@ -1714,19 +1708,10 @@ How the contacts between this machine's footprint and its peers' are drawn
 > drawn as a 2 pt dashed line in `amber`, 8 pt dashes and 4 pt gaps, with round ends, along the edge
 > they share.
 >
-> - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Place two peers' footprints touching each other and neither touching this machine's
-> - see: A thin dashed amber line marks where the two peers touch
+> - tier: human (how the crossing map is drawn is judged by eye; the dashed line itself, which needs two peers touching each other and so a third machine, stays out of the check)
+> - do: Drag the peer's footprint so it touches This Mac's, then away so it touches nothing, releasing it each time
+> - see: No dashed amber line is drawn anywhere on the map either time
 > - parity: Python's Mac dashed it 4 pt on, 3 pt off (ADR 0001: one Rune UI draws both machines)
-
-> r[ui.map.seam.between-picking]
-> While own zones on every machine is off, the map draws no amber dashed contact between two
-> machines, whichever machine is viewed.
->
-> - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Turn own zones on every machine off and view a peer whose map has two other machines touching each other but not it
-> - see: No amber dashed line is drawn anywhere on the map
-> - parity: Python's Mac drew it while picking too (ADR 0001: one Rune UI draws both machines, taking the PC's)
 
 ### Corner pads and the notch mark
 
@@ -1750,18 +1735,18 @@ How a corner pad (`viewmodel.map.corner-pad`) and, on a Mac, the notch mark
 > The pads and the notch mark of the peer selected on the map are drawn at full opacity and above
 > any other pad; those of other peers are drawn at 0.55 opacity.
 >
-> - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Give one peer the top-right corner and another the bottom-left corner, then select each peer in turn
-> - see: The selected peer's pad is solid and the other's faded, and they change places when the selection changes
+> - tier: human (how the crossing map is drawn is judged by eye; the faded pads of a peer not selected, which the desk's one peer can't show, stay out of the check)
+> - do: In the peer's ledger row turn on its top-right corner and tick "Notch"
+> - see: The pad and the notch mark are solid, at full strength
 
 > r[ui.map.corner.seam-stop]
 > On an edge of this machine's footprint with a corner pad at one end, whichever peer's pad it is,
 > a lit seam or an unlit track that reaches that corner stops 11 pt from the vertex, at the pad's
 > clear ring.
 >
-> - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Give a peer on the right both its whole edge and the top-right corner, then give the corner to another peer instead
-> - see: Each time the seam along the right edge stops just short of the pad's ring, never running under the pad
+> - tier: human (how the crossing map is drawn is judged by eye; a pad of another peer, which the desk's one peer can't show, stays out of the check)
+> - do: Give the peer, on This Mac's right, both its whole edge and the top-right corner
+> - see: The seam along the right edge stops just short of the pad's ring, never running under the pad
 
 > r[ui.map.notch.mark]
 > On a Mac, the notch mark is a 4 pt tall bar with 2 pt rounded corners in `signal`, centred on the
@@ -1771,7 +1756,7 @@ How a corner pad (`viewmodel.map.corner-pad`) and, on a Mac, the notch mark
 > of this Mac's footprint. Its opacity follows its peer as a pad's does (`ui.map.corner.opacity`).
 >
 > - tier: human (how the crossing map is drawn is judged by eye)
-> - do: On a MacBook with a notch and an external display to its left, turn the notch on for a peer
+> - do: On the MacBook, place the external display to the left of the built-in one with their tops level (System Settings, Displays), then tick "Notch" in the peer's ledger row
 > - see: A short accent-coloured bar sits across the top of the built-in display on the map, over where the notch is, not at the middle of the whole footprint
 
 ### Wrap-around seams
@@ -1793,17 +1778,17 @@ and their labels are drawn on this machine's footprint.
 > pad, whichever peer's pad it is, measured along the edge from the vertex, and 2 pt short of a
 > corner without one.
 >
-> - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Turn on a wrap-around zone on an edge whose corner has a pad, for this peer and then for another
-> - see: The seam ends just before the corner pad and never touches it, at the corner without a pad it runs almost to the end
+> - tier: human (how the crossing map is drawn is judged by eye; a pad of another peer, which the desk's one peer can't show, stays out of the check)
+> - do: With the peer on This Mac's right, click "Left" and the top-left corner square in its ledger row
+> - see: The seam along This Mac's left edge ends just before the top-left pad and never touches it; at the bottom-left corner, without a pad, it runs almost to the end
 
 > r[ui.map.wrap.opacity]
 > A wrap-around seam, its label and its arrow are drawn at full opacity for the peer selected on the
 > map and at 0.7 opacity for every other peer, each multiplied by 0.55 for a peer with no link.
 >
-> - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Give two peers a wrap-around zone each, select one, then put the selected one to sleep
-> - see: The selected peer's seam and label are the boldest and the other's slightly faded; once asleep, the first fades well below the other
+> - tier: human (how the crossing map is drawn is judged by eye; the 0.7 opacity of a peer not selected, which the desk's one peer can't show, stays out of the check)
+> - do: With the peer on This Mac's right, click "Left" in its ledger row, then quit Beamer on the peer
+> - see: The seam, its label and its arrow are at full strength, then fade to about half once Beamer on the peer has quit
 
 > r[ui.map.wrap.kept]
 > A kept seam is a 2 pt dashed line in `signal` at 0.35 opacity, 4 pt dashes and 5 pt gaps, on the
@@ -1825,9 +1810,9 @@ and their labels are drawn on this machine's footprint.
 > line when both fit with 26 pt from each edge and 8 pt between them. A label left without a line is
 > not drawn, though its seam is, and on a footprint under 56 pt tall no wrap label is drawn.
 >
-> - tier: human (how the crossing map is drawn is judged by eye)
-> - do: For one peer turn on wrap-around zones on This Mac's top, right and bottom edges, then for a second peer its left edge, and resize This Mac's footprint smaller step by step
-> - see: Every label shown sits in clear space inside This Mac's footprint, none over its name, its status line or another label; as the footprint shrinks, labels drop out while their seams stay
+> - tier: human (how the crossing map is drawn is judged by eye; a second peer's labels on lines of their own, which the desk's one peer can't show, stay out of the check)
+> - do: With the peer on This Mac's right, click "Left" in its ledger row, then "Top", then resize This Mac's footprint smaller step by step
+> - see: First the left edge's label sits a little below the middle of This Mac's footprint, then a single label naming the top and left edges sits under the status line; neither lands on the name or the status line, and as the footprint shrinks the label drops out while the seams stay
 > - parity: Python's Mac drew wrap labels at 10.5 pt from 55 pt below the top; its PC drew none on footprints under 78 px tall (ADR 0001: one Rune UI draws both machines)
 
 > r[ui.map.wrap.label-place]
@@ -1837,7 +1822,7 @@ and their labels are drawn on this machine's footprint.
 > otherwise.
 >
 > - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Turn on wrap-around zones on This Mac's left edge, then its right edge, then its top edge, each for a different peer
+> - do: With the peer under This Mac, click "Left" in its ledger row; then "Left, wraps" to remove it and "Right"; then "Right, wraps" and "Top"
 > - see: The left label sits near the left edge, the right one near the right edge, and the top one towards the right, all inside the footprint
 
 > r[ui.map.wrap.arrow]
@@ -1871,8 +1856,9 @@ its tooltips are, and its focus ring.
 > a display of another machine moved apart from its footprint; a press there goes to that display.
 >
 > - tier: human (how a press lands is judged by hand)
-> - do: Move one of this machine's displays apart and drag it over the bottom-right corner of a selected peer's footprint, then press there
-> - see: No grip is drawn under the display, and the press takes the display, not a resize
+> - parity: Python's Mac drew the grip there and took a press on it for a resize (ADR 0001: one Rune UI draws both machines, the PC's)
+> - do: On the MacBook, place the external display to the left of the built-in one with their tops level (System Settings, Displays), which leaves This Mac's footprint empty under the built-in display; Option-drag one of the peer's displays apart so that its top-left corner lies in that empty corner and release it; then press on This Mac's footprint's bottom-right corner, under that display
+> - see: No grip is drawn at This Mac's bottom-right corner under the peer's display, and the press takes the display, not a resize of This Mac's footprint
 
 > r[ui.map.pointer.shapes]
 > Over the map the pointer is the diagonal resize pointer over a resize grip and through a resize;
@@ -1901,19 +1887,21 @@ its tooltips are, and its focus ring.
 > on that name (`viewmodel.map.title`).
 >
 > - tier: human (how a tooltip appears is judged by eye)
-> - do: Give a peer a name too long for its footprint, then rest the pointer on its name, on a shared third and on a tick
+> - do: On the Crossing page, under "Shortcut goes to", choose "Next among ticked"; rename the peer to a name too long for its footprint, then on the map rest the pointer on its name, on a third of the edge it shares with This Mac and on its tick
 > - see: The full name, the third's tooltip and "In the shortcut's cycle" appear, each only where the pointer rests
 > - parity: Python's PC showed a footprint's name as its tooltip anywhere over the footprint and over its grip (ADR 0001: one Rune UI draws both machines, taking the Mac's)
 
 > r[ui.map.focus.ring]
 > While the map has keyboard focus that came from the keyboard, a ring 2 pt wide in `text-2`, with
-> 3 pt rounded corners, is drawn 3 pt outside the selected footprint, and moves with the selection
-> as Tab moves it (`viewmodel.map.tab-order`). It is not drawn while the map has focus from a press,
-> and it goes as soon as keyboard focus leaves the map.
+> 3 pt rounded corners, is drawn 3 pt outside the footprint Tab has reached: the selected footprint
+> (`viewmodel.map.tab-order`), or, while the map picks the viewed machine, the footprint with
+> keyboard focus, this machine's included (`viewmodel.profiles.keys.order`). It moves as Tab moves
+> focus, is not drawn while the map has focus from a press, and goes as soon as keyboard focus leaves
+> the map.
 >
-> - tier: human (how keyboard focus shows is judged by eye)
-> - do: Tab into the map, Tab once more, then Tab or click into a ledger row's name field
-> - see: A ring hugs the selected footprint, jumps to the next one, and disappears once focus is in the ledger
+> - tier: human (how keyboard focus shows is judged by eye; Tab from one peer's footprint to another's while own zones on every machine is on, which the desk's one peer can't show, stays out of the check)
+> - do: Turn "Own zones on every machine" off, Tab into the map, Tab once more, Tab again until focus leaves the map, then click a footprint
+> - see: A ring hugs one footprint, jumps to the other at the next Tab, is gone once focus leaves the map, and does not show after the click
 > - parity: Python's Mac rounded the ring by 4 pt (ADR 0001: one Rune UI draws both machines)
 
 ### Guides and the snap preview
@@ -1953,7 +1941,7 @@ How the map is drawn while own zones on every machine is off and it picks the vi
 > - tier: human (how the crossing map is drawn is judged by eye)
 > - do: Turn own zones on every machine off, then click a peer's footprint, then This Mac's
 > - see: The clicked footprint, This Mac's too, takes the thick light grey border, and only it
-> - parity: Python's Mac kept the hover border and the amber border on other footprints while picking (ADR 0001: one Rune UI draws both machines, taking the PC's)
+> - parity: Python's PC drew no 2 pt border while This PC was the viewed machine, only on another machine viewed, and kept the hover border on other footprints while picking; its Mac kept the hover border and the amber border on other footprints while picking (ADR 0001: one Rune UI draws both machines)
 
 > r[ui.map.picker.all-peers]
 > While own zones on every machine is off, every peer's contacts with the viewed machine's footprint
@@ -1971,8 +1959,8 @@ How the map is drawn while own zones on every machine is off and it picks the vi
 > `signal` for "Desk" and "Own" and `text-3` for "Offline", whatever the machine's link.
 >
 > - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Turn own zones on every machine off with one peer linked and another asleep
-> - see: The dots beside "Desk" and "Own" are in the accent colour and the one beside "Offline" is grey
+> - do: Turn "Own zones on every machine" off with the peer linked, then quit Beamer on the peer
+> - see: The dots beside "Desk" and "Own" are in the accent colour; once Beamer on the peer has quit, the dot beside its "Offline" is grey
 
 ### The audio map's arrows
 
