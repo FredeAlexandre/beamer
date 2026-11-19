@@ -67,8 +67,6 @@ runner of each OS; what only a real install, a real login session or a person at
 > (`platform.login.mac-hidden`, `platform.task.launch-visible`). Any other launch shows Beamer's
 > window once it has started. What a hidden start shows on a PC while Show in tray is off is
 > `viewmodel.tray.hidden-start`'s.
->
-> - parity: Python's Mac start at login showed Beamer's window, since its login item launched Beamer.app with no arguments and only `--hidden` started it hidden (#21: a login launch is recognised and starts hidden)
 
 ## Single instance
 
@@ -284,7 +282,7 @@ r[app.quit-command.asks]
 session that Beamer runs, also one running with administrator rights. This holds when `beamer quit`
 runs in another login session too, as over SSH, which on a PC lands in session 0: there it quits
 the Beamer that the SSH account runs at the desk. It waits until those Beamers and their watchdogs
-have ended, and ends with exit status 0. A Beamer of another account it leaves running.
+have ended, and ends with exit status 0.
 
 r[app.quit-command.none-running]
 With no Beamer of its account running on the machine, `beamer quit` ends with exit status 0 within
@@ -388,12 +386,14 @@ binary. GameInput recovery (F40), Later in #11, will be a step of the elevated s
 >
 > - parity: Python's PC handed its elevated script the path of `Beamer.exe` and the signed-in account's SID, and refused a path holding a double quote before starting it (#21: the binary's own elevated steps find the installed path themselves)
 
-r[app.elevated.other-account]
-On a PC, an elevated step run as an account other than the one Windows names as signed in to its
-session, as when another administrator approved its UAC prompt, changes nothing and ends with a
-non-zero exit status (`platform.login.pc-account`). When Windows names no account signed in to its
-session, as in session 0, where SSH lands, the step acts for the account it runs as: run over SSH,
-it accepts the SSH account and acts for it.
+> r[app.elevated.other-account]
+> On a PC, an elevated step run as an account other than the one Windows names as signed in to its
+> session, as when another administrator approved its UAC prompt, changes nothing and ends with a
+> non-zero exit status (`platform.login.pc-account`). When Windows names no account signed in to its
+> session, as in session 0, where SSH lands, the step acts for the account it runs as: run over SSH,
+> it accepts the SSH account and acts for it.
+>
+> - parity: Python's PC admin-mode and Start at login steps refused when Windows named no account signed in to their session, while its install maintenance acted for the account it ran as (one account rule for every elevated step, so that over SSH setup runs with no prompt, as #21 says)
 
 r[app.elevated.needs-rights]
 An elevated step run without administrator rights changes nothing and ends with a non-zero exit
