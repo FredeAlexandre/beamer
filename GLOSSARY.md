@@ -242,3 +242,25 @@ _Avoid_: audio follows input
 A shared entry saying which machine's camera another machine sees.
 _Avoid_: camera follows input
 
+## The app
+
+**Quit**:
+Ending Beamer on purpose, as from its tray menu, its window, `beamer quit`, a signal or the end of
+the login session. After Quit no Beamer process runs, and the watchdog relaunches nothing.
+_Avoid_: exit Beamer, close Beamer, shut Beamer down
+
+**Crash**:
+Any end of Beamer's app that is not a Quit: a panic, a kill, macOS's Force Quit or Windows' End
+task, or the watchdog killing a frozen engine.
+_Avoid_: unexpected exit, abnormal exit
+
+**Watchdog**:
+A second process of the same binary, `beamer --watchdog`, that the app starts and that only
+relaunches the app after a crash.
+_Avoid_: supervisor, restarter, keep-alive agent
+
+**Second launch**:
+A launch of Beamer's app that finds another Beamer running in the same login session, and so
+starts no second one. It asks the running Beamer to show its window, unless it was asked to start
+hidden.
+_Avoid_: duplicate instance, second instance
