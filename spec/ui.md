@@ -156,6 +156,7 @@ word or a light carries one.
 > A line, word or light in the live tone is drawn in `signal`.
 >
 > - tier: human (colour is judged by eye)
+> - parity: Python's PC drew the link status's word in `text` in the live tone, as in every tone but the fault tone (ADR 0001: one Rune UI draws both machines, the Mac's)
 > - do: Drive this machine from a peer and look at the link status
 > - see: Its word and its light are in the signal cyan in Dark, deep teal in Light
 
@@ -914,8 +915,8 @@ scrolling only downwards. "The page's width" is the window's width less the side
 
 > r[ui.page.tab-reach]
 > On every page, Tab and Shift-Tab reach every control that can be used, in the order the page
-> reads, one stop each, the Camera module's "Camera your apps see" list, its "Quality" choice and
-> its "Camera settings" button included; a group of options or tiles is one stop, taken at its
+> reads, each once, the Camera module's "Camera your apps see" list, its "Quality" choice and
+> its "Camera settings" button included; a group of options or tiles is reached once, at its
 > chosen one, whose others the arrow keys reach.
 >
 > - tier: human (keyboard reach is judged by hand)
@@ -1188,9 +1189,9 @@ How the sidebar's width, rows and keyboard focus follow the window. Its pages, d
 > While the sidebar is 144 or 176 pt wide, the response time (`viewmodel.status.response-time`)
 > wraps onto a second line when it does not fit on one, and its line grows to show it whole.
 >
-> - tier: human (wrapping is judged by eye)
-> - do: Connect to a peer over a slow network so the response time reads in thousands of milliseconds, with the window between 640 and 800 pt wide
-> - see: "Response time: 3000 ms" shows whole under the link's word, on two lines if need be
+> - tier: human (wrapping is judged by eye; a response time long enough to need a second line, which the desk's link a few milliseconds long never gives, stays out of the check)
+> - do: With the peer linked, narrow the window to 640 pt, then widen it to 800 pt
+> - see: Both times "Response time: {n} ms" shows whole under the link's word, nothing cut
 
 ## The pairing sheet
 
@@ -1609,7 +1610,7 @@ How each machine's footprint, its displays, its name and its lines are drawn.
 > bottom, whichever is lower.
 >
 > - tier: human (how the crossing map is drawn is judged by eye)
-> - do: With "next among ticked" chosen for where the shortcut goes, resize a peer's footprint down step by step to its smallest
+> - do: On the Crossing page, under "Shortcut goes to", choose "Next among ticked"; then resize the peer's footprint down step by step to its smallest
 > - see: The name stays readable and inside the footprint at every size, and the tick never covers it
 
 > r[ui.map.footprint.tiny]
@@ -1618,7 +1619,7 @@ How each machine's footprint, its displays, its name and its lines are drawn.
 > display numbers; no status line, dot or outcome.
 >
 > - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Drag a peer's footprint far below the others so that the map shrinks its drawing a lot
+> - do: Drag the peer's footprint far below This Mac's so that the map shrinks its drawing a lot
 > - see: Each footprint keeps a small readable name inside it, clear of the display numbers, and nothing else written
 
 ### The tick for the shortcut's cycle
@@ -1633,8 +1634,8 @@ press.
 > right. Unticked, it is filled with `well`, bordered 1 pt in `outline`, and empty.
 >
 > - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Choose "next among ticked" for where the shortcut goes, then click one peer's tick to untick it
-> - see: A ticked box is a filled square with a check mark (✓, not a caret ^); an unticked one is an empty outlined well
+> - do: On the Crossing page, under "Shortcut goes to", choose "Next among ticked"; then click the peer's tick to untick it
+> - see: Ticked, the box is a filled square with a check mark (✓, not a caret ^); unticked, it is an empty outlined well
 
 > r[ui.map.cycle.place]
 > On a footprint 56 pt tall or more the tick sits 8 pt in from the right edge, centred on the name's
@@ -1644,7 +1645,7 @@ press.
 > the right and 1 pt below the top, its check mark scaled with it. It never overlaps the name.
 >
 > - tier: human (how the crossing map is drawn is judged by eye)
-> - do: With "next among ticked" chosen, select a peer and resize its footprint down step by step to its smallest
+> - do: On the Crossing page, under "Shortcut goes to", choose "Next among ticked"; then resize the peer's footprint down step by step to its smallest
 > - see: The tick moves from the name's line to below it and back as the footprint shrinks, never on the name and never on the resize grip
 > - parity: Python's Mac kept the tick 8 pt in from the right at every height from 32 pt, in the resize grip's corner on footprints 44 to 56 pt tall (ADR 0001: one Rune UI draws both machines; `viewmodel.map.press-priority` needs the tick clear of the grip)
 
@@ -1908,7 +1909,7 @@ its tooltips are, and its focus ring.
 > press area is always the full 16 pt square (`ui.map.third.band-over-grip`).
 >
 > - tier: human (how the crossing map is drawn is judged by eye)
-> - do: Select a peer's footprint, then move the pointer over another one
+> - do: Look at the peer's footprint, selected, then move the pointer over This Mac's footprint
 > - see: Two short diagonal strokes appear in the bottom-right corner of each, and dragging there resizes the footprint
 > - parity: Python's Mac's grip was a 12 pt square, drawn in `text-3` on a footprint that was only under the pointer (ADR 0001: one Rune UI draws both machines)
 
@@ -2112,7 +2113,7 @@ Sizes are in pt, Rune's logical units, which a PC's px equal at 100 % scaling.
 > never shifts what it draws.
 >
 > - tier: human (where drawing lands is judged by eye)
-> - do: Set a second display to 150 % scaling and place it left of and above the main display, then bring input home by the shortcut with the pointer on it, with "Show where the pointer lands" on
+> - do: On the PC, set its second display to 150 % scaling and place it left of and above the main display, then bring input home by the shortcut with the pointer on it, with "Show where the pointer lands" on
 > - see: The Ring closes onto the pointer's tip on that display, sharp, not offset or blurred
 
 > r[ui.overlay.while-playing]
@@ -3109,7 +3110,7 @@ blur that softens what is drawn into a bloom.
 > (F30), Later in #11.
 >
 > - tier: human (drawing is judged by eye)
-> - do: With GN10 at its full 2560 × 1440 on both machines and the same colour, Size and Length on both, choose Colourful and Beam and turn on "Show where the pointer lands"; with GN10 showing the Mac, push against its edge toward the PC without crossing, then, with the pointer on GN10, cross by the shortcut and come home by it; then do the same with GN10 showing the PC
+> - do: With GN10 at its full 2560 × 1440 on both machines, at 100 % scaling on the PC and the same colour, Size and Length on both, choose Colourful and Beam and turn on "Show where the pointer lands"; with GN10 showing the Mac, push against its edge toward the PC without crossing, then, with the pointer on GN10, cross by the shortcut and come home by it; then do the same with GN10 showing the PC
 > - see: The light along GN10's edge and the Ring round the pointer look the same from the Mac and from the PC: the same colours, depth, line and comet
 
 > r[ui.later.notch]
