@@ -1025,9 +1025,9 @@ The order of arrows between two machines is `ui.map.audio.arrow-order`'s.
 > footprints touch keep their order with room for an arrow between them.
 >
 > - tier: human (how the audio map is drawn is judged by eye)
-> - parity: Python's Mac added 20 pt across and 14 pt down, up to 1.6 times (ADR 0001: one Rune UI draws both machines, the PC's, which leaves room for three arrows)
-> - do: Open Audio & Camera with three machines whose footprints touch, two side by side and one below
-> - see: The three cards sit in the same places relative to each other as their footprints on the crossing map, all inside the map, with a clear gap between neighbours
+> - parity: Python's Mac opened 40 pt across and 28 pt down between cards whose footprints touch, kept a 16 pt margin, scaled up to 1.6 times, and grew the map from 260 pt to as much as 420 pt for footprints in several rows (ADR 0001: one Rune UI draws both machines, the PC's, which leaves room for three arrows)
+> - do: Open Audio & Camera with the peer's footprint touching This Mac's right edge on the crossing map, then move the peer's footprint under This Mac's on the Crossing page and open Audio & Camera again
+> - see: Both times the two cards sit as their footprints do on the crossing map, side by side and then one above the other, both inside the map with a clear gap between them
 
 > r[ui.page.audio.arrow-path]
 > An arrow between two cards that share a line runs straight across the gap between their facing
