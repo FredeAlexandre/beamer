@@ -138,12 +138,19 @@ word or a light carries one.
 > - see: "No microphone is shared: apps that record it hear silence." is in the dim grey of the eyebrows, quieter than the notes around it
 
 > r[ui.look.tone.plain]
-> A line in the plain tone is drawn in `text-2`, a word in the plain tone, such as the link status's
-> word, in `text`, and a light in the plain tone in `off`.
+> A word in the plain tone, such as the link status's word, is drawn in `text`, and a light in the
+> plain tone in `off`.
 >
-> - tier: human (colour is judged by eye)
+> - tier: human (colour is judged by eye; a light in the plain tone, which no state of the link status gives yet, `viewmodel.status.parts`, stays out of the check)
 > - do: With a peer linked and this machine's input home, look at the link status on Overview
 > - see: Its word, "On this Mac" or "On this PC", is in the window's main text colour, neither cyan, amber nor red
+
+> r[ui.look.tone.plain-line]
+> A line in the plain tone is drawn in `text-2`.
+>
+> - tier: human (colour is judged by eye)
+> - do: Open Audio & Camera while each machine's sound plays on itself, and look at the machines on the audio map
+> - see: "Sound plays here" (`viewmodel.audio.map.output-line`) is in the soft grey of the notes, neither cyan, amber nor red, and brighter than the dim grey of the eyebrows
 
 > r[ui.look.tone.live]
 > A line, word or light in the live tone is drawn in `signal`.
@@ -170,15 +177,32 @@ word or a light carries one.
 
 > r[ui.look.titlebar.double-click]
 > On a Mac, a double-click on the settings window's title bar, on the 18 pt strip at the top of its
-> content or on the top of its sidebar does what the Mac's "Double-click a window's title bar to"
-> setting says: "Fill" makes the window fill its display's visible area and a second double-click
-> returns it to the frame it had, "Minimise" minimises it, and "Do nothing" leaves it as it is. A
-> double-click on a window button or on a control in those places acts on that button or control
-> only.
+> content or on the top of its sidebar, while the Mac's "Double-click a window's title bar to"
+> setting is "Fill" or "Zoom", or has no value Beamer knows, makes the window fill its display's
+> visible area, and a second double-click returns it to the frame it had. A double-click on a window
+> button or on a control in those places acts on that button or control only.
 >
 > - tier: human (window behaviour is judged by hand)
 > - do: With the Mac's setting at Fill, double-click the top of the sidebar, then double-click it again; then double-click the window's minimise button
 > - see: The window fills the display, then returns to its earlier size and place; the double-click on the minimise button only minimises the window, without filling it first
+
+> r[ui.look.titlebar.minimise]
+> On a Mac, while the Mac's "Double-click a window's title bar to" setting is "Minimise", a
+> double-click on the settings window's title bar, on the 18 pt strip at the top of its content or
+> on the top of its sidebar minimises the window.
+>
+> - tier: human (window behaviour is judged by hand)
+> - do: Set the Mac's "Double-click a window's title bar to" to Minimise, then double-click the top of the settings window's sidebar
+> - see: The window goes into the Dock, without filling the display first
+
+> r[ui.look.titlebar.do-nothing]
+> On a Mac, while the Mac's "Double-click a window's title bar to" setting is "Do Nothing", a
+> double-click on the settings window's title bar, on the 18 pt strip at the top of its content or
+> on the top of its sidebar leaves the window as it is.
+>
+> - tier: human (window behaviour is judged by hand)
+> - do: Set the Mac's "Double-click a window's title bar to" to Do Nothing, then double-click the settings window's title bar and the top of its sidebar
+> - see: The window keeps its size and place both times
 
 ## Appearance
 
@@ -768,12 +792,19 @@ How big the settings window is, where it opens and how it resizes. What it shows
 > - do: Drag the settings window's corner inwards as far as it goes, on the Mac and on the PC
 > - see: The window stops at about a third of its usual width and half its height, with the sidebar down to icons and the page still readable
 
+> r[ui.window.first-open]
+> The first time the settings window opens on a machine, it opens at 900 by 640 pt, shrunk to its
+> display's visible area where that is smaller, and centred on it.
+>
+> - tier: human (where a window opens is judged by eye; only a machine where Beamer has not yet opened its settings window shows it)
+> - do: On a machine where Beamer has just been installed and has never opened its settings window, open it
+> - see: The window opens in the middle of the display, wider than it is tall, at about 900 by 640 pt, or filling a display smaller than that
+
 > r[ui.window.remembered]
-> The settings window first opens at 900 by 640 pt, centred on its display's visible area. Each
-> later opening, in this run or the next, puts it where it last was and at the size it last had as
-> an ordinary window, moved and shrunk as little as needed to lie inside its display's visible
-> area. A window in full screen, filled by a title-bar double-click or tiled by the OS is not
-> remembered: the frame it had before is.
+> Each opening of the settings window after its first, in this run or the next, puts it where it last
+> was and at the size it last had as an ordinary window, moved and shrunk as little as needed to lie
+> inside its display's visible area. A window in full screen, filled by a title-bar double-click or
+> tiled by the OS is not remembered: the frame it had before is.
 >
 > - tier: human (where a window opens is judged by eye)
 > - parity: Python's PC opened the window at 900 by 640 each time, where its Mac remembered the frame (ADR 0001: one Rune UI draws both machines, the Mac's)

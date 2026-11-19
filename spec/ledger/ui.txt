@@ -326,7 +326,7 @@ mac_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptanceTests:
 mac_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptanceTests::test_long_buttons_grow_in_height_and_machine_names_remain_available  mined: ui.widget.button.size, ui.page.menu-width
 mac_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptanceTests::test_machine_section_heading_does_not_split_at_the_minimum_width  mined: ui.text.never-clipped
 mac_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptanceTests::test_native_machine_menu_complete_bounds_are_capped  mined: ui.page.menu-width
-mac_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptanceTests::test_normal_frames_are_clamped_and_tiled_frames_are_not_persisted  mined: ui.window.remembered
+mac_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptanceTests::test_normal_frames_are_clamped_and_tiled_frames_are_not_persisted  mined: ui.window.first-open, ui.window.remembered
 mac_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptanceTests::test_pairing_notch_and_switch_states_fit_at_every_width  mined: ui.page.fit
 mac_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptanceTests::test_rail_targets_and_selected_marks_are_explicit  mined: ui.sidebar.collapsed, ui.sidebar.dot, ui.widget.tiles.chosen
 mac_app/tests/test_settings_layout_acceptance.py::SettingsLayoutAcceptanceTests::test_section_padding_and_ordinary_row_spacing_are_shared  mined: ui.page.module-inset
@@ -346,7 +346,7 @@ mac_app/tests/test_settings_polish.py::SettingsPolishTests::test_only_the_active
 mac_app/tests/test_settings_polish.py::SettingsPolishTests::test_overview_machine_controls_form_one_group_at_the_right_edge  mined: ui.widget.actions.trailing
 mac_app/tests/test_settings_polish.py::SettingsPolishTests::test_preview_captions_fit_without_overlapping_the_picture_or_each_other  mined: ui.widget.tiles.look, ui.widget.swatch.look, ui.text.never-clipped
 mac_app/tests/test_settings_polish.py::SettingsPolishTests::test_time_between_taps_value_fits_in_both_appearances_at_every_width  mined: ui.text.never-clipped
-mac_app/tests/test_titlebar_events.py::TitlebarEventTests::test_explicit_do_nothing_keeps_the_frame_on_all_backgrounds  mined: ui.look.titlebar.double-click
+mac_app/tests/test_titlebar_events.py::TitlebarEventTests::test_explicit_do_nothing_keeps_the_frame_on_all_backgrounds  mined: ui.look.titlebar.do-nothing
 mac_app/tests/test_titlebar_events.py::TitlebarEventTests::test_real_zoom_fills_then_restores_the_previous_frame  mined: ui.look.titlebar.double-click
 mac_app/tests/test_titlebar_events.py::TitlebarEventTests::test_titlebar_and_strip_and_sidebar_top_deliver_fill_and_restore  mined: ui.look.titlebar.double-click
 mac_app/tests/test_titlebar_events.py::TitlebarEventTests::test_titlebar_routing_excludes_traffic_lights_and_page_controls  mined: ui.look.titlebar.double-click
@@ -364,14 +364,14 @@ mac_app/tests/test_widgets.py::WidthTests::test_ring_overlay_does_not_retain_its
 mac_app/tests/test_widgets.py::WidthTests::test_us_region_preserves_direct_and_interpolated_user_data  dropped: US spelling at run time (F34), dropped by #11
 mac_app/tests/test_window_geometry.py::WindowGeometryTests::test_a_full_screen_remove_question_keeps_its_buttons_their_own_width  mined: ui.page.overview.remove-question
 mac_app/tests/test_window_geometry.py::WindowGeometryTests::test_design_controls_lead_full_width_responsive_tile_groups  mined: ui.page.design.order, ui.page.design.tile-size, ui.widget.tiles.columns, ui.widget.tiles.chosen
-mac_app/tests/test_window_geometry.py::WindowGeometryTests::test_double_click_applies_the_selected_titlebar_action  mined: ui.look.titlebar.double-click
+mac_app/tests/test_window_geometry.py::WindowGeometryTests::test_double_click_applies_the_selected_titlebar_action  mined: ui.look.titlebar.double-click, ui.look.titlebar.minimise
 mac_app/tests/test_window_geometry.py::WindowGeometryTests::test_ledger_uses_blocks_under_its_least_table_width_and_columns_above  mined: ui.ledger.table, ui.ledger.stacked, ui.page.no-sideways
 mac_app/tests/test_window_geometry.py::WindowGeometryTests::test_narrow_page_uses_its_current_padding_for_available_width  mined: ui.page.column
 mac_app/tests/test_window_geometry.py::WindowGeometryTests::test_page_column_scales_with_free_width_and_stays_centred  mined: ui.page.column, ui.window.no-width-cap
 mac_app/tests/test_window_geometry.py::WindowGeometryTests::test_resizable_window_keeps_a_requested_full_screen_width  mined: ui.window.no-width-cap
 mac_app/tests/test_window_geometry.py::WindowGeometryTests::test_single_click_on_the_top_strip_starts_a_window_drag  mined: ui.window.drag-strip
 mac_app/tests/test_window_geometry.py::WindowGeometryTests::test_switch_mode_keeps_long_tile_titles_readable  mined: ui.page.design.tile-size, ui.widget.tiles.look
-mac_app/tests/test_window_geometry.py::WindowGeometryTests::test_the_global_titlebar_setting_selects_fill_or_minimise  mined: ui.look.titlebar.double-click
+mac_app/tests/test_window_geometry.py::WindowGeometryTests::test_the_global_titlebar_setting_selects_fill_or_minimise  mined: ui.look.titlebar.double-click, ui.look.titlebar.minimise, ui.look.titlebar.do-nothing
 mac_app/tests/test_window_geometry.py::WindowGeometryTests::test_zoom_uses_the_visible_screen_frame  mined: ui.look.titlebar.double-click
 mac_app/tests/test_window_resize.py::WindowResizeTests::test_expanded_earlier_ways_gives_spare_width_to_caption_without_ambiguity  mined: ui.page.crossing.saved-zones
 mac_app/tests/test_window_resize.py::WindowResizeTests::test_page_breakpoint_jitter_keeps_the_current_typography  mined: ui.page.narrow-layout
