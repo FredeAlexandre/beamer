@@ -19,7 +19,7 @@ no Python test is its own:
 | `input` | #58 | 796 |
 | `clipboard` | #59 | 213 |
 | `settings` | #60 | 472 |
-| `display` | #61 | 32 |
+| `display` | #61 | 37 |
 | `audio` | #62 | 148 |
 | `camera` | #63 | 202 |
 | `media` | #64 | 0 |
@@ -27,7 +27,7 @@ no Python test is its own:
 | `runtime` | #66 | 3 |
 | `app` | #67 | 93 |
 | `viewmodel` | #68 | 1064 |
-| `ui` | #69 | 705 |
+| `ui` | #69 | 700 |
 | `perf` | #70 | 2 |
 | `observability` | #71 | 0 |
 
@@ -77,7 +77,7 @@ flooded its own messages, and those tests went to the feature), the media engine
 ## Ambiguous assignments
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
-There are 113, covering 1,223 tests. Each row names the other candidates and why the owner won.
+There are 114, covering 1,228 tests. Each row names the other candidates and why the owner won.
 A miner who finds such a test's assertions are all another domain's settles it as
 `.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
 
@@ -143,6 +143,7 @@ tests stay ui's.
 | `mac_app/tests/test_dormant_rows.py` | 11 | viewmodel | pairing, crossing | how a dormant peer's rows show and what re-pair opens |
 | `mac_app/tests/test_effect_fires.py`, class `GestureOverlayOnReturnTest`: `test_a_push_at_the_edge_leaves_the_gesture_panel_to_the_status_tick`, `test_input_coming_home_takes_the_gesture_panel_down_at_once`, `test_the_gesture_panel_is_one_step_off_clear` | 3 | input | ui | moved from ui (#69): the gesture capture panel coming down as input comes home and staying clear |
 | `mac_app/tests/test_effect_size_settings.py`, class `EffectSizeSettingsTests`: `test_missing_size_defaults_to_medium_and_round_trips` | 1 | settings | ui | moved from ui (#69): the Size's default and saved round trip |
+| `mac_app/tests/test_identify_screens.py`, class `OverlayTests`: `test_failed_show_and_explicit_hide_do_not_reset_request_limit`, `test_newly_attached_display_is_identified_with_the_same_live_numbering`, `test_repeat_does_not_replace_panels_or_extend_expiry_and_reopens_at_boundary`, `test_stale_request_is_replaced_by_numbers_for_all_current_displays`, `test_timeout_hides_and_releases_all_panels_after_three_seconds` | 5 | display | ui | moved from ui (#69): which displays show a number when the displays changed, how long the numbers stay, and a repeated request |
 | `mac_app/tests/test_idle_refresh.py` | 6 | viewmodel | runtime, ui | how often the window and menu re-read settings and redraw |
 | `mac_app/tests/test_ignored_titles.py` | 16 | viewmodel | input | the names shown for stays-here inputs |
 | `mac_app/tests/test_jump_key_recorder_layout.py`, class `JumpKeyRecorderLayoutTests`: `test_input_method_toggles_are_not_shortcut_triggers` | 1 | crossing | ui | moved from ui (#69): input-method toggle keys never being the shortcut key |

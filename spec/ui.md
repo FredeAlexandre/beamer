@@ -2180,9 +2180,9 @@ of them shows it best.
 
 ## Identify displays
 
-How the numbers of identify displays are drawn and how long they stay. What starts them is
-`viewmodel.identify.press`, and that each display shows its number is
-`viewmodel.identify.number`.
+How the numbers of identify displays are drawn. What starts them is `viewmodel.identify.press`,
+and that each display shows its number is `viewmodel.identify.number`. Which displays show a
+number, which number, and for how long are `spec/display.md`'s (#61).
 
 > r[ui.identify.card]
 > Each display shows its number on a square card 220 pt wide, or as wide as the display's width or
@@ -2212,32 +2212,6 @@ How the numbers of identify displays are drawn and how long they stay. What star
 > - tier: human (placement is judged by eye)
 > - do: On a machine with two displays at different scaling, press "Identify screens" and compare with the crossing map
 > - see: Each number sits in the middle of the display that carries the same number on the map
-
-> r[ui.identify.every-display]
-> When the numbers asked for do not name exactly this machine's displays now, as when a display was
-> attached or removed since the machine that asked numbered them, every display this machine has now shows a
-> number, counted from 1 in the crossing map's order: top to bottom, then left to right.
->
-> - tier: human (which displays show a number is judged by eye)
-> - do: Attach a second display to a peer and, straight away, press "Identify screens" on this machine
-> - see: Both of the peer's displays show a number, 1 on the upper or left one and 2 on the other
-
-> r[ui.identify.three-seconds]
-> The cards show for 3 s from the request that put them up, then all of them go at once.
->
-> - tier: human (timing is judged by eye)
-> - do: Press "Identify screens" and count
-> - see: Every number goes away together after about three seconds
-
-> r[ui.identify.repeat]
-> A request to identify displays within 3 s of this machine's last one, from its own button or a
-> peer, changes nothing: the same cards stay with the same numbers and still go 3 s after the
-> first. A request 3 s or more after the last puts the cards up afresh. A request counts from the
-> moment it arrives, also when its cards could not be shown.
->
-> - tier: human (timing is judged by eye)
-> - do: Press "Identify screens" five times quickly, then once more after the numbers have gone
-> - see: The numbers do not flash or restart while you press, go three seconds after the first press, and show again for the last press
 
 ## Pointer overlay
 

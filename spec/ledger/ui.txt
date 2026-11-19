@@ -242,12 +242,7 @@ mac_app/tests/test_glow_falloff.py::test_screen_colour_space_does_not_change_the
 mac_app/tests/test_glow_falloff.py::test_style_changes_refresh_the_existing_inward_mask  mined: ui.glow.style-change
 mac_app/tests/test_glow_falloff.py::test_thirds_keep_the_inward_fade  mined: ui.glow.soft-end, ui.glow.third
 mac_app/tests/test_identify_screens.py::OverlayTests::test_each_label_is_centred_on_its_physical_display  mined: ui.identify.place
-mac_app/tests/test_identify_screens.py::OverlayTests::test_failed_show_and_explicit_hide_do_not_reset_request_limit  mined: ui.identify.repeat
-mac_app/tests/test_identify_screens.py::OverlayTests::test_newly_attached_display_is_identified_with_the_same_live_numbering  mined: ui.identify.every-display
 mac_app/tests/test_identify_screens.py::OverlayTests::test_numbered_panels_ignore_clicks_and_never_become_key_or_main  mined: ui.overlay.no-input, ui.overlay.on-top-mac
-mac_app/tests/test_identify_screens.py::OverlayTests::test_repeat_does_not_replace_panels_or_extend_expiry_and_reopens_at_boundary  mined: ui.identify.repeat, ui.identify.three-seconds
-mac_app/tests/test_identify_screens.py::OverlayTests::test_stale_request_is_replaced_by_numbers_for_all_current_displays  mined: ui.identify.every-display
-mac_app/tests/test_identify_screens.py::OverlayTests::test_timeout_hides_and_releases_all_panels_after_three_seconds  mined: ui.identify.three-seconds
 mac_app/tests/test_jump_key_recorder_layout.py::JumpKeyRecorderLayoutTests::test_empty_key_uses_body_type_and_the_hint_sits_below  dropped: uncalled code (#11): the Mac's jump key recorder at full size, which nothing builds; the ledger's is the compact one
 mac_app/tests/test_map_ticks.py::MapTicks::test_a_corner_where_two_displays_meet_beside_a_side_contact_is_not_drawn  mined: ui.map.seam.corner-contact
 mac_app/tests/test_map_ticks.py::MapTicks::test_a_name_that_fits_stays_centred_and_a_long_one_takes_the_room_left_of_the_badge  mined: ui.map.footprint.name
@@ -565,7 +560,7 @@ win_app/tests/test_frame_clock.py::FrameClockTests::test_interval_uses_the_scree
 win_app/tests/test_frame_clock.py::FrameClockTests::test_with_no_widget_the_fastest_screen_paces_the_clock  mined: ui.overlay.frame-rate
 win_app/tests/test_identify_screens_qt.py::IdentifyOverlayTests::test_compact_tiles_keep_number_row_separate_from_readable_names  mined: ui.map.footprint.name-numbers, ui.map.footprint.small, ui.map.footprint.tiny, ui.map.cycle.place
 win_app/tests/test_identify_screens_qt.py::IdentifyOverlayTests::test_failed_layer_shell_uses_xwayland_but_never_focusable_native_fallback  dropped: Linux-only, out of scope (#1)
-win_app/tests/test_identify_screens_qt.py::IdentifyOverlayTests::test_flags_geometry_repeat_does_not_replace_or_extend_three_second_expiry  mined: ui.overlay.no-input, ui.overlay.on-top-pc, ui.identify.three-seconds, ui.identify.repeat
+win_app/tests/test_identify_screens_qt.py::IdentifyOverlayTests::test_flags_geometry_repeat_does_not_replace_or_extend_three_second_expiry  mined: ui.overlay.no-input, ui.overlay.on-top-pc
 win_app/tests/test_identify_screens_qt.py::IdentifyOverlayTests::test_frozen_x11_entry_bypasses_singleton_and_real_settings  dropped: Linux-only, out of scope (#1)
 win_app/tests/test_identify_screens_qt.py::IdentifyOverlayTests::test_helper_failed_start_and_timeout_both_fall_back  dropped: Linux-only, out of scope (#1)
 win_app/tests/test_identify_screens_qt.py::IdentifyOverlayTests::test_helper_failure_logs_backend_and_bounded_stderr  dropped: Linux-only, out of scope (#1)
