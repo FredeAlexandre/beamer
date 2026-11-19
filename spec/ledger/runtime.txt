@@ -1,5 +1,5 @@
 # The runtime domain's slice of the Python ledger, laid out by #51.
 # Owner domains and the ambiguous assignments: spec/ledger/README.md.
-core/tests/test_crash_log.py::AFatalSignal::test_leaves_the_python_stack_of_every_thread_in_crash_log
-core/tests/test_crash_log.py::AThreadThatRaises::test_its_exception_and_the_thread_are_in_the_log
-core/tests/test_crash_log.py::TheFatalSignalHandlerOnTheMac::test_is_armed_and_writes_every_threads_stack_to_crash_log
+core/tests/test_crash_log.py::AFatalSignal::test_leaves_the_python_stack_of_every_thread_in_crash_log  mined: runtime.crash.fatal-signal
+core/tests/test_crash_log.py::AThreadThatRaises::test_its_exception_and_the_thread_are_in_the_log  mined: runtime.crash.logged
+core/tests/test_crash_log.py::TheFatalSignalHandlerOnTheMac::test_is_armed_and_writes_every_threads_stack_to_crash_log  mined: runtime.crash.fatal-signal
