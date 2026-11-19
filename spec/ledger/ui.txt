@@ -617,11 +617,11 @@ win_app/tests/test_pages_win.py::ArrangementGeometryTest::test_the_lit_marks_sit
 win_app/tests/test_pages_win.py::ArrangementGeometryTest::test_the_push_strip_fills_to_the_resistance  dropped: an uncalled function (push_depth), dropped by #11
 win_app/tests/test_pair_code_caret.py::PairCodeCaretTests::test_pasting_digits_with_separators_keeps_digits_and_places_caret_at_next_digit  mined: ui.sheet.boxes.caret
 win_app/tests/test_pair_code_caret.py::PairCodeCaretTests::test_qt_caret_rectangle_and_painted_caret_share_the_visible_cell  mined: ui.sheet.boxes.caret, ui.window.scale
-win_app/tests/test_pair_code_caret.py::PairCodeCaretTests::test_typing_space_or_hyphen_mid_code_does_not_move_caret_to_end  mined: ui.sheet.boxes.caret
-win_app/tests/test_pair_code_rendering.py::PairCodeRenderingTests::test_cell_click_shift_selection_drag_and_final_backspace_follow_visible_slots  mined: ui.sheet.boxes.select
+win_app/tests/test_pair_code_caret.py::PairCodeCaretTests::test_typing_space_or_hyphen_mid_code_does_not_move_caret_to_end  mined: ui.sheet.boxes.caret, ui.sheet.boxes.keys
+win_app/tests/test_pair_code_rendering.py::PairCodeRenderingTests::test_cell_click_shift_selection_drag_and_final_backspace_follow_visible_slots  mined: ui.sheet.boxes.caret, ui.sheet.boxes.select, ui.sheet.boxes.keys
 win_app/tests/test_pair_code_rendering.py::PairCodeRenderingTests::test_pair_action_precedes_the_machines_list  mined: ui.page.overview.pair-button
-win_app/tests/test_pair_code_rendering.py::PairCodeRenderingTests::test_paste_and_backspace_keep_the_six_digit_editing_contract  mined: ui.sheet.boxes.caret
-win_app/tests/test_pair_code_rendering.py::PairCodeRenderingTests::test_shown_code_selection_uses_the_six_visible_cells  mined: ui.sheet.boxes.select
+win_app/tests/test_pair_code_rendering.py::PairCodeRenderingTests::test_paste_and_backspace_keep_the_six_digit_editing_contract  mined: ui.sheet.boxes.keys
+win_app/tests/test_pair_code_rendering.py::PairCodeRenderingTests::test_shown_code_selection_uses_the_six_visible_cells  mined: ui.sheet.boxes.select-shown
 win_app/tests/test_pair_code_rendering.py::PairCodeRenderingTests::test_shown_digits_are_ink_centred_in_six_boxes_for_every_digit  mined: ui.sheet.boxes.centred, ui.sheet.boxes.look
 win_app/tests/test_pair_code_rendering.py::PairCodeRenderingTests::test_typed_digits_are_ink_centred_in_six_boxes_for_every_digit  mined: ui.sheet.boxes.centred, ui.sheet.boxes.look
 win_app/tests/test_pc_three_machines.py::DiagramGeometryTests::test_a_narrow_width_shrinks_the_drawing_to_fit  dropped: the arrangement diagram (ArrangementDiagram), dropped by #11

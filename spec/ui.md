@@ -1156,15 +1156,15 @@ and feel. Which digits they take is `viewmodel.pairing-sheet.code-digits`,
 > centred in the width the sheet gives it, in two groups of three: each box as wide as a digit plus
 > 4 pt either side and at least 34 by 40 pt, 6 pt apart, 18 pt between the third and the fourth.
 > Where the line is narrower than that, the boxes narrow alike to fit it and the digits step down in
-> size, never cut. A box is filled `ground` with 4 pt corners and a 1 pt `outline` border, the box
-> where the next digit goes `signal` while the code has keyboard focus. Digits are B612 Mono in
-> `text`, 20 pt typed and 48 pt shown; an empty box draws no digit, and the shown boxes take no
-> typing.
+> size, never cut. A box is filled `ground` with 4 pt corners and a 1 pt `outline` border; the box
+> of the typed code that has keyboard focus has a `signal` border instead, in place of a focus
+> ring. Digits are B612 Mono in `text`, 20 pt typed and 48 pt shown; an empty box draws no digit,
+> and the shown boxes take no typing.
 >
 > - tier: human (the code boxes are judged by eye)
-> - parity: Python's Mac drew both codes at 20 pt in six 48 pt tall boxes 4 pt apart filling the sheet's width, with no gap between the groups (ADR 0001: one Rune UI draws both machines, the PC's, which groups the digits as the shown code reads)
+> - parity: Python's Mac drew the typed code at 20 pt and the shown code at 34 pt bold, each in six 48 pt tall boxes 4 pt apart filling the sheet's width, with no gap between the groups, and kept the `outline` border on the box with keyboard focus (ADR 0001: one Rune UI draws both machines, the PC's look, which groups the digits as the shown code reads and marks the box typing goes into)
 > - do: Open the pairing sheet, press "Show a code", then type three digits into the code to enter
-> - see: Both codes sit in a centred line of six boxes split three and three; the next empty box of the typed code has a cyan border
+> - see: Both codes sit in a centred line of six boxes split three and three; the typed code's fourth box, where typing goes next, has a cyan border
 
 > r[ui.sheet.boxes.centred]
 > Each digit is drawn centred in its box to within one device pixel, across and up and down, for
@@ -1175,28 +1175,51 @@ and feel. Which digits they take is `viewmodel.pairing-sheet.code-digits`,
 > - see: Every digit sits in the exact middle of its box, a 1 as centred as an 8
 
 > r[ui.sheet.boxes.caret]
-> While the typed code has keyboard focus and nothing is selected, a 1 pt `signal` caret stands in
-> the box where the next digit goes, at the left edge of where a digit sits centred in it, from
-> 8 pt under the box's top to 8 pt above its bottom; with six digits it stands just after the sixth.
-> Typing, pasting or pressing a key the code does not take (a space or a hyphen) leaves it there, and
-> an input method's window opens at it.
+> While a box of the typed code has keyboard focus (`viewmodel.pairing-sheet.code-spread`) and
+> nothing in it is selected, a 1 pt `signal` caret stands in that box, from 8 pt under its top to
+> 8 pt above its bottom: in an empty box at the left edge of where a digit sits centred in it, and in
+> a box holding a digit just before or just after that digit, on the side a click or an arrow key
+> put it. No other box draws a caret. An input method's window opens at the caret.
 >
 > - tier: human (the caret is judged by eye)
-> - parity: Python's Mac drew the caret in `text` (ADR 0001: one Rune UI draws both machines, the PC's)
-> - do: Type 12, press Space, then paste "3-4"
-> - see: The cyan caret moves to the third box after 12, stays there after Space, and stands in the fifth box after the paste
+> - parity: Python's Mac drew each box's own caret in `text`, centred in an empty box; its PC took the code in one field drawn as six cells, with one `signal` caret in the cell the next digit went into (ADR 0001: one Rune UI draws both machines: the PC's caret, in the six boxes of `viewmodel.pairing-sheet.code-spread`, which are the Mac's)
+> - do: Type 12, press Space, then paste "3-4"; then click the right half of the first box
+> - see: The cyan caret stands at the left of the empty third box after 12 and stays there after Space; after the paste it stands in the empty fifth box; after the click it stands just after the 1
+
+> r[ui.sheet.boxes.keys]
+> In the typed code, a digit typed into a box moves keyboard focus to the next box, the sixth box
+> keeping it. Backspace with the caret after a box's digit clears that digit and keeps keyboard
+> focus in the box; Backspace in an empty box other than the first clears the box before it and
+> moves keyboard focus there. A key the code does not take, such as a space, a hyphen or a letter,
+> changes no box and leaves keyboard focus and the caret where they were.
+>
+> - tier: human (typing is felt by hand)
+> - parity: Python's PC took the code in one field drawn as six cells, in which Backspace removed the digit before the caret; its Mac also moved keyboard focus on when a letter or a space was typed into a box holding a digit (ADR 0001: one Rune UI draws both machines, the Mac's six boxes, which `viewmodel.pairing-sheet.code-spread` takes)
+> - do: Type 1234, press Backspace three times, then type 9; then press Space and a letter
+> - see: The digits fill the first four boxes; each Backspace clears the last digit left and the cyan box steps back one; the 9 goes into the second box, so the code reads 1 9 with the third box cyan, and Space and the letter change nothing
 
 > r[ui.sheet.boxes.select]
-> Across the six boxes the pointer selects whole digits, box by box: a press and drag, or a press
-> then a Shift-press, selects the digits of the boxes between; a double-click selects one digit; a
-> press in a box's right half puts the caret after its digit. Selected digits are drawn on
-> `signal-dim`. The shown code can be selected so, though nothing else is (`ui.focus.words-inert`),
-> and copies as it reads, "482 913".
+> In the typed code a selection stays within one box: a double-click on a box's digit, or a drag
+> across it, selects that digit, and a drag that leaves the box selects nothing in the boxes it
+> passes over. A box whose digit is selected is filled `signal-dim` inside its border and draws no
+> caret.
 >
 > - tier: human (selection is judged by hand)
-> - parity: Python's Mac boxes each selected on their own and its shown code could not be selected (ADR 0001: one Rune UI draws both machines, the PC's)
-> - do: Show a code and drag across its six boxes, copy and paste it into a text editor; type a full code, double-click its third box, then click the right half of its last box and press Backspace
-> - see: The drag highlights all six digits and pastes as "482 913"; the double-click highlights one digit; Backspace removes the last digit
+> - parity: Python's PC took the code in one field drawn as six cells, across which a press and drag, or a press then a Shift-press, selected the digits of several cells (ADR 0001: one Rune UI draws both machines, the Mac's, whose six boxes `viewmodel.pairing-sheet.code-spread` takes)
+> - do: Type a full code, double-click its third box, then drag from the fourth box's digit across the fifth and sixth
+> - see: The double-click fills the third box with the dim selection colour behind its digit; the drag fills the fourth box only, never the fifth or sixth
+
+> r[ui.sheet.boxes.select-shown]
+> The shown code can be selected across its six boxes, digit by digit: a press and drag, or a press
+> then a Shift-press, selects the digits of the boxes between, and a double-click selects one digit.
+> Each box whose digit is selected is filled `signal-dim` inside its border. Unlike the window's
+> other words (`ui.focus.words-inert`), the shown code can be selected so, and it copies as it reads,
+> "482 913".
+>
+> - tier: human (selection is judged by hand)
+> - parity: Python's Mac drew the shown code in boxes that could not be selected (ADR 0001: one Rune UI draws both machines, the PC's, so the code can be copied)
+> - do: Press "Show a code", drag across its six boxes, copy, and paste into a text editor; then double-click its third box
+> - see: The drag highlights all six digits and pastes as the code reads, three digits, a space and three digits; the double-click highlights the third digit alone
 
 ## The crossing ledger
 
