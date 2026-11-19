@@ -280,7 +280,7 @@ being logged.
 > room are dropped, and once there is room again one line says how many were dropped. No other line
 > is ever dropped.
 >
-> - parity: Python wrote each line on the thread that logged it, which waited for the file, and dropped none (#16: real-time threads never take locks, and their events reach the logging worker through a ring)
+> - parity: Python wrote each line on the thread that logged it, which waited for the file, and dropped none (#16: real-time threads never take locks, and their lines reach the logging worker through a ring)
 
 ## Crash
 
