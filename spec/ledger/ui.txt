@@ -294,7 +294,7 @@ mac_app/tests/test_notch_style_previews.py::HostedNotchCrossingPreviewTest::test
 mac_app/tests/test_pairing_pixels.py::PairingPixelsTests::test_digits_are_centred_from_rendered_pixels_at_both_scales  mined: ui.sheet.boxes.centred, ui.sheet.boxes.look
 mac_app/tests/test_pairing_pixels.py::PairingPixelsTests::test_leaving_an_empty_box_restores_the_shared_editor_without_typing  python-detail: AppKit's shared field editor, restored after the code boxes recoloured it; Rune has no shared editor
 mac_app/tests/test_pairing_pixels.py::PairingPixelsTests::test_machine_addresses_use_the_reading_face_without_mono_dot_spacing  mined: ui.page.overview.address-face
-mac_app/tests/test_pairing_pixels.py::PairingPixelsTests::test_pairing_action_leads_the_machines_and_uses_primary_style  mined: ui.page.overview.pair-button
+mac_app/tests/test_pairing_pixels.py::PairingPixelsTests::test_pairing_action_leads_the_machines_and_uses_primary_style  mined: ui.page.overview.pair-button, ui.widget.button.kinds
 mac_app/tests/test_pairing_pixels.py::PairingPixelsTests::test_pairing_dialog_hides_the_qr_and_caption  dropped: pairing a phone and the QR code, dropped by #11 and #14
 mac_app/tests/test_pairing_pixels.py::PairingPixelsTests::test_phone_button_visibility_tracks_the_feature_flag  dropped: phone peers and pairing a phone, dropped by #11
 mac_app/tests/test_pairing_pixels.py::PairingPixelsTests::test_selected_digits_use_the_same_centred_ink_and_restore_shared_editor_style  mined: ui.sheet.boxes.centred, ui.sheet.boxes.select

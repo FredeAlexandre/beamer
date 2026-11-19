@@ -314,13 +314,27 @@ How each kind of control is drawn. Every control here behaves the same on a Mac 
 
 > r[ui.widget.button.look]
 > A button has corners of 5 pt radius and its words in 13 pt semibold, centred. A plain button is
-> `well` with an `outline` border and `text` words; a primary button is filled `text` with `ground`
-> words; a live button is filled `signal` with `ground` words. A disabled button of any kind is
-> `panel` with a `hairline` border and `text-3` words, never a faded filled slab.
+> `well` with an `outline` border and `text` words; a primary button (`ui.widget.button.kinds`) is
+> filled `text` with `ground` words. A disabled button of either kind is `panel` with a `hairline`
+> border and `text-3` words, never a faded filled slab.
 >
 > - tier: human (a button is judged by eye)
-> - do: Open the pairing sheet on Overview, select a machine heard nearby, then type its six-digit code
-> - see: "Pair" is a quiet outline with grey words until the sixth digit is typed, then a filled button; the other buttons are filled with a visible outline
+> - parity: Python's PC drew a disabled primary button `well` rather than `panel`, and Python's Mac also had a live button, filled `signal`, for its "Send input" button, which 2.0's settings window does not show (ADR 0001: one Rune UI draws both machines, the Mac's)
+> - do: Open the pairing sheet with "Pair a machine" on Overview, type an address under "Not listed? Type its address.", then type six digits into the code to enter
+> - see: "Cancel" is an outlined button with words in the text colour; "Pair" is a quiet outline with grey words until the sixth digit is typed, then, like "Show a code", a solid block in the text colour with background-coloured words
+
+> r[ui.widget.button.kinds]
+> These buttons are primary: "Show a code" and "Pair" on the pairing sheet, the Pause crossing
+> button while it reads "Resume crossing" (`viewmodel.crossing.pause.button`), "Relaunch Beamer" on
+> a Mac (`viewmodel.permissions.capture-relaunch`), and a button that a line or notice of the
+> Audio & Camera page carries while that line or notice is in the waiting tone
+> (`viewmodel.audio.tone`). Every other button of the settings window is plain, "Pause crossing",
+> "Pair a machine" and "Cancel" included.
+>
+> - tier: human (a button's kind is judged by eye)
+> - parity: Python's PC drew the buttons of the Audio section's notices plain in every tone (ADR 0001: one Rune UI draws both machines, the Mac's)
+> - do: On Overview, with a zone on, look at "Pause crossing", press it, and look again; then press "Pair a machine"
+> - see: "Pause crossing" is an outlined button, and once pressed "Resume crossing" is a solid block in the text colour; on the sheet "Show a code" is a solid block and "Cancel" is outlined
 
 > r[ui.widget.button.size]
 > A button is at least 30 pt tall (40 pt for a big one) and as wide as its words plus 24 pt, never
@@ -333,12 +347,13 @@ How each kind of control is drawn. Every control here behaves the same on a Mac 
 > - see: Every button shows its whole words with room round them and is comfortably tall enough to click
 
 > r[ui.widget.button.hover]
-> On a PC, a button's border turns `text-3` under the pointer, and a primary button's fill turns
-> `text-2`. On a Mac a button does not change under the pointer.
+> On a PC, a plain button's border turns `text-3` under the pointer, and a primary button's fill and
+> border turn `text-2` (`ui.widget.button.kinds`). On a Mac a button does not change under the
+> pointer.
 >
 > - tier: human (hover is judged by eye)
-> - do: On the PC, move the pointer over a plain button and a primary button on Overview
-> - see: The plain button's outline brightens and the primary button's fill turns a softer shade under the pointer
+> - do: On the PC, press "Pair a machine" on Overview, then move the pointer over "Cancel" and over "Show a code"
+> - see: The outline of "Cancel" brightens and the fill of "Show a code" turns a softer shade under the pointer
 
 > r[ui.widget.disabled]
 > A switch, a ruler, a group of options and a group of tiles or colours that cannot be used is drawn
