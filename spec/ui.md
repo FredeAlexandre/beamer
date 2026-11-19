@@ -121,7 +121,7 @@ are in pt, Rune's logical units, which a PC's px equal at 100 % scaling.
 > | numeral | 52 pt, 42 pt narrow | |
 >
 > - tier: human (type sizes are judged by eye)
-> - parity: Python's PC rounded each size to whole px, so 10.5, 11.5 and 12.5 drew at 10, 12 and 12 px (ADR 0001: one Rune UI draws both machines, at the sizes Python's tokens give)
+> - parity: Python's PC set the link status's word at 22 px bold at every width and readouts at 12 px bold, and rounded each other size to whole px, so 10.5, 11.5 and 12.5 drew at 10, 12 and 12 px (ADR 0001: one Rune UI draws both machines, at the sizes Python's tokens give, as its Mac did)
 > - do: Open the Design page with the window wide, then narrow it to its minimum width and open Overview
 > - see: Module headings are small spaced capitals, notes slightly smaller than body text, and the link status's word on Overview is large and shrinks a step at the minimum width
 
@@ -261,9 +261,8 @@ How the settings window moves when a setting changes what it shows.
 > - see: Each change appears at once, with nothing sliding or fading
 
 > r[ui.motion.unseen]
-> A change to a part of the settings window that cannot be seen, because the window is hidden or
-> minimised or the part is scrolled out of view, lands at once without animating, so the part is
-> already in its end state when it is next seen.
+> A change to the settings window while it cannot be seen, because it is hidden or minimised, lands
+> at once without animating, so the window is already in its end state when it is next seen.
 >
 > - tier: human (motion is judged by eye)
 > - do: With "System" chosen, minimise the settings window, change the OS between light and dark mode, and restore the window
@@ -374,6 +373,7 @@ How each kind of control is drawn. Every control here behaves the same on a Mac 
 > on, the outline and the knob are `signal`, the knob 3 pt in from the right end.
 >
 > - tier: human (a switch is judged by eye)
+> - parity: Python's Mac set the knob 3 pt in from the left end but 4 pt from the right, and its PC 2.5 px from each (ADR 0001: one Rune UI draws both machines, the knob 3 pt from either end as it is from the track's top and bottom)
 > - do: On the Design page, click the words of "Animate crossings" to turn it off and on
 > - see: Clicking the words turns the switch on or off; off shows a grey knob on the left of a grey-outlined track, on a cyan knob on the right of a cyan-outlined track
 
@@ -445,6 +445,7 @@ rate" or "This window".
 > `text` with its words in `ground`, semibold, in Light and in Dark.
 >
 > - tier: human (an option is judged by eye)
+> - parity: Python's PC drew each option as a button of its own, `well` with an `outline` border and 5 px corners, 4 px from the next (ADR 0001: one Rune UI draws both machines, the Mac's)
 > - do: On the Design page, choose each of "System", "Light" and "Dark" under "This window"
 > - see: The chosen option is a solid block in the text colour with background-coloured words, black in Light and off-white in Dark, and the others are quiet
 
@@ -455,6 +456,7 @@ rate" or "This window".
 > option of the group grows to the same height.
 >
 > - tier: human (an option's size is judged by eye)
+> - parity: Python's PC made each option as wide as its group's longest words plus 24 px with no 120 pt cap, the group as wide as its options and their 4 px gaps with no 360 pt cap (ADR 0001: one Rune UI draws both machines, the Mac's)
 > - do: On the Design page, turn on "Show where the pointer lands", then look at "Style for" with the window at its widest
 > - see: "Crossing" and "Shortcut and menu" are two options of the same width and height, the group compact rather than stretched across the card, each option's words whole
 
@@ -593,6 +595,7 @@ each.
 > shrinking the window through 528 pt gives the same placement at the same width in either direction.
 >
 > - tier: human (placement is judged by eye)
+> - parity: Python's Mac stacked a setting below 528 pt but put its caption back beside the control only from 544 pt (ADR 0001: one Rune UI draws both machines, the PC's, which gives each width one placement)
 > - do: On the Design page, narrow the window to its minimum and widen it again
 > - see: The captions move above their controls when narrow and return to the left when wide, at the same width in both directions
 
@@ -602,6 +605,7 @@ each.
 > other they stand one above the other, each still 12 pt in from the end, none overlapping another.
 >
 > - tier: human (placement is judged by eye)
+> - parity: Python's PC set them 16 px apart with the last flush with the line's end (ADR 0001: one Rune UI draws both machines, the Mac's)
 > - do: Look at a peer's line on Overview at a wide window, then at the window's minimum width
 > - see: Its controls sit together at the end of the line, evenly spaced, and when narrow they stack neatly at the end without overlapping
 
@@ -690,7 +694,7 @@ the user moves keyboard focus with the keyboard.
 > control's; a switch's ring goes round its track.
 >
 > - tier: human (a focus ring is judged by eye)
-> - parity: Python's PC drew focus as the control's own border turned 1 or 2 px `signal`, inside the control, and its Mac ringed a switch's words and track together (ADR 0001: one Rune UI draws both machines)
+> - parity: Python's PC drew focus as the control's own border turned 1 or 2 px `signal`, inside the control, ringed a switch's track 1 px wide 2 px outside it, and ringed a tile 2 px wide in `text` 5 px inside it; its Mac ringed a switch's words and track together (ADR 0001: one Rune UI draws both machines)
 > - do: Tab through the controls on the Design page
 > - see: Each control in turn shows a cyan ring just outside it, following its rounded corners, and a switch's ring hugs its track
 
