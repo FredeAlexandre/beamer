@@ -63,7 +63,7 @@ win_app/tests/test_quit_signals.py::QuitSignalsTests::test_sigint_quits_and_a_se
 win_app/tests/test_quit_signals.py::QuitSignalsTests::test_sigterm_quits_through_the_event_loop  mined: app.quit.signal
 win_app/tests/test_single_instance.py::SingleInstanceTests::test_failed_migration_still_reaches_instance_handling  mined: app.instance.first
 win_app/tests/test_single_instance.py::SingleInstanceTests::test_hidden_second_launch_does_not_raise_the_existing_window  mined: app.instance.hidden
-win_app/tests/test_single_instance.py::SingleInstanceTests::test_relaunch_marks_replacement_and_quits_through_application  mined: app.watchdog.relaunch-arguments
+win_app/tests/test_single_instance.py::SingleInstanceTests::test_relaunch_marks_replacement_and_quits_through_application  dropped: the relaunch after choosing another language (F34: #11 drops Italian and the pseudo-locale)
 win_app/tests/test_single_instance.py::SingleInstanceTests::test_relaunched_instance_gives_up_after_the_wait_window  mined: app.instance.relaunch-gives-up
 win_app/tests/test_single_instance.py::SingleInstanceTests::test_relaunched_instance_waits_until_the_holder_releases_the_lock  mined: app.instance.relaunch-waits
 win_app/tests/test_single_instance.py::SingleInstanceTests::test_second_launch_signals_the_running_instance_with_activation_token  mined: app.instance.show

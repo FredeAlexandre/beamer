@@ -40,15 +40,15 @@ runner of each OS; what only a real install, a real login session or a person at
 r[app.command.forms]
 `beamer` takes one of these command lines: no command, which launches Beamer's app with the launch
 options of `app.command.launch-options`; `install`; `uninstall`, or `uninstall --purge`; `quit`;
-`--watchdog`, as the app starts it (`app.watchdog.started`); and `--elevated` followed by one
-elevated step (`app.elevated.steps`).
+`--watchdog` with the arguments the app gives it (`app.watchdog.started`); and `--elevated`
+followed by one elevated step (`app.elevated.steps`).
 
 > r[app.command.launch-options]
 > A launch takes these options, each at most once and in any order: `--hidden`
-> (`app.command.hidden`), `--relaunched` (`app.instance.relaunch-waits`), the watchdog's record of
-> recent crashes (`app.watchdog.relaunch-arguments`), and on a PC `--logon-task` and `--launched`
-> with the options after it, as the logon task passes them (`platform.task.definition`,
-> `platform.task.launch-options`).
+> (`app.command.hidden`), `--relaunched` (`app.instance.relaunch-waits`) and the watchdog's record of
+> recent crashes (`app.watchdog.relaunch-arguments`). On a PC, a launch from the logon task begins
+> with `--logon-task`, followed by `$(Arg0)` as written or by `--launched` and the options it carries
+> (`platform.task.definition`, `platform.task.launch-visible`, `platform.task.launch-options`).
 >
 > - parity: Python also took `--config` with the path of a settings file to use instead of its own (#16: the data folder and its two data files are fixed, `runtime.files.folder`)
 
@@ -61,9 +61,10 @@ elevated step (`app.elevated.steps`).
 > - fuzz: command-line
 
 r[app.command.hidden]
-A launch with `--hidden` starts Beamer without showing its window, as a start at login does
-(`platform.login.mac-hidden`, `platform.task.launch-visible`, `viewmodel.tray.hidden-start`). Any
-other launch shows Beamer's window once it has started.
+A launch with `--hidden` starts Beamer hidden, as a start at login does (`platform.login.mac-hidden`,
+`platform.task.launch-visible`), and so does a start at login. Any other launch shows Beamer's
+window once it has started. What a hidden start shows on a PC while Show in tray is off is
+`viewmodel.tray.hidden-start`'s.
 
 ## Single instance
 
@@ -80,6 +81,14 @@ r[app.instance.one]
 In one login session, at most one Beamer's app runs. A launch that finds one running starts no
 second one, also when two launches start at the same moment, as two logon tasks would.
 
+r[app.instance.after-crash]
+A Beamer that crashed or was killed keeps no claim on its login session: the next launch starts
+Beamer, with no wait.
+
+r[app.instance.same-account]
+Only a launch by the account Beamer runs as can ask it to show its window or to Quit
+(`app.quit-command.asks`): a launch by another account changes nothing in that Beamer.
+
 r[app.instance.elevated-counts]
 On a PC, a launch without administrator rights counts a Beamer running with them as running.
 
@@ -89,9 +98,11 @@ On a PC, a launch without administrator rights counts a Beamer running with them
 > and in front of other windows, also when the window was hidden or closed and while Show in tray
 > is off.
 
-r[app.instance.hidden]
-A second launch asked to start hidden, with `--hidden` or as a start at login, asks the running
-Beamer nothing and ends with exit status 0, leaving its window as it was.
+> r[app.instance.hidden]
+> A second launch asked to start hidden, with `--hidden` or as a start at login, asks the running
+> Beamer nothing and ends with exit status 0, leaving its window as it was.
+>
+> - parity: Python's Mac asked the running Beamer to show its window from any second launch, hidden or not (one behaviour on both machines: the PC's, so a start at login never brings up a window)
 
 r[app.instance.bounded]
 A second launch whose request the running Beamer has not taken within 2 s of the launch finding it
@@ -139,9 +150,10 @@ r[app.floor.pc-x64]
 >
 > - parity: Python's PC started on any Windows (#17: below the floor Beamer refuses to start and says why)
 
-r[app.floor.pc-install]
-On a PC running a Windows build below 22000, `beamer install` writes the floor message to standard
-error and ends with a non-zero exit status, having installed nothing.
+r[app.floor.pc-commands]
+On a PC running a Windows build below 22000, every command line but a launch (`install`,
+`uninstall`, `quit`, `--watchdog` and `--elevated`) writes the floor message to standard error and
+ends with a non-zero exit status, having changed nothing.
 
 ## Watchdog
 
@@ -150,7 +162,13 @@ relaunches the app after a crash or a frozen engine.
 
 r[app.watchdog.started]
 When Beamer's app starts, it starts its watchdog: the same binary run as `beamer --watchdog`,
-joined to the app by a pipe. No other command line of `app.command.forms` starts a watchdog.
+joined to the app by a pipe. Only a launch that goes on to run Beamer's app starts one: a second
+launch, a PC launch that runs the logon task and ends (`platform.task.launch`), and every other
+command line of `app.command.forms` start none.
+
+r[app.watchdog.by-hand]
+`beamer --watchdog` started without the pipe of the app that starts it ends at once with a non-zero
+exit status, and launches nothing.
 
 r[app.watchdog.no-logic]
 The watchdog shows no window, tray icon or Dock icon, opens no network socket, captures and injects
@@ -191,8 +209,9 @@ crash and, on a PC, giving the app's exit code.
 
 r[app.watchdog.relaunch-arguments]
 The watchdog relaunches the app with the crashed app's own command-line arguments, `--relaunched`
-and the watchdog's record of recent crashes, each once: a Beamer started hidden is relaunched
-hidden, and one the logon task started is relaunched as one the logon task started.
+and the watchdog's record of recent crashes, each once, and `--hidden` when the crashed app had
+started hidden, a start at login included: a Beamer started hidden is relaunched hidden, and one the
+logon task started is relaunched as one the logon task started.
 
 r[app.watchdog.backoff]
 The watchdog waits before it relaunches the app: 1 s after the first crash of a streak, then 2, 4, 8
@@ -230,15 +249,14 @@ When the watchdog ends while the app runs, the app starts a new watchdog within 
 
 r[app.quit.ends]
 Quit ends Beamer's app with exit status 0, and its watchdog with it (`app.watchdog.bye`): once Quit
-is done, no Beamer process runs. Quit comes from the tray menu's "Quit Beamer", from closing the
-window as `viewmodel.tray.close` says, from `beamer quit`, and from the end of the login session
-(`app.quit.session-end`).
+is done, no Beamer process runs. Quit comes, among others, from the tray menu's "Quit Beamer", from
+closing the window as `viewmodel.tray.close` says, from `beamer quit`, from a signal
+(`app.quit.signal`) and from the end of the login session (`app.quit.session-end`).
 
 > r[app.quit.signal]
-> On a Mac, a SIGTERM or SIGINT sent to Beamer's app quits it as Quit does, once, however many
-> arrive.
+> A SIGTERM or SIGINT that Beamer's app receives quits it as Quit does, once, however many arrive.
 >
-> - parity: Python's Mac app ended at once on SIGTERM, without quitting, and only its PC and Linux apps quit through Quit (one behaviour for every app: the PC app's, so a `kill` is a Quit and not a crash the watchdog relaunches)
+> - parity: Python's Mac app ended at once on SIGTERM, without quitting, while its PC and Linux apps quit through Quit (one behaviour for every app: the PC app's, so a `kill` is a Quit and not a crash the watchdog relaunches)
 
 > r[app.quit.session-end]
 > Logging out of the login session, restarting or shutting down the machine quits Beamer as Quit
@@ -247,8 +265,8 @@ window as `viewmodel.tray.close` says, from `beamer quit`, and from the end of t
 > - tier: machine (only a real machine ends a login session)
 
 > r[app.quit.kill-both]
-> Killing the app and the watchdog together, as `killall Beamer` on a Mac or
-> `taskkill /IM Beamer.exe` on a PC does, leaves no Beamer running: nothing relaunches it.
+> Ending the app and the watchdog together, with `killall Beamer` or `killall -KILL Beamer` on a Mac,
+> or `taskkill /F /IM Beamer.exe` on a PC, leaves no Beamer running: nothing relaunches it.
 >
 > - tier: machine (only a real install relaunches through LaunchServices or the logon task's token)
 
@@ -260,8 +278,8 @@ administrator rights, waits until that Beamer and its watchdog have ended, and e
 status 0.
 
 r[app.quit-command.none-running]
-With no Beamer running in its login session, `beamer quit` ends at once with exit status 0. It never
-starts Beamer.
+With no Beamer running in its login session, `beamer quit` ends with exit status 0 within 1 s. It
+never starts Beamer.
 
 r[app.quit-command.timeout]
 When the running Beamer and its watchdog have not both ended 10 s after `beamer quit` asked, it
@@ -311,19 +329,31 @@ r[app.uninstall.quits-first]
 r[app.uninstall.removes]
 `beamer uninstall` then removes everything install added, as `platform.install.uninstall` and the
 audio and camera install steps say, running `beamer --elevated remove` once for what needs
-administrator rights. With `--purge` it also removes the data folder and the identity key
-(`platform.install.purge`); without it, it keeps them (`platform.install.uninstall-keeps`).
+administrator rights. It keeps the data folder and the identity key
+(`platform.install.uninstall-keeps`).
+
+r[app.uninstall.purge]
+`beamer uninstall --purge` also removes the data folder and the identity key
+(`platform.install.purge`).
+
+r[app.uninstall.own-files]
+On a PC, `beamer uninstall` run from the installed copy leaves none of the installed files within
+10 s of its end, `Beamer.exe` included.
 
 r[app.uninstall.failed]
 When something install added could not be removed, or administrator permission for it is declined,
 `beamer uninstall` writes what is left to standard error and ends with a non-zero exit status;
-running it again removes what is left. Otherwise it ends with exit status 0, also when nothing was
-installed.
+running it again removes what is left.
+
+r[app.uninstall.done]
+`beamer uninstall` ends with exit status 0 when it has removed everything install added, also when
+nothing was installed.
 
 ## Elevated steps
 
 ADR 0004: every step that needs administrator rights is an `--elevated` command line of the same
-binary.
+binary. GameInput recovery (F40), Later in #11, will be a step of the elevated setup, the room
+`platform.install.one-setup` names, so it needs no new elevated step.
 
 > r[app.elevated.steps]
 > `beamer --elevated` takes exactly one of these steps. On a PC: `setup`, the elevated setup
@@ -348,20 +378,24 @@ binary.
 >
 > - parity: Python's PC handed its elevated script the path of `Beamer.exe` and the signed-in account's SID, and refused a path holding a double quote before starting it (#21: the binary's own elevated steps find the installed path themselves)
 
+r[app.elevated.other-account]
+On a PC, an elevated step run as an account other than the one Windows names as signed in to its
+session, as when another administrator approved its UAC prompt, changes nothing and ends with a
+non-zero exit status (`platform.login.pc-account`).
+
 r[app.elevated.needs-rights]
 An elevated step run without administrator rights changes nothing and ends with a non-zero exit
 status.
 
-> r[app.elevated.no-prompt]
-> Beamer, `beamer install` and `beamer uninstall`, when they already run with administrator rights,
-> as over SSH on a PC, run an elevated step with no prompt.
->
-> - tier: machine (only a real PC has an SSH session with administrator rights)
+r[app.elevated.no-prompt]
+Beamer, `beamer install` and `beamer uninstall` run an elevated step with no prompt when they already
+run with administrator rights, as over SSH on a PC, and on a Mac when sudo runs the step without a
+password, as #21's dev-only `beamer-hal` rule lets it for `install-driver`.
 
 > r[app.elevated.prompt]
-> Beamer, `beamer install` and `beamer uninstall`, when they run without administrator rights, run
-> an elevated step through one UAC prompt on a PC, or one macOS administrator password prompt on a
-> Mac, naming Beamer.
+> When they cannot run an elevated step without a prompt (`app.elevated.no-prompt`), Beamer,
+> `beamer install` and `beamer uninstall` run it through one UAC prompt on a PC, or one macOS
+> administrator password prompt on a Mac, naming Beamer.
 >
 > - tier: human (a UAC or administrator password prompt is seen at the desk)
 > - do: On the PC, signed in at the desk without an elevated shell, with something in the elevated setup differing (delete the "Beamer (UDP-In)" firewall rule), run `beamer install`; on the Mac, with the installed virtual microphone removed, run `beamer install`

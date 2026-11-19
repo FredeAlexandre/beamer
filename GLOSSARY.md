@@ -245,18 +245,18 @@ _Avoid_: camera follows input
 ## The app
 
 **Quit**:
-Ending Beamer on purpose, from its tray menu, its window, `beamer quit` or the end of the login
-session. After Quit no Beamer process runs, and nothing relaunches it.
+Ending Beamer on purpose, as from its tray menu, its window, `beamer quit`, a signal or the end of
+the login session. After Quit no Beamer process runs, and the watchdog relaunches nothing.
 _Avoid_: exit Beamer, close Beamer, shut Beamer down
 
 **Crash**:
-Any end of Beamer's app that is not a Quit: a panic, a kill, Force Quit or End task, or the
-watchdog killing a frozen engine.
+Any end of Beamer's app that is not a Quit: a panic, a kill, macOS's Force Quit or Windows' End
+task, or the watchdog killing a frozen engine.
 _Avoid_: unexpected exit, abnormal exit
 
 **Watchdog**:
 A second process of the same binary, `beamer --watchdog`, that the app starts and that only
-relaunches the app after a crash or a frozen engine.
+relaunches the app after a crash.
 _Avoid_: supervisor, restarter, keep-alive agent
 
 **Second launch**:
