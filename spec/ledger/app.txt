@@ -1,95 +1,91 @@
 # The app domain's slice of the Python ledger, laid out by #51.
 # Owner domains and the ambiguous assignments: spec/ledger/README.md.
-core/tests/test_no_copies.py::NoCopiesTests::test_no_app_holds_a_copy_of_a_core_module
-core/tests/test_no_copies.py::NoCopiesTests::test_no_app_holds_a_copy_of_a_core_test
-core/tests/test_release_body.py::ReleaseBodyTests::test_ambiguous_or_invalid_metadata_is_rejected
-core/tests/test_release_body.py::ReleaseBodyTests::test_default_patch_body_is_quiet_and_keeps_notes
-core/tests/test_release_body.py::ReleaseBodyTests::test_existing_important_mark_is_preserved_without_an_override
-core/tests/test_release_body.py::ReleaseBodyTests::test_important_replaces_template_mark_and_alerts
-core/tests/test_updates.py::BetaTests::test_a_beta_checks_for_updates_like_any_install
-core/tests/test_updates.py::BetaTests::test_a_beta_is_never_offered_to_anyone
-core/tests/test_updates.py::BetaTests::test_a_beta_reads_its_own_version
-core/tests/test_updates.py::BetaTests::test_an_older_release_is_not_offered_to_a_beta
-core/tests/test_updates.py::BetaTests::test_the_public_release_is_offered_to_a_beta_without_an_announce
-core/tests/test_updates.py::CheckerTests::test_a_failed_check_keeps_the_last_answer
-core/tests/test_updates.py::CheckerTests::test_error_payload_is_not_reported_as_up_to_date
-core/tests/test_updates.py::CheckerTests::test_explicit_check_reports_current_and_failure_without_discarding_cached_update
-core/tests/test_updates.py::CheckerTests::test_explicit_check_works_with_automatic_checks_off_without_changing_setting
-core/tests/test_updates.py::CheckerTests::test_explicit_request_wakes_the_worker_and_finishes
-core/tests/test_updates.py::CheckerTests::test_manual_request_arriving_after_worker_reads_flag_is_not_lost
-core/tests/test_updates.py::CheckerTests::test_reports_a_newer_release
-core/tests/test_updates.py::CheckerTests::test_reports_none_when_current
-core/tests/test_updates.py::CheckerTests::test_skipped_quiet_patch_does_not_consume_a_later_important_notice
-core/tests/test_updates.py::CheckerTests::test_switched_off_it_asks_nothing
-core/tests/test_updates.py::CheckerTests::test_switching_off_during_a_request_discards_its_answer
-core/tests/test_updates.py::NewerReleaseTests::test_a_dev_build_is_never_told_to_update
-core/tests/test_updates.py::NewerReleaseTests::test_a_newer_tag_is_offered_with_its_page
-core/tests/test_updates.py::NewerReleaseTests::test_a_page_outside_the_project_is_replaced_by_the_releases_page
-core/tests/test_updates.py::NewerReleaseTests::test_a_quiet_patch_still_offers_the_minor_version_someone_is_behind
-core/tests/test_updates.py::NewerReleaseTests::test_drafts_prereleases_and_odd_tags_never_count
-core/tests/test_updates.py::NewerReleaseTests::test_every_newer_stable_patch_is_offered
-core/tests/test_updates.py::NewerReleaseTests::test_new_minor_or_major_alerts_even_when_latest_is_a_quiet_patch
-core/tests/test_updates.py::NewerReleaseTests::test_patch_notification_policy_reads_only_the_machine_readable_mark
-core/tests/test_updates.py::NewerReleaseTests::test_the_same_or_an_older_tag_is_not
-core/tests/test_updates.py::NewerReleaseTests::test_versions_compare_as_numbers
-core/tests/test_updates.py::NoticeTests::test_a_quiet_patch_never_becomes_a_notice_even_after_an_explicit_check
-core/tests/test_updates.py::NoticeTests::test_dismissal_survives_a_new_check_but_not_a_newer_version
-core/tests/test_updates.py::NoticeTests::test_explicit_request_resurfaces_a_dismissed_release_with_automatic_checks_off
-core/tests/test_updates.py::NoticeTests::test_off_setting_hides_a_cached_result_and_none_stays_hidden
-core/tests/test_updates.py::PortableCheckerTests::test_failed_request_keeps_matching_cached_page_and_asset
-core/tests/test_updates.py::PortableCheckerTests::test_installed_checker_keeps_its_existing_release_page_behaviour
-core/tests/test_updates.py::PortableCheckerTests::test_missing_portable_zip_never_offers_the_installer
-core/tests/test_updates.py::PortableCheckerTests::test_new_answer_clears_an_asset_from_the_previous_answer
-core/tests/test_updates.py::PortableCheckerTests::test_portable_download_keeps_the_release_page_for_whats_new
-core/tests/test_updates.py::PortableCheckerTests::test_untrusted_or_wrong_release_assets_are_rejected
-mac_app/tests/test_single_instance.py::SingleInstanceTests::test_second_launch_signals_the_running_instance
-mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_dismissal_survives_rebuilding_and_other_settings_changes
-mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_explicit_check_resurfaces_a_dismissed_action_until_dismissed_again
-mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_failed_save_keeps_the_notice_available
-mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_hidden_notice_does_not_keep_a_width_link_to_the_window
-mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_manual_check_is_visible_and_works_when_automatic_checks_are_off
-mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_manual_check_reports_no_update_and_retryable_failure
-mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_quiet_patch_does_not_change_menu_header_but_important_release_does_once
-mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_quiet_patch_stays_on_updates_page_even_when_explicitly_requested
-mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_switching_off_clears_the_tray_download_action
-mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_switching_off_hides_the_notice_and_late_answers
-mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_update_notice_has_an_explicit_update_action
-mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_whats_new_opens_the_release_only_on_a_click
-win_app/tests/test_linux_start.py::LinuxStartTest::test_on_x11_the_x11_parts_start_and_the_receiver_listens
-win_app/tests/test_linux_start.py::LinuxStartTest::test_the_shell_starts_builds_its_window_and_quits_with_no_windows_module
-win_app/tests/test_linux_start.py::SessionTest::test_which_display_server
-win_app/tests/test_quit_signals.py::QuitSignalsTests::test_close_restores_the_previous_handlers
-win_app/tests/test_quit_signals.py::QuitSignalsTests::test_sigint_quits_and_a_second_signal_does_not_quit_twice
-win_app/tests/test_quit_signals.py::QuitSignalsTests::test_sigterm_quits_through_the_event_loop
-win_app/tests/test_single_instance.py::SingleInstanceTests::test_closing_after_the_tray_disappears_quits
-win_app/tests/test_single_instance.py::SingleInstanceTests::test_closing_with_a_tray_hides_instead_of_quitting
-win_app/tests/test_single_instance.py::SingleInstanceTests::test_closing_without_a_tray_quits_instead_of_hiding
-win_app/tests/test_single_instance.py::SingleInstanceTests::test_escape_quits_when_no_tray_icon_is_visible
-win_app/tests/test_single_instance.py::SingleInstanceTests::test_failed_migration_still_reaches_instance_handling
-win_app/tests/test_single_instance.py::SingleInstanceTests::test_hidden_second_launch_does_not_raise_the_existing_window
-win_app/tests/test_single_instance.py::SingleInstanceTests::test_relaunch_marks_replacement_and_quits_through_application
-win_app/tests/test_single_instance.py::SingleInstanceTests::test_relaunched_instance_gives_up_after_the_wait_window
-win_app/tests/test_single_instance.py::SingleInstanceTests::test_relaunched_instance_waits_until_the_holder_releases_the_lock
-win_app/tests/test_single_instance.py::SingleInstanceTests::test_second_launch_signals_the_running_instance_with_activation_token
-win_app/tests/test_single_instance.py::SingleInstanceTests::test_startup_migrates_the_legacy_task_before_single_instance_handling
-win_app/tests/test_single_instance.py::SingleInstanceTests::test_two_logon_tasks_cannot_claim_two_receivers
-win_app/tests/test_single_instance.py::SingleInstanceTests::test_visible_second_launch_still_raises_the_existing_window
-win_app/tests/test_single_instance.py::SingleInstanceTests::test_wayland_activation_token_is_removed_after_the_activation_request
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_desktop_update_header_remains_a_download_action
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_dismissal_survives_rebuilding_and_other_settings_changes
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_explicit_flatpak_check_resurfaces_a_dismissed_action_until_dismissed_again
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_failed_save_keeps_the_notice_available
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_flatpak_has_store_guidance_and_no_download_action
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_flatpak_update_action_opens_the_release_with_store_guidance
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_important_release_after_quiet_patch_alerts_until_dismissed
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_linux_start_checks_for_updates_without_waiting_for_a_toggle
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_manual_check_is_visible_and_works_when_automatic_checks_are_off
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_manual_check_reports_no_update_and_retryable_failure
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_missing_portable_download_is_explained_without_offering_installer
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_quiet_flatpak_keeps_release_notes_on_the_updates_page
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_quiet_patch_is_available_on_updates_page_without_a_banner_or_tray_alert
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_quiet_patch_without_a_portable_zip_explains_the_missing_download_on_updates_page
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_switching_off_hides_the_notice_and_late_answers
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_unreadable_settings_do_not_block_opening_the_panel
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_update_notice_has_an_explicit_update_action
-win_app/tests/test_update_notice.py::UpdateNoticeTest::test_whats_new_opens_the_release_only_on_a_click
+core/tests/test_no_copies.py::NoCopiesTests::test_no_app_holds_a_copy_of_a_core_module  python-detail: the Python repo keeps each shared module once, in core/
+core/tests/test_no_copies.py::NoCopiesTests::test_no_app_holds_a_copy_of_a_core_test  python-detail: the Python repo keeps each shared module once, in core/
+core/tests/test_release_body.py::ReleaseBodyTests::test_ambiguous_or_invalid_metadata_is_rejected  dropped: release notes and their notify mark, read only by the update check (F22, #11 drops it)
+core/tests/test_release_body.py::ReleaseBodyTests::test_default_patch_body_is_quiet_and_keeps_notes  dropped: release notes and their notify mark, read only by the update check (F22, #11 drops it)
+core/tests/test_release_body.py::ReleaseBodyTests::test_existing_important_mark_is_preserved_without_an_override  dropped: release notes and their notify mark, read only by the update check (F22, #11 drops it)
+core/tests/test_release_body.py::ReleaseBodyTests::test_important_replaces_template_mark_and_alerts  dropped: release notes and their notify mark, read only by the update check (F22, #11 drops it)
+core/tests/test_updates.py::BetaTests::test_a_beta_checks_for_updates_like_any_install  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::BetaTests::test_a_beta_is_never_offered_to_anyone  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::BetaTests::test_a_beta_reads_its_own_version  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::BetaTests::test_an_older_release_is_not_offered_to_a_beta  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::BetaTests::test_the_public_release_is_offered_to_a_beta_without_an_announce  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::CheckerTests::test_a_failed_check_keeps_the_last_answer  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::CheckerTests::test_error_payload_is_not_reported_as_up_to_date  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::CheckerTests::test_explicit_check_reports_current_and_failure_without_discarding_cached_update  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::CheckerTests::test_explicit_check_works_with_automatic_checks_off_without_changing_setting  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::CheckerTests::test_explicit_request_wakes_the_worker_and_finishes  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::CheckerTests::test_manual_request_arriving_after_worker_reads_flag_is_not_lost  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::CheckerTests::test_reports_a_newer_release  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::CheckerTests::test_reports_none_when_current  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::CheckerTests::test_skipped_quiet_patch_does_not_consume_a_later_important_notice  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::CheckerTests::test_switched_off_it_asks_nothing  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::CheckerTests::test_switching_off_during_a_request_discards_its_answer  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::NewerReleaseTests::test_a_dev_build_is_never_told_to_update  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::NewerReleaseTests::test_a_newer_tag_is_offered_with_its_page  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::NewerReleaseTests::test_a_page_outside_the_project_is_replaced_by_the_releases_page  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::NewerReleaseTests::test_a_quiet_patch_still_offers_the_minor_version_someone_is_behind  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::NewerReleaseTests::test_drafts_prereleases_and_odd_tags_never_count  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::NewerReleaseTests::test_every_newer_stable_patch_is_offered  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::NewerReleaseTests::test_new_minor_or_major_alerts_even_when_latest_is_a_quiet_patch  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::NewerReleaseTests::test_patch_notification_policy_reads_only_the_machine_readable_mark  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::NewerReleaseTests::test_the_same_or_an_older_tag_is_not  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::NewerReleaseTests::test_versions_compare_as_numbers  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::NoticeTests::test_a_quiet_patch_never_becomes_a_notice_even_after_an_explicit_check  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::NoticeTests::test_dismissal_survives_a_new_check_but_not_a_newer_version  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::NoticeTests::test_explicit_request_resurfaces_a_dismissed_release_with_automatic_checks_off  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::NoticeTests::test_off_setting_hides_a_cached_result_and_none_stays_hidden  dropped: the update check (F22, #11 drops it)
+core/tests/test_updates.py::PortableCheckerTests::test_failed_request_keeps_matching_cached_page_and_asset  dropped: the update check for the portable build (F22 and F23, #11 drops both)
+core/tests/test_updates.py::PortableCheckerTests::test_installed_checker_keeps_its_existing_release_page_behaviour  dropped: the update check for the portable build (F22 and F23, #11 drops both)
+core/tests/test_updates.py::PortableCheckerTests::test_missing_portable_zip_never_offers_the_installer  dropped: the update check for the portable build (F22 and F23, #11 drops both)
+core/tests/test_updates.py::PortableCheckerTests::test_new_answer_clears_an_asset_from_the_previous_answer  dropped: the update check for the portable build (F22 and F23, #11 drops both)
+core/tests/test_updates.py::PortableCheckerTests::test_portable_download_keeps_the_release_page_for_whats_new  dropped: the update check for the portable build (F22 and F23, #11 drops both)
+core/tests/test_updates.py::PortableCheckerTests::test_untrusted_or_wrong_release_assets_are_rejected  dropped: the update check for the portable build (F22 and F23, #11 drops both)
+mac_app/tests/test_single_instance.py::SingleInstanceTests::test_second_launch_signals_the_running_instance  mined: app.instance.show
+mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_dismissal_survives_rebuilding_and_other_settings_changes  dropped: the update notice (F22, #11 drops it)
+mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_explicit_check_resurfaces_a_dismissed_action_until_dismissed_again  dropped: the update notice (F22, #11 drops it)
+mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_failed_save_keeps_the_notice_available  dropped: the update notice (F22, #11 drops it)
+mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_hidden_notice_does_not_keep_a_width_link_to_the_window  dropped: the update notice (F22, #11 drops it)
+mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_manual_check_is_visible_and_works_when_automatic_checks_are_off  dropped: the update notice (F22, #11 drops it)
+mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_manual_check_reports_no_update_and_retryable_failure  dropped: the update notice (F22, #11 drops it)
+mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_quiet_patch_does_not_change_menu_header_but_important_release_does_once  dropped: the update notice (F22, #11 drops it)
+mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_quiet_patch_stays_on_updates_page_even_when_explicitly_requested  dropped: the update notice (F22, #11 drops it)
+mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_switching_off_clears_the_tray_download_action  dropped: the update notice (F22, #11 drops it)
+mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_switching_off_hides_the_notice_and_late_answers  dropped: the update notice (F22, #11 drops it)
+mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_update_notice_has_an_explicit_update_action  dropped: the update notice (F22, #11 drops it)
+mac_app/tests/test_update_notice.py::UpdateNoticeTest::test_whats_new_opens_the_release_only_on_a_click  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_linux_start.py::LinuxStartTest::test_on_x11_the_x11_parts_start_and_the_receiver_listens  dropped: Linux-only, out of scope (#1)
+win_app/tests/test_linux_start.py::LinuxStartTest::test_the_shell_starts_builds_its_window_and_quits_with_no_windows_module  dropped: Linux-only, out of scope (#1)
+win_app/tests/test_linux_start.py::SessionTest::test_which_display_server  dropped: Linux-only, out of scope (#1)
+win_app/tests/test_quit_signals.py::QuitSignalsTests::test_close_restores_the_previous_handlers  python-detail: Python putting its earlier signal handlers back once its event loop is done
+win_app/tests/test_quit_signals.py::QuitSignalsTests::test_sigint_quits_and_a_second_signal_does_not_quit_twice  mined: app.quit.signal
+win_app/tests/test_quit_signals.py::QuitSignalsTests::test_sigterm_quits_through_the_event_loop  mined: app.quit.signal
+win_app/tests/test_single_instance.py::SingleInstanceTests::test_failed_migration_still_reaches_instance_handling  mined: app.instance.first
+win_app/tests/test_single_instance.py::SingleInstanceTests::test_hidden_second_launch_does_not_raise_the_existing_window  mined: app.instance.hidden
+win_app/tests/test_single_instance.py::SingleInstanceTests::test_relaunch_marks_replacement_and_quits_through_application  mined: app.watchdog.relaunch-arguments
+win_app/tests/test_single_instance.py::SingleInstanceTests::test_relaunched_instance_gives_up_after_the_wait_window  mined: app.instance.relaunch-gives-up
+win_app/tests/test_single_instance.py::SingleInstanceTests::test_relaunched_instance_waits_until_the_holder_releases_the_lock  mined: app.instance.relaunch-waits
+win_app/tests/test_single_instance.py::SingleInstanceTests::test_second_launch_signals_the_running_instance_with_activation_token  mined: app.instance.show
+win_app/tests/test_single_instance.py::SingleInstanceTests::test_startup_migrates_the_legacy_task_before_single_instance_handling  mined: app.instance.first
+win_app/tests/test_single_instance.py::SingleInstanceTests::test_two_logon_tasks_cannot_claim_two_receivers  mined: app.instance.one
+win_app/tests/test_single_instance.py::SingleInstanceTests::test_visible_second_launch_still_raises_the_existing_window  mined: app.instance.show
+win_app/tests/test_single_instance.py::SingleInstanceTests::test_wayland_activation_token_is_removed_after_the_activation_request  dropped: Linux-only, out of scope (#1)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_desktop_update_header_remains_a_download_action  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_dismissal_survives_rebuilding_and_other_settings_changes  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_explicit_flatpak_check_resurfaces_a_dismissed_action_until_dismissed_again  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_failed_save_keeps_the_notice_available  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_flatpak_has_store_guidance_and_no_download_action  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_flatpak_update_action_opens_the_release_with_store_guidance  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_important_release_after_quiet_patch_alerts_until_dismissed  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_linux_start_checks_for_updates_without_waiting_for_a_toggle  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_manual_check_is_visible_and_works_when_automatic_checks_are_off  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_manual_check_reports_no_update_and_retryable_failure  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_missing_portable_download_is_explained_without_offering_installer  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_quiet_flatpak_keeps_release_notes_on_the_updates_page  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_quiet_patch_is_available_on_updates_page_without_a_banner_or_tray_alert  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_quiet_patch_without_a_portable_zip_explains_the_missing_download_on_updates_page  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_switching_off_hides_the_notice_and_late_answers  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_unreadable_settings_do_not_block_opening_the_panel  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_update_notice_has_an_explicit_update_action  dropped: the update notice (F22, #11 drops it)
+win_app/tests/test_update_notice.py::UpdateNoticeTest::test_whats_new_opens_the_release_only_on_a_click  dropped: the update notice (F22, #11 drops it)

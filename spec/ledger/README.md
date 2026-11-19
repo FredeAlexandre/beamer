@@ -25,8 +25,8 @@ no Python test is its own:
 | `media` | #64 | 0 |
 | `platform` | #65 | 336 |
 | `runtime` | #66 | 3 |
-| `app` | #67 | 93 |
-| `viewmodel` | #68 | 1046 |
+| `app` | #67 | 89 |
+| `viewmodel` | #68 | 1050 |
 | `ui` | #69 | 741 |
 | `perf` | #70 | 0 |
 | `observability` | #71 | 0 |
@@ -77,9 +77,13 @@ flooded its own messages, and those tests went to the feature), the media engine
 ## Ambiguous assignments
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
-There are 90, covering 1,195 tests. Each row names the other candidates and why the owner won.
+There are 91, covering 1,199 tests. Each row names the other candidates and why the owner won.
 A miner who finds such a test's assertions are all another domain's settles it as
 `.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
+
+The row marked "moved from app (#67)" records lines that did move, after #51 (#147): the app miner
+found their assertions all another domain's, and moved them to that domain's slice with no fate. It
+splits its class, an exception to rule 2's "no assignment finer than a class".
 
 | Tests | Count | Owner | Also a candidate | Why the owner |
 |---|---|---|---|---|
@@ -171,5 +175,6 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `win_app/tests/test_same_on_both.py` | 54 | settings | viewmodel | Same on all machines through the real window; its assertions are the sync's |
 | `win_app/tests/test_sender_motion_flow.py` | 8 | link | input, crossing | the sender batching motion before the link, keeping travel and barriers |
 | `win_app/tests/test_settings_migration.py`, class `OverlapTests` | 7 | crossing | settings | overlapping zones in the saved settings |
+| `win_app/tests/test_single_instance.py`, class `SingleInstanceTests`: `test_closing_after_the_tray_disappears_quits`, `test_closing_with_a_tray_hides_instead_of_quitting`, `test_closing_without_a_tray_quits_instead_of_hiding`, `test_escape_quits_when_no_tray_icon_is_visible` | 4 | viewmodel | app | moved from app (#67): whether closing the window, or pressing Escape in it, hides it or quits Beamer, by whether the tray icon is shown; the class's other tests stay app's |
 | `win_app/tests/test_tile_resize_qt.py` | 16 | viewmodel | crossing, ui | resizing a display's tile on the crossing map |
 | `win_app/tests/test_vcam_install.py` | 38 | camera | platform | installing the virtual camera; camera's scope names it |
