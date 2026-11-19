@@ -2521,19 +2521,22 @@ said under "When feedback plays". The crossing effects (F30) are Later, their ro
 ## Ring
 
 The Ring is a style for "Shortcut and menu" (`viewmodel.design.switch-styles`): it shows where the
-pointer is when input arrives without a crossing through an edge, while "Show where the pointer lands" is on
+pointer is when input arrives with no landing point, while "Show where the pointer lands" is on
 (`viewmodel.design.landing`).
 
 > r[ui.ring.when]
-> The Ring plays at the pointer on this machine when this machine's own user brings input home by
-> the shortcut, a jump key or the menu (`crossing.method.report-home`), and when a driver takes this
-> machine with no landing point, as by the shortcut, a jump key or the menu
-> (`crossing.return.arrival-edge`). It plays on no other crossing, and never on the machine input
-> leaves.
+> The Ring plays at the pointer on this machine as input arrives with no landing point: when this
+> machine's own user brings input home by the shortcut, a jump key, a shake or the menu
+> (`crossing.method.report-home`, `crossing.shake.home`), and when a driver takes this machine with
+> no landing point, by the shortcut, a jump key or the menu (`crossing.landing.no-edge`). It plays on
+> no other arrival: not when the driven machine sends input home
+> (`crossing.method.report-arrival-no-point`), not when a crossing lands the pointer through an
+> edge, and never on the machine input leaves.
 >
 > - tier: human (the Ring's appearance is judged by eye)
-> - do: With "Show where the pointer lands" on, on both machines, cross to the peer by the shortcut, then come home by the shortcut
-> - see: A ring closes onto the pointer on the peer when input arrives there, and on this machine when input comes home, and none plays on the machine left
+> - do: With "Show where the pointer lands" on, on both machines, cross from the Mac to the PC by the shortcut and come home by the shortcut; then cross to the PC by the shortcut again and come home by shaking the Mac's pointer
+> - see: A ring closes onto the pointer on the PC each time input arrives there, and on the Mac each time input comes home, by the shortcut and by the shake; none plays on the machine input leaves
+> - parity: Python's PC also played the Ring when the driven machine sent input home with no landing point (`win_app/sender.py:1538`, `win_app/kvm_bridge_win.py:5749`), where its Mac played none (`mac_app/kvm_bridge_app.py:5633–5638`); both started every Ring 0.12 s late and dropped it when a crossing landed the pointer meanwhile (`core/effects.py:1378–1386`), so a send home that came with a take through an edge showed only the take (ADR 0001: one Rune UI draws both machines; the Mac's, under which no Ring comes with a crossing, so none waits for one)
 
 > r[ui.ring.off]
 > With "Show where the pointer lands" off, or with crossings not animated on this machine
@@ -2589,16 +2592,6 @@ pointer is when input arrives without a crossing through an edge, while "Show wh
 > - tier: human (motion is judged by eye)
 > - do: Turn on Reduce Motion in the OS, then come home by the shortcut
 > - see: Two small rings fade in round the pointer and out again without moving or changing size
-
-> r[ui.ring.yields]
-> The Ring starts 0.12 s after input arrives, and yields to a crossing: it does not play when a
-> crossing lands the pointer on this machine within 0.12 s before or after that arrival, as when one
-> peer's crossing brings this machine's input home over one link while its own pointer lands here over
-> another. A Ring for an arrival more than 0.12 s after a crossing landed plays.
->
-> - tier: human (what plays is judged by eye)
-> - do: With three machines, from a peer driving this machine, cross on through an edge so that input lands here as this machine's own input comes home
-> - see: Only the edge glow plays; no Ring appears at the pointer
 
 ## Colours
 
@@ -2706,9 +2699,10 @@ machine's displays, and only while crossings are animated on it.
 > - see: Nothing lights along the edge
 
 > r[ui.feedback.arrival]
-> Glow and Beam play nothing when input lands on a machine through an edge: neither at an arrival
+> Glow and Beam play nothing when input arrives on a machine: neither at an arrival
 > (`crossing.method.report-arrival`, `crossing.method.report-arrival-no-point`) nor on the driven
-> machine when a driver's take lands its pointer there through an edge.
+> machine when a driver's take lands its pointer there through an edge. What plays when input
+> arrives with no landing point is the Ring's (`ui.ring.when`).
 >
 > - tier: human (the absence of light is judged by eye)
 > - do: Cross to a peer through an edge and come home through the edge you landed at

@@ -58,13 +58,13 @@ core/tests/test_switch_arrival.py::LocatorTests::test_one_colour_and_many_both_d
 core/tests/test_switch_arrival.py::LocatorTests::test_reduce_motion_holds_its_size  mined: ui.ring.reduce-motion
 core/tests/test_switch_arrival.py::LocatorTests::test_reference_size_is_never_more_than_260pt_across  mined: ui.ring.closes, ui.ring.reduce-motion
 core/tests/test_switch_arrival.py::NearestEdgeTests::test_each_side  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
-core/tests/test_switch_arrival.py::PlayerSwitchTests::test_a_crossing_arriving_during_the_settle_is_the_one_that_plays  mined: ui.ring.yields
-core/tests/test_switch_arrival.py::PlayerSwitchTests::test_a_crossing_drawn_elsewhere_still_cancels_a_waiting_switch  mined: ui.ring.yields
-core/tests/test_switch_arrival.py::PlayerSwitchTests::test_a_later_switch_replaces_an_old_crossing_arrival  mined: ui.ring.yields
+core/tests/test_switch_arrival.py::PlayerSwitchTests::test_a_crossing_arriving_during_the_settle_is_the_one_that_plays  mined: ui.ring.when
+core/tests/test_switch_arrival.py::PlayerSwitchTests::test_a_crossing_drawn_elsewhere_still_cancels_a_waiting_switch  mined: ui.ring.when
+core/tests/test_switch_arrival.py::PlayerSwitchTests::test_a_later_switch_replaces_an_old_crossing_arrival  mined: ui.ring.when
 core/tests/test_switch_arrival.py::PlayerSwitchTests::test_a_switch_is_not_told_about_the_notch  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
-core/tests/test_switch_arrival.py::PlayerSwitchTests::test_a_switch_just_after_a_crossing_arrival_gives_way_to_it  mined: ui.ring.yields
+core/tests/test_switch_arrival.py::PlayerSwitchTests::test_a_switch_just_after_a_crossing_arrival_gives_way_to_it  mined: ui.ring.when
 core/tests/test_switch_arrival.py::PlayerSwitchTests::test_a_switch_plays_out_and_ends  mined: ui.ring.closes
-core/tests/test_switch_arrival.py::PlayerSwitchTests::test_a_switch_waits_for_the_settle_then_plays_at_the_pointer  mined: ui.ring.yields, ui.ring.closes
+core/tests/test_switch_arrival.py::PlayerSwitchTests::test_a_switch_waits_for_the_settle_then_plays_at_the_pointer  mined: ui.ring.closes
 core/tests/test_switch_arrival.py::SwitchPreviewTests::test_the_loop_rests_then_plays_round_the_pointer  mined: ui.preview.shortcut
 core/tests/test_switch_arrival.py::SwitchStyleTests::test_a_chosen_style_wins_over_the_crossing_style  mined: ui.ring.same-as-crossing
 core/tests/test_switch_arrival.py::SwitchStyleTests::test_a_switch_plays_its_own_effect_beside_the_crossing_one  mined: ui.ring.same-as-crossing
@@ -138,7 +138,7 @@ mac_app/tests/test_design_tiles.py::DesignTileMeasurements::test_real_tile_previ
 mac_app/tests/test_design_tiles.py::DesignTileMeasurements::test_selected_badge_is_a_signal_circle_with_ground_check_on_the_name_line  mined: ui.widget.tiles.chosen
 mac_app/tests/test_design_tiles.py::DesignTileMeasurements::test_still_time_is_inside_the_loop_and_deterministic  mined: ui.preview.still
 mac_app/tests/test_effect_fires.py::CrossingFeedbackArrivalTest::test_a_crossing_arrival_reaches_the_effects_overlay_when_the_style_is_an_effect  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
-mac_app/tests/test_effect_fires.py::CrossingFeedbackArrivalTest::test_a_crossing_arrival_under_glow_calls_crossed_in_and_the_edge_glow  mined: ui.feedback.arrival, ui.ring.yields
+mac_app/tests/test_effect_fires.py::CrossingFeedbackArrivalTest::test_a_crossing_arrival_under_glow_calls_crossed_in_and_the_edge_glow  mined: ui.feedback.arrival
 mac_app/tests/test_effect_fires.py::CrossingFeedbackDepartureTest::test_an_effect_that_disables_itself_this_event_falls_back_to_the_glow  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 mac_app/tests/test_effect_fires.py::CrossingFeedbackDepartureTest::test_cross_reaches_edge_glow_when_the_style_is_glow  mined: ui.feedback.cross
 mac_app/tests/test_effect_fires.py::CrossingFeedbackDepartureTest::test_cross_reaches_the_effects_overlay_when_the_style_is_an_effect  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
@@ -148,7 +148,7 @@ mac_app/tests/test_effect_fires.py::CrossingFeedbackDepartureTest::test_pressure
 mac_app/tests/test_effect_fires.py::CrossingFeedbackDepartureTest::test_tick_at_the_notch_reaches_notch_beam_not_edge_glow  dropped: the notch island and beam (F31), Later in #11: not built in 2.0, room in ui.later.notch
 mac_app/tests/test_effect_fires.py::CrossingFeedbackDepartureTest::test_tick_at_the_notch_reaches_notch_island_when_the_notch_style_is_island  dropped: the notch island and beam (F31), Later in #11: not built in 2.0, room in ui.later.notch
 mac_app/tests/test_effect_fires.py::DrivenReturnEdgeTest::test_a_driven_crossing_reaches_the_effects_overlay_when_wanted  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
-mac_app/tests/test_effect_fires.py::DrivenReturnEdgeTest::test_a_driven_crossing_under_glow_only_calls_crossed_in  mined: ui.feedback.arrival, ui.ring.yields
+mac_app/tests/test_effect_fires.py::DrivenReturnEdgeTest::test_a_driven_crossing_under_glow_only_calls_crossed_in  mined: ui.feedback.arrival
 mac_app/tests/test_effect_fires.py::DrivenReturnEdgeTest::test_a_driven_switch_with_no_edge_shows_where_the_pointer_landed  mined: ui.ring.when
 mac_app/tests/test_effect_fires.py::DrivenReturnEdgeTest::test_a_return_push_lights_the_edge_glow_under_glow  mined: ui.feedback.push
 mac_app/tests/test_effect_fires.py::DrivenReturnEdgeTest::test_a_return_push_reaches_the_effects_overlay_when_wanted  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
@@ -456,7 +456,7 @@ win_app/tests/test_effect_fires.py::ArrivalMethodTest::test_other_edges_are_edge
 win_app/tests/test_effect_fires.py::ArrivalRoutingTest::test_a_notch_crossing_arrival_reaches_the_effects_overlay_with_its_own_method  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 win_app/tests/test_effect_fires.py::ArrivalRoutingTest::test_a_switch_arrival_does_nothing_when_the_locator_is_off  mined: ui.ring.off
 win_app/tests/test_effect_fires.py::ArrivalRoutingTest::test_a_switch_arrival_with_no_edge_reaches_the_switch_overlay  mined: ui.ring.when, ui.ring.same-as-crossing
-win_app/tests/test_effect_fires.py::ArrivalRoutingTest::test_an_arrival_under_glow_only_calls_crossed_in_when_an_overlay_already_exists  mined: ui.feedback.arrival, ui.ring.yields
+win_app/tests/test_effect_fires.py::ArrivalRoutingTest::test_an_arrival_under_glow_only_calls_crossed_in_when_an_overlay_already_exists  mined: ui.feedback.arrival
 win_app/tests/test_effect_fires.py::ArrivalRoutingTest::test_an_arrival_under_glow_with_no_overlay_ever_built_calls_nothing  mined: ui.feedback.arrival
 win_app/tests/test_effect_fires.py::ArrivalRoutingTest::test_an_edge_crossing_arrival_reaches_the_effects_overlay_when_wanted  dropped: the crossing effects (F30), Later in #11: not built in 2.0, room in ui.later.effects
 win_app/tests/test_effect_fires.py::PressureRoutingTest::test_a_beam_style_push_configures_the_glow_as_beam  mined: ui.feedback.push
