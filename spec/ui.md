@@ -141,7 +141,7 @@ word or a light carries one.
 > A word in the plain tone, such as the link status's word, is drawn in `text`, and a light in the
 > plain tone in `off`.
 >
-> - tier: human (colour is judged by eye; a light in the plain tone, which no state of the link status gives yet, `viewmodel.status.parts`, stays out of the check)
+> - tier: human (colour is judged by eye; a light in the plain tone, which no state of `viewmodel.status` gives the link status's light, stays out of the check)
 > - do: With a peer linked and this machine's input home, look at the link status on Overview
 > - see: Its word, "On this Mac" or "On this PC", is in the window's main text colour, neither cyan, amber nor red
 
@@ -163,6 +163,7 @@ word or a light carries one.
 > A line, word or light in the waiting tone is drawn in `amber`.
 >
 > - tier: human (colour is judged by eye)
+> - parity: Python's PC drew the link status's word in `text` in the waiting tone, as in every tone but the fault tone (ADR 0001: one Rune UI draws both machines, the Mac's)
 > - do: Quit Beamer on the peer, then quit and restart Beamer here and open Overview at once, before the link reports anything (`viewmodel.status.looking`)
 > - see: The link status's word, "Waiting", and its light are amber
 
@@ -342,7 +343,7 @@ How each kind of control is drawn. Every control here behaves the same on a Mac 
 > border and `text-3` words, never a faded filled slab.
 >
 > - tier: human (a button is judged by eye)
-> - parity: Python's PC drew a disabled primary button `well` rather than `panel`, and Python's Mac also had a live button, filled `signal`, for its "Send input" button, which 2.0's settings window does not show (ADR 0001: one Rune UI draws both machines, the Mac's)
+> - parity: Python's PC drew a disabled primary button `well` rather than `panel`, and Python's Mac drew its "Send input" button live, filled `signal` (ADR 0001: one Rune UI draws both machines, the Mac's disabled look; 2.0's settings window has no "Send input" button, so no button is live)
 > - do: Open the pairing sheet with "Pair a machine" on Overview, type an address under "Not listed? Type its address.", then type six digits into the code to enter
 > - see: "Cancel" is an outlined button with words in the text colour; "Pair" is a quiet outline with grey words until the sixth digit is typed, then, like "Show a code", a solid block in the text colour with background-coloured words
 
