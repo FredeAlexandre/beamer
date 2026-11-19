@@ -642,15 +642,6 @@ How text fits the space it has.
 > - do: With a peer of a very long name, narrow the window until the crossing ledger's "Leave out" button for it is cut with "…", and hover it
 > - see: The tooltip says "Leave this machine out of pointer crossings", not the button's whole words
 
-> r[ui.text.elide.suffix]
-> A machine's line that ends in what it is and its state after " · ", such as "Studio  ·  Windows
-> ·  showing a code", cuts the machine's name with "…" and keeps the separator and the words after
-> it whole.
->
-> - tier: human (eliding is judged by eye)
-> - do: On the pairing sheet, with a nearby machine of a very long name showing a code, look at its line
-> - see: The name ends in "…" and is followed by "  ·  Windows  ·  showing a code" in full
-
 ## Keyboard focus
 
 When a focus ring shows and how keyboard focus is drawn. Keyboard navigation is the state in which
@@ -1206,16 +1197,6 @@ and feel. Which digits they take is `viewmodel.pairing-sheet.code-digits`,
 > - parity: Python's Mac boxes each selected on their own and its shown code could not be selected (ADR 0001: one Rune UI draws both machines, the PC's)
 > - do: Show a code and drag across its six boxes, copy and paste it into a text editor; type a full code, double-click its third box, then click the right half of its last box and press Backspace
 > - see: The drag highlights all six digits and pastes as "482 913"; the double-click highlights one digit; Backspace removes the last digit
-
-> r[ui.sheet.heard-line]
-> A machine heard nearby (`viewmodel.pairing-sheet.heard-item`) shows its name and its detail on one
-> line: the name keeps at least 100 pt and the detail at least 60 pt, each cut at its end with "…"
-> when it does not fit, with its whole text as its tooltip and accessible name
-> (`ui.text.elide.tooltip`).
->
-> - tier: human (eliding is judged by eye)
-> - do: With a machine named "a-very-long-machine-name.example.lan" heard nearby, open the pairing sheet at 900 pt and hover its name
-> - see: Both its name and its detail show their beginnings ending in "…", and the tooltip shows the whole name
 
 ## The crossing ledger
 

@@ -544,11 +544,11 @@ win_app/tests/test_effect_preview_timeline.py::EffectPreviewTimelineTests::test_
 win_app/tests/test_effect_preview_timeline.py::EffectPreviewTimelineTests::test_specimen_screens_use_the_card_ground_while_live_scenes_keep_the_dark_ground  mined: ui.preview.scene
 win_app/tests/test_effect_preview_timeline.py::EffectPreviewTimelineTests::test_switch_preview_continues_from_its_existing_still  mined: ui.preview.hover
 win_app/tests/test_eliding_text.py::ElidingTextGeometryTests::test_audit_keeps_source_text_when_elision_itself_cannot_fit  python-detail: what the UI audit script reports for a widget too narrow for an ellipsis
-win_app/tests/test_eliding_text.py::ElidingTextGeometryTests::test_audited_button_text_areas_elide_painted_text_and_keep_full_names  mined: ui.text.elide.end, ui.text.elide.tooltip, ui.text.elide.suffix
+win_app/tests/test_eliding_text.py::ElidingTextGeometryTests::test_audited_button_text_areas_elide_painted_text_and_keep_full_names  mined: ui.text.elide.end, ui.text.elide.tooltip
 win_app/tests/test_eliding_text.py::ElidingTextGeometryTests::test_audited_peer_headings_elide_to_their_real_label_width  mined: ui.text.elide.end, ui.text.elide.tooltip
 win_app/tests/test_eliding_text.py::ElidingTextGeometryTests::test_linux_appearance_guidance_names_the_linux_desktop  dropped: Linux-only, out of scope (#1)
 win_app/tests/test_eliding_text.py::ElidingTextGeometryTests::test_linux_connection_guidance_does_not_name_windows  dropped: Linux-only, out of scope (#1)
-win_app/tests/test_eliding_text.py::ElidingTextGeometryTests::test_pairing_discovery_retains_the_separator_before_its_platform_and_status  mined: ui.text.elide.suffix
+win_app/tests/test_eliding_text.py::ElidingTextGeometryTests::test_pairing_discovery_retains_the_separator_before_its_platform_and_status  dropped: a heard machine's name, platform and state on the pairing sheet; #14's beacon carries none of them, so the sheet lists its address alone (viewmodel.pairing-sheet.heard-item)
 win_app/tests/test_eliding_text.py::ElidingTextGeometryTests::test_short_machine_name_stays_readable_between_long_names  mined: ui.widget.option.size
 win_app/tests/test_eliding_text.py::ElidingTextGeometryTests::test_three_machine_choices_keep_full_names_within_the_capped_column  mined: ui.widget.option.size
 win_app/tests/test_empty_choice_layout.py::EmptyChoiceLayout::test_empty_choice_lays_out_without_error_or_crash  python-detail: a PySide6 crash when a choice with no options is resized
