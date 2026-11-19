@@ -272,7 +272,8 @@ rate setting.
 _Avoid_: display link, frame timer
 
 **Edge glow**:
-The light Beamer draws along a zone while the pointer pushes it, in the crossing style chosen.
+The light Beamer draws along a zone while the pointer pushes it, and the breakthrough it plays there
+as the push crosses, in the crossing style chosen.
 _Avoid_: push strip
 
 **Crossing style**:
@@ -280,13 +281,15 @@ What plays at a zone as it is pushed and crossed, chosen on the Design page: Glo
 _Avoid_: glow style
 
 **Ring**:
-What plays around the pointer where it lands after a crossing by the shortcut, the menu or a jump
-key, while "Show where the pointer lands" is on.
+What plays around the pointer as input arrives with no landing point, while "Show where the pointer
+lands" is on: at home when the shortcut, a jump key, a shake or the menu brings input back, and on a
+machine that the shortcut, a jump key or the menu takes.
 _Avoid_: locator, switch arrival
 
 **Stop**:
-One of a colour's hues, in order. Glow and Beam lay a colour's stops evenly along the stretch
-pushed; the Ring runs them round its line.
+One point of a gradient: a colour and an opacity at a place along it, between which the gradient
+blends. A colour's stops are its colours in order; Glow and Beam lay them evenly along the stretch
+pushed, and the Ring runs them round its line.
 _Avoid_: shade
 
 **Style tile**:
