@@ -3,7 +3,8 @@
 #51 laid the ledger out: every Python test at `archive/python`, 6,232 of them, in exactly one
 domain's slice, `spec/ledger/<domain>.txt`, with no fate yet. The format and the check are in
 [`spec/README.md`](../README.md#the-python-ledger). Each domain's miner gives its slice's tests their
-fates and adds or removes no line (the `build-spec-miner` skill).
+fates, and removes only a test whose assertions are another domain's, which moves to that domain's
+slice (the `build-spec-miner` skill).
 
 The domains are the twenty "Spec: <domain>" tasks under #24. Every domain has a slice, empty where
 no Python test is its own:
@@ -78,8 +79,10 @@ flooded its own messages, and those tests went to the feature), the media engine
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
 There are 90, covering 1,195 tests. Each row names the other candidates and why the owner won.
-A miner who finds such a test's assertions are all another domain's settles it as
-`.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
+A row whose reason starts `moved from <domain> (#<task>)` records a line moved after #51: that
+domain's miner found its assertions all the owner's and moved it with no fate, as
+`.claude/skills/build-spec-miner/blocked.md` says. Such a row may name single tests, finer than
+rule 2's class; the class's other tests stay where they were.
 
 | Tests | Count | Owner | Also a candidate | Why the owner |
 |---|---|---|---|---|
