@@ -246,9 +246,9 @@ _Avoid_: camera follows input
 ## Media
 
 **Media packet**:
-One datagram of media on a link: an audio frame, a fragment of a video frame, a stream's feedback
-to its sender, or a time map.
-_Avoid_: media frame, RTP packet
+One datagram of media on a link: an audio frame, a fragment of a camera stream's picture, a
+stream's feedback to its sender, or a time map.
+_Avoid_: RTP packet, media datagram
 
 **Jitter buffer**:
 Where a machine keeps an audio stream's frames as they arrive, and plays them from, so that sound
