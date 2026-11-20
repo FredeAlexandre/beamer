@@ -238,6 +238,16 @@ A shared entry saying which machine's microphone another machine uses, or where 
 plays.
 _Avoid_: audio follows input
 
+**Shared microphone**:
+The one microphone, on any machine of the cluster, that the microphone's audio route names: what
+every virtual microphone delivers to the apps that record it.
+_Avoid_: active microphone, active mic
+
+**Audio stream**:
+One machine's microphone or sound carried as media to one other machine, or the shared microphone
+played into its own machine's virtual microphone.
+_Avoid_: audio flow
+
 **Camera route**:
 A shared entry saying which machine's camera another machine sees.
 _Avoid_: camera follows input
