@@ -547,30 +547,38 @@ r[media.video.in-flight]
 The receiving machine keeps at most 160 pictures being put together once the stream has started, and
 64 before, forgetting the oldest for a new one.
 
-r[media.video.nack]
-On a fragment whose packet number is more than one above the highest yet, the receiving machine at
-once asks the camera machine to send every missing packet again, as many to a request as fit. It
-asks again for each still missing 15 ms after the first request, and then once more after the retry
-interval, max(2 × QUIC's RTT for the link (`link.rtt.reported`), 15 ms): 3 requests in all. The
-first goes whatever the due time; each later one only while the oldest picture the gap may hold is
-not yet due, and once one is skipped that packet is asked for no more. The pictures a gap may
-hold run from that oldest one, the picture of the last fragment before the gap or the next one when
-that fragment ended its picture, to the picture of the fragment after the gap, or the one before it
-when that fragment begins its picture; they are the oldest one alone when that range is empty. A
-gap of more than 64 packets is asked for not at all. What a gap does to its pictures is
-`media.video.lost`.
+> r[media.video.nack]
+> On a fragment whose packet number is more than one above the highest yet, the receiving machine at
+> once asks the camera machine to send every missing packet again, as many to a request as fit. It
+> asks again for each still missing 15 ms after the first request, and then once more after the retry
+> interval, max(2 × QUIC's RTT for the link (`link.rtt.reported`), 15 ms): 3 requests in all. The
+> first goes whatever the due time; each later one only while the oldest picture the gap may hold is
+> not yet due, by its own due time even once it is lost or forgotten, and once one is skipped that
+> packet is asked for no more. The pictures a gap may hold run from that oldest one, the picture of
+> the last fragment before the gap or the next one when that fragment ended its picture, to the
+> picture of the fragment after the gap, or the one before it when that fragment begins its picture;
+> they are the oldest one alone when that range is empty. A gap of more than 64 packets is asked for
+> not at all. What a gap does to its pictures is `media.video.lost`.
+>
+> - parity: Python took the due time of a gap's oldest picture that it had already lost or forgotten (`media.video.in-flight`) as an unseen picture's (`media.video.unseen-due`), from the next picture it still held a fragment of (a picture's own due time is one a test can decide from the spec; Python's estimate hung on which pictures it still held and on the frame period at the retry)
 
 r[media.video.lost]
 Loss evidence goes on up to 256 of the pictures a gap may hold (`media.video.nack`), counting from
 the oldest: at once for a gap of more than 64 packets, and otherwise when a packet of the gap is
-still missing one retry interval after its third request. A picture that is not whole is lost when
-it carries loss evidence; when it is due and a later packet has arrived; or when no fragment of it
-came, a later picture's has, and its due time (`media.video.unseen-due`) has passed. A whole
-picture is never lost, and a picture merely late, with nothing later arrived, is not lost. From the
-first key frame on, a picture is lost only in its turn, once every picture before it is decoded or
-lost: until then evidence on it waits, and so does the request for a key frame its loss makes
-(`media.video.asks`). A picture that is whole by its turn is decoded
-(`media.video.decoded-in-order`).
+still missing one retry interval after its third request. No picture is lost while the stream waits
+for a key frame: from its start, and again from each time it starts again, after 3 decoder errors
+(`media.video.decoder-error`), a refused size (`media.video.size-refused`), or a new decoder that
+asks for a key frame or a lost GPU (`media.video.decoder-reopen`), until a key frame starts it
+(`media.video.first-key`). The pictures before that key frame are discarded with their evidence,
+and a key frame it waits for that is not whole and carries loss evidence, or is due with a later
+packet arrived, is asked for again, not lost. From the key frame that last started the stream on, a
+picture that is not whole is lost when it carries loss evidence; when it is due and a later packet
+has arrived; or when no fragment of it came, a later picture's has, and its due time
+(`media.video.unseen-due`) has passed. A whole picture is never lost, and a picture merely late,
+with nothing later arrived, is not lost. A picture is lost only in its turn, once every picture
+before it since that key frame is decoded or lost: until then evidence on it waits, and so does the
+request for a key frame its loss makes (`media.video.asks`). A picture that is whole by its turn is
+decoded (`media.video.decoded-in-order`).
 
 r[media.video.unseen-due]
 A picture of which no fragment came falls due when the next picture of which a fragment came does,
@@ -586,13 +594,16 @@ error breaks it again.
 
 r[media.video.first-key]
 The receiving machine decodes nothing of a camera stream before a whole key frame newer than its
-request to start, and discards every picture before it. When that key frame is lost, it asks for a
-key frame again.
+request to start, or to start again (`media.video.lost`), and discards every picture before it. Once
+a fragment of a key frame newer than that request has come, when every such key frame is not whole
+and carries loss evidence, or is due with a later packet arrived, it asks for a key frame again, and
+counts none of them lost.
 
 r[media.video.decoded-in-order]
-From the first key frame on, every whole picture is decoded in frame number order; a picture of a
-broken stream is decoded but never shown. A clean picture that is not a key frame and whose encoder
-output is older than the playout delay plus the lip sync delay plus 150 ms is decoded and not shown.
+From the key frame that last started the stream (`media.video.first-key`) on, every whole picture
+is decoded in frame number order; a picture of a broken stream is decoded but never shown. A clean
+picture that is not a key frame and whose encoder output is older than the playout delay plus the
+lip sync delay plus 150 ms is decoded and not shown.
 
 r[media.video.asks]
 The receiving machine asks for a key frame to start at the stream's start, and every 100 ms until
