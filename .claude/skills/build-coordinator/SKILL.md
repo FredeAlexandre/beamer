@@ -94,6 +94,10 @@ green, and every acceptance criterion holds in the diff. Then:
   its body, comment with the PR and anything a later task must know, and close it as completed.
   Fast-forward your `rust` worktree, run `git push pc origin/rust:rust`, and remove the task's
   worktree and branch, on GitHub too (`git push origin --delete build/<n>-<slug>`).
+- **A spec PR's "Moved to other domains"** may move tests into a domain whose own PR has already
+  merged. After the merge, reopen that domain's task and dispatch its miner to give those tests
+  their fates, from the comment the moving miner left on the task
+  ([../build-spec-miner/blocked.md](../build-spec-miner/blocked.md)).
 - **A `build:api` merge** reopens every closed `build:test` task whose rule group uses an item
   the PR changed, each with a comment naming the PR and the items. For each old item the PR kept
   beside its replacement, cut a `build:api` task that removes it, blocked by those test tasks.
