@@ -351,9 +351,9 @@ the frame shows to handing the frame to the OS to show.
 > it showed before, every frame's time, the largest included, is under 16 ms.
 >
 > Run: on each machine, the machine agent clicks the other machine on the Audio & Camera page and
-> then this machine, so the page has shown both before the run's samples start. Then it clicks the
-> other machine and this machine in turn, one click a second, 40 clicks in all, so every click
-> chooses a machine shown before. The run's samples are every frame made from its first click to
+> then this machine, so the page has shown both, and waits 2 s before the run's samples start.
+> Then it clicks the other machine and this machine in turn, one click a second, 40 clicks in all,
+> so every click chooses a machine shown before. The run's samples are every frame made from its first click to
 > 1 s after its last, and each of them meets the bound: the frame times the app writes once a
 > second do not tell the frames that follow a click from the others, so the bound covers them all.
 >
@@ -364,12 +364,12 @@ the frame shows to handing the frame to the OS to show.
 > While the camera's status changes and the Audio & Camera page shows it, each frame's time is
 > under 16 ms at p50, p95 and p99, and at its largest.
 >
-> Run: for 10 minutes, with the camera route naming the Mac's camera and the Audio & Camera page
+> Run: for 20 minutes, with the camera route naming the Mac's camera and the Audio & Camera page
 > shown on both machines at once for the whole run, the PC's machine agent opens the virtual
-> camera as an app does for 2 s, then closes it for 2 s, so the camera's status changes 300 times
-> as its stream starts and stops, and the page on each machine shows it. Each machine's
-> frames are a run of their own, with the 10 minutes' frames, at least 100 of them (Enough
-> samples).
+> camera as an app does for 2 s, then closes it for 6 s. The stream keeps running for 3 s after
+> each close (`camera.demand.hold`) and then stops, so every cycle starts and stops it, and the
+> camera's status changes 300 times, which the page on each machine shows. Each machine's frames
+> are a run of their own, with the 20 minutes' frames, at least 100 of them (Enough samples).
 >
 > - tier: machine (only a real window on a real display with a real camera stream gives frame
 >   times)
