@@ -9,7 +9,7 @@ an app records a virtual microphone; a sound stream runs while its route sends t
 
 The rules come from the Python app at `archive/python` (the routes, the plan and the statuses in
 `core/audio/model.py`, `core/audio/planner.py` and `core/audio/service.py`, the limits in
-`core/audio/wire.py`, the Mac's install in `mac_app/audio_driver.py`, and the OS side in the audio
+`core/audio/wire.py`, the Mac's install in `mac_app/audio_driver.py`, and the OS's part in the audio
 helper's backends under `native/audio/mac/` and `native/audio/win/`), mined through its tests in
 `spec/ledger/audio.txt`, and from the measured design in `dev/audio/PHASE2.md` and
 `dev/audio/STATUS.md`. They take #14's store, in which the audio routes and the headset choices are
@@ -30,7 +30,7 @@ reports its state is `spec/platform.md`'s (`platform.capability.*`); the `--elev
 written are `spec/runtime.md`'s (`runtime.files.*`); and every word the Audio & Camera page shows
 is `spec/viewmodel.md`'s (`viewmodel.audio.*`).
 
-Dropped, so no rule here (#11): the `audio-dev-*` files and the dev test sources the audio service
+Dropped, so no rule here (#11): the `audio-dev-*` files and the dev test signals the audio service
 read and wrote, and with them the echo cancellation mode "off", which only a dev file could set.
 Compatibility with the Python apps' `audio_*` messages, their UDP media flow and its keys goes too
 (#14, ADR 0003). Linux has no audio here (#1). Nothing in this domain comes later.
@@ -268,9 +268,9 @@ microphone or default output is one of them, the record names no default.
 > - model: audio
 
 > r[audio.mic.on-demand]
-> The shared microphone streams from its machine to each other machine in the cluster on which an
-> app records the virtual microphone, and to no other machine. It streams into that machine's
-> virtual microphone.
+> The shared microphone streams from its machine to each other machine that has a link up with it,
+> has its virtual microphone installed, and on which an app records its virtual microphone, and to
+> no other machine. It streams into that machine's virtual microphone.
 >
 > - model: audio
 
@@ -359,9 +359,10 @@ Core reports whether echo is cancelled on a running microphone stream of this ma
 > - model: audio
 
 > r[audio.sound.sent]
-> While a machine's sound route sends its sound to another machine, and nothing below stops it, that
-> machine streams its sound to the output the route names on the other machine, and plays none of
-> it itself. The route's status is streaming. The machine whose sound it is sends the stream,
+> While a machine's sound route sends its sound to another machine, and none of
+> `audio.sound.waiting`, `audio.sound.unreachable`, `audio.sound.cannot-capture`,
+> `audio.sound.device-gone` and `audio.sound.muted-there` stops it, that machine streams its sound
+> to the output the route names on the other machine, and plays none of it itself. The route's status is streaming. The machine whose sound it is sends the stream,
 > whichever machine wrote the route.
 >
 > - model: audio
@@ -573,8 +574,10 @@ are reported for each microphone and output Beamer has open on a machine, by mac
 key.
 
 r[audio.levels.rate]
-A peer that has asked for levels gets this machine's every 250 ms, and Core reports new levels at
-most every 50 ms.
+A peer that has asked for levels gets this machine's every 250 ms.
+
+r[audio.levels.coalesced]
+However often levels change, Core reports new levels at most once every 50 ms.
 
 r[audio.levels.drop]
 When Core stops reporting levels, or the link to a peer goes down, the levels and feedback reports
@@ -673,7 +676,7 @@ it.
 
 > r[audio.low-latency.change]
 > On a PC, changing the setting stops each stream into its virtual microphone and starts it again in
-> the new way, and touches no other stream. Setting the value it has changes nothing. On a Mac the
+> the new mode, and touches no other stream. Setting the value it has changes nothing. On a Mac the
 > setting is kept and changes nothing.
 >
 > - parity: Python restarted its whole audio helper with or without the low-latency flag, which stopped every audio stream of the machine (ADR 0004: Beamer is one process, with no audio helper)

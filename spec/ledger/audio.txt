@@ -94,7 +94,7 @@ core/tests/test_audio_service.py::PairTests::test_refused_open_marks_failed_and_
 core/tests/test_audio_service.py::PairTests::test_route_change_closes_and_reopens  mined: audio.stream.change, audio.sound.here
 core/tests/test_audio_service.py::PairTests::test_system_sound_waiting_for_its_prompt_opens_once_answered  mined: audio.permission.answered, audio.status.failed
 core/tests/test_audio_service.py::PairTests::test_test_input_on_a_peer  mined: audio.levels.test
-core/tests/test_audio_service.py::PairTests::test_watch_levels_and_stats  mined: audio.levels.watch, audio.levels.what, audio.levels.rate
+core/tests/test_audio_service.py::PairTests::test_watch_levels_and_stats  mined: audio.levels.watch, audio.levels.what, audio.levels.rate, audio.levels.coalesced
 core/tests/test_audio_service.py::RestartTests::test_a_late_dev_test_source_is_what_restarts_the_mic  dropped: the dev test sources set through the audio-dev-* files (#11 Drop: dead or dev-only)
 core/tests/test_audio_service.py::RestartTests::test_pc_mic_and_output_in_one_change_open_each_stream_once  mined: audio.stream.once
 core/tests/test_audio_service.py::RestartTests::test_unrelated_entries_never_restart_a_running_stream  mined: audio.stream.untouched
