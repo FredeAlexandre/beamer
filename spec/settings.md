@@ -158,7 +158,8 @@ rule about shared settings is about the store's state machine and names its `mod
 > r[settings.shared.newest]
 > Of two changes of one shared setting made on two machines, the newer write
 > (`store.stamp.parts`) is the value both machines have while its group is kept in step, whichever
-> arrives first: with the same time, the one from the machine with the greater machine id.
+> arrives first: with the same time and counter, the one from the machine with the greater machine
+> id.
 >
 > - model: store
 > - parity: Python stamped a change with whole seconds of wall time and broke a tie by the larger machine id (#14: stamps are a hybrid logical clock)
@@ -274,12 +275,12 @@ rule about shared settings is about the store's state machine and names its `mod
 ## Revert
 
 > r[settings.revert.kept]
-> When taking writes from a peer changes the value of any of this machine's shared settings, or
-> changes which groups are kept in step here, this machine keeps what was replaced: the groups kept
-> in step just before, and the values just before of every setting in the groups that change
-> applied to. Each such change replaces what was kept before. A change that replaces nothing, such
-> as a write refused here (`settings.shared.key-clash`), keeps nothing and leaves what was kept as it
-> was.
+> When Same on all machines changes the value of any of this machine's shared settings, by a write
+> taken from a peer or by a group becoming kept in step, or when a write taken from a peer changes
+> which groups are kept in step here, this machine keeps what was replaced: the groups kept in step
+> just before, and the values just before of every setting in the groups that change applied to.
+> Each such change replaces what was kept before. A change that replaces nothing, such as a write
+> refused here (`settings.shared.key-clash`), keeps nothing and leaves what was kept as it was.
 >
 > - model: store
 
@@ -441,9 +442,10 @@ and each change to them after. Which peer this machine follows is its own settin
 > Every setting that is not a shared setting (`settings.groups.four`) is this machine's own: no
 > group carries it, no write from a peer changes it, and Same on all machines sends it to no peer.
 > Among them: whether crossings are animated on this machine, the window's appearance, the
-> full-screen pause, the Mac's notch and trackpad settings, the modifier style and the rest of the
-> Keyboard page, Show in Dock, Show in menu bar and Show in tray, start at login, admin mode, hiding
-> addresses, the settings window's last frame, and which peer's design this machine follows.
+> full-screen pause, the Mac's notch and trackpad settings, the modifier style, the Mac's key map
+> and the rest of the Keyboard page, Show in Dock, Show in menu bar and Show in tray, start at
+> login, admin mode, hiding addresses, the settings window's last frame, and which peer's design
+> this machine follows.
 >
 > - model: store
 
@@ -467,7 +469,10 @@ and each change to them after. Which peer this machine follows is its own settin
 > A `local.json` that is not one JSON object, or in which any setting's value is not one that
 > setting can hold, such as a word where on or off goes or a number out of its range, is refused
 > whole as `runtime.files.refused-defaults` and `runtime.files.refused-kept` say: every own setting
-> reads as its default, and the file stays as it is.
+> reads as its default, and the file stays as it is. A value is one a setting can hold as the domain
+> that owns the setting says; where that domain says how a value it does not know reads, such as an
+> unknown modifier style (`input.modifier.unknown-style`) or a speed out of its range
+> (`input.speed.range`), the value reads so and the file is not refused for it.
 >
 > - fuzz: store-file
 > - parity: Python read a window appearance it did not know as System and loaded the rest of the file, and refused the whole file for every other value it could not hold (one rule for every own setting, as `store.file.refused` has for the store)
