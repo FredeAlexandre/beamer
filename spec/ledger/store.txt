@@ -1,3 +1,6 @@
 # The store domain's slice of the Python ledger, laid out by #51.
 # Owner domains and the ambiguous assignments: spec/ledger/README.md.
-# No Python test is assigned to this domain.
+mac_app/tests/test_settings_v6.py::RefusingToStartOverTests::test_a_file_without_a_machine_id_is_refused_and_never_given_one
+mac_app/tests/test_settings_v6.py::RefusingToStartOverTests::test_a_file_without_peers_or_zones_is_refused
+mac_app/tests/test_settings_v6.py::SavingTests::test_each_shared_values_stamp_is_saved_and_a_malformed_one_is_dropped
+mac_app/tests/test_settings_v6.py::ValidationTests::test_a_bad_machine_id_is_refused

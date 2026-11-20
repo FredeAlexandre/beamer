@@ -242,3 +242,16 @@ _Avoid_: audio follows input
 A shared entry saying which machine's camera another machine sees.
 _Avoid_: camera follows input
 
+
+## Settings
+
+**Shared setting**:
+A setting that Same on all machines can keep the same on every machine, in one of its four groups:
+Crossing, Design, Shortcut and Names. Each is a shared entry. Every other setting is the machine's
+own and never leaves it.
+_Avoid_: synced setting, same-on value
+
+**Design follow**:
+A machine taking a peer's design, the values of its Design group, as its own, and each change to it
+after. The machine it follows is not a driver of it.
+_Avoid_: leader, match design, design sync

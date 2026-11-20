@@ -294,6 +294,7 @@ win_app/tests/test_links.py::ReviewTests::test_pointer_moves_during_a_clipboard_
 win_app/tests/test_links.py::ReviewTests::test_settings_from_a_peer_that_does_not_list_the_capability_are_ignored
 win_app/tests/test_links.py::ReviewTests::test_stopping_sends_the_let_go_and_the_releases_first
 win_app/tests/test_links.py::ReviewTests::test_what_follows_a_clipboard_read_for_that_peer_still_goes_after_it
+win_app/tests/test_links.py::SettingsTests::test_a_machine_without_an_id_drives_nothing
 win_app/tests/test_links.py::TakingTests::test_a_driven_machine_sends_its_driver_home_before_it_drives
 win_app/tests/test_links.py::TakingTests::test_a_dropped_peer_forgets_held_key_names_before_reconnect
 win_app/tests/test_links.py::TakingTests::test_a_link_ending_after_an_ack_stall_returns_pc_input_home
