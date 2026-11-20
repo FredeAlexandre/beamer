@@ -58,8 +58,9 @@ display's owner or a shared setting.
 _Avoid_: route document, setting
 
 **Stamp**:
-What orders the writes of one shared entry: a hybrid logical clock's wall time and counter, and
-the writing machine's id, so every machine agrees which write is newest.
+What orders the writes of one shared entry, so every machine agrees which write is newest. It is
+made of a hybrid logical clock's wall time and counter and the writing machine's id; the store's
+spec gives its order (`store.stamp.parts`).
 _Avoid_: timestamp, set at
 
 **Forgotten machine**:

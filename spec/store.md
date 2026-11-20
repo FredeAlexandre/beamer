@@ -46,9 +46,10 @@ machine may write it.
 > - model: store
 
 > r[store.entry.newest]
-> Of all the writes of one shared entry, every machine ends with the one with the newest stamp,
-> whatever order they arrived in. A write that arrives no newer than the write this machine has for
-> that entry changes nothing here and is not sent on.
+> Of the writes of one shared entry a machine has made or taken since a domain last discarded the
+> entry there (`store.entry.discard`), it keeps the one with the newest stamp
+> (`store.stamp.parts`), whatever order they arrived in. A write that arrives no newer than the
+> write this machine has for that entry changes nothing here and is not sent on.
 >
 > - model: store
 
@@ -61,7 +62,8 @@ machine may write it.
 > r[store.entry.unchanged]
 > Writing a shared entry with the value it already has from an earlier write writes nothing: no new
 > stamp, and nothing goes to any peer. An entry never written has no value yet, so writing its
-> default to it is a write like any other.
+> default to it is a write like any other. An entry whose value is a fallback's
+> (`store.stamp.fallback`) is written by a write of the same value that is not a fallback.
 >
 > - model: store
 
@@ -80,8 +82,9 @@ machine may write it.
 > - model: store
 
 > r[store.entry.refused]
-> A domain may refuse writes of its keys as they arrive from a peer, one by one or all those of one
-> arrival together. A refused write is not taken, read or sent on, and the entry stays as it was.
+> A domain may refuse writes of its keys as they arrive from a peer, one by one, or all those of one
+> change (`store.sync.together`) or of one exchange at link up (`store.sync.exchange`) together. A
+> refused write is not taken, read or sent on, and the entry stays as it was.
 >
 > - model: store
 
@@ -96,25 +99,39 @@ machine may write it.
 ## Stamps
 
 > r[store.stamp.parts]
-> A stamp is a wall time in milliseconds, a counter and the machine id of the machine that made the
-> write. Of two stamps, the newer is the one with the later time; with the same time, the one with
-> the greater counter; with the same counter too, the one with the greater machine id, compared as
-> bytes. No two writes have the same stamp.
+> A stamp is a wall time in milliseconds, a counter and a machine id, marked as a fallback's or not
+> (`store.stamp.fallback`), and followed, on an answer, by the ids of the machines that answered
+> (`store.stamp.answer`). The order of stamps is the order of the writes of one shared entry, and
+> every rule that calls a write of an entry newer or older than another means this order. Of two
+> stamps, the newer is:
+>
+> 1. the one not marked as a fallback's, when only one of them is;
+> 2. otherwise, the one with the later time; with the same time, the one with the greater counter;
+>    with the same counter too, the one with the greater machine id, compared as bytes;
+> 3. with all of these the same, the one whose answering machine ids, compared in order, first have
+>    the greater id, compared as bytes, or, when one of them runs out first, the longer one.
+>
+> No two writes of one shared entry have the same stamp.
 >
 > - model: store
 > - parity: Python stamped each crossing map and profile register with whole seconds of wall time, raised to one past the stamp it had when the clock was not ahead of it, and broke a tie by the writer's machine id (#14: stamps are a hybrid logical clock, wall time with a counter and the machine id)
 
 > r[store.stamp.after-seen]
-> Every write a machine makes is stamped newer than every stamp it has made or taken, whatever its
-> clock says: a write made on a machine whose clock is behind the stamp of the entry it replaces
-> still replaces it, on every machine.
+> Every write a machine makes, apart from an answer (`store.stamp.answer`), is stamped with its own
+> machine id and a time and counter after those of every stamp it has seen: a later time, or the
+> same time and a greater counter. A machine has seen every stamp it made, and every stamp that
+> arrived from a peer in a write, whether that write was taken, refused or ignored
+> (`store.entry.refused`, `store.entry.schema`). So a write that is not a fallback, made on a
+> machine whose clock is behind the stamp of the entry it replaces, still replaces it on every
+> machine that takes it, and one made after a refused write arrived is newer than that write.
 >
 > - model: store
 
 > r[store.stamp.clock]
-> A write made on a machine whose clock is ahead of every stamp it has made or taken is stamped with
-> its clock's time and a counter of 0. So of two writes of one entry made on two machines whose
-> clocks agree, the later one wins, even when neither machine had taken the other's write.
+> A write other than an answer, made on a machine whose clock is ahead of every stamp it has seen
+> (`store.stamp.after-seen`), is stamped with its clock's time and a counter of 0. So of two such
+> writes of one entry, both fallbacks or neither, made on two machines whose clocks agree, the later
+> one wins, even when neither machine had taken the other's write.
 >
 > - model: store
 
@@ -126,24 +143,30 @@ machine may write it.
 > - parity: Python ignored a crossing map stamped more than a day ahead of its own clock, and a profile register stamped more than 600 s ahead (#14: the newest stamp wins, and the hybrid logical clock carries a machine whose clock is behind past every stamp it takes)
 
 > r[store.stamp.restart]
-> After a restart, every write a machine makes is stamped newer than every stamp in the store's
-> file, whatever its clock says.
+> After a restart, every write a machine makes, apart from an answer, is stamped with a time and
+> counter after those of the newest stamp the store's file keeps (`store.file.kept`), whatever its
+> clock says.
 >
 > - model: store
 
 > r[store.stamp.fallback]
-> A domain may write a shared entry as a fallback. A fallback loses to every write of that entry
-> that is not a fallback, older or newer, in whatever order they arrive, and wins over the entry's
-> default. Of two fallbacks of one entry, the one with the newer stamp wins.
+> A domain may write a shared entry as a fallback. Its stamp is marked as a fallback's
+> (`store.stamp.parts`), so it loses to every write of that entry that is not a fallback, older or
+> newer, in whatever order they arrive, and wins over the entry's default
+> (`store.entry.default`). Of two fallbacks of one entry, the one with the newer stamp wins.
 >
 > - model: store
 
 > r[store.stamp.answer]
-> A domain may write a shared entry in answer to a write it has taken. Such a write wins over every
-> write of that entry older than the write it answers, and loses to every write of that entry made,
-> on any machine, after that machine took the write it answers, whatever the machines' clocks say.
-> Of two writes of one entry in answer to the same write, the one made on the machine with the
-> greater machine id wins.
+> A domain may write a shared entry in answer to a write of any entry it has taken. The answer is
+> stamped with the time, counter, machine id and answering machine ids of the write it answers,
+> followed by this machine's id, and is not marked as a fallback (`store.stamp.parts`). So an
+> answer to a write that is not a fallback is newer than that write and every write it is newer
+> than, and older than every write newer than it that is neither a fallback nor an answer: every
+> such write made on any machine after that machine took the write answered is newer than the
+> answer, whatever the machines' clocks say. Of two answers to the same write, the one made on the
+> machine with the greater machine id is newer. A machine writes one entry at most once in answer to
+> one write: a later write of that entry it makes is stamped as `store.stamp.after-seen` says.
 >
 > - model: store
 
@@ -205,9 +228,10 @@ status, its hardware addresses and its capabilities, are declared by the domains
 
 > r[store.forget.record]
 > A forgotten machine's record is dropped from the store, and a record of a forgotten machine
-> arriving from a peer is not taken. Whether a machine is forgotten is judged once a whole arrival
-> has been taken, so a record that arrives with the record whose paired list lists its machine is
-> taken.
+> arriving from a peer is not taken. Whether a machine is forgotten is judged once everything of
+> one change (`store.sync.together`), or of one exchange at link up (`store.sync.exchange`), has
+> been taken, so a record that arrives in the same change or exchange as the record whose paired
+> list lists its machine is taken.
 >
 > - model: store
 
@@ -227,8 +251,10 @@ status, its hardware addresses and its capabilities, are declared by the domains
 > - model: store
 
 > r[store.forget.write-keeps]
-> A write of a shared entry, made on a machine where a machine its value names is forgotten, keeps
-> the parts of the value naming that machine as they were.
+> A write of a shared entry whose value has parts naming a machine forgotten on the writing machine,
+> next to other parts, such as zone choices toward each peer, keeps those parts as the store has
+> them there and replaces only the others. A write of an entry whose whole value is a machine's
+> name, such as a display owner, replaces that value as any write does.
 >
 > - model: store
 
@@ -246,25 +272,38 @@ status, its hardware addresses and its capabilities, are declared by the domains
 >
 > - model: store
 
+> r[store.forget.record-again]
+> When a machine becomes known here while this machine lacks its record, as when a forgotten
+> machine is known again, this machine asks every peer it has a link up with for that record at
+> once, without waiting for a link to come up, and takes it from those that have it as a record
+> arriving from a peer (`store.record.version`).
+>
+> - model: store
+
 ## Exchange and changes
 
 > r[store.sync.exchange]
 > When a link comes up, each of its two machines takes every shared entry and machine record the
-> other has that it lacks or has older, so both end with the newer of the two for each.
+> other has that it lacks or has older, so both end with the newer of the two for each, apart from
+> the writes and records one of them refuses or ignores as they arrive (`store.entry.schema`,
+> `store.entry.refused`, `store.forget.record`). An entry a domain discarded on one of them is one
+> that machine lacks, so it crosses the link again at each link up with a machine that has it, and
+> is refused or taken there again.
 >
 > - model: store
 
 > r[store.sync.lacks-only]
 > In the exchange at link up, each shared entry and machine record goes over the link only when the
-> other machine lacks it or has it older, and at most once. When the two machines already have the
-> same store, no entry and no record goes over the link.
+> other machine lacks it, a discarded entry included, or has it older, and at most once. When the
+> two machines already have the same store, no entry and no record goes over the link.
 >
 > - model: store
 
 > r[store.sync.done]
 > Each machine of a link tells its domains once the exchange at link up is done: it has, for every
 > shared entry and machine record either machine had when the link came up, the newer of the two
-> versions, and the other machine has them too.
+> versions, and the other machine has them too, apart from the writes and records one of them
+> refused or ignored as they arrived (`store.sync.exchange`).
 >
 > - model: store
 
@@ -276,8 +315,10 @@ status, its hardware addresses and its capabilities, are declared by the domains
 
 > r[store.sync.reaches]
 > A write made on any machine reaches every machine of the cluster, including machines with no link
-> to the machine that made it, through the machines between. A machine that was away takes every
-> write it missed in the exchange at its next link.
+> to the machine that made it, through the machines between. Only a machine between that refuses or
+> ignores it stops it: it goes from that machine to no peer (`store.entry.refused`,
+> `store.entry.schema`), so the machines it reaches only through that one don't take it. A machine
+> that was away takes every write it missed in the exchange at its next link.
 >
 > - model: store
 
@@ -290,7 +331,10 @@ status, its hardware addresses and its capabilities, are declared by the domains
 
 > r[store.sync.together]
 > The writes of one change, however many entries they are and however many messages carry them, are
-> taken together on every machine: no domain reads some of them without the others.
+> taken together on every machine: no domain reads some of the writes of one change taken there
+> without the others taken there. The writes of it that break their schema, that a domain refuses
+> or that are no newer than this machine's (`store.entry.schema`, `store.entry.refused`,
+> `store.entry.newest`) are not taken, and the rest are taken together.
 >
 > - model: store
 
@@ -300,9 +344,12 @@ status, its hardware addresses and its capabilities, are declared by the domains
 
 > r[store.sync.settles]
 > After any number of writes, made at once on any number of machines of a cluster, once every link
-> between them has been up long enough to carry them, every machine has the same shared entries and
-> the same machine records of the machines known to it, and no further store message goes over any
-> link.
+> between them has been up long enough to carry them, no further store message goes over any link,
+> and every two machines with a link up between them have the same machine record of each machine
+> known to both, and the same write of each shared entry, apart from an entry one of them discarded
+> (`store.entry.discard`), or of which one of them refused or ignored the other's newer write
+> (`store.entry.refused`, `store.entry.schema`). So when no domain refused, ignored or discarded
+> anything, every machine of the cluster has the same shared entries.
 >
 > - model: store
 
@@ -310,9 +357,9 @@ status, its hardware addresses and its capabilities, are declared by the domains
 
 > r[store.file.kept]
 > The store's file keeps every shared entry with its stamp, a fallback's or an answer's included,
-> every machine record with its version, and the newest stamp this machine has made or taken. After
-> a restart, the store reads exactly as it did when its file was last written, entries naming a
-> forgotten machine included.
+> every machine record with its version, and the newest stamp this machine has seen
+> (`store.stamp.after-seen`). After a restart, the store reads exactly as it did when its file was
+> last written, entries naming a forgotten machine included.
 >
 > - model: store
 
