@@ -89,7 +89,8 @@ rule about shared settings is about the store's state machine and names its `mod
 
 > r[settings.groups.off-keeps]
 > When a group stops being kept in step, each machine keeps the values its settings in that group
-> have then, and changes none of them back.
+> have then, and changes none of them back, apart from the Design group of a machine that follows a
+> peer, which takes the followed peer's design (`settings.follow.paused`).
 >
 > - model: store
 
@@ -159,10 +160,11 @@ rule about shared settings is about the store's state machine and names its `mod
 > Of two changes of one shared setting made on two machines, the newer write
 > (`store.stamp.parts`) is the value both machines have while its group is kept in step, whichever
 > arrives first: with the same time and counter, the one from the machine with the greater machine
-> id.
+> id. A write stamped ahead of this machine's clock is taken as any other, however far ahead
+> (`store.stamp.ahead`).
 >
 > - model: store
-> - parity: Python stamped a change with whole seconds of wall time and broke a tie by the larger machine id (#14: stamps are a hybrid logical clock)
+> - parity: Python stamped a change with whole seconds of wall time and broke a tie by the larger machine id, and ignored a value stamped more than a day ahead of its own clock (#14: stamps are a hybrid logical clock, the newest stamp wins, and the clock carries a machine whose clock is behind past every stamp it takes)
 
 > r[settings.shared.apart]
 > Two machines changing different shared settings at once both keep their changes: once their
@@ -316,8 +318,9 @@ rule about shared settings is about the store's state machine and names its `mod
 > - model: store
 
 > r[settings.revert.once]
-> Once Revert has put back what was kept, nothing is kept until a peer's change replaces values
-> again.
+> Once Revert has put back what was kept, nothing is kept until Same on all machines next replaces
+> values or a peer's write next changes which groups are kept in step, as `settings.revert.kept`
+> says.
 
 ## Design follow
 
@@ -358,7 +361,7 @@ and each change to them after. Which peer this machine follows is its own settin
 > - model: store
 > - parity: Python stamped each value it took from the followed machine's design with its own design stamp (#14: a machine's design is a part of its own record, apart from the shared entries)
 
-> r[settings.follow.chain]
+> r[settings.follow.through]
 > A machine that follows a peer which itself follows another machine has the other machine's
 > design: in A ← B ← C, each following the machine to its left, C has A's design, and its record
 > lists A, B and C. A change of A's design reaches C through B.
@@ -475,7 +478,7 @@ and each change to them after. Which peer this machine follows is its own settin
 > (`input.speed.range`), the value reads so and the file is not refused for it.
 >
 > - fuzz: store-file
-> - parity: Python read a window appearance it did not know as System and loaded the rest of the file, and refused the whole file for every other value it could not hold (one rule for every own setting, as `store.file.refused` has for the store)
+> - parity: Python read a window appearance it did not know as System and loaded the rest of the file, but refused the whole file for an unknown modifier style, for a pointer or scroll speed outside 25 % to 400 %, and for every other value it could not hold (one rule for every own setting, as `store.file.refused` has for the store, and a value whose owning domain says how it reads, as `input.modifier.unknown-style` and `input.speed.range` do, is read so instead of costing every other own setting its saved value)
 
 > r[settings.own.unknown-kept]
 > A field of `local.json` that this build does not know, such as one a later Beamer wrote, is

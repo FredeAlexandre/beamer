@@ -1,6 +1,6 @@
 # The settings domain's slice of the Python ledger, laid out by #51.
 # Owner domains and the ambiguous assignments: spec/ledger/README.md.
-core/tests/settings_behaviour.py::SettingsBehaviourTests::test_downstream_follower_adopts_when_its_leader_selects_older_design  mined: settings.follow.chain, settings.follow.choose
+core/tests/settings_behaviour.py::SettingsBehaviourTests::test_downstream_follower_adopts_when_its_leader_selects_older_design  mined: settings.follow.through, settings.follow.choose
 core/tests/settings_behaviour.py::SettingsBehaviourTests::test_identical_values_cycle_has_bounded_announcements  mined: settings.follow.cycle
 core/tests/settings_behaviour.py::SettingsBehaviourTests::test_next_leader_update_uses_leader_cursor_and_duplicates_do_not_resend  mined: settings.follow.changes
 core/tests/settings_behaviour.py::SettingsBehaviourTests::test_observed_missing_design_capability_is_labelled_old  dropped: the "Needs beta.6 or later" label for a peer of an older Python app, no compatibility with the Python apps (#11, #14)
@@ -40,7 +40,7 @@ core/tests/test_settings_mixed_groups.py::TwoAtOnce::test_different_values_both_
 core/tests/test_settings_mixed_groups.py::TwoAtOnce::test_the_same_value_settles_on_one_choice_on_both  mined: settings.shared.same-value
 core/tests/test_settings_per_key.py::Merge::test_a_1_5_1_peer_without_stamps_counts_every_value_at_its_whole_stamp  dropped: peers of 1.5.1 that sent no stamps of their own, no compatibility with the Python apps (#11, #14)
 core/tests/test_settings_per_key.py::Merge::test_a_fresh_machine_adopts_every_value_the_group_holds  mined: settings.shared.fresh
-core/tests/test_settings_per_key.py::Merge::test_a_value_changed_while_its_group_was_off_travels_newer_than_its_state  mined: settings.shared.turned-on
+core/tests/test_settings_per_key.py::Merge::test_a_value_changed_while_its_group_was_off_travels_newer_than_its_state  mined: settings.shared.turned-on, settings.shared.newest
 core/tests/test_settings_per_key.py::Merge::test_an_edit_from_a_machine_that_missed_one_carries_only_its_own_change  mined: settings.shared.only-changed
 core/tests/test_settings_per_key.py::Merge::test_ties_break_on_the_larger_id_as_whole_states_do  mined: settings.shared.newest
 core/tests/test_settings_per_key.py::Merge::test_values_wait_while_same_is_off_and_outside_the_selected_groups  mined: settings.shared.waits
@@ -90,7 +90,7 @@ core/tests/test_settings_sync.py::MessageTests::test_an_optional_design_state_ke
 core/tests/test_settings_sync.py::MessageTests::test_an_untouched_empty_own_name_cannot_be_attributed_to_a_peer  python-detail: the author Python kept beside a name never set, which no peer took
 core/tests/test_settings_sync.py::MessageTests::test_an_update_without_design_values_does_not_advance_direct_design  mined: settings.follow.record
 core/tests/test_settings_sync.py::MessageTests::test_compared_as_bytes_not_as_text  mined: settings.shared.newest
-core/tests/test_settings_sync.py::MessageTests::test_design_follow_chain_keeps_the_leaders_stamp  mined: settings.follow.chain
+core/tests/test_settings_sync.py::MessageTests::test_design_follow_chain_keeps_the_leaders_stamp  mined: settings.follow.through
 core/tests/test_settings_sync.py::MessageTests::test_design_follow_ignores_other_peers_and_waits_while_same_is_on  mined: settings.follow.ignore-others, settings.follow.paused
 core/tests/test_settings_sync.py::MessageTests::test_design_states_use_the_same_stamp_order_as_same_on_all_machines  wire-v6: the stamps of the v6 design state, replaced by the machine record's version (spec/store.md)
 core/tests/test_settings_sync.py::MessageTests::test_explicit_follow_adopts_all_design_values_despite_a_newer_local_stamp  mined: settings.follow.choose
