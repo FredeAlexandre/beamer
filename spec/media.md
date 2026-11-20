@@ -586,10 +586,10 @@ over the period, and whether the stream is broken.
 ## Camera streams: showing
 
 > r[media.video.offset]
-> The receiving machine reads the sending machine's clock from each time map: the sending machine's
-> clock when the time map was sent, less the time it arrived here plus half the link's round trip by
-> QUIC. Of the last 10 time maps it takes the one that came fastest, and every due time uses the
-> newest such reading.
+> The receiving machine reads the sending machine's clock from each time map, as the sending
+> machine's clock when the time map was sent, plus half the link's round trip by QUIC, less the time
+> it arrived here. Of the last 10 time maps it takes the one that came fastest, and every due time
+> uses the newest such reading.
 >
 > - parity: Python measured the offset from its own pings and pongs every 1 s, taking the one of the last 10 with the lowest round trip (#14: no pings of media's own; the time map says when it was sent, and QUIC's RTT stands for the round trip)
 
