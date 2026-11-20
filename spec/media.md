@@ -551,9 +551,9 @@ r[media.video.nack]
 On a fragment whose packet number is more than one above the highest yet, the receiving machine at
 once asks the camera machine to send every missing packet again, as many to a request as fit. It
 asks again for each still missing 15 ms after the first request, and then once more after the retry
-interval, max(2 × QUIC's RTT for the link (`link.rtt.reported`), 15 ms): 3 requests in all, each
-only while its picture is not yet due. A gap of more than 64 packets is asked for not at all, and
-its pictures are lost at once.
+interval, max(2 × QUIC's RTT for the link (`link.rtt.reported`), 15 ms): 3 requests in all. The
+first goes whatever its picture's due time; the second and third only while its picture is not yet
+due. A gap of more than 64 packets is asked for not at all, and its pictures are lost at once.
 
 r[media.video.lost]
 A picture is lost only on evidence: a packet it may hold is still missing one retry interval after
