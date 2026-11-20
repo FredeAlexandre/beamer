@@ -50,6 +50,15 @@ the check. The format itself is `spec/README.md`'s: read it first.
 A `build:spec` domain PR also meets its task's criteria, checked across the whole file:
 
 - every Python test the ledger gives the domain has exactly one fate;
+- each test the PR moves out of the slice checks only the behaviour of another domain whose spec
+  is not on `rust` yet, and lands with no fate in that domain's slice. It has its row in
+  `spec/ledger/README.md`'s ambiguous list, `moved from` this domain, and the README's counts
+  match. The new owner's task has the miner's comment naming it
+  (`gh issue view <task> -R FredeAlexandre/beamer --comments`). The miner's
+  [blocked.md](../build-spec-miner/blocked.md) gives the form;
+- each other domain's rule a rule names is on `rust`, or at the head of that domain's open PR that
+  the PR body lists under "Depends on". A behaviour that domain has not written yet is stated in
+  words, and the task is blocked by that domain's task, as the same file says;
 - Later and Dropped features follow #11: a Later feature has a rule naming the room the design
   leaves for it, and a Dropped one has none;
 - every state machine and parser in the domain's scope is marked, as #15 lists them.

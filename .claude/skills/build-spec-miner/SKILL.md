@@ -26,12 +26,12 @@ the default (#11): a rule says what Python does, unless a decision says otherwis
   code, its `git log`. Read and search there; never edit, build or run anything in it, since a run
   writes caches into it.
 - **Touches** two files: `spec/<domain>.md`, and the fates in `spec/ledger/<domain>.txt`. The
-  slice's test ids stay exactly as #51 laid them out: you add a fate after each, and add or remove
-  no line. Two additions, only when they arise: a new `GLOSSARY.md` term (step 3), and a file the
-  task issue itself says to delete (the `link` task deletes `WIRE.md`, `pairing` deletes
-  `PAIRING.md`).
-- **Leaves untouched**: every other domain's spec file and ledger slice, `crates/`, `xtask/`, and
-  everything else in the repo.
+  slice's test ids stay as #51 laid them out: you add a fate after each, and add no line. Three
+  additions, only when they arise: a test [blocked.md](blocked.md) moves to another domain's slice,
+  with its row in `spec/ledger/README.md`; a new `GLOSSARY.md` term (step 3); and a file the task
+  issue itself says to delete (the `link` task deletes `WIRE.md`, `pairing` deletes `PAIRING.md`).
+- **Leaves untouched**: every other domain's spec file, the rest of its ledger slice, `crates/`,
+  `xtask/`, and everything else in the repo.
 - **Opens** no issue. It comments on other domains' tasks and labels its own, as
   [blocked.md](blocked.md) says.
 - **Finishes** with a PR into `rust` labelled `build:spec` that waits for its review, and a
@@ -147,8 +147,9 @@ Done when every command passes and every `words.sh` hit is a word used in anothe
    `gh pr create -R FredeAlexandre/beamer --base rust --title '<issue title> (#<n>)' --label build:spec`.
    Its body names #<n>, and gives: the rule count by topic; the fates by kind
    (`grep -Eo '[[:space:]](mined|dropped|python-detail|wire-v6):' spec/ledger/<domain>.txt | sort | uniq -c`);
-   each parity change, Later room and proposed glossary term; and each blocker. Open it with
-   `--draft` while a blocker is open. Leave auto-merge off: the PR merges only after its review,
+   each parity change, Later room and proposed glossary term; each test moved to another slice;
+   each other domain's rule cited from an open PR; and each blocker. Open it with `--draft` while
+   a blocker is open. Leave auto-merge off: the PR merges only after its review,
    which the coordinator dispatches.
 3. **Comment** on the task: the PR, the parity-change count, and each blocker.
 
