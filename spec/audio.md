@@ -275,7 +275,9 @@ microphone or default output is one of them, the record names no default.
 
 > r[audio.cluster.same-status]
 > Every machine of the cluster reports the same status for the microphone's route and for each
-> sound route, once their stores hold the same entries and records.
+> sound route, once their stores hold the same entries and records, apart from failed while a
+> stream cannot start (`audio.status.failed`). Only the machine that would send that stream reports
+> it; every other machine reports the status the route's other steps give.
 >
 > - model: audio
 
@@ -349,7 +351,9 @@ microphone or default output is one of them, the record names no default.
 > 1. off (`audio.mic.off`);
 > 2. waiting for the shared microphone's machine (`audio.mic.machine-gone`);
 > 3. waiting for the device (`audio.mic.device-gone`);
-> 4. failed, while one of its microphone streams cannot start (`audio.status.failed`);
+> 4. failed, on the shared microphone's machine only, while one of the microphone streams it sends
+>    to another machine cannot start (`audio.status.failed`); every other machine goes on to the
+>    next step;
 > 5. streaming, while the shared microphone streams to at least one machine, its own included,
 >    naming those machines;
 > 6. unreachable, when any machine recording it is (`audio.mic.direct-only`), and else without a
@@ -405,8 +409,9 @@ Core reports whether echo is cancelled on a running microphone stream of this ma
 > `audio.sound.waiting`, `audio.sound.unreachable`, `audio.sound.cannot-capture`,
 > `audio.sound.device-gone` and `audio.sound.muted-there` stops it, that machine streams its sound
 > to the output the route names on the other machine, and plays none of it itself. The route's
-> status is streaming, unless its stream cannot start (`audio.sound.status`). The machine whose
-> sound it is sends the stream, whichever machine wrote the route.
+> status is streaming, but failed on the sending machine while its stream cannot start
+> (`audio.sound.status`). The machine whose sound it is sends the stream, whichever machine wrote
+> the route.
 >
 > - model: audio
 
@@ -420,7 +425,8 @@ Core reports whether echo is cancelled on a running microphone stream of this ma
 > 4. failed, because the sending machine cannot capture its sound (`audio.sound.cannot-capture`);
 > 5. waiting for the device (`audio.sound.device-gone`);
 > 6. the output muted there (`audio.sound.muted-there`);
-> 7. failed, while its stream cannot start (`audio.status.failed`);
+> 7. failed, on the sending machine only, while its stream cannot start (`audio.status.failed`);
+>    every other machine goes on to the next step;
 > 8. else streaming (`audio.sound.sent`).
 >
 > - model: audio
@@ -497,11 +503,13 @@ Beamer never changes which microphone or output the OS uses by default, on any m
 ## Statuses
 
 > r[audio.status.failed]
-> When an audio stream cannot start, its route's status is failed, naming the machine it goes to and
-> why: the device is gone, it is a device Beamer leaves alone (`audio.devices.left-alone`), another
-> app holds it, the OS does not allow it, or the machine cannot do it, on the machine that would
-> send; or, as the machine that would take it answers, its output is gone, it has no virtual
-> microphone, its output is muted there, or it cannot do it.
+> When an audio stream cannot start, its route's status on the machine that would send it is
+> failed, naming the machine it goes to and why: the device is gone, it is a device Beamer leaves
+> alone (`audio.devices.left-alone`), another app holds it, the OS does not allow it, or the machine
+> cannot do it, on the machine that would send; or, as the machine that would take it answers, its
+> output is gone, it has no virtual microphone, its output is muted there, or it cannot do it. Every
+> other machine, the one that would take it included, reports the status the route's other steps
+> give (`audio.mic.status`, `audio.sound.status`).
 >
 > - model: audio
 
