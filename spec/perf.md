@@ -17,7 +17,15 @@ is `spec/camera.md`'s, and what is inside their streams is `spec/media.md`'s. Th
 delays input, and input delays media by at most one datagram, is `link.class.media-and-input`'s,
 checked at `ci`; `perf.input.with-media` checks its effect on the real machines.
 
-The input budgets gate M1, the clipboard and window budgets M2, and the media budgets M3 (#24).
+Each budget gates the milestone that first ships what its run needs (#24). A run that carries an
+audio or camera stream waits for M3, which brings them (F43, F44):
+
+| Milestone | Rules |
+|---|---|
+| M1 | `perf.own.driver`, `perf.own.driven`, `perf.input.round-trip-wifi`, `perf.input.round-trip-cable`, `perf.input.loss`, `perf.crossing.wifi`, `perf.crossing.cable` |
+| M2 | `perf.clipboard.text-wifi`, `perf.clipboard.text-cable`, `perf.clipboard.image-wifi`, `perf.clipboard.image-cable`, `perf.ui.resize`, `perf.ui.scroll` |
+| M3 | `perf.input.with-media`, `perf.ui.audio-levels`, `perf.ui.audio-machine`, `perf.ui.camera-status`, `perf.ui.tray-menu`, every `perf.audio.*` and `perf.camera.*` rule |
+
 No part of this domain is Later or dropped (#11), and no rule here is about a state machine or a
 parser, so none carries `model:` or `fuzz:`.
 
@@ -27,16 +35,42 @@ parser, so none carries `model:` or `fuzz:`.
   percentile is taken over every sample of the run, by nearest rank: the p95 is the smallest
   sample that at least 95 % of the samples do not exceed. A bound is met when the run's percentile
   is at most the bound.
+- **Every run stands alone.** A rule whose run is made once with each machine driving, in each
+  direction, or on each machine, is met only when each of those runs meets it on its own samples.
+  Samples are never pooled across runs.
+- **A sample that never ends.** A sample whose end has not come by its run's next step, or by the
+  end of the run, counts as a sample above every bound: a crossing refused or never placed, a
+  clipboard never set, a virtual camera that never gives a picture. Two kinds are dropped instead:
+  a test signal's marker never recorded, and a camera picture never got by the app. A run that
+  drops more than 1 % of the markers or pictures it made fails. Beamer's own time, round trips and
+  frame times are logged by the app as each one ends, so none of them is left without an end.
+- **Enough samples.** A run keeps at least 20 samples, at least 100 when its rule bounds a p99,
+  and at least 1000 when its rule bounds a p99.9. A run with fewer fails.
+- **A void run.** A run is void, and gives its rule no verdict, when during it a link between the
+  two machines goes down, either app quits or starts, or the clock tie discards more than 10 % of
+  its samples. The run is made again, and a rule whose run is void 3 times in a row fails.
 - **Each machine's part is read from its own log**: the JSON-lines log lines that
   `spec/observability.md` defines (#71), never a hook inside the app (ADR 0005). Lines about
   what happens many times a second are counts and histograms written once a second, as #16
   decided, and percentiles merge those histograms.
 - **Two machines' clocks are never subtracted.** The PC's clock wanders against the Mac's by
   hundreds of milliseconds (#4). A quantity that starts on one machine and ends on the other is
-  either read as half the sum of a trip out and the trip home that follows it, each started and
-  ended on the clocks of the machines they run between, so the offset cancels; or, where no trip
-  home exists, against the two machines' clocks tied by out-and-back pairs between the machine
-  agents, a sample whose tie is uncertain by more than 2 ms being discarded.
+  either read as half the sum of a trip out and the trip home that follows it, each started on the
+  clock of the machine it leaves and ended on the clock of the machine it reaches, so the offset
+  cancels; or, where no trip home exists, through the clock tie.
+- **The clock tie.** Through a run that needs it, the two machine agents make an out-and-back pair
+  every 100 ms. The first agent stamps a datagram on its clock as it sends it (t1), the second
+  stamps its answer on its clock as it sends it (t2), and the first stamps the answer as it
+  arrives (t3). The pair's round trip is t3 − t1, and it reads the second clock as ahead of the
+  first by t2 − (t1 + t3) / 2, uncertain by half its round trip. A sample is tied by the pair with
+  the smallest round trip of those made within 10 s before or after it, and its uncertainty is
+  half that round trip. A sample is discarded when its uncertainty is over 2 ms, or when either
+  machine's clock stepped between the sample and its pair: a step is a change of more than 1 ms,
+  from one pair to the next, in how far that machine's clock is ahead of its monotonic clock. The
+  smallest of the 200 round trips around a sample is the radio's floor, not #4's 6 ms p50; WP10's
+  harness tied the clocks the same way, by the smallest of its SSH pings, at 4.1 ms
+  (`dev/audio/reports/wp10.md`). A radio that cannot keep 90 % of the samples voids the run
+  rather than failing it.
 - **On Wi-Fi** means both machines on the same 5 GHz Wi-Fi, as #4 measured. **On the cable**
   means both machines wired by Ethernet to one router, with Wi-Fi off. Each rule names which.
 - **Input** in a run is real OS input posted by the machine agent of the machine it starts on.
@@ -45,8 +79,15 @@ parser, so none carries `model:` or `fuzz:`.
 ## Beamer's own time
 
 > r[perf.own.driver]
-> On a driver, the time from its capture getting an input from the OS to the first datagram
-> carrying that input being handed to the OS to send is at most 0.5 ms at p50, p95 and p99.
+> On a driver, the time from an input message being ready to send to the first datagram carrying
+> it being handed to the OS to send is at most 0.5 ms at p50, p95 and p99. An input message is
+> ready to send at the later of two moments: its capture getting from the OS the newest input it
+> carries, which for a merged move (`link.input.merge`) is the newest move merged into it; and the
+> link being free to send it, which is when the last wait a rule makes it take ends: the pace
+> (`link.input.pace`), room in the window (`link.input.window`), the answer to a pass on that
+> queues it (`driving.pass-on.take`), or the clipboard sent to a machine ahead of it
+> (`clipboard.take.sent`). Those waits are timing the link's and driving's rules set on purpose,
+> not the time Beamer takes to deal with an input, which is what #14 bounds here.
 >
 > Run: for 10 minutes on Wi-Fi, the driver's machine agent moves the pointer in circles at 125
 > moves a second and taps Shift every 100 ms, with the input on the peer. It runs once with the
@@ -61,7 +102,8 @@ parser, so none carries `model:` or `fuzz:`.
 > On a driven machine, the time from a datagram carrying an input message arriving from the OS to
 > the OS taking the injection of that message (`input.injection.each-kind`) is at most 0.5 ms at
 > p50, p95 and p99. An input message that waits for a missing one (`link.input.once-in-order`)
-> counts from the arrival of the one it waited for.
+> counts from the arrival of the one it waited for, and a pointer move merged on arrival
+> (`link.input.receive-merge`) from the arrival of the newest move merged into it.
 >
 > Run: the run of `perf.own.driver`, read on the driven machine.
 >
@@ -101,17 +143,35 @@ parser, so none carries `model:` or `fuzz:`.
 
 > r[perf.input.loss]
 > On Wi-Fi, with 2 % of the link's datagrams dropped at random in each direction, the input round
-> trip of input made one message at a time is at most 6.3 ms at p50 and 23 ms at p95, in each
-> direction. Its p99 is reported and not bounded, as in `perf.input.round-trip-wifi`.
+> trip of input sent one message at a time is at most the round trip without loss, over the same
+> run, plus the cost of a loss: its p50 and its p95 at most the p50 and the p95 without loss plus
+> that cost, and its p99 at most the p99 without loss plus twice that cost, in each direction. The
+> cost of a loss is the larger of 15 ms and twice the p50 without loss.
 >
-> Run: for 10 minutes on Wi-Fi, the Mac's packet filter discards 2 % of the UDP datagrams to and
-> from port 24820 at random in each direction, and the driver's machine agent taps Shift every
-> 100 ms, with no other input and the input on the peer. It runs once with each machine driving.
+> Run: for 20 minutes on Wi-Fi, the driver's machine agent presses Shift and releases it 50 ms
+> later, every 100 ms, with no other input and the input on the peer. The minutes alternate: in
+> the first, third and every odd minute, no datagram is dropped; in every even minute, the Mac's
+> packet filter discards 2 % of the UDP datagrams to and from port 24820 at random in each
+> direction. The round trip without loss is that of the odd minutes, and the round trip with loss
+> that of the even minutes, so the radio's own tail falls on both. It runs once with each machine
+> driving.
 >
-> Baseline: #4 measured no loss on purpose. The p95 bound is the Wi-Fi baseline's 10.5 ms plus
-> one resend after max(2 × 6 ms, 5 ms) (`link.input.resend`), at the 6 ms p50 of #4's link round
-> trip. #14 bounds the Wi-Fi tail by the cost of recovering from a loss, measured by dropping
-> datagrams on purpose.
+> Baseline: #4 measured no loss on purpose, and #14 bounds the Wi-Fi tail by the cost of
+> recovering from a loss, measured by dropping datagrams on purpose. Each input message here is
+> acknowledged at once and alone: it is dealt with about 50 ms after the one before it, so more
+> than 15 ms after the last acknowledgement (`link.input.ack-timing`), and outside the radio's
+> stalls its round trip, a loss's wait included, ends before the next one is made. One loss costs
+> it one wait. A dropped input datagram is sent again max(2 × QUIC's RTT, 5 ms) after it was first
+> sent (`link.input.resend`), so its sample grows by that wait. A dropped acknowledgement is
+> answered by acknowledging the datagram sent again, on the same timing (`link.input.ack-repeat`):
+> at the later of its arrival and 15 ms after the dropped one, with a delay of 0, so its sample
+> grows by the larger of 15 ms and the resend's wait. Twice the p50 without loss stands for twice
+> QUIC's RTT: at #4's 6 ms p50 the cost is 15 ms. A sample made longer by at most the cost raises
+> each percentile by at most the cost. About 4 % of the samples meet one loss, out of two
+> datagrams each dropped 2 % of the time, and about 0.1 % meet two, which can raise the p99 by
+> twice the cost. At #4's Wi-Fi the p95 without loss plus the cost, about 25 ms, is near the
+> link's p99 of 24 to 32 ms, so the samples without loss above it are about 1 %, which leaves room
+> for that 0.1 % at the p95.
 >
 > - tier: machine (only the real machines on a real Wi-Fi give the cost of a loss on top of the
 >   radio's)
@@ -122,8 +182,14 @@ parser, so none carries `model:` or `fuzz:`.
 > trip is at most 6.3 ms at p50 and 10.5 ms at p95, in each direction. Its p99 is reported and not
 > bounded, as in `perf.input.round-trip-wifi`.
 >
-> Run: the run of `perf.own.driver`, with those three streams running from before it starts to after
-> it ends.
+> Run: the run of `perf.own.driver`, with those three streams running from 30 s before it starts
+> to after it ends, each carrying what the media budgets' runs carry. The camera route names the
+> Mac's camera that the Mac's machine agent feeds with pictures, as in the camera budgets, and
+> the PC's machine agent keeps the virtual camera open as an app does. The PC's machine agent
+> plays the audio budgets' test signal as the PC's sound, without pause. The Mac's machine agent
+> plays it, without pause, into the microphone the audio route names, as in
+> `perf.audio.mic-mac-to-pc`, and the PC's machine agent records the PC's virtual microphone as
+> an app does.
 >
 > Baseline: the bounds of `perf.input.round-trip-wifi` (#4). #14 promises that media never delays
 > input (`link.class.media-and-input`).
@@ -141,8 +207,9 @@ parser, so none carries `model:` or `fuzz:`.
 > p99 is reported and not bounded: on Wi-Fi the radio's stalls set the tail (#14).
 >
 > Run: on Wi-Fi, 200 times, the driver's machine agent pushes the pointer through a zone to the
-> peer, waits 1 s, pushes it through the peer's zone that leads home, and waits 1 s. It runs once
-> with each machine driving.
+> peer, waits 1 s, pushes it through the peer's zone that leads home, and waits 1 s. A crossing
+> placed after its 1 s wait has no end (How a budget is measured). It runs once with each machine
+> driving.
 >
 > Baseline: a crossing out and the crossing home summed took 9 ms at p50, 37 ms at p95 and 40 ms
 > at most, over 52 pairs, so a crossing about 4.5 ms at p50 and 18 ms at p95 (#4). #14 sets the
@@ -152,13 +219,13 @@ parser, so none carries `model:` or `fuzz:`.
 >   time)
 
 > r[perf.crossing.cable]
-> On the cable, a crossing, as `perf.crossing.wifi` measures it, takes at most 4.5 ms at p50,
-> 10 ms at p95 and 20 ms at p99.
+> On the cable, a crossing, as `perf.crossing.wifi` measures it, takes at most 4.5 ms at p50 and
+> 10 ms at p95. Its p99 is reported and not bounded until the cable's first measurement (#14).
 >
 > Run: the run of `perf.crossing.wifi`, on the cable.
 >
-> Baseline: the p50 and the p95 of `perf.crossing.wifi`; the p99 is the largest crossing of #4's
-> 52 pairs on Wi-Fi, about 20 ms. #14 sets the p95 on both Wi-Fi and the cable.
+> Baseline: the p50 and the p95 of `perf.crossing.wifi`. #14 sets the p95 on both Wi-Fi and the
+> cable, and leaves every other cable bound but input's p99.9 to the cable's first measurement.
 >
 > - tier: machine (only the real capture and the real machines on a real cable give a crossing's
 >   time)
@@ -168,15 +235,19 @@ parser, so none carries `model:` or `fuzz:`.
 > r[perf.clipboard.text-wifi]
 > On Wi-Fi, a text on the clipboard of the machine the input leaves is on the clipboard of the
 > machine it reaches, ready to paste, at most 15 ms at p50 and at p95 after the push that crosses
-> (`crossing.push.breakthrough`): written there going out (`clipboard.take.sent`), and set at home
-> coming home (`clipboard.arrive.set`). A sample is half the sum of a crossing out and the crossing
-> home that follows it, each carrying a new text. Its p99 is reported and not bounded: on Wi-Fi
-> the radio's stalls set the tail (#14).
+> (`crossing.push.breakthrough`). Going out, the trip starts at the push on the driver's clock
+> and ends as the driven machine sets its clipboard from the clipboard message its driver sent it
+> (`clipboard.take.sent`, `clipboard.travel.order`), on the driven machine's clock. Coming home,
+> it starts at the push through the driven machine's zone, on its clock, and ends as the driver
+> sets its clipboard from the machine let go (`clipboard.arrive.set`), on the driver's clock. A
+> sample is half the sum of a crossing out and the crossing home that follows it, each carrying a
+> new text. Its p99 is reported and not bounded: on Wi-Fi the radio's stalls set the tail (#14).
 >
 > Run: on Wi-Fi, 100 times, the driver's machine agent puts a new text of 100 characters on the
 > driver's clipboard and pushes the pointer through a zone to the peer; then, 1 s later, the
 > peer's machine agent puts another on the peer's clipboard, and the driver's pushes the pointer
-> through the peer's zone that leads home. It runs once with each machine driving.
+> through the peer's zone that leads home, and waits 1 s. A clipboard set after its 1 s wait has no
+> end. It runs once with each machine driving.
 >
 > Baseline: 8 to 36 ms over 5 texts, too few for percentiles (#4). #14 sets the p95 at 15 ms.
 >
@@ -185,11 +256,13 @@ parser, so none carries `model:` or `fuzz:`.
 
 > r[perf.clipboard.text-cable]
 > On the cable, a text follows a crossing, as `perf.clipboard.text-wifi` measures it, within 15 ms
-> at p50 and at p95, and within 36 ms at p99.
+> at p50 and at p95. Its p99 is reported and not bounded until the cable's first measurement
+> (#14).
 >
 > Run: the run of `perf.clipboard.text-wifi`, on the cable.
 >
-> Baseline: #14's p95 bound, and for the p99 the largest of #4's 5 texts on Wi-Fi, 36 ms.
+> Baseline: #14's p95 bound. #14 leaves every other cable bound but input's p99.9 to the cable's
+> first measurement.
 >
 > - tier: machine (only the real OS clipboards and the real machines on a real cable give the time
 >   to paste)
@@ -197,15 +270,20 @@ parser, so none carries `model:` or `fuzz:`.
 > r[perf.clipboard.image-wifi]
 > On Wi-Fi, a PNG of 8 MiB on the clipboard of the machine the input leaves is on the clipboard of
 > the machine it reaches, ready to paste, within twice the raw time at p50 and at p95, measured
-> from the push that crosses as `perf.clipboard.text-wifi` measures a text. The raw time is the
-> median of 5 copies of 8 MiB of random bytes over one TCP stream between the two machine agents,
-> made just before the samples. A sample is half the sum of a crossing out and the crossing home
-> that follows it, each carrying a new PNG, divided by the raw time. Its p99 is reported and not
-> bounded: on Wi-Fi the radio's stalls set the tail (#14).
+> from the push that crosses as `perf.clipboard.text-wifi` measures a text. A sample is half the
+> sum of a crossing out and the crossing home that follows it, each carrying a new PNG, divided by
+> the raw time. Its p99 is reported and not bounded: on Wi-Fi the radio's stalls set the tail
+> (#14).
+>
+> The raw time is the time 8 MiB takes one way between the two machine agents on the same link,
+> over one TCP stream. One copy pair is timed on the driver's clock: its machine agent writes
+> 8 MiB of random bytes on the stream; the peer's machine agent reads all of them, then writes
+> them back; the copy pair's time runs from the first byte written to the last byte read back.
+> The raw time is half the median of 5 copy pairs, made just before the samples.
 >
 > Run: as `perf.clipboard.text-wifi`, 20 times, each machine agent putting a new PNG of noise of
-> between 7.5 and 8 MiB on the clipboard in place of the text. Each PNG fits
-> (`clipboard.payload.image-limit`, `clipboard.png.size`).
+> between 7.5 and 8 MiB on the clipboard in place of the text, and each wait 5 s in place of 1 s.
+> Each PNG fits (`clipboard.payload.image-limit`, `clipboard.png.size`).
 >
 > Baseline: 113 to 345 ms over 3 images of sizes not recorded (#4). #14 sets the bound at twice
 > the time the raw bytes take.
@@ -215,11 +293,13 @@ parser, so none carries `model:` or `fuzz:`.
 
 > r[perf.clipboard.image-cable]
 > On the cable, a PNG of 8 MiB follows a crossing, as `perf.clipboard.image-wifi` measures it,
-> within twice the raw time at p50, p95 and p99.
+> within twice the raw time at p50 and at p95, the raw time measured on the cable. Its p99 is
+> reported and not bounded until the cable's first measurement (#14).
 >
 > Run: the run of `perf.clipboard.image-wifi`, on the cable.
 >
-> Baseline: #4 measured no image wired. #14 sets the bound at twice the time the raw bytes take.
+> Baseline: #4 measured no image wired. #14 sets the bound at twice the time the raw bytes take,
+> and leaves every other cable bound but input's p99.9 to the cable's first measurement.
 >
 > - tier: machine (only the real OS clipboards and the real machines on a real cable give the time
 >   to paste)
@@ -274,9 +354,9 @@ the frame shows to handing the frame to the OS to show.
 > While the camera's status changes and the Audio & Camera page shows it, each frame's time is
 > under 16 ms at p50, p95 and p99, and at its largest.
 >
-> Run: for 60 s, with the camera route naming the Mac's camera and the Audio & Camera page shown
-> on each machine in turn, the PC's machine agent opens the virtual camera as an app does for 2 s,
-> then closes it for 2 s, so the camera's status changes as its stream starts and stops.
+> Run: for 10 minutes, with the camera route naming the Mac's camera and the Audio & Camera page
+> shown on each machine in turn, the PC's machine agent opens the virtual camera as an app does
+> for 2 s, then closes it for 2 s, so the camera's status changes as its stream starts and stops.
 >
 > - tier: machine (only a real window on a real display with a real camera stream gives frame
 >   times)
@@ -297,19 +377,36 @@ Each audio budget is the one-way time of a marked test signal: the sending machi
 plays it, into a microphone the audio route names or as the machine's sound, and the receiving
 machine's machine agent records it, from the virtual microphone as an app does or from the output
 it plays on. A sample is one marker, from the moment it is played to the moment it is recorded,
-against the two machines' clocks tied by out-and-back pairs. Every run lasts 10 minutes on Wi-Fi,
-with a marker every 250 ms, and starts once the stream has run for 30 s. The baselines are the
-Python app's last full measurement, WP16 in `dev/audio/reports/wp16.md`, made the same way with
-the audio helper's test signal, which #4 gathers; the helper is gone (ADR 0004).
+tied by the clock tie. Every run lasts 10 minutes on Wi-Fi, with a marker every 250 ms, and starts
+once the stream has run for 30 s. The baselines are the Python app's last full measurement, WP16 in
+`dev/audio/reports/wp16.md`, which #4 gathers.
+
+WP16 timed a microphone differently: its test signal was made inside the audio helper, after the
+capture, and timed from there (`dev/audio/reports/wp10.md`), so no capture device was in its path.
+The helper is gone (ADR 0004), and ADR 0005 puts no hook inside the app, so a microphone run here
+plays the test signal into a loopback device: an output the machine agent plays into, and the
+microphone it feeds, which the audio route names. Two things make up the difference. A
+microphone sample is the marker's time less the device's own time: before the run, the sending
+machine's agent plays markers into the device and records them from its microphone, for 60 s on
+its one clock, and the median of those is the device's own time. That loop also holds one capture
+of the device by the agent, which Beamer's capture of the device replaces in the run; the two may
+differ by up to one capture period, so each microphone bound is WP16's figure plus 10 ms, the
+period of 480 frames at 48 kHz that WP16's helper captured in (WP16, miss 1).
+
+In every microphone run, nothing plays on the default output of the machine whose microphone is
+shared, so the stream's echo is not cancelled (`audio.echo.when`, `audio.echo.idle`).
 
 > r[perf.audio.mic-pc-to-mac]
-> The PC's microphone reaches the Mac's virtual microphone within 56.5 ms at p50 and 62 ms at
-> p95. Its p99 is reported and not bounded: no baseline measured one (#4).
+> The PC's microphone reaches the Mac's virtual microphone within 66.5 ms at p50 and 72 ms at
+> p95, a sample less the device's own time. Its p99 is reported and not bounded: no baseline
+> measured one (#4).
 >
-> Run: the microphone's audio route names the PC and a microphone of it that the PC's machine
-> agent plays the test signal into. The Mac's machine agent records the Mac's virtual microphone.
+> Run: the microphone's audio route names the PC and its loopback device's microphone, which the
+> PC's machine agent plays the test signal into. The Mac's machine agent records the Mac's virtual
+> microphone. The stream's echo is not cancelled.
 >
-> Baseline: 56.5 ms at p50 and 62 ms at p95; 41 to 56 ms at p50 over WP16's runs (#4).
+> Baseline: 56.5 ms at p50 and 62 ms at p95 in WP16's a_1; 41 to 56 ms at p50 over WP16's runs
+> (#4). The bounds add the 10 ms margin above.
 >
 > - tier: machine (only real sound through the real OS audio and a real Wi-Fi gives its delay)
 
@@ -337,25 +434,31 @@ the audio helper's test signal, which #4 gathers; the helper is gone (ADR 0004).
 
 > r[perf.audio.mic-mac-to-pc]
 > With the low-latency virtual microphone setting off, the Mac's microphone reaches the PC's
-> virtual microphone within 172.4 ms at p50 and 185 ms at p95. Its p99 is reported and not
-> bounded: no baseline measured one (#4).
+> virtual microphone within 182.4 ms at p50 and 195 ms at p95, a sample less the device's own
+> time. Its p99 is reported and not bounded: no baseline measured one (#4).
 >
-> Run: the microphone's audio route names the Mac and a microphone of it that the Mac's machine
-> agent plays the test signal into. The PC's machine agent records "CABLE Output" as an app does.
+> Run: the microphone's audio route names the Mac and its loopback device's microphone, which the
+> Mac's machine agent plays the test signal into. The PC's machine agent records "CABLE Output" as
+> an app does. The stream's echo is not cancelled.
 >
-> Baseline: 172.4 ms at p50 and 185 ms at p95 (#4).
+> Baseline: 172.4 ms at p50 and 185 ms at p95 in WP16's d_1, whose echo was not cancelled either
+> (#4). The bounds add the 10 ms margin above.
 >
 > - tier: machine (only real sound through the real OS audio, a real VB-CABLE and a real Wi-Fi
 >   gives its delay)
 
 > r[perf.audio.mic-mac-to-pc-low-latency]
 > With the PC's low-latency virtual microphone setting on (`audio.low-latency.pc`), the Mac's
-> microphone reaches the PC's virtual microphone within 120.3 ms at p50 and 166.7 ms at p95. Its
-> p99 is reported and not bounded: no baseline measured one (#4).
+> microphone reaches the PC's virtual microphone within 130.3 ms at p50 and 176.7 ms at p95, a
+> sample less the device's own time. Its p99 is reported and not bounded: no baseline measured
+> one (#4).
 >
-> Run: the run of `perf.audio.mic-mac-to-pc`, with the setting on.
+> Run: the run of `perf.audio.mic-mac-to-pc`, with the setting on. The stream's echo is not
+> cancelled.
 >
-> Baseline: 120.3 ms at p50 and 166.7 ms at p95 (#4).
+> Baseline: 120.3 ms at p50 and 166.7 ms at p95 in WP16's d_ex1 (#4), whose echo was cancelled
+> (WP16, miss 4); here it is not, so this run differs from `perf.audio.mic-mac-to-pc`'s only in
+> the setting. The bounds add the 10 ms margin above.
 >
 > - tier: machine (only real sound through the real OS audio, a real VB-CABLE and a real Wi-Fi
 >   gives its delay)
@@ -365,8 +468,8 @@ the audio helper's test signal, which #4 gathers; the helper is gone (ADR 0004).
 Each camera budget is measured with a camera on the Mac that the Mac's machine agent feeds with
 pictures carrying their number and the time they were made, and the PC's machine agent opening
 the virtual camera as an app does and reading each picture's number and time. A sample is one
-picture, from the time it was made to the time the PC's machine agent got it, against the two
-machines' clocks tied by out-and-back pairs. The camera route names that camera, on Wi-Fi, with
+picture, from the time it was made to the time the PC's machine agent got it, tied by the clock
+tie. The camera route names that camera, on Wi-Fi, with
 no microphone stream to the PC.
 
 > r[perf.camera.latency-720p]
