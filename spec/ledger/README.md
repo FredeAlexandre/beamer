@@ -12,7 +12,7 @@ no Python test is its own:
 |---|---|---|
 | `link` | #52 | 321 |
 | `pairing` | #53 | 286 |
-| `store` | #54 | 0 |
+| `store` | #54 | 1 |
 | `discovery` | #55 | 116 |
 | `driving` | #56 | 327 |
 | `crossing` | #57 | 1115 |
@@ -21,12 +21,12 @@ no Python test is its own:
 | `settings` | #60 | 461 |
 | `display` | #61 | 31 |
 | `audio` | #62 | 148 |
-| `camera` | #63 | 202 |
-| `media` | #64 | 0 |
+| `camera` | #63 | 196 |
+| `media` | #64 | 3 |
 | `platform` | #65 | 336 |
-| `runtime` | #66 | 3 |
+| `runtime` | #66 | 4 |
 | `app` | #67 | 93 |
-| `viewmodel` | #68 | 1046 |
+| `viewmodel` | #68 | 1047 |
 | `ui` | #69 | 741 |
 | `perf` | #70 | 0 |
 | `observability` | #71 | 0 |
@@ -70,23 +70,34 @@ no Python test is its own:
 7. **Tests of the Python repo itself** (no duplicate modules, the release-body generator) go to
    `app`.
 
-`store`, `media`, `perf` and `observability` own no Python test: Python had no store (each feature
-flooded its own messages, and those tests went to the feature), the media engine is C++, and
-`perf` and `observability` are written from #4, #14 and the other domains.
+#51 gave `store`, `media`, `perf` and `observability` no Python test: Python had no store (each
+feature flooded its own messages, and those tests went to the feature), the media engine is C++,
+and `perf` and `observability` are written from #4, #14 and the other domains. The camera miner
+(#63) later moved one test to `store` and three to `media`, listed below.
 
 ## Ambiguous assignments
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
-There are 90, covering 1,195 tests. Each row names the other candidates and why the owner won.
+There are 95, covering 1,196 tests. Each row names the other candidates and why the owner won.
 A miner who finds such a test's assertions are all another domain's settles it as
 `.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
+
+Five rows record lines that did move, after #51: the camera miner (#63) found their assertions all
+another domain's, and moved them to that domain's slice with no fate, as #147 decides. Four of them
+split their class, an exception to rule 2's "no assignment finer than a class": the class's other
+tests stay camera's.
 
 | Tests | Count | Owner | Also a candidate | Why the owner |
 |---|---|---|---|---|
 | `core/tests/test_address_choice_commit.py` | 3 | discovery | pairing | the address a peer is reached at, chosen by the user, is discovery's address list |
 | `core/tests/test_audio_link_gating.py` | 23 | audio | link | capability gating of `audio_*` messages; audio's own messages, so audio |
 | `core/tests/test_audio_view.py` | 36 | viewmodel | audio | the Audio page model, what each state shows and what each action calls |
-| `core/tests/test_camera_link_gating.py` | 26 | camera | link | capability gating of `camera_*` messages; camera's own messages, so camera |
+| `core/tests/test_camera_link_gating.py` (its other classes and tests) | 21 | camera | link | capability gating of `camera_*` messages; camera's own messages, so camera |
+| `core/tests/test_camera_link_gating.py`, class `NamesAndSubscribeTests`: `test_machine_name` | 1 | viewmodel | camera | moved from camera (#63): how a machine is named, by its own name, its record, its link, else "Machine · " and its id's tail |
+| `core/tests/test_camera_link_gating.py`, class `NamesAndSubscribeTests`: `test_subscribe_fires_on_a_camera_change` | 1 | runtime | camera | moved from camera (#63): the UI is woken when a new snapshot is published, and not when nothing changed |
+| `core/tests/test_camera_link_gating.py`, class `StreamIdTests`: `test_new_stream_never_returns_a_camera_stream_id` | 1 | media | camera | moved from camera (#63): an audio stream never takes the id of a running camera stream |
+| `core/tests/test_camera_link_gating.py`, class `TimeMapTests` | 2 | media | camera | moved from camera (#63): which audio streams carry the time map that lip sync with a camera stream needs |
+| `core/tests/test_camera_r4.py`, class `PartTests`: `test_own_rev_never_jumps_far_ahead` | 1 | store | camera | moved from camera (#63): a version of this machine's own record arriving far ahead of its clock never moves the versions it writes far ahead |
 | `core/tests/test_camera_texts.py` | 8 | camera | viewmodel | the placeholder text is shown in the virtual camera's picture, not on a screen of Beamer's |
 | `core/tests/test_camera_view.py` | 33 | viewmodel | camera | the Camera module's model, what each state shows |
 | `core/tests/test_dormant_repair.py` | 19 | pairing | discovery | dormant repair is in both scopes; these tests check the peer entry, re-pairing and capacity, not address probing |

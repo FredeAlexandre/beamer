@@ -242,3 +242,12 @@ _Avoid_: audio follows input
 A shared entry saying which machine's camera another machine sees.
 _Avoid_: camera follows input
 
+**Placeholder**:
+A picture the virtual camera shows in place of a camera's: Beamer's, saying why no camera is
+shown, or the virtual camera's own when Beamer is not feeding it.
+_Avoid_: waiting image, slate, built-in image
+
+**Frame Server**:
+Windows' camera service, which loads the virtual camera for the apps that open it.
+_Avoid_: camera service, svchost
+

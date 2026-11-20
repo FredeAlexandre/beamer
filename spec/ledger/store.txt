@@ -1,3 +1,5 @@
 # The store domain's slice of the Python ledger, laid out by #51.
 # Owner domains and the ambiguous assignments: spec/ledger/README.md.
-# No Python test is assigned to this domain.
+# #51 assigned no Python test to this domain; the camera miner (#63) moved the ones below here,
+# without a fate (spec/ledger/README.md, Ambiguous assignments).
+core/tests/test_camera_r4.py::PartTests::test_own_rev_never_jumps_far_ahead

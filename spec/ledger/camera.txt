@@ -1,204 +1,198 @@
 # The camera domain's slice of the Python ledger, laid out by #51.
 # Owner domains and the ambiguous assignments: spec/ledger/README.md.
-core/camera/wire.py::test_source_ok
-core/tests/test_camera_cluster.py::ConvergenceTests::test_two_hundred_seeded_sequences
-core/tests/test_camera_cluster.py::ScenarioTests::test_cut_udp_turns_the_camera_off
-core/tests/test_camera_cluster.py::ScenarioTests::test_not_source_race_retries_once
-core/tests/test_camera_cluster.py::ScenarioTests::test_not_source_refusal_then_route_catch_up
-core/tests/test_camera_cluster.py::ScenarioTests::test_on_demand_stream_and_stop
-core/tests/test_camera_cluster.py::ScenarioTests::test_pc_helper_restart_and_link_loss
-core/tests/test_camera_cluster.py::ScenarioTests::test_permission_requests_only_for_mac_actions
-core/tests/test_camera_cluster.py::ScenarioTests::test_posts_only_on_the_worker
-core/tests/test_camera_cluster.py::ScenarioTests::test_refusal_of_every_code
-core/tests/test_camera_cluster.py::ScenarioTests::test_restart_keeps_route_and_sharing
-core/tests/test_camera_cluster.py::ScenarioTests::test_sharing_off_wins_whatever_the_others_set
-core/tests/test_camera_cluster.py::ScenarioTests::test_silent_receiver_backoff
-core/tests/test_camera_cluster.py::ScenarioTests::test_two_sinks_one_stream_each
-core/tests/test_camera_link_gating.py::CapabilityTableTests::test_every_camera_type_rides_the_audio_capability
-core/tests/test_camera_link_gating.py::CapabilityTableTests::test_no_new_capability
-core/tests/test_camera_link_gating.py::CapabilityTableTests::test_the_feature_flag_is_on_in_the_fork
-core/tests/test_camera_link_gating.py::DevCommandTests::test_every_camera_key_reaches_the_part_and_the_status_has_camera
-core/tests/test_camera_link_gating.py::HelloAndGatingTests::test_camera1_only_with_a_video_helper
-core/tests/test_camera_link_gating.py::HelloAndGatingTests::test_flag_off_means_no_part_no_camera1_and_camera_ignored
-core/tests/test_camera_link_gating.py::HelloAndGatingTests::test_nothing_camera_to_a_peer_without_camera1_or_audio
-core/tests/test_camera_link_gating.py::LiveServicesTests::test_camera_devices_cross_real_links_and_the_old_peer_sees_nothing
-core/tests/test_camera_link_gating.py::MacBridgeTests::test_camera_is_forwarded_like_audio
-core/tests/test_camera_link_gating.py::NamesAndSubscribeTests::test_machine_name
-core/tests/test_camera_link_gating.py::NamesAndSubscribeTests::test_part_wake_alone_closes_after_the_hold
-core/tests/test_camera_link_gating.py::NamesAndSubscribeTests::test_schedule_keeps_the_latest_wake
-core/tests/test_camera_link_gating.py::NamesAndSubscribeTests::test_shutdown_closes_the_camera_streams
-core/tests/test_camera_link_gating.py::NamesAndSubscribeTests::test_subscribe_fires_on_a_camera_change
-core/tests/test_camera_link_gating.py::OutboundGatingTests::test_camera_is_not_queued_for_a_peer_without_audio
-core/tests/test_camera_link_gating.py::OutboundGatingTests::test_camera_is_queued_for_a_peer_with_audio
-core/tests/test_camera_link_gating.py::PcSenderTests::test_camera_is_forwarded_like_audio
-core/tests/test_camera_link_gating.py::PcSenderTests::test_nothing_from_a_peer_without_audio
-core/tests/test_camera_link_gating.py::ResponderLinkTests::test_dispatch_hands_camera_over_only_when_both_ends_announced_audio
-core/tests/test_camera_link_gating.py::ResponderLinkTests::test_post_drops_camera_for_a_peer_without_audio
-core/tests/test_camera_link_gating.py::ResponderLinkTests::test_post_keeps_camera_for_a_peer_with_audio
-core/tests/test_camera_link_gating.py::StreamIdTests::test_new_stream_never_returns_a_camera_stream_id
-core/tests/test_camera_link_gating.py::StreamIdTests::test_video_stats_stay_out_of_the_audio_stats
-core/tests/test_camera_link_gating.py::ThreadedSetterTests::test_each_setter_reaches_the_part_on_the_worker
-core/tests/test_camera_link_gating.py::TimeMapTests::test_audio_send_carries_sr_only_towards_a_video1_peer
-core/tests/test_camera_link_gating.py::TimeMapTests::test_no_sr_when_the_own_helper_lacks_video1
-core/tests/test_camera_model.py::DevicesTests::test_direct_from_its_machine_replaces_a_differing_list
-core/tests/test_camera_model.py::DevicesTests::test_higher_rev_wins
-core/tests/test_camera_model.py::DevicesTests::test_machine_data_round_trip
-core/tests/test_camera_model.py::DevicesTests::test_sharing_only_on_a_capture_machine
-core/tests/test_camera_model.py::ResolveTests::test_ambiguous_or_missing_name
-core/tests/test_camera_model.py::ResolveTests::test_key_first
-core/tests/test_camera_model.py::ResolveTests::test_unique_name_when_the_key_moved
-core/tests/test_camera_model.py::RouteMergeTests::test_commutative_associative_on_random_routes
-core/tests/test_camera_model.py::RouteMergeTests::test_idempotent_and_no_answer_for_equal
-core/tests/test_camera_model.py::RouteMergeTests::test_newer_entry_wins_per_entry
-core/tests/test_camera_model.py::RouteMergeTests::test_next_stamp_is_newer_than_everything
-core/tests/test_camera_model.py::RouteMergeTests::test_route_data_round_trip
-core/tests/test_camera_model.py::RouteMergeTests::test_tie_broken_by_larger_by
-core/tests/test_camera_model.py::RouteMergeTests::test_unknown_entries_kept_and_forwarded
-core/tests/test_camera_model.py::SizeTests::test_sizes
-core/tests/test_camera_model.py::SizeTests::test_snapshot_types_are_frozen_with_own_mappings
-core/tests/test_camera_part.py::LinkOutTests::test_drop_rule
-core/tests/test_camera_part.py::LinkOutTests::test_pause_after_one_second_and_resume
-core/tests/test_camera_part.py::SenderTests::test_close_after_the_three_second_hold
-core/tests/test_camera_part.py::SenderTests::test_helper_restart_closes_and_replans
-core/tests/test_camera_part.py::SenderTests::test_no_camera_one_peer_without_camera1
-core/tests/test_camera_part.py::SenderTests::test_no_receiver_backoff
-core/tests/test_camera_part.py::SenderTests::test_permission_request_only_for_local_mac_actions
-core/tests/test_camera_part.py::SenderTests::test_quality_change_reconfigures_without_reopening
-core/tests/test_camera_part.py::SenderTests::test_refusal_stops_at_once_and_waits_for_a_new_token
-core/tests/test_camera_part.py::SenderTests::test_running_stream_resets_the_backoff
-core/tests/test_camera_part.py::SenderTests::test_send_and_open_in_the_same_iteration_as_the_demand
-core/tests/test_camera_part.py::SenderTests::test_sharing_off_closes_and_is_persisted_before_the_first_plan
-core/tests/test_camera_part.py::SenderTests::test_test_source_ignored_without_a_dev_helper
-core/tests/test_camera_part.py::SenderTests::test_test_source_needs_no_permission
-core/tests/test_camera_part.py::SenderTests::test_video_warm_on_changes_and_after_every_ready
-core/tests/test_camera_part.py::SinkTests::test_a_second_accepted_open_closes_the_first
-core/tests/test_camera_part.py::SinkTests::test_camera_refuse_dev_key
-core/tests/test_camera_part.py::SinkTests::test_mac_never_sends_vcam_and_pc_never_warm
-core/tests/test_camera_part.py::SinkTests::test_not_source_and_republish_after_the_route_view_changes
-core/tests/test_camera_part.py::SinkTests::test_open_from_the_route_source_is_accepted
-core/tests/test_camera_part.py::SinkTests::test_placeholders_pushed_on_change_and_after_ready_never_twice
-core/tests/test_camera_part.py::SinkTests::test_recv_failure_closes_with_error
-core/tests/test_camera_part.py::SinkTests::test_refresh_install_sends_an_empty_vcam
-core/tests/test_camera_part.py::SinkTests::test_refusals_by_install_state_and_helper
-core/tests/test_camera_part.py::StateTests::test_dev_commands_and_status
-core/tests/test_camera_part.py::StateTests::test_link_down_stops_streams_without_messages
-core/tests/test_camera_part.py::StateTests::test_link_messages_do_not_touch_the_disk
-core/tests/test_camera_part.py::StateTests::test_own_list_from_a_peer_is_never_taken
-core/tests/test_camera_part.py::StateTests::test_route_and_lists_flood_and_persist
-core/tests/test_camera_part.py::StateTests::test_sharing_of_a_machine_comes_only_from_its_list
-core/tests/test_camera_planner.py::PlannerTests::test_demand_zero_one_two_sinks
-core/tests/test_camera_planner.py::PlannerTests::test_dev_test_source
-core/tests/test_camera_planner.py::PlannerTests::test_hold_three_seconds
-core/tests/test_camera_planner.py::PlannerTests::test_idle_placeholder_per_state
-core/tests/test_camera_planner.py::PlannerTests::test_mac_as_sink_and_linux_ignored
-core/tests/test_camera_planner.py::PlannerTests::test_missing_camera_and_return
-core/tests/test_camera_planner.py::PlannerTests::test_not_direct_and_loopback_only
-core/tests/test_camera_planner.py::PlannerTests::test_not_installed_outdated_broken
-core/tests/test_camera_planner.py::PlannerTests::test_off
-core/tests/test_camera_planner.py::PlannerTests::test_permission
-core/tests/test_camera_planner.py::PlannerTests::test_preferred_camera_followed
-core/tests/test_camera_planner.py::PlannerTests::test_remote_source_reachability_uses_its_links
-core/tests/test_camera_planner.py::PlannerTests::test_sharing_off
-core/tests/test_camera_planner.py::PlannerTests::test_size_is_the_cluster_quality_whatever_the_app_wants
-core/tests/test_camera_planner.py::PlannerTests::test_source_offline_or_without_capture
-core/tests/test_camera_planner.py::PlannerTests::test_streaming_follows_the_source_capture
-core/tests/test_camera_planner.py::PlannerTests::test_warm
-core/tests/test_camera_r4.py::NoStaleDemand::test_app_closed_during_a_link_outage
-core/tests/test_camera_r4.py::NoStaleDemand::test_app_closed_while_the_mac_beamer_restarts
-core/tests/test_camera_r4.py::NoStaleDemand::test_app_closed_while_the_pc_helper_restarts
-core/tests/test_camera_r4.py::OffAlwaysStopsTheMacCamera::test_scenario_a_unvalidated_extra_stamp
-core/tests/test_camera_r4.py::OffAlwaysStopsTheMacCamera::test_scenario_b_extra_over_16_kib
-core/tests/test_camera_r4.py::OffAlwaysStopsTheMacCamera::test_scenario_c_pc_clock_more_than_a_day_ahead
-core/tests/test_camera_r4.py::PartTests::test_a_failed_save_is_surfaced_and_retried
-core/tests/test_camera_r4.py::PartTests::test_a_live_end_still_holds_three_seconds
-core/tests/test_camera_r4.py::PartTests::test_a_machine_offline_for_the_ttl_is_purged
-core/tests/test_camera_r4.py::PartTests::test_held_lists_are_bounded
-core/tests/test_camera_r4.py::PartTests::test_link_down_drops_demand_without_a_hold
-core/tests/test_camera_r4.py::PartTests::test_loaded_lists_have_no_demand
-core/tests/test_camera_r4.py::PartTests::test_missing_file_is_a_first_run_with_sharing_on
-core/tests/test_camera_r4.py::PartTests::test_own_rev_never_jumps_far_ahead
-core/tests/test_camera_r4.py::PartTests::test_sharing_off_is_written_at_once
-core/tests/test_camera_r4.py::PartTests::test_sink_closes_a_stream_its_route_no_longer_names
-core/tests/test_camera_r4.py::PartTests::test_sink_refuses_an_open_for_another_camera
-core/tests/test_camera_r4.py::PartTests::test_unreadable_or_other_version_file_starts_with_sharing_off
-core/tests/test_camera_r4.py::SinkCloseIsNoError::test_route_close_from_the_sink
-core/tests/test_camera_texts.py::PlaceholderTextTests::test_denied_points_to_the_system_settings_of_the_camera_machine
-core/tests/test_camera_texts.py::PlaceholderTextTests::test_error_reason
-core/tests/test_camera_texts.py::PlaceholderTextTests::test_every_state_has_a_title_and_a_line
-core/tests/test_camera_texts.py::PlaceholderTextTests::test_every_string_goes_through_tr
-core/tests/test_camera_texts.py::PlaceholderTextTests::test_names_through_the_callable
-core/tests/test_camera_texts.py::PlaceholderTextTests::test_test_source_replaces_the_camera_name
-core/tests/test_camera_texts.py::PlaceholderTextTests::test_the_preferred_camera_by_name_when_the_route_follows_it
-core/tests/test_camera_texts.py::PlaceholderTextTests::test_wording_with_a_named_camera
-core/tests/test_camera_wire.py::DevicesTests::test_limits
-core/tests/test_camera_wire.py::DevicesTests::test_malformed_is_ignored
-core/tests/test_camera_wire.py::DevicesTests::test_round_trip
-core/tests/test_camera_wire.py::DevicesTests::test_sharing_and_test_source_only_from_a_capture_machine
-core/tests/test_camera_wire.py::DevicesTests::test_size_limit
-core/tests/test_camera_wire.py::DevicesTests::test_unknown_fields_ignored_and_unknown_values_defaulted
-core/tests/test_camera_wire.py::GatingTests::test_announce_needs_the_flag_and_video1
-core/tests/test_camera_wire.py::GatingTests::test_is_camera
-core/tests/test_camera_wire.py::GatingTests::test_may_send_needs_audio_and_camera1
-core/tests/test_camera_wire.py::GatingTests::test_test_source_specs
-core/tests/test_camera_wire.py::RouteTests::test_at_most_max_extra_unknown_entries
-core/tests/test_camera_wire.py::RouteTests::test_bad_entries_are_dropped_one_by_one
-core/tests/test_camera_wire.py::RouteTests::test_malformed
-core/tests/test_camera_wire.py::RouteTests::test_missing_quality_is_the_default
-core/tests/test_camera_wire.py::RouteTests::test_off_route_drops_a_device
-core/tests/test_camera_wire.py::RouteTests::test_round_trip_with_unknown_entries_kept
-core/tests/test_camera_wire.py::StreamMessageTests::test_open_malformed
-core/tests/test_camera_wire.py::StreamMessageTests::test_open_round_trip
-core/tests/test_camera_wire.py::StreamMessageTests::test_opened_and_close
-dev/camera/e2e/test_analysis.py::ClockTests::test_round_trip_and_drift
-dev/camera/e2e/test_analysis.py::ClockTests::test_unix_to_mac
-dev/camera/e2e/test_analysis.py::EventTests::test_invariant
-dev/camera/e2e/test_analysis.py::EventTests::test_streams_and_counters
-dev/camera/e2e/test_analysis.py::EveryAnalysisTests::test_check_coerces_numpy_bools
-dev/camera/e2e/test_analysis.py::EveryAnalysisTests::test_every_case
-dev/camera/e2e/test_analysis.py::FrameTests::test_frozen_in_counts_a_repeat_as_frozen
-dev/camera/e2e/test_analysis.py::FrameTests::test_integrity
-dev/camera/e2e/test_analysis.py::FrameTests::test_latency_and_skip
-dev/camera/e2e/test_analysis.py::FrameTests::test_start_of_read
-dev/camera/e2e/test_analysis.py::PlanTests::test_every_case_builds_a_plan
-dev/camera/e2e/test_analysis.py::StripTests::test_helper_clock_offset_after_mac_sleep
-dev/camera/e2e/test_analysis.py::StripTests::test_unwrap_across_the_u32_wrap
-dev/camera/e2e/test_analysis.py::SyntheticRunTests::test_clean_run_passes
-dev/camera/e2e/test_analysis.py::SyntheticRunTests::test_faults_are_caught
-win_app/tests/test_vcam_install.py::InstallTests::test_an_on_done_that_raises_is_not_called_twice
-win_app/tests/test_vcam_install.py::InstallTests::test_an_unexpected_exception_still_calls_on_done_once_with_failed
-win_app/tests/test_vcam_install.py::InstallTests::test_an_unreadable_or_odd_sid_never_reaches_the_command_line
-win_app/tests/test_vcam_install.py::InstallTests::test_default_helper_is_the_one_beamer_runs
-win_app/tests/test_vcam_install.py::InstallTests::test_exit_codes_map_to_the_contract_codes
-win_app/tests/test_vcam_install.py::InstallTests::test_install_update_and_repair_are_one_command_whatever_the_versions
-win_app/tests/test_vcam_install.py::InstallTests::test_no_helper_when_the_exe_is_missing_or_not_windows
-win_app/tests/test_vcam_install.py::InstallTests::test_other_launch_errors_fail
-win_app/tests/test_vcam_install.py::InstallTests::test_pywin32_style_error_1223_is_cancelled
-win_app/tests/test_vcam_install.py::InstallTests::test_the_dll_hash_is_the_one_the_helper_will_install
-win_app/tests/test_vcam_install.py::InstallTests::test_uac_refused_is_cancelled
-win_app/tests/test_vcam_install.py::InstallTests::test_verb_line_runs_the_helper_elevated_with_this_users_sid
-win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_by_the_owner_removes_everything
-win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_deletes_a_camera_folder_that_is_a_junction_as_a_link
-win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_deletes_keys_and_folders_without_stopping_frame_server
-win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_keeps_a_beamer_parent_that_is_not_empty
-win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_keeps_a_camera_another_account_owns
-win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_leaves_a_camera_folder_whose_parent_is_a_junction
-win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_never_deletes_through_a_junction_inside_the_camera_folder
-win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_on_a_machine_without_the_camera_is_a_no_op
-win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_stops_frame_server_only_when_the_dll_is_locked
-win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_with_no_owner_recorded_removes_everything
-win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_stale_versions_do_nothing_without_a_registration
-win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_stale_versions_go_the_registered_one_stays_and_a_locked_one_waits
-win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_stale_versions_never_delete_through_a_junction
-win_app/tests/test_vcam_install.py::PackagingContractTests::test_inno_ships_the_dll_in_camera_and_removes_the_camera_before_maintenance
-win_app/tests/test_vcam_install.py::PackagingContractTests::test_maintenance_removes_the_camera_only_on_remove_and_clears_stale_versions_otherwise
-win_app/tests/test_vcam_install.py::PackagingContractTests::test_portable_build_puts_the_dll_in_camera_at_the_top_of_the_folder
-win_app/tests/test_vcam_install.py::PackagingContractTests::test_script_install_copies_the_dll_and_has_no_uninstall_path
-win_app/tests/test_vcam_install.py::RemoveTests::test_a_failed_vcam_remove_still_unregisters
-win_app/tests/test_vcam_install.py::RemoveTests::test_remove_cancelled_and_failed
-win_app/tests/test_vcam_install.py::RemoveTests::test_remove_runs_vcam_remove_unelevated_then_vcam_uninstall_elevated
-win_app/tests/test_vcam_install.py::ResultAndApiTests::test_both_calls_return_at_once_and_call_on_done_once_on_another_thread
-win_app/tests/test_vcam_install.py::ResultAndApiTests::test_result_is_frozen_with_ok_and_code
-win_app/tests/test_vcam_install.py::ScriptInstallBehaviourTests::test_the_dll_lands_in_camera_and_a_build_without_it_removes_it
-win_app/tests/test_vcam_install.py::WindowsSeamTests::test_current_user_sid_is_this_accounts
-win_app/tests/test_vcam_install.py::WindowsSeamTests::test_elevated_launch_returns_the_exit_code
-win_app/tests/test_vcam_install.py::WindowsSeamTests::test_unelevated_run_returns_the_exit_code
+core/camera/wire.py::test_source_ok  python-detail: not a test: the wire module's check of a dev synthetic source, which pytest collects by its name
+core/tests/test_camera_cluster.py::ConvergenceTests::test_two_hundred_seeded_sequences  mined: camera.cluster.same-status, camera.stream.bound, camera.sharing.off, camera.status.retry, camera.peer.gated
+core/tests/test_camera_cluster.py::ScenarioTests::test_cut_udp_turns_the_camera_off  mined: camera.stream.no-receiver, camera.link.down, camera.link.up
+core/tests/test_camera_cluster.py::ScenarioTests::test_not_source_race_retries_once  mined: camera.stream.route-first, camera.link.up
+core/tests/test_camera_cluster.py::ScenarioTests::test_not_source_refusal_then_route_catch_up  mined: camera.stream.route-first, camera.stream.take, camera.stream.refused
+core/tests/test_camera_cluster.py::ScenarioTests::test_on_demand_stream_and_stop  mined: camera.stream.on-demand, camera.stream.at-once, camera.demand.hold, camera.status.route, camera.placeholder.idle, camera.peer.gated
+core/tests/test_camera_cluster.py::ScenarioTests::test_pc_helper_restart_and_link_loss  mined: camera.state.recovers, camera.link.down, camera.link.up
+core/tests/test_camera_cluster.py::ScenarioTests::test_permission_requests_only_for_mac_actions  mined: camera.permission.local, camera.permission.needed, camera.permission.granted, camera.status.route, camera.placeholder.idle
+core/tests/test_camera_cluster.py::ScenarioTests::test_posts_only_on_the_worker  python-detail: every post made on the Python service's worker thread (ADR 0004: one engine thread)
+core/tests/test_camera_cluster.py::ScenarioTests::test_refusal_of_every_code  mined: camera.stream.refused, camera.stream.take, camera.status.failed, camera.status.retry
+core/tests/test_camera_cluster.py::ScenarioTests::test_restart_keeps_route_and_sharing  mined: camera.link.restart, camera.sharing.restart
+core/tests/test_camera_cluster.py::ScenarioTests::test_sharing_off_wins_whatever_the_others_set  mined: camera.sharing.off, camera.placeholder.idle
+core/tests/test_camera_cluster.py::ScenarioTests::test_silent_receiver_backoff  mined: camera.stream.no-receiver, camera.stream.bound
+core/tests/test_camera_cluster.py::ScenarioTests::test_two_sinks_one_stream_each  mined: camera.stream.on-demand
+core/tests/test_camera_link_gating.py::CapabilityTableTests::test_every_camera_type_rides_the_audio_capability  wire-v6: camera_* messages gated by the v6 link's audio capability, replaced by capabilities in machine records (#14; camera.peer.gated)
+core/tests/test_camera_link_gating.py::CapabilityTableTests::test_no_new_capability  wire-v6: the v6 handshake's list of at most 16 capabilities, replaced by capabilities in machine records (#14)
+core/tests/test_camera_link_gating.py::CapabilityTableTests::test_the_feature_flag_is_on_in_the_fork  python-detail: Python's camera feature flag, always on in the fork; the Rust app has no such flag
+core/tests/test_camera_link_gating.py::DevCommandTests::test_every_camera_key_reaches_the_part_and_the_status_has_camera  dropped: the audio-dev-* files and their camera keys (#11, Drop: dead or dev-only)
+core/tests/test_camera_link_gating.py::HelloAndGatingTests::test_camera1_only_with_a_video_helper  mined: camera.peer.gated
+core/tests/test_camera_link_gating.py::HelloAndGatingTests::test_flag_off_means_no_part_no_camera1_and_camera_ignored  python-detail: Python's camera feature flag turned off; the Rust app has no such flag
+core/tests/test_camera_link_gating.py::HelloAndGatingTests::test_nothing_camera_to_a_peer_without_camera1_or_audio  mined: camera.peer.gated, camera.devices.record
+core/tests/test_camera_link_gating.py::LiveServicesTests::test_camera_devices_cross_real_links_and_the_old_peer_sees_nothing  mined: camera.peer.gated, camera.devices.record
+core/tests/test_camera_link_gating.py::MacBridgeTests::test_camera_is_forwarded_like_audio  mined: camera.peer.gated
+core/tests/test_camera_link_gating.py::NamesAndSubscribeTests::test_part_wake_alone_closes_after_the_hold  mined: camera.demand.hold
+core/tests/test_camera_link_gating.py::NamesAndSubscribeTests::test_schedule_keeps_the_latest_wake  python-detail: the Python service keeping one wake-up time for its camera part
+core/tests/test_camera_link_gating.py::NamesAndSubscribeTests::test_shutdown_closes_the_camera_streams  mined: camera.link.quit
+core/tests/test_camera_link_gating.py::OutboundGatingTests::test_camera_is_not_queued_for_a_peer_without_audio  mined: camera.peer.gated
+core/tests/test_camera_link_gating.py::OutboundGatingTests::test_camera_is_queued_for_a_peer_with_audio  mined: camera.peer.gated
+core/tests/test_camera_link_gating.py::PcSenderTests::test_camera_is_forwarded_like_audio  mined: camera.peer.gated
+core/tests/test_camera_link_gating.py::PcSenderTests::test_nothing_from_a_peer_without_audio  mined: camera.peer.gated
+core/tests/test_camera_link_gating.py::ResponderLinkTests::test_dispatch_hands_camera_over_only_when_both_ends_announced_audio  mined: camera.peer.gated
+core/tests/test_camera_link_gating.py::ResponderLinkTests::test_post_drops_camera_for_a_peer_without_audio  mined: camera.peer.gated
+core/tests/test_camera_link_gating.py::ResponderLinkTests::test_post_keeps_camera_for_a_peer_with_audio  mined: camera.peer.gated
+core/tests/test_camera_link_gating.py::StreamIdTests::test_video_stats_stay_out_of_the_audio_stats  python-detail: video stats kept apart from audio stats in the Python service's tables
+core/tests/test_camera_link_gating.py::ThreadedSetterTests::test_each_setter_reaches_the_part_on_the_worker  python-detail: each setter queued onto the Python service's worker thread (ADR 0004: one engine thread)
+core/tests/test_camera_model.py::DevicesTests::test_direct_from_its_machine_replaces_a_differing_list  wire-v6: a camera list taken when it came straight from its machine, whatever its revision, replaced by machine record versions (#14; store.record.version)
+core/tests/test_camera_model.py::DevicesTests::test_higher_rev_wins  wire-v6: camera list revisions, replaced by machine record versions (#14; store.record.version)
+core/tests/test_camera_model.py::DevicesTests::test_machine_data_round_trip  wire-v6: building and reading back the JSON of a camera_devices message, replaced by the store's parts (store.file.round-trip)
+core/tests/test_camera_model.py::DevicesTests::test_sharing_only_on_a_capture_machine  mined: camera.sharing.record
+core/tests/test_camera_model.py::ResolveTests::test_ambiguous_or_missing_name  mined: camera.route.found
+core/tests/test_camera_model.py::ResolveTests::test_key_first  mined: camera.route.found
+core/tests/test_camera_model.py::ResolveTests::test_unique_name_when_the_key_moved  mined: camera.route.found
+core/tests/test_camera_model.py::RouteMergeTests::test_commutative_associative_on_random_routes  mined: camera.route.apart, camera.route.any-machine
+core/tests/test_camera_model.py::RouteMergeTests::test_idempotent_and_no_answer_for_equal  mined: camera.stream.change
+core/tests/test_camera_model.py::RouteMergeTests::test_newer_entry_wins_per_entry  mined: camera.route.apart, camera.route.entry, camera.route.quality
+core/tests/test_camera_model.py::RouteMergeTests::test_next_stamp_is_newer_than_everything  mined: camera.route.any-machine
+core/tests/test_camera_model.py::RouteMergeTests::test_route_data_round_trip  wire-v6: building and reading back the JSON of a camera_route message, replaced by the store's entries (store.file.round-trip)
+core/tests/test_camera_model.py::RouteMergeTests::test_tie_broken_by_larger_by  mined: camera.route.any-machine
+core/tests/test_camera_model.py::RouteMergeTests::test_unknown_entries_kept_and_forwarded  mined: camera.route.schema
+core/tests/test_camera_model.py::SizeTests::test_sizes  mined: camera.quality.size, camera.route.schema
+core/tests/test_camera_model.py::SizeTests::test_snapshot_types_are_frozen_with_own_mappings  python-detail: frozen Python dataclasses with mappings of their own
+core/tests/test_camera_part.py::LinkOutTests::test_drop_rule  wire-v6: video packets sent through the v6 link's outbox when the UDP flow failed, and dropped while it was full, replaced by media datagrams on the link (link.class.media-datagrams)
+core/tests/test_camera_part.py::LinkOutTests::test_pause_after_one_second_and_resume  wire-v6: video paused while the v6 link's outbox stayed full, replaced by media datagrams on the link (link.class.media-datagrams)
+core/tests/test_camera_part.py::SenderTests::test_close_after_the_three_second_hold  mined: camera.demand.hold, camera.stream.reasons
+core/tests/test_camera_part.py::SenderTests::test_helper_restart_closes_and_replans  mined: camera.state.failed, camera.state.recovers
+core/tests/test_camera_part.py::SenderTests::test_no_camera_one_peer_without_camera1  mined: camera.peer.gated
+core/tests/test_camera_part.py::SenderTests::test_no_receiver_backoff  mined: camera.stream.no-receiver, camera.stream.reasons
+core/tests/test_camera_part.py::SenderTests::test_permission_request_only_for_local_mac_actions  mined: camera.permission.local, camera.permission.needed, camera.permission.granted
+core/tests/test_camera_part.py::SenderTests::test_quality_change_reconfigures_without_reopening  mined: camera.quality.change, camera.quality.size
+core/tests/test_camera_part.py::SenderTests::test_refusal_stops_at_once_and_waits_for_a_new_token  mined: camera.stream.refused, camera.status.failed, camera.status.retry
+core/tests/test_camera_part.py::SenderTests::test_running_stream_resets_the_backoff  mined: camera.stream.no-receiver
+core/tests/test_camera_part.py::SenderTests::test_send_and_open_in_the_same_iteration_as_the_demand  mined: camera.stream.at-once, camera.stream.ask, camera.quality.size, camera.status.streams
+core/tests/test_camera_part.py::SenderTests::test_sharing_off_closes_and_is_persisted_before_the_first_plan  mined: camera.sharing.off, camera.sharing.record, camera.sharing.restart, camera.stream.reasons
+core/tests/test_camera_part.py::SenderTests::test_test_source_ignored_without_a_dev_helper  dropped: the synthetic test source set through the audio-dev-* files (#11, Drop: dead or dev-only)
+core/tests/test_camera_part.py::SenderTests::test_test_source_needs_no_permission  dropped: the synthetic test source set through the audio-dev-* files (#11, Drop: dead or dev-only)
+core/tests/test_camera_part.py::SenderTests::test_video_warm_on_changes_and_after_every_ready  python-detail: the standby encoder commands sent to the media helper process, which turn no camera on (ADR 0004: no media helper)
+core/tests/test_camera_part.py::SinkTests::test_a_second_accepted_open_closes_the_first  mined: camera.stream.one
+core/tests/test_camera_part.py::SinkTests::test_camera_refuse_dev_key  dropped: the camera_refuse dev key of the audio-dev-* files (#11, Drop: dead or dev-only)
+core/tests/test_camera_part.py::SinkTests::test_mac_never_sends_vcam_and_pc_never_warm  mined: camera.permission.local, camera.virtual.pc-only
+core/tests/test_camera_part.py::SinkTests::test_not_source_and_republish_after_the_route_view_changes  mined: camera.stream.take, camera.stream.route-first
+core/tests/test_camera_part.py::SinkTests::test_open_from_the_route_source_is_accepted  mined: camera.stream.take, camera.status.streams
+core/tests/test_camera_part.py::SinkTests::test_placeholders_pushed_on_change_and_after_ready_never_twice  mined: camera.placeholder.idle, camera.placeholder.words, camera.placeholder.names
+core/tests/test_camera_part.py::SinkTests::test_recv_failure_closes_with_error  mined: camera.stream.receiver-ends
+core/tests/test_camera_part.py::SinkTests::test_refresh_install_sends_an_empty_vcam  mined: camera.virtual.reread, camera.virtual.versions
+core/tests/test_camera_part.py::SinkTests::test_refusals_by_install_state_and_helper  mined: camera.stream.take
+core/tests/test_camera_part.py::StateTests::test_dev_commands_and_status  dropped: the audio-dev-* files, their camera keys and the dev status file (#11, Drop: dead or dev-only)
+core/tests/test_camera_part.py::StateTests::test_link_down_stops_streams_without_messages  mined: camera.link.down
+core/tests/test_camera_part.py::StateTests::test_link_messages_do_not_touch_the_disk  python-detail: the camera part's own delayed save of camera.json; the camera route is in the store, whose writes runtime.files.debounced times
+core/tests/test_camera_part.py::StateTests::test_own_list_from_a_peer_is_never_taken  mined: camera.sharing.record
+core/tests/test_camera_part.py::StateTests::test_route_and_lists_flood_and_persist  mined: camera.route.entry, camera.devices.record, camera.link.restart
+core/tests/test_camera_part.py::StateTests::test_sharing_of_a_machine_comes_only_from_its_list  mined: camera.sharing.record
+core/tests/test_camera_planner.py::PlannerTests::test_demand_zero_one_two_sinks  mined: camera.stream.on-demand, camera.status.route, camera.status.machine, camera.quality.size
+core/tests/test_camera_planner.py::PlannerTests::test_dev_test_source  dropped: the synthetic test source set through the audio-dev-* files (#11, Drop: dead or dev-only)
+core/tests/test_camera_planner.py::PlannerTests::test_hold_three_seconds  mined: camera.demand.hold
+core/tests/test_camera_planner.py::PlannerTests::test_idle_placeholder_per_state  mined: camera.placeholder.idle
+core/tests/test_camera_planner.py::PlannerTests::test_mac_as_sink_and_linux_ignored  mined: camera.status.machine, camera.state.kinds
+core/tests/test_camera_planner.py::PlannerTests::test_missing_camera_and_return  mined: camera.status.route, camera.route.found
+core/tests/test_camera_planner.py::PlannerTests::test_not_direct_and_loopback_only  mined: camera.status.route, camera.status.machine
+core/tests/test_camera_planner.py::PlannerTests::test_not_installed_outdated_broken  mined: camera.status.machine, camera.status.route
+core/tests/test_camera_planner.py::PlannerTests::test_off  mined: camera.route.off, camera.status.route, camera.status.machine, camera.placeholder.idle
+core/tests/test_camera_planner.py::PlannerTests::test_permission  mined: camera.status.route, camera.permission.needed, camera.placeholder.idle
+core/tests/test_camera_planner.py::PlannerTests::test_preferred_camera_followed  mined: camera.route.preferred
+core/tests/test_camera_planner.py::PlannerTests::test_remote_source_reachability_uses_its_links  mined: camera.cluster.in, camera.status.machine
+core/tests/test_camera_planner.py::PlannerTests::test_sharing_off  mined: camera.sharing.off, camera.placeholder.idle
+core/tests/test_camera_planner.py::PlannerTests::test_size_is_the_cluster_quality_whatever_the_app_wants  mined: camera.quality.whatever-the-app, camera.quality.size
+core/tests/test_camera_planner.py::PlannerTests::test_source_offline_or_without_capture  mined: camera.status.route, camera.placeholder.idle
+core/tests/test_camera_planner.py::PlannerTests::test_streaming_follows_the_source_capture  mined: camera.status.machine
+core/tests/test_camera_planner.py::PlannerTests::test_warm  python-detail: when the media helper kept a standby encoder ready, which turns no camera on (ADR 0004: no media helper)
+core/tests/test_camera_r4.py::NoStaleDemand::test_app_closed_during_a_link_outage  mined: camera.demand.fresh, camera.demand.live-end, camera.stream.bound
+core/tests/test_camera_r4.py::NoStaleDemand::test_app_closed_while_the_mac_beamer_restarts  mined: camera.demand.fresh, camera.stream.bound
+core/tests/test_camera_r4.py::NoStaleDemand::test_app_closed_while_the_pc_helper_restarts  mined: camera.demand.live-end, camera.state.failed
+core/tests/test_camera_r4.py::OffAlwaysStopsTheMacCamera::test_scenario_a_unvalidated_extra_stamp  mined: camera.route.off, camera.route.schema
+core/tests/test_camera_r4.py::OffAlwaysStopsTheMacCamera::test_scenario_b_extra_over_16_kib  mined: camera.route.off, camera.route.schema
+core/tests/test_camera_r4.py::OffAlwaysStopsTheMacCamera::test_scenario_c_pc_clock_more_than_a_day_ahead  mined: camera.route.off, camera.stream.receiver-ends
+core/tests/test_camera_r4.py::PartTests::test_a_failed_save_is_surfaced_and_retried  mined: camera.sharing.save-failed
+core/tests/test_camera_r4.py::PartTests::test_a_live_end_still_holds_three_seconds  mined: camera.demand.hold, camera.demand.live-end
+core/tests/test_camera_r4.py::PartTests::test_a_machine_offline_for_the_ttl_is_purged  mined: camera.devices.kept
+core/tests/test_camera_r4.py::PartTests::test_held_lists_are_bounded  mined: camera.devices.kept
+core/tests/test_camera_r4.py::PartTests::test_link_down_drops_demand_without_a_hold  mined: camera.demand.live-end, camera.demand.fresh
+core/tests/test_camera_r4.py::PartTests::test_loaded_lists_have_no_demand  mined: camera.demand.fresh
+core/tests/test_camera_r4.py::PartTests::test_missing_file_is_a_first_run_with_sharing_on  mined: camera.sharing.refused, camera.sharing.setting
+core/tests/test_camera_r4.py::PartTests::test_sharing_off_is_written_at_once  mined: camera.sharing.written
+core/tests/test_camera_r4.py::PartTests::test_sink_closes_a_stream_its_route_no_longer_names  mined: camera.stream.receiver-ends
+core/tests/test_camera_r4.py::PartTests::test_sink_refuses_an_open_for_another_camera  mined: camera.stream.take
+core/tests/test_camera_r4.py::PartTests::test_unreadable_or_other_version_file_starts_with_sharing_off  mined: camera.sharing.refused, camera.sharing.off
+core/tests/test_camera_r4.py::SinkCloseIsNoError::test_route_close_from_the_sink  mined: camera.status.quiet, camera.stream.refused
+core/tests/test_camera_texts.py::PlaceholderTextTests::test_denied_points_to_the_system_settings_of_the_camera_machine  mined: camera.placeholder.denied
+core/tests/test_camera_texts.py::PlaceholderTextTests::test_error_reason  mined: camera.placeholder.reason
+core/tests/test_camera_texts.py::PlaceholderTextTests::test_every_state_has_a_title_and_a_line  mined: camera.placeholder.words
+core/tests/test_camera_texts.py::PlaceholderTextTests::test_every_string_goes_through_tr  mined: camera.placeholder.translated
+core/tests/test_camera_texts.py::PlaceholderTextTests::test_names_through_the_callable  mined: camera.placeholder.names
+core/tests/test_camera_texts.py::PlaceholderTextTests::test_test_source_replaces_the_camera_name  dropped: the synthetic test source set through the audio-dev-* files (#11, Drop: dead or dev-only)
+core/tests/test_camera_texts.py::PlaceholderTextTests::test_the_preferred_camera_by_name_when_the_route_follows_it  mined: camera.placeholder.names
+core/tests/test_camera_texts.py::PlaceholderTextTests::test_wording_with_a_named_camera  mined: camera.placeholder.words, camera.placeholder.denied
+core/tests/test_camera_wire.py::DevicesTests::test_limits  mined: camera.devices.limits, camera.virtual.record
+core/tests/test_camera_wire.py::DevicesTests::test_malformed_is_ignored  wire-v6: malformed JSON camera_devices messages, replaced by machine records whose schema the store holds (store.entry.schema, link.frame.undecodable)
+core/tests/test_camera_wire.py::DevicesTests::test_round_trip  wire-v6: building and reading back the JSON of a camera_devices message, replaced by the store's parts (store.file.round-trip)
+core/tests/test_camera_wire.py::DevicesTests::test_sharing_and_test_source_only_from_a_capture_machine  mined: camera.sharing.record
+core/tests/test_camera_wire.py::DevicesTests::test_size_limit  wire-v6: the 16 KiB limit of a camera_* message, replaced by the store's changes of any size (#14)
+core/tests/test_camera_wire.py::DevicesTests::test_unknown_fields_ignored_and_unknown_values_defaulted  wire-v6: unknown fields and values in a JSON camera_devices message, which an exact protocol version leaves no room for (#14)
+core/tests/test_camera_wire.py::GatingTests::test_announce_needs_the_flag_and_video1  wire-v6: the camera1 word in the audio hello, replaced by capabilities in machine records (#14; camera.peer.gated)
+core/tests/test_camera_wire.py::GatingTests::test_is_camera  wire-v6: telling camera_* messages apart by the JSON type's prefix, replaced by the link's messages (link.frame.*)
+core/tests/test_camera_wire.py::GatingTests::test_may_send_needs_audio_and_camera1  mined: camera.peer.gated
+core/tests/test_camera_wire.py::GatingTests::test_test_source_specs  dropped: the synthetic test source set through the audio-dev-* files (#11, Drop: dead or dev-only)
+core/tests/test_camera_wire.py::RouteTests::test_at_most_max_extra_unknown_entries  mined: camera.route.schema
+core/tests/test_camera_wire.py::RouteTests::test_bad_entries_are_dropped_one_by_one  mined: camera.route.schema
+core/tests/test_camera_wire.py::RouteTests::test_malformed  mined: camera.route.schema
+core/tests/test_camera_wire.py::RouteTests::test_missing_quality_is_the_default  mined: camera.route.quality
+core/tests/test_camera_wire.py::RouteTests::test_off_route_drops_a_device  mined: camera.route.any-machine
+core/tests/test_camera_wire.py::RouteTests::test_round_trip_with_unknown_entries_kept  mined: camera.route.schema
+core/tests/test_camera_wire.py::StreamMessageTests::test_open_malformed  mined: camera.message.malformed
+core/tests/test_camera_wire.py::StreamMessageTests::test_open_round_trip  wire-v6: building and reading back the JSON of a camera_open message, replaced by the link's messages (link.frame.round-trip)
+core/tests/test_camera_wire.py::StreamMessageTests::test_opened_and_close  wire-v6: reading the JSON of camera_opened and camera_close messages, with unknown codes read as defaults, replaced by the link's messages (link.frame.*)
+dev/camera/e2e/test_analysis.py::ClockTests::test_round_trip_and_drift  dropped: the camera end-to-end harness under dev/, which drove the audio-dev-* files and the synthetic test source (#11, Drop: dead or dev-only)
+dev/camera/e2e/test_analysis.py::ClockTests::test_unix_to_mac  dropped: the camera end-to-end harness under dev/, which drove the audio-dev-* files and the synthetic test source (#11, Drop: dead or dev-only)
+dev/camera/e2e/test_analysis.py::EventTests::test_invariant  dropped: the camera end-to-end harness under dev/, which drove the audio-dev-* files and the synthetic test source (#11, Drop: dead or dev-only)
+dev/camera/e2e/test_analysis.py::EventTests::test_streams_and_counters  dropped: the camera end-to-end harness under dev/, which drove the audio-dev-* files and the synthetic test source (#11, Drop: dead or dev-only)
+dev/camera/e2e/test_analysis.py::EveryAnalysisTests::test_check_coerces_numpy_bools  dropped: the camera end-to-end harness under dev/, which drove the audio-dev-* files and the synthetic test source (#11, Drop: dead or dev-only)
+dev/camera/e2e/test_analysis.py::EveryAnalysisTests::test_every_case  dropped: the camera end-to-end harness under dev/, which drove the audio-dev-* files and the synthetic test source (#11, Drop: dead or dev-only)
+dev/camera/e2e/test_analysis.py::FrameTests::test_frozen_in_counts_a_repeat_as_frozen  dropped: the camera end-to-end harness under dev/, which drove the audio-dev-* files and the synthetic test source (#11, Drop: dead or dev-only)
+dev/camera/e2e/test_analysis.py::FrameTests::test_integrity  dropped: the camera end-to-end harness under dev/, which drove the audio-dev-* files and the synthetic test source (#11, Drop: dead or dev-only)
+dev/camera/e2e/test_analysis.py::FrameTests::test_latency_and_skip  dropped: the camera end-to-end harness under dev/, which drove the audio-dev-* files and the synthetic test source (#11, Drop: dead or dev-only)
+dev/camera/e2e/test_analysis.py::FrameTests::test_start_of_read  dropped: the camera end-to-end harness under dev/, which drove the audio-dev-* files and the synthetic test source (#11, Drop: dead or dev-only)
+dev/camera/e2e/test_analysis.py::PlanTests::test_every_case_builds_a_plan  dropped: the camera end-to-end harness under dev/, which drove the audio-dev-* files and the synthetic test source (#11, Drop: dead or dev-only)
+dev/camera/e2e/test_analysis.py::StripTests::test_helper_clock_offset_after_mac_sleep  dropped: the camera end-to-end harness under dev/, which drove the audio-dev-* files and the synthetic test source (#11, Drop: dead or dev-only)
+dev/camera/e2e/test_analysis.py::StripTests::test_unwrap_across_the_u32_wrap  dropped: the camera end-to-end harness under dev/, which drove the audio-dev-* files and the synthetic test source (#11, Drop: dead or dev-only)
+dev/camera/e2e/test_analysis.py::SyntheticRunTests::test_clean_run_passes  dropped: the camera end-to-end harness under dev/, which drove the audio-dev-* files and the synthetic test source (#11, Drop: dead or dev-only)
+dev/camera/e2e/test_analysis.py::SyntheticRunTests::test_faults_are_caught  dropped: the camera end-to-end harness under dev/, which drove the audio-dev-* files and the synthetic test source (#11, Drop: dead or dev-only)
+win_app/tests/test_vcam_install.py::InstallTests::test_an_on_done_that_raises_is_not_called_twice  python-detail: a callback that raises on Python's worker thread
+win_app/tests/test_vcam_install.py::InstallTests::test_an_unexpected_exception_still_calls_on_done_once_with_failed  mined: camera.install.page
+win_app/tests/test_vcam_install.py::InstallTests::test_an_unreadable_or_odd_sid_never_reaches_the_command_line  mined: camera.install.owner
+win_app/tests/test_vcam_install.py::InstallTests::test_default_helper_is_the_one_beamer_runs  python-detail: which media helper executable Python ran, a process Beamer no longer has (ADR 0004)
+win_app/tests/test_vcam_install.py::InstallTests::test_exit_codes_map_to_the_contract_codes  mined: camera.install.page
+win_app/tests/test_vcam_install.py::InstallTests::test_install_update_and_repair_are_one_command_whatever_the_versions  mined: camera.install.page
+win_app/tests/test_vcam_install.py::InstallTests::test_no_helper_when_the_exe_is_missing_or_not_windows  mined: camera.install.page
+win_app/tests/test_vcam_install.py::InstallTests::test_other_launch_errors_fail  mined: camera.install.page
+win_app/tests/test_vcam_install.py::InstallTests::test_pywin32_style_error_1223_is_cancelled  mined: camera.install.page
+win_app/tests/test_vcam_install.py::InstallTests::test_the_dll_hash_is_the_one_the_helper_will_install  mined: camera.install.hash, camera.install.carried
+win_app/tests/test_vcam_install.py::InstallTests::test_uac_refused_is_cancelled  mined: camera.install.page
+win_app/tests/test_vcam_install.py::InstallTests::test_verb_line_runs_the_helper_elevated_with_this_users_sid  mined: camera.install.page, camera.install.owner
+win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_by_the_owner_removes_everything  mined: camera.install.other-owner, camera.install.removes
+win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_deletes_a_camera_folder_that_is_a_junction_as_a_link  mined: camera.install.links
+win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_deletes_keys_and_folders_without_stopping_frame_server  mined: camera.install.removes, camera.install.parents, camera.install.frame-server
+win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_keeps_a_beamer_parent_that_is_not_empty  mined: camera.install.parents
+win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_keeps_a_camera_another_account_owns  mined: camera.install.other-owner
+win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_leaves_a_camera_folder_whose_parent_is_a_junction  mined: camera.install.links
+win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_never_deletes_through_a_junction_inside_the_camera_folder  mined: camera.install.links
+win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_on_a_machine_without_the_camera_is_a_no_op  mined: camera.install.nothing-installed
+win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_stops_frame_server_only_when_the_dll_is_locked  mined: camera.install.frame-server
+win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_remove_with_no_owner_recorded_removes_everything  mined: camera.install.other-owner
+win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_stale_versions_do_nothing_without_a_registration  mined: camera.install.stale
+win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_stale_versions_go_the_registered_one_stays_and_a_locked_one_waits  mined: camera.install.stale
+win_app/tests/test_vcam_install.py::MaintenanceCameraBehaviourTests::test_stale_versions_never_delete_through_a_junction  mined: camera.install.links
+win_app/tests/test_vcam_install.py::PackagingContractTests::test_inno_ships_the_dll_in_camera_and_removes_the_camera_before_maintenance  mined: camera.install.carried, camera.install.remove-first
+win_app/tests/test_vcam_install.py::PackagingContractTests::test_maintenance_removes_the_camera_only_on_remove_and_clears_stale_versions_otherwise  mined: camera.install.removes, camera.install.stale, camera.install.frame-server
+win_app/tests/test_vcam_install.py::PackagingContractTests::test_portable_build_puts_the_dll_in_camera_at_the_top_of_the_folder  dropped: the portable build (F23), dropped by #11
+win_app/tests/test_vcam_install.py::PackagingContractTests::test_script_install_copies_the_dll_and_has_no_uninstall_path  mined: camera.install.carried
+win_app/tests/test_vcam_install.py::RemoveTests::test_a_failed_vcam_remove_still_unregisters  mined: camera.install.remove-first
+win_app/tests/test_vcam_install.py::RemoveTests::test_remove_cancelled_and_failed  mined: camera.install.page-remove
+win_app/tests/test_vcam_install.py::RemoveTests::test_remove_runs_vcam_remove_unelevated_then_vcam_uninstall_elevated  mined: camera.install.remove-first, camera.install.page-remove
+win_app/tests/test_vcam_install.py::ResultAndApiTests::test_both_calls_return_at_once_and_call_on_done_once_on_another_thread  python-detail: Python's callback API, run on a worker thread and called once
+win_app/tests/test_vcam_install.py::ResultAndApiTests::test_result_is_frozen_with_ok_and_code  python-detail: a frozen Python dataclass
+win_app/tests/test_vcam_install.py::ScriptInstallBehaviourTests::test_the_dll_lands_in_camera_and_a_build_without_it_removes_it  mined: camera.install.carried
+win_app/tests/test_vcam_install.py::WindowsSeamTests::test_current_user_sid_is_this_accounts  mined: camera.install.owner
+win_app/tests/test_vcam_install.py::WindowsSeamTests::test_elevated_launch_returns_the_exit_code  mined: camera.install.page
+win_app/tests/test_vcam_install.py::WindowsSeamTests::test_unelevated_run_returns_the_exit_code  python-detail: the exit code of Python's unelevated media helper run, a process Beamer no longer starts (ADR 0004)
