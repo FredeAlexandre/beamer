@@ -70,7 +70,7 @@ breaks any of them does not fit.
 > r[clipboard.png.size]
 > An image fits only when its `IHDR` gives a width and a height each from 1 to 16384 pixels, and
 > a width times height of at most 2^25 pixels. An 8K display's 7680 by 4320 fits, and so does
-> 16384 by 2048; a side of 16385 does not, and nor does 6000 by 6000.
+> 16384 by 2048; a width of 16385 does not, and nor does 6000 by 6000.
 >
 > - fuzz: clipboard-payload
 
@@ -308,7 +308,7 @@ breaks any of them does not fit.
 
 > r[clipboard.let-go.not-returned]
 > A clipboard a driven machine set from its driver is not a copy: what the driver brought is never
-> returned to it on the let go. That holds for a write that finishes after the let go.
+> returned to it on the let go, even when its write finishes after the let go.
 >
 > - model: clipboard
 
@@ -409,7 +409,7 @@ breaks any of them does not fit.
 > - model: clipboard
 
 > r[clipboard.read.failed-not-empty]
-> A clipboard that offers text or an image it cannot hand over is a failed read, tried again under
+> A clipboard that offers text or an image it then cannot give is a failed read, tried again under
 > `clipboard.read.retry` or `clipboard.read.let-go-retry`. An empty clipboard is not a failure: it
 > has nothing to send and is not read again.
 >
@@ -428,7 +428,7 @@ breaks any of them does not fit.
 
 > r[clipboard.read.steady]
 > On a Mac, a read during which the clipboard changes reads it again, up to three times in all, and
-> sends the newest contents it read whole. A clipboard that never holds still for a read is a
+> sends the newest contents it read whole. A clipboard that never stays still for a read is a
 > failed read.
 >
 > - tier: machine (the Mac pasteboard's change count is the real one's)
@@ -496,13 +496,13 @@ breaks any of them does not fit.
 > r[clipboard.write.pc-text]
 > On a PC, text is written with CRLF line endings: each LF, and each CRLF, becomes one CRLF.
 >
-> - tier: machine (the text the clipboard holds is the real Windows clipboard's)
+> - tier: machine (the text on the clipboard is the real Windows clipboard's)
 
 > r[clipboard.write.pc-image]
 > On a PC, an image is written as a 32-bit device-independent bitmap with a 40-byte header, its
 > rows bottom-up, and its alpha in each pixel's fourth byte.
 >
-> - tier: machine (the bitmap the clipboard holds is the real Windows clipboard's)
+> - tier: machine (the bitmap on the clipboard is the real Windows clipboard's)
 
 > r[clipboard.write.pc-undecodable]
 > On a PC, an image that does not decode is not written: its text alone is, and when there is no
@@ -518,7 +518,7 @@ breaks any of them does not fit.
 
 ## Reading a device-independent bitmap
 
-A PC's clipboard holds images as a device-independent bitmap (DIB): a header, then pixel rows.
+A PC's clipboard keeps images as a device-independent bitmap (DIB): a header, then pixel rows.
 Reading one gives the pixels the PNG is made of.
 
 > r[clipboard.dib.kinds]
@@ -537,8 +537,8 @@ Reading one gives the pixels the PNG is made of.
 
 > r[clipboard.dib.masks]
 > In a bitfields DIB with a 40-byte header, the three masks follow the header and the pixels follow
-> the masks. A 52-byte header holds three masks and no alpha mask; 56-, 108- and 124-byte headers
-> hold an alpha mask after them. A palette's entries, when the header counts any, come before the
+> the masks. A 52-byte header carries three masks and no alpha mask; 56-, 108- and 124-byte headers
+> carry an alpha mask after them. A palette's entries, when the header counts any, come before the
 > pixels.
 >
 > - fuzz: clipboard-dib
@@ -551,8 +551,8 @@ Reading one gives the pixels the PNG is made of.
 > - fuzz: clipboard-dib
 
 > r[clipboard.dib.round-trip]
-> A 32-bit image written to a PC's clipboard (`clipboard.write.pc-image`) reads back as the same
-> pixels.
+> A 32-bit image written to a PC's clipboard (`clipboard.write.pc-image`) reads as the same
+> pixels again.
 >
 > - fuzz: clipboard-dib
 
