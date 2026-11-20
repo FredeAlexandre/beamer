@@ -61,9 +61,12 @@ machine may write it.
 
 > r[store.entry.unchanged]
 > Writing a shared entry with the value it already has from an earlier write writes nothing: no new
-> stamp, and nothing goes to any peer. An entry never written has no value yet, so writing its
-> default to it is a write like any other. An entry whose value is a fallback's
-> (`store.stamp.fallback`) is written by a write of the same value that is not a fallback.
+> stamp, and nothing goes to any peer. A domain may instead write an entry again with the value it
+> has, as after refusing a write of it (`store.entry.refused`): that is a write like any other,
+> stamped as `store.stamp.after-seen` says, and it goes to every peer. An entry never written has
+> no value yet, so writing its default to it is a write like any other. An entry whose value is a
+> fallback's (`store.stamp.fallback`) is written by a write of the same value that is not a
+> fallback.
 >
 > - model: store
 
@@ -137,7 +140,8 @@ machine may write it.
 
 > r[store.stamp.ahead]
 > A write arriving with a stamp ahead of this machine's clock is taken as any other, however far
-> ahead, and this machine's next stamps are newer than it (`store.stamp.after-seen`).
+> ahead, and this machine's next writes, apart from answers, are stamped with a time and counter
+> after its (`store.stamp.after-seen`).
 >
 > - model: store
 > - parity: Python ignored a crossing map stamped more than a day ahead of its own clock, and a profile register stamped more than 600 s ahead (#14: the newest stamp wins, and the hybrid logical clock carries a machine whose clock is behind past every stamp it takes)

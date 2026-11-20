@@ -59,8 +59,8 @@ _Avoid_: route document, setting
 
 **Stamp**:
 What orders the writes of one shared entry, so every machine agrees which write is newest. It is
-made of a hybrid logical clock's wall time and counter and the writing machine's id; the store's
-spec gives its order (`store.stamp.parts`).
+made of a hybrid logical clock's wall time and counter and a machine id, in the order the store's
+spec gives (`store.stamp.parts`).
 _Avoid_: timestamp, set at
 
 **Forgotten machine**:
