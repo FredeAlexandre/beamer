@@ -231,9 +231,9 @@ breaks any of them does not fit.
 > r[clipboard.take.input-waits]
 > Input the driver sends to a machine after its clipboard waits until that clipboard has been read
 > here and sent, or found to have nothing to send, then goes in the order it was made, merged as
-> any waiting input is (`link.input.merge`): pointer moves that waited become one move that keeps
-> each of them as a step (`link.input.merge-steps`). Once the clipboard is sent, input goes
-> straight through again.
+> any waiting input is (`link.input.merge`, `link.input.merge-order`), each merged move keeping
+> the moves it was made of as its steps as far as `link.input.merge-steps` allows. Once the
+> clipboard is sent, input goes straight through again.
 >
 > - parity: Python's Mac sent the pointer moves that waited one by one, as made, where its PC merged them (one reading for both platforms: the PC's, with each move kept as a step, which the driven machine's edges and zones take as they take any merged move, `crossing.zone.merged-steps` and `crossing.zone.merged-long`, so a return edge there still feels the moves where its pointer is)
 > - model: clipboard
@@ -425,7 +425,9 @@ breaks any of them does not fit.
 > r[clipboard.read.failed-not-empty]
 > A read of a clipboard that offers text or an image, and gives neither, is a failed read, tried
 > again under `clipboard.read.retry` or `clipboard.read.let-go-retry`. An empty clipboard is not a
-> failure: it has nothing to send and is not read again.
+> failure: it has nothing to send and is not read again. A clipboard whose only offer is an image
+> that gives no image, a Mac's TIFF that cannot be converted (`clipboard.read.mac-image`) or a PC's
+> DIB that is not read or whose PNG cannot be made (`clipboard.read.pc-image`), reads as empty.
 >
 > - tier: machine (an app that offers a format and then fails to give it is the real OS clipboard's)
 
@@ -457,7 +459,8 @@ breaks any of them does not fit.
 
 > r[clipboard.read.pc-image]
 > On a PC, the image is read from the clipboard's device-independent bitmap and sent as a PNG of
-> the same pixels (`clipboard.dib.*`).
+> the same pixels (`clipboard.dib.*`). A DIB that is not read (`clipboard.dib.kinds`,
+> `clipboard.dib.rows`), or whose PNG cannot be made, gives no image, which is not a failed read.
 >
 > - tier: machine (the bitmap Windows gives for a copied image is the real clipboard's)
 
@@ -558,6 +561,7 @@ Reading one gives the pixels the PNG is made of.
 > whatever its header holds. A palette's entries, when the header counts any, come before the
 > pixels.
 >
+> - parity: Python read a fourth mask from a 52-byte header too, the word after it (the first palette entry, or the first pixel), so such a DIB whose word there is `0xFF000000`, and whose fourth bytes are all 0, read as transparent (the format's reading: a 52-byte header carries no alpha mask)
 > - fuzz: clipboard-dib
 
 > r[clipboard.dib.alpha]
