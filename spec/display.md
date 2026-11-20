@@ -137,10 +137,13 @@ is away.
 > - model: handover
 
 > r[display.owner.same]
-> Choosing for a display the machine that already is its display owner, or none when an earlier
-> choice on any machine gave it none, changes nothing and writes nothing. Choosing none for a
-> display key that was never given a display owner is a new choice: it writes none as the display
-> key's display owner, which every machine of the cluster then has, as `display.owner.entry` says.
+> Choosing a display owner for a display changes nothing and writes nothing only when this
+> machine's shared entry for its display key already names that choice, a machine or none. Any
+> other choice is a new one, which every machine of the cluster then has (`display.owner.entry`,
+> `display.owner.later-wins`). So choosing none writes a shared entry naming none when this
+> machine's entry names a machine, even one chosen after an earlier none, and when this machine
+> has no entry for the display key, as when it was never given a display owner or a none chosen on
+> another machine has not reached it yet.
 >
 > - model: handover
 
