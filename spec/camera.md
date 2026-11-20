@@ -59,10 +59,15 @@ virtual camera. A rule that only a real camera, a real Frame Server or a person'
 > A machine has a camera when its record says either, as a Mac and a PC do. A machine without a
 > camera is never a camera machine and never takes a camera stream.
 
-r[camera.state.reported]
-Each machine's record says whether its camera is starting, running or failed: starting until its
-camera devices capability first reports, running while that capability is ready or needs
-permission, and failed while it is refused.
+> r[camera.state.reported]
+> Each machine's record says whether its camera is starting, running or failed. A Mac's comes from
+> its camera devices capability (`platform.capability.states`): starting until that capability first
+> reports, running while it is ready or needs permission, and failed while it is refused or
+> unsupported here. A PC captures no camera, and its camera never fails: it is starting until Beamer
+> has first read its virtual camera's install state (`camera.virtual.state`), and running from then
+> on.
+>
+> - parity: Python's PC reported its camera failed while its media helper had failed or ran without video (ADR 0004: there is no media helper, and a PC's virtual camera's install state says what it can do)
 
 > r[camera.state.failed]
 > When a machine's camera fails, nothing of its camera runs: every camera stream it sends or takes
@@ -246,11 +251,15 @@ A camera stream at 720p is 1280 by 720 pixels at 30 frames a second and 2.5 Mbit
 > - model: camera
 
 > r[camera.cluster.same-status]
-> Every machine of the cluster reports the same status for the camera route and the same status for
-> each machine, once their stores hold the same entries and records, apart from failed while a
-> camera stream cannot start (`camera.status.failed`) and reduced (`camera.status.reduced`). Only
-> the machines that send and take a stream report those; every other machine reports the status
-> the other steps give.
+> Once their stores hold the same entries and records, every machine of the cluster reports the same
+> status for each machine and the same status for the camera route, apart from steps 7 and 8 of
+> `camera.status.machine`. Those rest on a camera stream's own state, which only its two ends see:
+> only the camera machine reports step 7, for the machine a stream goes to, and only the machine
+> taking a stream reports step 8, for itself; every other machine reports step 9 for that machine.
+> So failed while a stream cannot start (`camera.status.failed`) is reported only on the camera
+> machine, and reduced (`camera.status.reduced`) only on a stream's two ends. Where step 10 of
+> `camera.status.route` builds the route's status from machine statuses that differ this way, the
+> route's status may differ too.
 >
 > - model: camera
 
@@ -374,31 +383,36 @@ allowed, not allowed, restricted, not asked yet, or unknown.
 >    naming it by the route's name;
 > 8. denied, while the camera machine's camera access is not allowed or restricted;
 > 9. waiting for camera access, while it is not asked yet or unknown;
-> 10. then, from the statuses of the machines (`camera.status.machine`): streaming, naming every
->     machine streaming; else starting, naming every machine starting; else failed, naming the
->     first failed machine in machine id order, with its reason; else unreachable, naming every
->     machine unreachable; else idle, naming every machine idle; else not installed, outdated or
->     damaged, in that order, naming every machine in that state; else no virtual camera.
+> 10. then, from the statuses this machine reports for the machines (`camera.status.machine`):
+>     streaming, naming every machine streaming; else starting, naming every machine starting; else
+>     failed, naming the first failed machine in machine id order, with its reason; else
+>     unreachable, naming every machine unreachable; else idle, naming every machine idle; else not
+>     installed, outdated or damaged, in that order, naming every machine in that state; else no
+>     virtual camera.
 >
 > - model: camera
 
 > r[camera.status.machine]
-> The camera route has one status for each machine with a camera in the cluster, the first of
-> these that holds:
+> The camera route has one status for each machine in the cluster whose record says it has the
+> virtual camera, and, while the route is not off, for each other machine with a camera in the
+> cluster too. It is the first of these that holds:
 >
-> 1. no virtual camera, when it is the camera machine or has no virtual camera;
-> 2. off, while the route is off;
-> 3. not installed, outdated or damaged, as its virtual camera's install says
->    (`camera.virtual.state`), whether or not an app has it open;
+> 1. off, while the route is off;
+> 2. no virtual camera, when it is the camera machine, has no virtual camera, or its virtual
+>    camera is unsupported here (`camera.virtual.state`);
+> 3. not installed, outdated or damaged, as its virtual camera's install state says, whether or not
+>    an app has it open;
 > 4. the route's status from steps 2 to 9 of `camera.status.route`;
 > 5. idle, while no app has its virtual camera open, nor did within the last 3 s
 >    (`camera.demand.hold`);
 > 6. unreachable, while it has no link up with the camera machine (`camera.cluster.in`);
-> 7. on the camera machine: failed while the stream to it failed (`camera.status.failed`), idle
->    when that machine ended it as `camera.status.quiet` says, streaming while it runs and starting
->    while it opens or starts;
-> 8. on that machine itself, while it takes a stream from the camera machine: streaming while it
->    runs, starting otherwise;
+> 7. on the camera machine only, while it has a stream to that machine, one that stopped included
+>    until the route no longer calls for it or it is asked for again (`camera.status.retry`): failed
+>    while that stream failed (`camera.status.failed`), idle when that machine ended it as
+>    `camera.status.quiet` says, streaming while it runs (or reduced, `camera.status.reduced`) and
+>    starting while it opens or starts;
+> 8. on that machine itself only, while it takes a stream from the camera machine: streaming while
+>    it runs (or reduced), starting otherwise;
 > 9. else failed, while the camera machine's capture failed, with its reason; streaming while it
 >    runs or is interrupted; starting otherwise.
 >
@@ -410,8 +424,9 @@ allowed, not allowed, restricted, not asked yet, or unknown.
 > the machine it goes to as failed, with why: that machine refused it (its camera route does not
 > name this camera, its virtual camera is not installed or outdated, or it cannot take it), the
 > picture did not reach it (`camera.stream.no-receiver`), the camera is gone, macOS does not allow
-> it, or the camera failed. Every other machine, the one the stream goes to included, reports the
-> status the other steps give, unless the camera machine's record says its capture failed
+> it, or the camera failed (step 7 of `camera.status.machine`). The machine the stream went to does
+> not take it, or no longer does, and it and every other machine report that machine's status from
+> the other steps: failed only while the camera machine's record says its capture failed
 > (`camera.capture.which`).
 >
 > - model: camera
@@ -573,15 +588,20 @@ decide.
 > r[camera.virtual.state]
 > A PC's virtual camera has one install state, the first of these that holds:
 >
-> 1. unsupported here, while Windows cannot create a software virtual camera (no Media Foundation,
->    or no `MFCreateVirtualCamera`, as before Windows 11);
-> 2. missing, while neither the COM class
->    `HKLM\SOFTWARE\Classes\CLSID\{19FCB9D1-E91E-45D0-B865-75D8F6D98A91}\InprocServer32` nor the
->    install record `HKLM\SOFTWARE\Beamer\Camera` exists;
+> 1. unsupported here, while Windows cannot create a software virtual camera: Media Foundation is
+>    missing or does not start, `mfsensorgroup.dll` does not load, it lacks
+>    `MFIsVirtualCameraTypeSupported` or `MFCreateVirtualCamera` (as before Windows 11), or
+>    `MFIsVirtualCameraTypeSupported` fails or says a software camera source is not supported;
+> 2. missing, while neither the COM class nor the install record `HKLM\SOFTWARE\Beamer\Camera`
+>    exists, the COM class existing only while the default value of
+>    `HKLM\SOFTWARE\Classes\CLSID\{19FCB9D1-E91E-45D0-B865-75D8F6D98A91}\InprocServer32` is a
+>    string (REG_SZ), and the install record while its key exists;
 > 3. damaged, while one of the two is missing, the install record's `InstallGuid` is empty, longer
 >    than 38 characters or holds a character other than a hex digit, `-`, `{` and `}`, its `OwnerSid`
->    is not a SID, its `DllVersion` is missing or 0, the COM class names another DLL path than its
->    `DllPath` (compared without case), or no file is at `DllPath`;
+>    is not a SID, its `DllVersion` is missing, not a DWORD, 0, or 0x80000000 or more, the COM class
+>    names another DLL path than its `DllPath` (compared without case), or no file is at `DllPath`
+>    (a folder there counts as none), where `InstallGuid`, `OwnerSid` and `DllPath` read as empty
+>    when they are not strings (REG_SZ);
 > 4. outdated, while the DLL version this Beamer carries (`camera.install.carried`) is greater than
 >    `DllVersion`;
 > 5. else installed, an installed version greater than the carried one included.
@@ -594,9 +614,11 @@ decide.
 >
 > - model: camera
 
-r[camera.virtual.listed]
-Windows lists Beamer Camera while it has a present video camera interface of a Windows virtual
-camera device whose friendly name begins with "Beamer Camera", compared without case.
+> r[camera.virtual.listed]
+> Windows lists Beamer Camera while it has a present video camera interface of a Windows virtual
+> camera device whose friendly name begins with "Beamer Camera", compared without case.
+>
+> - tier: machine (only Windows 11 with a real Beamer Camera device lists one)
 
 > r[camera.virtual.versions]
 > On a PC, `Core` reports three DLL versions of the virtual camera: the one this Beamer carries, the
@@ -604,13 +626,16 @@ camera device whose friendly name begins with "Beamer Camera", compared without 
 > while Beamer has not read it.
 
 > r[camera.virtual.created]
-> While the install state is installed and Windows does not list Beamer Camera, Beamer creates it
-> when it starts and each time it is asked to read the install state again: a software virtual
-> camera named "Beamer Camera" on the COM class, with system lifetime and access for the signed-in
-> account, which it then starts. It never creates it in any other install state, and makes at most
-> one attempt every 2 s for the same `InstallGuid` and `DllVersion` when not asked.
+> Beamer tries to create Beamer Camera only while the install state is installed, Windows does not
+> list Beamer Camera, and no earlier try is still running. A try creates a software virtual camera
+> named "Beamer Camera" on the COM class, with system lifetime and access for the signed-in
+> account, and then starts it. Beamer tries when it starts and each time it is asked to read the
+> install state again (`camera.virtual.reread`), however recent its last try. Each time its virtual
+> camera's state changes otherwise, it tries only when its last try was 2 s ago or more, or was for
+> another `InstallGuid` or `DllVersion`.
 >
 > - tier: machine (only Windows 11's Frame Server creates a virtual camera)
+> - parity: Python's media helper also tried at once each time Beamer sent it new placeholder words (ADR 0004: no media helper takes the words)
 
 r[camera.virtual.reread]
 When asked, as after an install or a removal from the Audio & Camera page
@@ -638,9 +663,10 @@ reports it, with the DLL versions (`camera.virtual.versions`).
 > r[camera.virtual.app]
 > While an app has the virtual camera open, Beamer names it from Windows' camera consent store for
 > the signed-in account: when exactly one app's entry there was last started later than it was last
-> stopped, that app's package display name, else its program's file description, else its file
-> name; with none or several, no name. It reads it when the virtual camera opens and every 2 s while
-> it stays open.
+> stopped, that app's name, and with none or several, no name. A packaged app is named by its
+> package's display name, else its package name (its package family name up to its last `_`); an
+> app that is not packaged by its program's file description, else its file name. It reads it when
+> the virtual camera opens and every 2 s while it stays open.
 
 > r[camera.virtual.no-beat]
 > While Beamer's beat in the shared memory is older than 500 ms, is 0, or is more than 1 s ahead
@@ -732,7 +758,7 @@ apart from the machine's and the camera's names, which go into their template un
 > Each Beamer for Windows carries the virtual camera's DLL, built with it, with one DLL version. The
 > elevated setup installs only that DLL.
 >
-> - parity: Python's installers copied the DLL into a `camera` folder beside its media helper, which looked for it there and then beside itself, and a build without the DLL installed none and removed the copy an earlier build left (ADR 0004: there is no media helper; #21: the binary installs itself)
+> - parity: Python's installers copied the DLL into a `camera` folder beside its media helper, which looked for it there and then beside itself, and a build without the DLL installed none; its script installer then also removed the `camera` folder an earlier build left, which its Inno Setup installer did not (ADR 0004: there is no media helper; #21: the binary installs itself)
 
 > r[camera.install.differs]
 > The virtual camera's step of the elevated setup differs (`platform.install.check`) while the
@@ -742,10 +768,11 @@ apart from the machine's and the camera's names, which go into their template un
 > Asking `Core` to install the virtual camera, the one request for an install, an update and a repair,
 > runs `beamer --elevated setup` (`app.elevated.steps`) and reports how it ended: installed when the
 > step ends with exit status 0; cancelled when the user declined the UAC prompt; failed for any other
-> end, a non-zero exit status or a step that could not start, with the step's output in the log. On
-> a Mac it ends as failed and runs nothing.
+> end, a non-zero exit status, a step that could not start, or a step that has not ended 120 s after
+> it started, which is left running. The step's exit status and output go to the log. On a Mac it
+> ends as failed and runs nothing.
 >
-> - parity: Python ran its media helper's `vcam-install --owner-sid <SID> --dll-sha256 <hash>` through the UAC prompt, and reported "not elevated" (exit 3), "bad arguments" (exit 2) and "no helper" apart from failed (ADR 0004: no media helper; #21: the app's Repair runs `setup`; `viewmodel.camera.install.refused` tells only cancelled from failed)
+> - parity: Python ran its media helper's `vcam-install --owner-sid <SID> --dll-sha256 <hash>` through the UAC prompt, logged only its exit status, since the prompt hands back no output, and reported "not elevated" (exit 3), "bad arguments" (exit 2) and "no helper" apart from failed (ADR 0004: no media helper; #21: the app's Repair runs `setup`; `viewmodel.camera.install.refused` tells only cancelled from failed; the output is logged so that a failure says why)
 
 > r[camera.install.copies]
 > The virtual camera's step of `beamer --elevated setup` copies the carried DLL to
@@ -754,8 +781,11 @@ apart from the machine's and the camera's names, which go into their template un
 > `HKLM\SOFTWARE\Classes\CLSID\{19FCB9D1-E91E-45D0-B865-75D8F6D98A91}` (its default value "Beamer
 > Camera"; under `InprocServer32` the DLL's path as default value and `ThreadingModel` `Both`), and
 > writes the install record `HKLM\SOFTWARE\Beamer\Camera`: `InstallGuid`, kept when it is valid
-> (`camera.virtual.state`) and a new GUID otherwise, `OwnerSid` (`camera.install.owner`), `DllPath`
-> and `DllVersion` as a DWORD, all in the registry's 64-bit view.
+> (`camera.virtual.state`) and a new random GUID otherwise, `OwnerSid` (`camera.install.owner`),
+> `DllPath` and `DllVersion` as a DWORD, all in the registry's 64-bit view. A new `InstallGuid` is
+> 38 characters, in a form the virtual camera's DLL accepts: `{`, then 36 characters with `-` as the
+> 9th, 14th, 19th and 24th and an upper-case hex digit as each other, then `}`, as
+> `{0F8E3A2C-5B1D-4E6F-9A7B-3C2D1E0F4A5B}`.
 
 > r[camera.install.owner]
 > The install record's `OwnerSid` is the SID of the account the elevated step acts for
@@ -773,21 +803,19 @@ apart from the machine's and the camera's names, which go into their template un
 > r[camera.install.safe-folder]
 > When `%ProgramFiles%\Beamer`, `%ProgramFiles%\Beamer\Camera`, its version folder,
 > `%ProgramData%\Beamer` or `%ProgramData%\Beamer\Camera` exists as a junction, a symbolic link or a
-> file, or as a folder whose owner is neither Administrators nor SYSTEM, the step writes nothing into
-> it and fails, naming that path in its output.
+> file, as a folder Administrators cannot open, or as a folder whose owner is neither Administrators
+> nor SYSTEM, the step writes nothing into it and fails, naming that path in its output.
 
 > r[camera.install.acl]
 > After the step, only Administrators and SYSTEM may write `%ProgramFiles%\Beamer`, its `Camera`
-> folder, the version folder and `%ProgramData%\Beamer`, which users, LocalService and app packages
-> may read; LocalService may also write `%ProgramData%\Beamer\Camera`, which users may read. None
-> of these folders inherits another ACL.
+> folder and the version folder, which users, LocalService and app packages may read and run, and
+> `%ProgramData%\Beamer`, which users and LocalService may read; LocalService may also write
+> `%ProgramData%\Beamer\Camera`, which users may read. None of these folders inherits another ACL.
 
 > r[camera.install.loaded]
-> Installing over a DLL Frame Server has loaded succeeds without stopping Frame Server: a copy with
-> the same bytes is kept as it is, and one with other bytes is renamed aside, to be deleted at the
-> next restart of Windows, with the new DLL in its place.
->
-> - tier: machine (only a real Frame Server holds the DLL loaded)
+> Installing over a DLL that a process has loaded, as Frame Server does, succeeds without stopping
+> Frame Server: a copy with the same bytes is kept as it is, and one with other bytes is renamed
+> aside, to be deleted at the next restart of Windows, with the new DLL in its place.
 
 > r[camera.install.stale]
 > Each run of `beamer --elevated setup` on a PC whose install record names a `DllPath` deletes every
@@ -795,30 +823,38 @@ apart from the machine's and the camera's names, which go into their template un
 > in use, which stays for a later run. Stale entries never stop Frame Server and never make the step
 > fail. Without an install record, or without a `DllPath`, it deletes none.
 >
-> - parity: Python cleared stale versions both in its helper's install and in every run of its installer's maintenance script (#21: one elevated setup does both)
+> - parity: Python cleared stale versions in its helper's install, which deleted every entry as here, and in its installer's install and repair runs, which deleted only folders and never ran on removal (#21: one elevated setup does both)
 
 ## Removing the virtual camera
 
 > r[camera.install.remove-first]
-> Removing the virtual camera, by `beamer uninstall` or from the Audio & Camera page, first removes
-> Beamer Camera from the signed-in account's cameras without administrator rights, and then runs
-> the elevated removal whether that worked or not. With the install state missing or unsupported
-> here, the first part does nothing.
+> Removing the virtual camera, by `beamer uninstall` or from the Audio & Camera page, has two
+> parts: first Beamer removes Beamer Camera from the signed-in account's cameras
+> (`camera.install.remove-account`), and then it runs the elevated removal, whether the first part
+> worked, failed or had not ended 30 s after it started. With the install state missing or
+> unsupported here, the first part does nothing.
 >
 > - parity: Python ran its media helper's `vcam-remove` for the first part, skipped when the helper file was missing (ADR 0004: Beamer removes the camera itself)
 
-> r[camera.install.page-remove]
-> Asking `Core` to remove the virtual camera runs the elevated step that removes the virtual camera
-> alone (`app.elevated.steps`), not the firewall rule or anything else uninstall removes, after the
-> first part (`camera.install.remove-first`), and reports how it ended: removed when the step ends with
-> exit status 0, cancelled when the user declined the UAC prompt, failed for any other end.
+> r[camera.install.remove-account]
+> The first part of a removal runs without administrator rights, and afterwards Windows no longer
+> lists Beamer Camera for the signed-in account (`camera.virtual.listed`).
 >
-> - parity: Python ran its media helper's `vcam-uninstall` through the UAC prompt, and reported "not elevated" (exit 3) apart from failed (ADR 0004: no media helper; `viewmodel.camera.install.refused`)
+> - tier: machine (only Windows 11 makes and removes a virtual camera, and a CI runner runs every process as an administrator)
+
+> r[camera.install.page-remove]
+> Asking `Core` to remove the virtual camera runs `beamer --elevated remove-camera`
+> (`app.elevated.steps`), which removes the virtual camera alone, not the firewall rule or anything
+> else uninstall removes, after the first part (`camera.install.remove-first`), and reports how it
+> ended: removed when the step ends with exit status 0, cancelled when the user declined the UAC
+> prompt, failed for any other end, a step that has not ended 120 s after it started, which is left
+> running, included. The step's exit status and output go to the log.
+>
+> - parity: Python ran its media helper's `vcam-uninstall` through the UAC prompt, logged only its exit status, and reported "not elevated" (exit 3) apart from failed (ADR 0004: no media helper; `viewmodel.camera.install.refused`; the output is logged so that a failure says why)
 
 > r[camera.install.removes]
-> `beamer --elevated remove`, and the elevated step that removes the virtual camera alone, delete
-> the COM class, the install record,
-> `%ProgramFiles%\Beamer\Camera` and `%ProgramData%\Beamer\Camera` (`app.uninstall.removes`).
+> `beamer --elevated remove` and `beamer --elevated remove-camera` delete the COM class, the install
+> record, `%ProgramFiles%\Beamer\Camera` and `%ProgramData%\Beamer\Camera` (`app.uninstall.removes`).
 
 > r[camera.install.parents]
 > After removing the virtual camera, `HKLM\SOFTWARE\Beamer`, `%ProgramFiles%\Beamer` and
@@ -826,21 +862,26 @@ apart from the machine's and the camera's names, which go into their template un
 > is in them otherwise.
 
 r[camera.install.nothing-installed]
-Removing the virtual camera from a PC that does not have it changes nothing, does not stop Frame
-Server, and succeeds, the second of two removals in a row included.
+Removing the virtual camera from a PC that does not have it deletes nothing but an empty `Beamer`
+parent (`camera.install.parents`), does not stop Frame Server, and succeeds, the second of two
+removals in a row included.
 
 > r[camera.install.frame-server]
 > The removal stops Frame Server only when a file of the virtual camera cannot be deleted because it
-> is in use, and then deletes it. While no file is in use, Frame Server keeps running.
+> is in use, and then tries again to delete each folder still left, at once and then every 500 ms.
+> A folder still left after the 10th try makes the removal fail, naming that folder in its output.
+> While no file is in use, Frame Server keeps running.
 >
 > - tier: machine (only a real Frame Server holds the DLL loaded)
+> - parity: Python's page removal also stopped FrameServerMonitor, tried once more, left what remained under `%ProgramFiles%\Beamer` to be deleted at the next restart of Windows, and succeeded, while its installer's removal tried 10 times and failed (one rule for both removals: the installer's, as `camera.install.links` keeps)
 
 > r[camera.install.links]
 > Removing the virtual camera or its stale versions never deletes or changes anything a junction or
 > symbolic link points to. A link inside the virtual camera's folders, or in place of one of them or
 > of a version folder, is deleted as a link. When `%ProgramFiles%\Beamer\Camera`,
 > `%ProgramData%\Beamer\Camera` or their `Beamer` parent is reached through a link, nothing is
-> deleted through it.
+> deleted through it: a `Beamer` parent that is itself a link stays in place, with what it points
+> to, and the removal says so in its output and goes on.
 >
 > - parity: Python's page removal deleted a `Beamer` parent that was a link as a link, while its installer's removal left it in place (one rule for both removals: the installer's, which its tests cover)
 
@@ -865,8 +906,9 @@ Server, and succeeds, the second of two removals in a row included.
 > r[camera.shm.demand]
 > Beamer creates the `.Demand` event so that SYSTEM, LocalService and the install record's
 > `OwnerSid` may use it, and nobody else. When it already exists and is owned neither by this
-> account nor by this process's default owner, Beamer does not use it, reports the virtual camera's
-> error as taken by another process, and tries to create it again every 5 s.
+> account nor by this process's default owner, or creating it is refused for want of access, Beamer
+> does not use it, reports the virtual camera's error as taken by another process, and tries to
+> create it again every 5 s.
 
 > r[camera.shm.owner]
 > Beamer writes into the section only when it is owned by LocalService or SYSTEM, and sets the
@@ -911,17 +953,22 @@ event is set. On opening it, Beamer writes its process id into `helper_pid`.
 > camera's picture, so that the beat stops when that work stops.
 
 > r[camera.shm.live]
-> Beamer writes each live picture into slot `(latest + 1) mod 3`, the live slots being 0 to 2: it
-> makes the slot's `seq` odd, adding 1 first when it was already odd; writes the NV12 picture at the
+> Beamer writes each live picture into the live slot after the one it last wrote, the live slots
+> being 0 to 2: slot 1 first after it opens the section, then 2, 0, 1 and so on. It keeps that slot
+> itself and never reads `latest` back. In the slot, it takes `q`, the slot's `seq` when that is
+> even and `seq` plus 1 when it is odd, and sets `seq` to `q + 1`; writes the NV12 picture at the
 > slot's pixels, Y first and UV from `stride * h`, with `w` and `h` its display size and `stride`
-> equal to `w`; sets `written_qpc` to the current QueryPerformanceCounter value and `picture` to its
-> picture count plus 1; then sets `seq` to its value before the write plus 2. Only then does it set
-> `latest` to that slot and `mode` to 1 (live), and set the `.Frame` event. `seq` is never reset.
+> equal to `w`; sets `written_qpc` to the current QueryPerformanceCounter value and `picture` to the
+> picture count; then sets `seq` to `q + 2`. Only then does it set `latest` to that slot and `mode`
+> to 1 (live), and set the `.Frame` event. The picture count is one counter for the four slots,
+> which goes up by 1 for each picture Beamer writes into any of them, the first since Beamer started
+> being 1. Neither `seq` nor the picture count is ever reset.
 
 > r[camera.shm.placeholder]
-> Beamer writes a placeholder picture into slot 3 as it writes a live picture, at the size the app
-> asks for while one has the virtual camera open and 1280x720 otherwise, then sets `mode` to 3
-> (waiting), and sets `.Frame` when it wrote the slot or `mode` was not 3 before. A placeholder
+> Beamer writes a placeholder picture into slot 3 the same way it writes a live picture into its
+> slot, up to setting `seq` to `q + 2` (`camera.shm.live`), at the size the app asks for while one
+> has the virtual camera open and 1280x720 otherwise. It leaves `latest` as it is, then sets `mode`
+> to 3 (waiting), and sets `.Frame` when it wrote the slot or `mode` was not 3 before. A placeholder
 > showing when the section opens is written into it at once.
 
 r[camera.shm.mode]
