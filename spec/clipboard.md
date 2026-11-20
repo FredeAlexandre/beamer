@@ -19,34 +19,36 @@ record (`spec/store.md`).
 
 Not here: the X11 and portal clipboards of the Linux app, which is out of scope (#1).
 
-Every rule is `ci` unless it says otherwise. A clipboard, in these rules, is also the message that
-carries one from machine to machine.
+Every rule is `ci` unless it says otherwise. Translation code (what a PC does with the answers of
+the Windows calls that read and write its clipboard) is `ci` on a hosted runner of its own OS
+(#15); a rule that only the real OS clipboard can show is `machine`. A clipboard is a machine's
+own; what carries its text and image from machine to machine is a clipboard message.
 
-## What a clipboard carries
+## What a clipboard message carries
 
 > r[clipboard.payload.contents]
-> A clipboard carries text, a PNG image, or both. A machine never sends a clipboard with neither,
+> A clipboard message carries text, a PNG image, or both. A machine never sends one with neither,
 > and an image copied with no text arrives with no text.
 >
 > - fuzz: clipboard-payload
 
 > r[clipboard.payload.text-limit]
-> Clipboard text is at most 256 KiB as UTF-8. A machine never sends longer text, and discards
-> longer text it receives.
+> A clipboard message's text is at most 256 KiB as UTF-8. A machine never sends longer text, and
+> discards longer text it receives.
 >
 > - fuzz: clipboard-payload
 
 > r[clipboard.payload.image-limit]
-> A clipboard image is at most 8 MiB. A machine never sends a larger one, and discards a larger
-> one it receives.
+> A clipboard message's image is at most 8 MiB. A machine never sends a larger one, and discards a
+> larger one it receives.
 >
 > - parity: Python counted the 8 MiB before base64, and its frames carried the base64 (#14: the bytes of WIRE.md are not kept, so the image travels as its own bytes)
 > - fuzz: clipboard-payload
 
 > r[clipboard.payload.part]
-> When one part of a clipboard is over its limit or is not a PNG that fits (`clipboard.png.*`),
-> only that part is discarded, and the rest is sent or set as if the clipboard had carried it
-> alone. When neither part remains, nothing is sent, or nothing is set.
+> When one part of a clipboard message is over its limit or is not a PNG that fits
+> (`clipboard.png.*`), only that part is discarded, and the rest is sent or set as if the message
+> had carried it alone. When neither part remains, nothing is sent, or nothing is set.
 >
 > - fuzz: clipboard-payload
 
@@ -101,78 +103,81 @@ breaks any of them does not fit.
 ## How it travels
 
 > r[clipboard.travel.control]
-> A clipboard with no image and at most 32 KiB of text as UTF-8, half the largest control message
-> (`link.frame.control-limit`), travels as a control message, in order with the input and control
-> messages around it (`link.class.order`).
+> A clipboard message with no image and at most 32 KiB of text as UTF-8, half the largest control
+> message (`link.frame.control-limit`), travels as a control message, in order with the input and
+> control messages around it (`link.class.order`).
 >
 > - model: clipboard
 
 > r[clipboard.travel.bulk]
-> A clipboard with an image, or with more than 32 KiB of text, travels as a bulk message
+> A clipboard message with an image, or with more than 32 KiB of text, travels as a bulk message
 > (`link.class.bulk-stream`).
 >
-> - parity: Python sent every clipboard on its one link as a frame of its own, ahead of what followed it (#14: clipboard images and large text go as bulk, on a stream of their own, below every other class)
+> - parity: Python sent every clipboard message on its one link as a frame of its own, ahead of what followed it (#14: clipboard images and large text go as bulk, on a stream of their own, below every other class)
 > - model: clipboard
 
 > r[clipboard.travel.bulk-not-waited]
-> Input a driver sends after a clipboard that travels as a bulk message does not wait for it: the
-> driven machine may inject that input before the clipboard is set.
+> Input a driver sends after a clipboard message that travels as a bulk message does not wait for
+> it: the driven machine may inject that input before it sets its clipboard from the message.
 >
 > - parity: Python sent the clipboard ahead of the input on the same link, so input sent after an image waited for the whole image to arrive (#14: bulk is the lowest traffic class, and never delays input)
 > - model: clipboard
 
 > r[clipboard.travel.whole]
-> A clipboard is set only once its whole message has arrived. Nothing of a bulk clipboard that was
-> cancelled, by its sender or by its receiver, is ever set.
+> A machine sets its clipboard from a clipboard message only once the whole message has arrived.
+> Nothing of a bulk clipboard message that was cancelled, by its sender or by its receiver, is ever
+> set.
 >
 > - model: clipboard
 
 > r[clipboard.travel.newer-cancels]
-> When a machine starts sending a peer a clipboard while an earlier clipboard of its to that peer is
-> still under way as a bulk message, it cancels the earlier one (`link.class.bulk-cancel`).
+> When a machine starts sending a peer a clipboard message while an earlier one of its to that peer
+> is still under way as a bulk message, it cancels the earlier one (`link.class.bulk-cancel`).
 >
-> - parity: Python could not cancel a clipboard once it began, and a newer one waited behind it (#14: a bulk stream is reset when a newer clipboard replaces it)
+> - parity: Python could not cancel a clipboard message once it began, and a newer one waited behind it (#14: a bulk stream is reset when a newer clipboard message replaces it)
 > - model: clipboard
 
 > r[clipboard.travel.order]
-> A machine sets the clipboards a peer sent it in the order the peer sent them, and never sets one
-> after a newer one from that peer has been set.
+> A machine sets its clipboard from the clipboard messages a peer sent it in the order the peer
+> sent them, and never from one after it has set its clipboard from a newer one of that peer's.
 >
 > - model: clipboard
 
-## Who may send a clipboard
+## Whose clipboard messages are taken
 
 > r[clipboard.expect.from-driver]
-> A driven machine takes a clipboard only from its driver. One from any other peer is discarded,
-> and when it travels as a bulk message it is cancelled unread (`link.frame.bulk-unexpected`).
+> A driven machine takes a clipboard message only from its driver. One from any other peer is
+> discarded, and when it travels as a bulk message it is cancelled unread
+> (`link.frame.bulk-unexpected`).
 >
 > - model: clipboard
 
 > r[clipboard.expect.let-go]
-> A driver takes a clipboard from a peer only when it sent that peer a let go no more than 10 s
-> before the clipboard's first byte arrived, and only the first such clipboard for each let go.
-> Any other clipboard from a peer is discarded, and when it travels as a bulk message it is
-> cancelled unread (`link.frame.bulk-unexpected`).
+> A driver takes a clipboard message from a peer only when it sent that peer a let go no more than
+> 10 s before the message's first byte arrived, and only the first such message for each let go.
+> Any other clipboard message from a peer is discarded, and when it travels as a bulk message it
+> is cancelled unread (`link.frame.bulk-unexpected`).
 >
 > - model: clipboard
 
 > r[clipboard.expect.began]
-> Whether a clipboard is taken is decided by when its first byte arrived: one that began within
-> the 10 s is taken however long it then takes to arrive whole (`link.frame.bulk-deadline`), and
-> one that began before the let go is not taken and does not use up the let go's clipboard.
+> Whether a clipboard message is taken is decided by when its first byte arrived: one that began
+> within the 10 s is taken however long it then takes to arrive whole (`link.frame.bulk-deadline`),
+> and one that began before the let go is not taken and does not use up the let go's clipboard
+> message.
 >
 > - model: clipboard
 
 > r[clipboard.expect.later-move]
 > A move of the input after a let go, a refusal by the next machine included, does not cost the
-> machine let go its one clipboard: it is still taken within the 10 s.
+> machine let go its one clipboard message: it is still taken within the 10 s.
 >
 > - model: clipboard
 
 > r[clipboard.expect.capability]
 > A machine sends its clipboard to a peer only while the peer's machine record reports the peer's
-> clipboard capability ready, and sets a clipboard from a peer only while its own clipboard
-> capability is ready.
+> clipboard capability ready, and sets its clipboard from a peer's clipboard message only while
+> its own clipboard capability is ready.
 >
 > - parity: Python had two capabilities, one for clipboard text and one for clipboard images, and sent each part only to a peer that announced its own (#16: the clipboard is one capability; #14: capabilities are facts in each machine's record)
 
@@ -187,10 +192,10 @@ breaks any of them does not fit.
 
 > r[clipboard.take.has]
 > A driver counts a peer as having its clipboard once it has sent the peer its clipboard, or taken
-> a clipboard from the peer or sent one on to it (`clipboard.arrive.send-on`), until a copy is made
-> on the driver or the driver takes a clipboard from another peer. It does not send a peer that
-> has its clipboard the clipboard again, so a clipboard copied on one machine and brought home
-> reaches the next machine taken, and never returns to the machine it was copied on.
+> a clipboard message from the peer or sent one on to it (`clipboard.arrive.send-on`), until a copy
+> is made on the driver or the driver takes a clipboard message from another peer. It does not
+> send a peer that has its clipboard the clipboard again, so what was copied on one machine and
+> brought home reaches the next machine taken, and never returns to the machine it was copied on.
 >
 > - model: clipboard
 
@@ -226,9 +231,11 @@ breaks any of them does not fit.
 > r[clipboard.take.input-waits]
 > Input the driver sends to a machine after its clipboard waits until that clipboard has been read
 > here and sent, or found to have nothing to send, then goes in the order it was made, merged as
-> any waiting input is (`link.input.merge`). Once the clipboard is sent, input goes straight
-> through again.
+> any waiting input is (`link.input.merge`): pointer moves that waited become one move that keeps
+> each of them as a step (`link.input.merge-steps`). Once the clipboard is sent, input goes
+> straight through again.
 >
+> - parity: Python's Mac sent the pointer moves that waited one by one, as made, where its PC merged them (one reading for both platforms: the PC's, with each move kept as a step, which the driven machine's edges and zones take as they take any merged move, `crossing.zone.merged-steps` and `crossing.zone.merged-long`, so a return edge there still feels the moves where its pointer is)
 > - model: clipboard
 
 > r[clipboard.take.read-not-in-the-way]
@@ -261,15 +268,16 @@ breaks any of them does not fit.
 ## Copies on the driver
 
 > r[clipboard.copy.what]
-> A copy is any change to a machine's clipboard that Beamer did not make by setting a clipboard
-> from a peer: the user copying, or any program writing to the clipboard, even the same contents
-> again.
+> A copy is any change to a machine's clipboard that Beamer did not make by setting it from a
+> peer's clipboard message: the user copying, or any program writing to the clipboard, even the
+> same contents again.
 >
 > - tier: machine (what counts as a change is the real Mac and Windows clipboards')
 
 > r[clipboard.copy.after-write]
-> A copy made on a machine just after Beamer set a clipboard from a peer there is a copy, never part
-> of that write. A write that failed changes nothing about which copies were made.
+> A copy made on a machine just after Beamer set its clipboard from a peer's clipboard message is a
+> copy, never part of that write. A write that failed changes nothing about which copies were
+> made.
 >
 > - model: clipboard
 
@@ -302,25 +310,26 @@ breaks any of them does not fit.
 > r[clipboard.let-go.changed]
 > When a driver lets go of a driven machine, that machine sends the driver its clipboard when a
 > copy was made on it while that driver drove it, and sends nothing otherwise, so a peer cannot
-> collect a clipboard by taking an idle machine and letting it go.
+> collect a machine's clipboard by taking it while idle and letting it go.
 >
 > - model: clipboard
 
 > r[clipboard.let-go.not-returned]
-> A clipboard a driven machine set from its driver is not a copy: what the driver brought is never
-> returned to it on the let go, even when its write finishes after the let go.
+> A driven machine setting its clipboard from its driver's clipboard message is not a copy: what
+> the driver brought is never returned to it on the let go, even when its write finishes after the
+> let go.
 >
 > - model: clipboard
 
 > r[clipboard.let-go.copy-after-write]
-> A copy made on a driven machine just after it set a clipboard from its driver is a copy, and is
-> sent to the driver on the let go.
+> A copy made on a driven machine just after it set its clipboard from its driver's clipboard
+> message is a copy, and is sent to the driver on the let go.
 >
 > - model: clipboard
 
 > r[clipboard.let-go.failed-write]
-> A clipboard from the driver that could not be set does not hide an earlier copy made on the
-> driven machine: that copy is still sent on the let go.
+> A clipboard message from the driver that could not be set does not hide an earlier copy made on
+> the driven machine: that copy is still sent on the let go.
 >
 > - model: clipboard
 
@@ -350,8 +359,9 @@ breaks any of them does not fit.
 > - model: clipboard
 
 > r[clipboard.let-go.in-order]
-> A clipboard from the driver that arrived before its let go is set before the let go's clipboard
-> is read, and one from a new take after it is set after, so neither is mistaken for a copy.
+> A clipboard message from the driver that arrived before its let go is set before the clipboard is
+> read for the let go, and one from a new take after it is set after, so neither is mistaken for a
+> copy.
 >
 > - model: clipboard
 
@@ -361,38 +371,40 @@ breaks any of them does not fit.
 >
 > - model: clipboard
 
-## The driver takes a clipboard
+## The driver takes a clipboard message
 
 > r[clipboard.arrive.set]
-> A clipboard a driver takes from a machine let go (`clipboard.expect.let-go`) is set on the
-> driver, so a clipboard brought home stays on the driver.
+> A driver sets its clipboard from a clipboard message it takes from a machine let go
+> (`clipboard.expect.let-go`), so what is brought home stays on the driver.
 >
 > - model: clipboard
 
 > r[clipboard.arrive.send-on]
-> When the driver's input is on a machine as it takes a clipboard, it also sends the clipboard on to
-> that machine, so a clipboard copied on a machine left in a chain reaches the next one.
+> When the driver's input is on a machine as it takes a clipboard message, it also sends the message
+> on to that machine, so what was copied on a machine left in a chain reaches the next one.
 >
 > - model: clipboard
 
 > r[clipboard.arrive.as-taken]
-> A clipboard the driver sends on carries what the driver took of it, after `clipboard.payload.part`,
-> and nothing else.
+> A clipboard message the driver sends on carries what the driver took of it, after
+> `clipboard.payload.part`, and nothing else.
 
 > r[clipboard.arrive.failed-write]
-> When the driver cannot set a clipboard it took (`clipboard.write.retry`), its clipboard counts as
-> changed by a copy: the next take of any machine, the one let go included, sends the driver's
-> clipboard.
+> When the driver cannot set its clipboard from a clipboard message it took
+> (`clipboard.write.retry`), its clipboard counts as changed by a copy: the next take of any
+> machine, the one let go included, sends the driver's clipboard.
 >
 > - model: clipboard
 
 ## Reading the clipboard here
 
 > r[clipboard.read.retry]
-> When the driver cannot read its clipboard for a take, it tries again twice, 50 ms apart. A try
-> again stops as soon as the input moves or a copy changes the clipboard, so it never sends a newer
-> copy for an older take. After the third failure, the input waiting behind the read is sent, and
-> the clipboard is tried again at the next take of that peer, or the next copy.
+> When the driver cannot read its clipboard for a take or for a copy it sends while driving, or
+> its link to that peer refuses the clipboard message (`link.send.full`), it tries again twice,
+> 50 ms apart, reading the clipboard again each time. A try again stops as soon as the input moves
+> or a copy changes the clipboard, so it never sends a newer copy for an older take. After the
+> third failure, the input waiting behind the read is sent, and the clipboard is tried again at the
+> next take of that peer, or the next copy.
 >
 > - model: clipboard
 
@@ -411,9 +423,9 @@ breaks any of them does not fit.
 > - model: clipboard
 
 > r[clipboard.read.failed-not-empty]
-> A clipboard that offers text or an image it then cannot give is a failed read, tried again under
-> `clipboard.read.retry` or `clipboard.read.let-go-retry`. An empty clipboard is not a failure: it
-> has nothing to send and is not read again.
+> A read of a clipboard that offers text or an image, and gives neither, is a failed read, tried
+> again under `clipboard.read.retry` or `clipboard.read.let-go-retry`. An empty clipboard is not a
+> failure: it has nothing to send and is not read again.
 >
 > - tier: machine (an app that offers a format and then fails to give it is the real OS clipboard's)
 
@@ -423,10 +435,12 @@ breaks any of them does not fit.
 >
 > - tier: machine (what a copy puts on the clipboard is the real OS's)
 
-> r[clipboard.read.image-failed]
-> When the image cannot be read or converted to a PNG, the text is still read and sent.
+> r[clipboard.read.part-failed]
+> A read that gives the clipboard's text but not the image it offers, or its image but not the text
+> it offers, is not a failed read: what it gave is sent at once, without the part that failed, and
+> the clipboard is not read again for it.
 >
-> - tier: machine (an image provider that fails is the real OS clipboard's)
+> - tier: machine (a text or image provider that fails is the real OS clipboard's)
 
 > r[clipboard.read.steady]
 > On a Mac, a read during which the clipboard changes reads it again, up to three times in all, and
@@ -450,8 +464,8 @@ breaks any of them does not fit.
 ## Writing the clipboard here
 
 > r[clipboard.write.replaces]
-> Setting a clipboard from a peer replaces everything on the clipboard here with its text and its
-> image: nothing copied before stays offered beside them.
+> Setting the clipboard here from a peer's clipboard message replaces everything on it with the
+> message's text and image: nothing copied before stays offered beside them.
 >
 > - tier: machine (what the clipboard offers is the real OS clipboard's)
 
@@ -460,7 +474,7 @@ breaks any of them does not fit.
 > fails, the write is tried again every 50 ms for up to 1 s, and then given up with a warning in
 > the log. A write blocked for less than 1 s still lands.
 >
-> - parity: Python's driver tried a clipboard it took three times, 50 ms apart, where its driven machine tried for up to 1 s (one rule for every clipboard set from a peer)
+> - parity: Python's driver tried to set a clipboard message it took three times, 50 ms apart, where its driven machine tried for up to 1 s (one rule for every clipboard message set from a peer)
 > - model: clipboard
 
 > r[clipboard.write.copy-wins]
@@ -470,13 +484,14 @@ breaks any of them does not fit.
 > - model: clipboard
 
 > r[clipboard.write.stale]
-> On a driven machine, a clipboard from the driver is not written once that driving has ended or
-> the driver's link has closed, unless its write had already begun.
+> On a driven machine, a clipboard message from the driver is not written once that driving has
+> ended or the driver's link has closed, unless its write had already begun.
 >
 > - model: clipboard
 
 > r[clipboard.write.newest]
-> When several clipboards from the same driver wait to be written, only the newest is written.
+> When several clipboard messages from the same driver wait to be written, only the newest is
+> written.
 >
 > - model: clipboard
 
@@ -513,10 +528,9 @@ breaks any of them does not fit.
 > - tier: machine (decoding for the real Windows clipboard)
 
 > r[clipboard.write.pc-not-emptied]
-> On a PC, when the clipboard cannot be emptied, nothing is written to it, so nothing is mixed into
-> another program's clipboard.
->
-> - tier: machine (emptying is the real Windows clipboard's)
+> On a PC, when Windows refuses to empty the clipboard Beamer has opened for a write, nothing is
+> written to it, so nothing is mixed into another program's clipboard, and the write has failed
+> (`clipboard.write.retry`).
 
 ## Reading a device-independent bitmap
 
@@ -539,16 +553,19 @@ Reading one gives the pixels the PNG is made of.
 
 > r[clipboard.dib.masks]
 > In a bitfields DIB with a 40-byte header, the three masks follow the header and the pixels follow
-> the masks. A 52-byte header carries three masks and no alpha mask; 56-, 108- and 124-byte headers
-> carry an alpha mask after them. A palette's entries, when the header counts any, come before the
+> the masks. A bitfields DIB's 52-byte header carries three masks and no alpha mask; its 56-, 108-
+> and 124-byte headers carry an alpha mask after them. An uncompressed DIB's masks are never read,
+> whatever its header holds. A palette's entries, when the header counts any, come before the
 > pixels.
 >
 > - fuzz: clipboard-dib
 
 > r[clipboard.dib.alpha]
-> A 24-bit DIB reads as opaque. In a 32-bit DIB without an alpha mask of `0xFF000000`, each pixel's
-> fourth byte is its alpha, unless every pixel's fourth byte is 0: the image then reads as opaque.
-> With an alpha mask of `0xFF000000`, the fourth byte is the alpha even when every one is 0.
+> A 24-bit DIB reads as opaque. In a 32-bit DIB, each pixel's fourth byte is its alpha, unless every
+> pixel's fourth byte is 0: the image then reads as opaque. In a bitfields DIB with an alpha mask of
+> `0xFF000000`, the fourth byte is the alpha even when every one is 0. An uncompressed DIB never
+> has an alpha mask: one whose header holds `0xFF000000` where a bitfields DIB's alpha mask would
+> be, and whose fourth bytes are all 0, reads as opaque.
 >
 > - fuzz: clipboard-dib
 

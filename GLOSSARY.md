@@ -195,13 +195,17 @@ _Avoid_: follows focus
 ## Clipboard
 
 **Clipboard**:
-A machine's own OS clipboard, whose text and PNG image follow input; also the message that carries
-them from one machine to another.
+A machine's own OS clipboard, whose text and PNG image follow input. Sending a machine's clipboard
+sends what is on it in a clipboard message.
 _Avoid_: pasteboard, clipboard sync
 
+**Clipboard message**:
+The message that carries a clipboard's text, its PNG image or both from one machine to another.
+_Avoid_: clipboard (for the message), clipboard payload
+
 **Copy**:
-Any change to a machine's clipboard that Beamer did not make by setting a clipboard from a peer:
-the user copying, or another program writing to it.
+Any change to a machine's clipboard that Beamer did not make by setting it from a peer's clipboard
+message: the user copying, or another program writing to it.
 _Avoid_: local copy, local change, own write
 
 ## Displays

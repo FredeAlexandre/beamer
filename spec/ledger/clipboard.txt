@@ -91,12 +91,12 @@ mac_app/tests/test_clipboard_mac.py::ChangedContentsTests::test_a_new_copy_is_se
 mac_app/tests/test_clipboard_mac.py::ChangedContentsTests::test_a_new_link_sends_it_again  mined: clipboard.take.not-had
 mac_app/tests/test_clipboard_mac.py::ChangedContentsTests::test_an_unchanged_clipboard_is_sent_once  mined: clipboard.take.has
 mac_app/tests/test_clipboard_mac.py::ChangedContentsTests::test_copy_during_read_retries_the_newest_stable_snapshot  mined: clipboard.read.steady
-mac_app/tests/test_clipboard_mac.py::ChangedContentsTests::test_image_failure_keeps_the_text_representation  mined: clipboard.read.image-failed
+mac_app/tests/test_clipboard_mac.py::ChangedContentsTests::test_image_failure_keeps_the_text_representation  mined: clipboard.read.part-failed
 mac_app/tests/test_clipboard_mac.py::ChangedContentsTests::test_local_copy_during_peer_write_is_not_marked_synchronised  mined: clipboard.copy.after-write
 mac_app/tests/test_clipboard_mac.py::ChangedContentsTests::test_strict_read_distinguishes_a_provider_failure_from_empty  mined: clipboard.read.failed-not-empty
 mac_app/tests/test_clipboard_mac.py::ChangedContentsTests::test_strict_read_keeps_an_unsupported_tiff_terminal  mined: clipboard.read.mac-image
 mac_app/tests/test_clipboard_mac.py::ChangedContentsTests::test_strict_read_keeps_real_empty_text_and_an_unoffered_clipboard_terminal  mined: clipboard.read.failed-not-empty
-mac_app/tests/test_clipboard_mac.py::ChangedContentsTests::test_strict_read_preserves_valid_text_when_the_image_provider_fails  mined: clipboard.read.image-failed
+mac_app/tests/test_clipboard_mac.py::ChangedContentsTests::test_strict_read_preserves_valid_text_when_the_image_provider_fails  mined: clipboard.read.part-failed
 mac_app/tests/test_clipboard_mac.py::ChangedContentsTests::test_strict_read_rejects_a_pasteboard_that_never_stabilises  mined: clipboard.read.steady
 mac_app/tests/test_clipboard_mac.py::ChangedContentsTests::test_strict_read_retries_advertised_png_returning_nil  mined: clipboard.read.failed-not-empty
 mac_app/tests/test_clipboard_mac.py::ChangedContentsTests::test_strict_read_retries_advertised_text_returning_nil_at_a_stable_count  mined: clipboard.read.failed-not-empty
@@ -155,15 +155,15 @@ win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_copy_afte
 win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_failed_empty_does_not_write_into_another_apps_clipboard  mined: clipboard.write.pc-not-emptied
 win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_get_contents_never_raises_off_windows  python-detail: the module's import guard off Windows
 win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_get_contents_reads_text_and_converts_the_dib  mined: clipboard.read.both, clipboard.read.pc-image
-win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_get_contents_with_an_undecodable_dib_still_returns_the_text  mined: clipboard.dib.kinds, clipboard.read.image-failed
-win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_image_read_failure_does_not_drop_valid_text  mined: clipboard.read.image-failed
+win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_get_contents_with_an_undecodable_dib_still_returns_the_text  mined: clipboard.dib.kinds, clipboard.read.part-failed
+win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_image_read_failure_does_not_drop_valid_text  mined: clipboard.read.part-failed
 win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_rapid_large_unicode_writes_keep_the_latest_text  mined: clipboard.write.replaces
 win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_set_contents_with_an_undecodable_png_sets_the_text_only  mined: clipboard.write.pc-undecodable
 win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_set_contents_with_only_an_undecodable_png_leaves_the_clipboard_alone  mined: clipboard.write.pc-undecodable
 win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_set_contents_writes_text_and_dib_after_one_empty  mined: clipboard.write.replaces, clipboard.write.pc-image
 win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_set_contents_writes_windows_line_endings  mined: clipboard.write.pc-text
 win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_strict_read_distinguishes_a_native_exception_from_empty  mined: clipboard.read.failed-not-empty
-win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_strict_read_preserves_valid_text_when_the_image_provider_fails  mined: clipboard.read.image-failed
+win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_strict_read_preserves_valid_text_when_the_image_provider_fails  mined: clipboard.read.part-failed
 win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_strict_read_reports_an_offered_format_that_cannot_be_read  mined: clipboard.read.failed-not-empty
 win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_strict_read_retries_native_contention_without_another_copy  mined: clipboard.read.failed-not-empty
 win_app/tests/test_clipboard_win.py::ClipboardOrchestrationTests::test_the_change_stamp_is_the_sequence_number  mined: clipboard.copy.what
