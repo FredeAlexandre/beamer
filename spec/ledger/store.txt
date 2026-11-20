@@ -1,3 +1,12 @@
 # The store domain's slice of the Python ledger, laid out by #51.
 # Owner domains and the ambiguous assignments: spec/ledger/README.md.
-# No Python test is assigned to this domain.
+# No Python test was assigned to this domain; the audio miner moved here the tests below (#147).
+core/tests/test_audio_model.py::DeviceListTests::test_accept_by_rev_or_straight_from_its_machine
+core/tests/test_audio_model.py::DeviceListTests::test_machine_round_trip
+core/tests/test_audio_model.py::ExhaustiveMergeTests::test_every_order_of_three_routes_converges
+core/tests/test_audio_model.py::MergeTests::test_commutative_associative_idempotent
+core/tests/test_audio_model.py::MergeTests::test_next_stamp_beats_everything_held
+core/tests/test_audio_model.py::MergeTests::test_older_incoming_changes_nothing_and_asks_for_an_answer
+core/tests/test_audio_model.py::MergeTests::test_round_trip_through_data
+core/tests/test_audio_model.py::MergeTests::test_same_route_is_quiet
+core/tests/test_audio_model.py::MergeTests::test_tie_goes_to_the_larger_by
