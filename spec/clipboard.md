@@ -195,10 +195,10 @@ breaks any of them does not fit.
 > - model: clipboard
 
 > r[clipboard.take.not-had]
-> A peer stops counting as having the driver's clipboard when its take is refused or goes
-> unanswered, when a pass on to it is not taken or given up, when its link closes, and when the
-> clipboard could not be read or sent to it (`clipboard.read.retry`). The next take of that peer
-> sends the clipboard again.
+> A peer stops counting as having the driver's clipboard when the input comes home before the peer
+> accepted its take, refused, unanswered or for any other reason; when a pass on to it is given up
+> (`driving.pass-on.given-up`); when its link closes; and when the clipboard could not be read or
+> sent to it (`clipboard.read.retry`). The next take of that peer sends the clipboard again.
 >
 > - model: clipboard
 
@@ -332,7 +332,8 @@ breaks any of them does not fit.
 
 > r[clipboard.let-go.unknown]
 > When the driven machine cannot tell whether its clipboard changed while the driver drove it,
-> because the clipboard could not be asked as driving began or as it ended, it sends no clipboard.
+> because the OS could not say when the clipboard last changed, as driving began or as it ended, it
+> sends no clipboard.
 >
 > - model: clipboard
 
@@ -403,8 +404,9 @@ breaks any of them does not fit.
 
 > r[clipboard.read.let-go-retry]
 > When the driven machine cannot read its clipboard for a let go, it tries again every 50 ms for up
-> to 1 s, stopping as soon as `clipboard.let-go.copy-after-let-go` or `clipboard.let-go.new-driver`
-> applies, and then logs a warning naming the driver.
+> to 1 s, and stops at once, sending nothing, when `clipboard.let-go.copy-after-let-go` or
+> `clipboard.let-go.new-driver` applies. A read still failing after 1 s is given up
+> (`clipboard.log.given-up`).
 >
 > - model: clipboard
 
