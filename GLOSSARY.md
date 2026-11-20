@@ -57,6 +57,16 @@ A store entry that any machine may write, where the newest stamp wins, such as a
 display's owner or a shared setting.
 _Avoid_: route document, setting
 
+**Stamp**:
+What orders the writes of one shared entry: a hybrid logical clock's wall time and counter, and
+the writing machine's id, so every machine agrees which write is newest.
+_Avoid_: timestamp, set at
+
+**Forgotten machine**:
+A machine that neither this machine nor any machine it knows lists as a peer. Its machine record is
+dropped, and the shared entries naming it read as unset until it is known again.
+_Avoid_: pruned machine
+
 ## Driving
 
 **Driver**:
