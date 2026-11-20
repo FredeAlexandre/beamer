@@ -64,11 +64,18 @@ parser, so none carries `model:` or `fuzz:`.
   arrives (t3). The pair's round trip is t3 − t1, and it reads the second clock as ahead of the
   first by t2 − (t1 + t3) / 2, uncertain by half its round trip. A sample is tied by the pair with
   the smallest round trip of those made within 10 s before or after it, and its uncertainty is
-  half that round trip. A sample is discarded when its uncertainty is over 2 ms, or when either
+  half that round trip. A sample is discarded when its uncertainty is over 3 ms, or when either
   machine's clock stepped between the sample and its pair: a step is a change of more than 1 ms,
   from one pair to the next, in how far that machine's clock is ahead of its monotonic clock. The
-  smallest of the 200 round trips around a sample is the radio's floor, not #4's 6 ms p50; WP10's
-  harness tied the clocks the same way, by the smallest of its SSH pings, at 4.1 ms
+  3 ms is #4's own error, half the round trip of its clock pings
+  (`docs/research/perf-baseline.md` on `research/perf-baseline`, "error ≤ RTT/2 ≈ 3 ms"), and is
+  small against the audio and camera bounds of 66 ms and more. The smallest of the 200 round
+  trips around a sample is near the radio's floor, not #4's 6 ms p50: datagram pings between the
+  two machines had their smallest round trip at 2.5 to 3.4 ms over whole 5 to 10 minute runs
+  (`docs/research/perf-baseline/audio-camera-existing.md` on `research/perf-baseline`), an
+  uncertainty of 1.25 to 1.7 ms, so a 20 s window's smallest round trip still ties its samples up
+  to 6 ms, 2.6 ms above the highest of those floors. WP10's harness tied the clocks the same way,
+  by the smallest of its SSH pings, 4.1 ms, which this cut-off keeps at 2.05 ms
   (`dev/audio/reports/wp10.md`). A radio that cannot keep 90 % of the samples voids the run
   rather than failing it.
 - **On Wi-Fi** means both machines on the same 5 GHz Wi-Fi, as #4 measured. **On the cable**
@@ -340,12 +347,15 @@ the frame shows to handing the frame to the OS to show.
 > - parity: Python bounded, on the Mac only, each level update at 20 a second and each status update every 2 s to under 16 ms, from fake levels and statuses, without drawing (one toolkit, Rune, draws the window on both machines, ADR 0001; the frame drawn is what the user sees)
 
 > r[perf.ui.audio-machine]
-> Choosing again, on the Audio & Camera page, a machine whose devices it showed before shows its
-> devices in a frame whose time is under 16 ms.
+> While the Audio & Camera page is made to show again, one after the other, machines whose devices
+> it showed before, every frame's time, the largest included, is under 16 ms.
 >
-> Run: on each machine, the machine agent clicks the other machine on the Audio & Camera page,
-> then this machine, then the other machine again, 20 times; every frame made after a click that
-> chooses a machine shown before meets the bound.
+> Run: on each machine, the machine agent clicks the other machine on the Audio & Camera page and
+> then this machine, so the page has shown both before the run's samples start. Then it clicks the
+> other machine and this machine in turn, one click a second, 40 clicks in all, so every click
+> chooses a machine shown before. The run's samples are every frame made from its first click to
+> 1 s after its last, and each of them meets the bound: the frame times the app writes once a
+> second do not tell the frames that follow a click from the others, so the bound covers them all.
 >
 > - tier: machine (only a real window on a real display gives frame times)
 > - parity: Python bounded, on the Mac only, the time to deal with the click and lay out the kept devices, without drawing (one toolkit, Rune, draws the window on both machines, ADR 0001; the frame drawn is what the user sees)
@@ -355,8 +365,11 @@ the frame shows to handing the frame to the OS to show.
 > under 16 ms at p50, p95 and p99, and at its largest.
 >
 > Run: for 10 minutes, with the camera route naming the Mac's camera and the Audio & Camera page
-> shown on each machine in turn, the PC's machine agent opens the virtual camera as an app does
-> for 2 s, then closes it for 2 s, so the camera's status changes as its stream starts and stops.
+> shown on both machines at once for the whole run, the PC's machine agent opens the virtual
+> camera as an app does for 2 s, then closes it for 2 s, so the camera's status changes 300 times
+> as its stream starts and stops, and the page on each machine shows it. Each machine's
+> frames are a run of their own, with the 10 minutes' frames, at least 100 of them (Enough
+> samples).
 >
 > - tier: machine (only a real window on a real display with a real camera stream gives frame
 >   times)
@@ -366,7 +379,12 @@ the frame shows to handing the frame to the OS to show.
 > Each update of the tray menu takes under 16 ms, at p50, p95 and p99, and at its largest, from
 > starting on what the menu shows to handing it to the OS.
 >
-> Run: the run of `perf.ui.camera-status`, on each machine.
+> Run: on the Mac, the run of `perf.ui.camera-status`, whose 300 changes each show or hide the
+> camera line of the Mac's tray menu (`viewmodel.camera.menu.line`). The PC's tray menu has no
+> camera items (`viewmodel.camera.menu.shown`), so on the PC it is the run of
+> `perf.crossing.wifi` with the PC driving, whose 200 crossings out and 200 home each change the
+> drive status the menu shows first (`viewmodel.tray.drive-status`). Each machine's updates are a
+> run of their own, at least 100 of them (Enough samples).
 >
 > - tier: machine (only a real tray menu on a real OS gives its update times)
 > - parity: Python bounded, on the Mac only, its menu's status refresh every 0.4 s to under 16 ms, from fake camera statuses (the tray menu is Beamer's on both machines; Python's PC had no such bound)
@@ -390,11 +408,16 @@ microphone sample is the marker's time less the device's own time: before the ru
 machine's agent plays markers into the device and records them from its microphone, for 60 s on
 its one clock, and the median of those is the device's own time. That loop also holds one capture
 of the device by the agent, which Beamer's capture of the device replaces in the run; the two may
-differ by up to one capture period, so each microphone bound is WP16's figure plus 10 ms, the
-period of 480 frames at 48 kHz that WP16's helper captured in (WP16, miss 1).
+differ by up to one capture period, so each microphone bound is WP16's figure plus a margin of
+10 ms. The margin is this spec's choice, not a measured figure. The PC captured in packets of 480 frames, 10 ms at 48 kHz, in
+every run (`dev/audio/reports/wp14.md`), but on the Mac each process sets its own capture period:
+the audio helper asked for 128 frames and a process that asks for none got 512
+(`dev/audio/reports/wp11.md`), and nothing yet fixes Beamer 2.0's.
 
-In every microphone run, nothing plays on the default output of the machine whose microphone is
-shared, so the stream's echo is not cancelled (`audio.echo.when`, `audio.echo.idle`).
+In every microphone run, the headset choice of the default output of the machine whose
+microphone is shared is headset, written in the seeded state before the apps start (ADR 0005).
+That output's form is then a headset (`audio.form.choice`, `audio.form.applied`), so the stream's
+echo is not cancelled, whatever that output plays (`audio.echo.when`).
 
 > r[perf.audio.mic-pc-to-mac]
 > The PC's microphone reaches the Mac's virtual microphone within 66.5 ms at p50 and 72 ms at
@@ -403,7 +426,8 @@ shared, so the stream's echo is not cancelled (`audio.echo.when`, `audio.echo.id
 >
 > Run: the microphone's audio route names the PC and its loopback device's microphone, which the
 > PC's machine agent plays the test signal into. The Mac's machine agent records the Mac's virtual
-> microphone. The stream's echo is not cancelled.
+> microphone. The headset choice of the PC's default output is headset, so the stream's echo is
+> not cancelled (`audio.echo.when`).
 >
 > Baseline: 56.5 ms at p50 and 62 ms at p95 in WP16's a_1; 41 to 56 ms at p50 over WP16's runs
 > (#4). The bounds add the 10 ms margin above.
@@ -439,7 +463,8 @@ shared, so the stream's echo is not cancelled (`audio.echo.when`, `audio.echo.id
 >
 > Run: the microphone's audio route names the Mac and its loopback device's microphone, which the
 > Mac's machine agent plays the test signal into. The PC's machine agent records "CABLE Output" as
-> an app does. The stream's echo is not cancelled.
+> an app does. The headset choice of the Mac's default output is headset, so the stream's echo is
+> not cancelled (`audio.echo.when`).
 >
 > Baseline: 172.4 ms at p50 and 185 ms at p95 in WP16's d_1, whose echo was not cancelled either
 > (#4). The bounds add the 10 ms margin above.
@@ -453,8 +478,9 @@ shared, so the stream's echo is not cancelled (`audio.echo.when`, `audio.echo.id
 > sample less the device's own time. Its p99 is reported and not bounded: no baseline measured
 > one (#4).
 >
-> Run: the run of `perf.audio.mic-mac-to-pc`, with the setting on. The stream's echo is not
-> cancelled.
+> Run: the run of `perf.audio.mic-mac-to-pc`, with the setting on. The headset choice of the
+> Mac's default output is headset there too, so the stream's echo is not cancelled
+> (`audio.echo.when`).
 >
 > Baseline: 120.3 ms at p50 and 166.7 ms at p95 in WP16's d_ex1 (#4), whose echo was cancelled
 > (WP16, miss 4); here it is not, so this run differs from `perf.audio.mic-mac-to-pc`'s only in
