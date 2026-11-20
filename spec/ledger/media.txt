@@ -1,3 +1,7 @@
 # The media domain's slice of the Python ledger, laid out by #51.
 # Owner domains and the ambiguous assignments: spec/ledger/README.md.
-# No Python test is assigned to this domain.
+# #51 assigned no Python test to this domain; the camera miner (#63) moved the ones below here,
+# without a fate (spec/ledger/README.md, Ambiguous assignments).
+core/tests/test_camera_link_gating.py::StreamIdTests::test_new_stream_never_returns_a_camera_stream_id
+core/tests/test_camera_link_gating.py::TimeMapTests::test_audio_send_carries_sr_only_towards_a_video1_peer
+core/tests/test_camera_link_gating.py::TimeMapTests::test_no_sr_when_the_own_helper_lacks_video1

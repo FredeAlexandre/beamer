@@ -242,3 +242,35 @@ _Avoid_: audio follows input
 A shared entry saying which machine's camera another machine sees.
 _Avoid_: camera follows input
 
+**Camera machine**:
+The machine whose camera the camera route names: the one that sends every camera stream.
+_Avoid_: source machine, sender
+
+**Shared camera**:
+The one camera, on the camera machine, that the camera route names, or the one that machine
+prefers when the route follows it: what every virtual camera shows the apps that open it.
+_Avoid_: active camera, source camera
+
+**Camera quality**:
+A shared entry saying at what size every camera stream runs: 720p or 1080p.
+_Avoid_: camera size, video quality, resolution
+
+**Camera stream**:
+The shared camera's picture carried as media from the camera machine to one other machine's
+virtual camera.
+_Avoid_: video flow, video stream, video send
+
+**Camera sharing**:
+A Mac's own setting saying whether its camera may be sent to other machines at all, which only
+that Mac changes.
+_Avoid_: camera privacy, camera enabled
+
+**Placeholder**:
+A picture the virtual camera shows in place of a camera's: Beamer's, saying why no camera is
+shown, or the virtual camera's own when Beamer is not feeding it.
+_Avoid_: waiting image, slate, built-in image
+
+**Frame Server**:
+Windows' camera service, which loads the virtual camera for the apps that open it.
+_Avoid_: camera service, svchost
+
