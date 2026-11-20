@@ -265,7 +265,7 @@ breaks any of them does not fit.
 > from a peer: the user copying, or any program writing to the clipboard, even the same contents
 > again.
 >
-> - tier: machine (what counts as a change is the real Mac pasteboard's and Windows clipboard's)
+> - tier: machine (what counts as a change is the real Mac and Windows clipboards')
 
 > r[clipboard.copy.after-write]
 > A copy made on a machine just after Beamer set a clipboard from a peer there is a copy, never part
@@ -431,13 +431,13 @@ breaks any of them does not fit.
 > sends the newest contents it read whole. A clipboard that never stays still for a read is a
 > failed read.
 >
-> - tier: machine (the Mac pasteboard's change count is the real one's)
+> - tier: machine (when the Mac clipboard changes is the real one's)
 
 > r[clipboard.read.mac-image]
 > On a Mac, an image the clipboard offers as PNG is sent as it is, and one it offers only as TIFF
 > is converted to PNG. A TIFF that cannot be converted gives no image, which is not a failed read.
 >
-> - tier: machine (TIFF and PNG on the pasteboard are the real Mac pasteboard's)
+> - tier: machine (TIFF and PNG on the clipboard are the real Mac clipboard's)
 
 > r[clipboard.read.pc-image]
 > On a PC, the image is read from the clipboard's device-independent bitmap and sent as a PNG of
@@ -491,7 +491,7 @@ breaks any of them does not fit.
 > r[clipboard.write.mac]
 > On a Mac, text is written as a string and an image as PNG only.
 >
-> - tier: machine (the pasteboard's types are the real Mac pasteboard's)
+> - tier: machine (the types on the clipboard are the real Mac clipboard's)
 
 > r[clipboard.write.pc-text]
 > On a PC, text is written with CRLF line endings: each LF, and each CRLF, becomes one CRLF.

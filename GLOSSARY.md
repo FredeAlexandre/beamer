@@ -192,6 +192,18 @@ _Avoid_: mouse-only
 Moves to whichever machine input is on, as the clipboard does.
 _Avoid_: follows focus
 
+## Clipboard
+
+**Clipboard**:
+A machine's own OS clipboard, whose text and PNG image follow input; also the message that carries
+them from one machine to another.
+_Avoid_: pasteboard, clipboard sync
+
+**Copy**:
+Any change to a machine's clipboard that Beamer did not make by setting a clipboard from a peer:
+the user copying, or another program writing to it.
+_Avoid_: local copy, local change, own write
+
 ## Displays
 
 **Display**:
