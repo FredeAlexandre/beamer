@@ -12,7 +12,7 @@ no Python test is its own:
 |---|---|---|
 | `link` | #52 | 321 |
 | `pairing` | #53 | 286 |
-| `store` | #54 | 0 |
+| `store` | #54 | 9 |
 | `discovery` | #55 | 116 |
 | `driving` | #56 | 327 |
 | `crossing` | #57 | 1115 |
@@ -20,12 +20,12 @@ no Python test is its own:
 | `clipboard` | #59 | 213 |
 | `settings` | #60 | 461 |
 | `display` | #61 | 31 |
-| `audio` | #62 | 148 |
+| `audio` | #62 | 136 |
 | `camera` | #63 | 202 |
 | `media` | #64 | 0 |
 | `platform` | #65 | 336 |
 | `runtime` | #66 | 3 |
-| `app` | #67 | 93 |
+| `app` | #67 | 96 |
 | `viewmodel` | #68 | 1046 |
 | `ui` | #69 | 741 |
 | `perf` | #70 | 0 |
@@ -77,14 +77,22 @@ flooded its own messages, and those tests went to the feature), the media engine
 ## Ambiguous assignments
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
-There are 90, covering 1,195 tests. Each row names the other candidates and why the owner won.
+There are 94, covering 1,204 tests. Each row names the other candidates and why the owner won.
 A miner who finds such a test's assertions are all another domain's settles it as
 `.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
+
+Rows marked "moved from audio (#62)" record lines that did move, after #51 (#147): the audio miner
+found their assertions all another domain's, and moved them to that domain's slice with no fate.
+Each splits its file or class, an exception to rule 2's "no assignment finer than a class": the
+other tests stay where they were.
 
 | Tests | Count | Owner | Also a candidate | Why the owner |
 |---|---|---|---|---|
 | `core/tests/test_address_choice_commit.py` | 3 | discovery | pairing | the address a peer is reached at, chosen by the user, is discovery's address list |
 | `core/tests/test_audio_link_gating.py` | 23 | audio | link | capability gating of `audio_*` messages; audio's own messages, so audio |
+| `core/tests/test_audio_model.py`, class `DeviceListTests` | 2 | store | audio | moved from audio (#62): which version of a machine record a machine keeps, and the record read back as written (`store.record.*`) |
+| `core/tests/test_audio_model.py`, class `ExhaustiveMergeTests` | 1 | store | audio | moved from audio (#62): writes of shared entries arriving in any order end the same (`store.entry.newest`) |
+| `core/tests/test_audio_model.py`, class `MergeTests`: `test_commutative_associative_idempotent`, `test_next_stamp_beats_everything_held`, `test_older_incoming_changes_nothing_and_asks_for_an_answer`, `test_round_trip_through_data`, `test_same_route_is_quiet`, `test_tie_goes_to_the_larger_by` | 6 | store | audio | moved from audio (#62): the newest stamp of a shared entry winning, ties, answers, stamps after every stamp seen, and the entries read back as written (`store.entry.*`, `store.stamp.*`) |
 | `core/tests/test_audio_view.py` | 36 | viewmodel | audio | the Audio page model, what each state shows and what each action calls |
 | `core/tests/test_camera_link_gating.py` | 26 | camera | link | capability gating of `camera_*` messages; camera's own messages, so camera |
 | `core/tests/test_camera_texts.py` | 8 | camera | viewmodel | the placeholder text is shown in the virtual camera's picture, not on a screen of Beamer's |
@@ -118,7 +126,8 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `core/tests/test_windows_launch_manifest.py` | 1 | platform | app | the Windows manifest asks for no elevation at launch, an install step (#21) |
 | `mac_app/tests/test_atlas_canvas.py` (its other classes) | 60 | viewmodel | ui, crossing | the crossing map's canvas; its tests are mostly what it shows and what a drag, drop or key does |
 | `mac_app/tests/test_atlas_canvas.py`, class `WrapAroundSeams` | 10 | crossing | viewmodel | wrap-around zones as the map shows them |
-| `mac_app/tests/test_audio_driver.py` | 23 | audio | platform | installing the virtual microphone; audio's scope names it |
+| `mac_app/tests/test_audio_driver.py` (its other tests) | 20 | audio | platform | installing the virtual microphone; audio's scope names it |
+| `mac_app/tests/test_audio_driver.py`, class `InstallPathTests`: `test_beamer_hal_is_chosen_when_it_exists`, `test_dev_mac_installs_through_beamer_hal_without_a_prompt`, `test_shipped_mac_runs_the_bundled_script_with_administrator_privileges` | 3 | app | audio | moved from audio (#62): whether an elevated step runs through the dev-only sudo rule with no prompt or through the administrator prompt (`app.elevated.no-prompt`, `app.elevated.prompt`) |
 | `mac_app/tests/test_bridge.py`, class `ControllerTests` | 37 | driving | crossing, link | the shortcut, take, refuse and send home, and alerts on a failed link |
 | `mac_app/tests/test_bridge.py`, class `CursorPinningTests` | 9 | crossing | input | the pointer held at the edge while pushing |
 | `mac_app/tests/test_bridge.py`, class `RoundTripTests` | 4 | viewmodel | link | when a response-time sample is shown |

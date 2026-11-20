@@ -1,150 +1,138 @@
 # The audio domain's slice of the Python ledger, laid out by #51.
 # Owner domains and the ambiguous assignments: spec/ledger/README.md.
-core/audio/service.py::AudioService::test_input
-core/tests/audio_fixtures.py::FakeService::test_input
-core/tests/test_audio_cluster.py::ConvergenceTests::test_sequences_with_three_audio_machines
-core/tests/test_audio_cluster.py::ConvergenceTests::test_two_hundred_seeded_sequences_with_a_peer_without_audio
-core/tests/test_audio_cluster.py::ScenarioTests::test_old_peer_receives_nothing
-core/tests/test_audio_cluster.py::ScenarioTests::test_reconnect_reapplies_the_route
-core/tests/test_audio_cluster.py::ScenarioTests::test_route_survives_a_restart
-core/tests/test_audio_cluster.py::ScenarioTests::test_three_machines_with_a_non_direct_pair
-core/tests/test_audio_cluster.py::ScenarioTests::test_unplug_and_replug
-core/tests/test_audio_helper.py::HelperProcessTests::test_eof_on_stdin_ends_the_helper
-core/tests/test_audio_helper.py::HelperProcessTests::test_exit_restarts_with_backoff_then_gives_up_and_retry_starts_again
-core/tests/test_audio_helper.py::HelperProcessTests::test_missing_binary_counts_as_a_failure
-core/tests/test_audio_helper.py::HelperProcessTests::test_spawn_ready_and_commands
-core/tests/test_audio_helper.py::HelperProcessTests::test_stderr_is_rate_limited
-core/tests/test_audio_helper.py::HelperProcessTests::test_the_vmic_exclusive_flag_reaches_the_process
-core/tests/test_audio_helper.py::HelperProcessTests::test_watchdog_kills_a_helper_that_stops_answering
-core/tests/test_audio_helper.py::LocateTests::test_available_needs_the_flag_and_a_file
-core/tests/test_audio_helper.py::LocateTests::test_command_line
-core/tests/test_audio_helper.py::LocateTests::test_frozen_app_finds_the_helper_next_to_its_executable
-core/tests/test_audio_helper.py::LocateTests::test_order_dev_switch_env_build
-core/tests/test_audio_helper.py::LocateTests::test_python_variables_do_not_reach_the_helper
-core/tests/test_audio_helper_native.py::NativeHelperTests::test_ready_devices_and_control_answers
-core/tests/test_audio_helper_native.py::NativeHelperTests::test_two_helpers_stream_over_loopback
-core/tests/test_audio_link_gating.py::CapabilityTableTests::test_every_audio_type_needs_the_audio_capability
-core/tests/test_audio_link_gating.py::CapabilityTableTests::test_linux_never_announces_audio
-core/tests/test_audio_link_gating.py::CapabilityTableTests::test_no_helper_means_no_audio
-core/tests/test_audio_link_gating.py::CapabilityTableTests::test_the_feature_flag_is_on_in_the_fork
-core/tests/test_audio_link_gating.py::LinkPeersTests::test_mac
-core/tests/test_audio_link_gating.py::LinkPeersTests::test_udp_host
-core/tests/test_audio_link_gating.py::LinkPeersTests::test_windows
-core/tests/test_audio_link_gating.py::LiveLinkTests::test_a_peer_without_audio_neither_gets_nor_gives_audio
-core/tests/test_audio_link_gating.py::LiveLinkTests::test_link_events_and_messages_with_an_audio_peer
-core/tests/test_audio_link_gating.py::LiveLinkTests::test_this_machine_without_audio_hands_nothing_over
-core/tests/test_audio_link_gating.py::LiveServicesTests::test_two_audio_machines_meet_and_an_old_peer_hears_nothing
-core/tests/test_audio_link_gating.py::MacHostTests::test_identity
-core/tests/test_audio_link_gating.py::MacHostTests::test_peer_host
-core/tests/test_audio_link_gating.py::MacHostTests::test_the_own_link_first_else_the_peers
-core/tests/test_audio_link_gating.py::OutboundGatingTests::test_audio_is_not_queued_for_a_peer_without_the_capability
-core/tests/test_audio_link_gating.py::OutboundGatingTests::test_audio_is_queued_for_a_peer_with_it
-core/tests/test_audio_link_gating.py::PcHostTests::test_identity
-core/tests/test_audio_link_gating.py::PcHostTests::test_peer_host
-core/tests/test_audio_link_gating.py::PcHostTests::test_the_own_link_first_else_the_peers
-core/tests/test_audio_link_gating.py::ResponderLinkTests::test_dispatch_hands_audio_over_only_when_both_ends_announced_it
-core/tests/test_audio_link_gating.py::ResponderLinkTests::test_post_drops_audio_for_a_peer_without_the_capability
-core/tests/test_audio_link_gating.py::ResponderLinkTests::test_post_keeps_audio_for_a_peer_with_it
-core/tests/test_audio_link_gating.py::ResponderLinkTests::test_set_audio_replaces_the_callbacks
-core/tests/test_audio_model.py::DeviceListTests::test_accept_by_rev_or_straight_from_its_machine
-core/tests/test_audio_model.py::DeviceListTests::test_machine_round_trip
-core/tests/test_audio_model.py::ExhaustiveMergeTests::test_every_order_of_three_routes_converges
-core/tests/test_audio_model.py::MergeTests::test_commutative_associative_idempotent
-core/tests/test_audio_model.py::MergeTests::test_forms_trimmed_oldest_null_first
-core/tests/test_audio_model.py::MergeTests::test_next_stamp_beats_everything_held
-core/tests/test_audio_model.py::MergeTests::test_older_incoming_changes_nothing_and_asks_for_an_answer
-core/tests/test_audio_model.py::MergeTests::test_per_entry_newer_wins_and_both_concurrent_edits_survive
-core/tests/test_audio_model.py::MergeTests::test_round_trip_through_data
-core/tests/test_audio_model.py::MergeTests::test_same_route_is_quiet
-core/tests/test_audio_model.py::MergeTests::test_tie_goes_to_the_larger_by
-core/tests/test_audio_model.py::OnlineTests::test_alone_and_cut_off
-core/tests/test_audio_model.py::OnlineTests::test_direct_peers_and_mutual_links_beyond
-core/tests/test_audio_model.py::OnlineTests::test_one_sided_link_does_not_count
-core/tests/test_audio_model.py::ResolveTests::test_key_then_unique_name
-core/tests/test_audio_model.py::ShapeTests::test_fields_match_the_contract
-core/tests/test_audio_model.py::ShapeTests::test_frozen_and_mapping_defaults_never_shared
-core/tests/test_audio_planner.py::MicTests::test_aec_by_form_override_and_mode
-core/tests/test_audio_planner.py::MicTests::test_aec_only_where_the_helper_has_it
-core/tests/test_audio_planner.py::MicTests::test_hold_keeps_demand_and_wakes
-core/tests/test_audio_planner.py::MicTests::test_no_aec_on_the_loop
-core/tests/test_audio_planner.py::MicTests::test_no_aec_while_the_speakers_play_nothing
-core/tests/test_audio_planner.py::MicTests::test_not_direct_is_unreachable
-core/tests/test_audio_planner.py::MicTests::test_offline_mic_machine
-core/tests/test_audio_planner.py::MicTests::test_on_demand_table
-core/tests/test_audio_planner.py::MicTests::test_two_consumers_and_the_pc_sees_the_same_status
-core/tests/test_audio_planner.py::MicTests::test_unique_name_finds_a_moved_device
-core/tests/test_audio_planner.py::OutputTests::test_not_direct
-core/tests/test_audio_planner.py::OutputTests::test_pc_sound_on_the_mac_is_planned_on_the_pc
-core/tests/test_audio_planner.py::OutputTests::test_redirect_table
-core/tests/test_audio_planner.py::OutputTests::test_send_spec_mutes_and_names_the_sink
-core/tests/test_audio_planner.py::SinkTests::test_receiver_checks
-core/tests/test_audio_service.py::DevCommandTests::test_dev_files
-core/tests/test_audio_service.py::DevCommandTests::test_without_the_switch_nothing_is_read
-core/tests/test_audio_service.py::HowlTests::test_howl_shows_on_the_sender_and_a_watching_receiver
-core/tests/test_audio_service.py::HowlTests::test_stream_closed_while_ducked_ends_the_howl
-core/tests/test_audio_service.py::HowlTests::test_unknown_streams_and_mic_streams_are_ignored
-core/tests/test_audio_service.py::PairTests::test_answerer_helper_restart_asks_for_a_flow
-core/tests/test_audio_service.py::PairTests::test_flow_state_gives_the_stream_path
-core/tests/test_audio_service.py::PairTests::test_form_override_reaches_the_owners_list
-core/tests/test_audio_service.py::PairTests::test_helper_crash_closes_streams_and_restart_reopens
-core/tests/test_audio_service.py::PairTests::test_helper_failed_and_retry
-core/tests/test_audio_service.py::PairTests::test_link_down_stops_everything_with_that_peer
-core/tests/test_audio_service.py::PairTests::test_link_fallback_posts_frames_and_caps_the_outbox
-core/tests/test_audio_service.py::PairTests::test_link_up_order_hello_devices_route
-core/tests/test_audio_service.py::PairTests::test_local_loop_when_the_mic_machine_records
-core/tests/test_audio_service.py::PairTests::test_loopback_host_means_no_udp
-core/tests/test_audio_service.py::PairTests::test_mac_offers_and_pc_answers_on_24823
-core/tests/test_audio_service.py::PairTests::test_malformed_and_capless_messages_are_ignored
-core/tests/test_audio_service.py::PairTests::test_mic_on_demand_open_and_close
-core/tests/test_audio_service.py::PairTests::test_mic_waiting_for_permission_opens_once_granted
-core/tests/test_audio_service.py::PairTests::test_own_list_rev_only_grows
-core/tests/test_audio_service.py::PairTests::test_receiver_refuses_its_muted_endpoint
-core/tests/test_audio_service.py::PairTests::test_refused_open_marks_failed_and_retries_on_change
-core/tests/test_audio_service.py::PairTests::test_route_change_closes_and_reopens
-core/tests/test_audio_service.py::PairTests::test_system_sound_waiting_for_its_prompt_opens_once_answered
-core/tests/test_audio_service.py::PairTests::test_test_input_on_a_peer
-core/tests/test_audio_service.py::PairTests::test_watch_levels_and_stats
-core/tests/test_audio_service.py::RestartTests::test_a_late_dev_test_source_is_what_restarts_the_mic
-core/tests/test_audio_service.py::RestartTests::test_pc_mic_and_output_in_one_change_open_each_stream_once
-core/tests/test_audio_service.py::RestartTests::test_unrelated_entries_never_restart_a_running_stream
-core/tests/test_audio_service.py::StoreTests::test_bad_file_loads_empty
-core/tests/test_audio_service.py::StoreTests::test_saved_after_the_debounce_and_loaded_on_start
-core/tests/test_audio_service.py::ThreadTests::test_link_threads_only_enqueue
-core/tests/test_audio_service.py::VmicExclusiveTests::test_a_replaced_helpers_late_events_are_dropped
-core/tests/test_audio_service.py::VmicExclusiveTests::test_dev_command
-core/tests/test_audio_service.py::VmicExclusiveTests::test_kept_across_a_restart_and_turned_off
-core/tests/test_audio_service.py::VmicExclusiveTests::test_local_only_and_windows_only
-core/tests/test_audio_service.py::VmicExclusiveTests::test_turning_it_on_restarts_the_helper_with_the_flag
-core/tests/test_audio_wire.py::MalformedTests::test_devices_limits
-core/tests/test_audio_wire.py::MalformedTests::test_flow_open_frame
-core/tests/test_audio_wire.py::MalformedTests::test_forms_over_the_limit_are_trimmed
-core/tests/test_audio_wire.py::MalformedTests::test_hello
-core/tests/test_audio_wire.py::MalformedTests::test_not_audio_or_unknown
-core/tests/test_audio_wire.py::MalformedTests::test_route_limits
-core/tests/test_audio_wire.py::MalformedTests::test_stats_drops_bad_entries
-core/tests/test_audio_wire.py::MalformedTests::test_stats_howls
-core/tests/test_audio_wire.py::RoundTripTests::test_every_builder_reads_back
-core/tests/test_audio_wire.py::RoundTripTests::test_full_device_lists_fit
-mac_app/tests/test_audio_driver.py::InstallPathTests::test_beamer_hal_is_chosen_when_it_exists
-mac_app/tests/test_audio_driver.py::InstallPathTests::test_cancelled_prompt
-mac_app/tests/test_audio_driver.py::InstallPathTests::test_dev_mac_installs_through_beamer_hal_without_a_prompt
-mac_app/tests/test_audio_driver.py::InstallPathTests::test_failure_carries_the_output
-mac_app/tests/test_audio_driver.py::InstallPathTests::test_never_while_a_stream_runs
-mac_app/tests/test_audio_driver.py::InstallPathTests::test_nothing_to_install_without_the_bundle_or_script
-mac_app/tests/test_audio_driver.py::InstallPathTests::test_runner_error_is_a_failure_not_an_exception
-mac_app/tests/test_audio_driver.py::InstallPathTests::test_shipped_mac_runs_the_bundled_script_with_administrator_privileges
-mac_app/tests/test_audio_driver.py::InstallPathTests::test_the_applescript_compiles
-mac_app/tests/test_audio_driver.py::InstallScriptCheckTests::test_a_foreign_bundle_is_refused
-mac_app/tests/test_audio_driver.py::InstallScriptCheckTests::test_a_signed_bundle_passes
-mac_app/tests/test_audio_driver.py::InstallScriptCheckTests::test_a_tampered_bundle_is_refused
-mac_app/tests/test_audio_driver.py::InstallScriptCheckTests::test_install_needs_root
-mac_app/tests/test_audio_driver.py::StatusTests::test_a_running_stream_blocks_the_offer
-mac_app/tests/test_audio_driver.py::StatusTests::test_foreign_or_unreadable_install_is_replaced
-mac_app/tests/test_audio_driver.py::StatusTests::test_frozen_app_looks_in_its_resources
-mac_app/tests/test_audio_driver.py::StatusTests::test_missing_offers_install
-mac_app/tests/test_audio_driver.py::StatusTests::test_no_bundle_offers_nothing
-mac_app/tests/test_audio_driver.py::StatusTests::test_older_installed_offers_update
-mac_app/tests/test_audio_driver.py::StatusTests::test_same_or_newer_installed_offers_nothing
-mac_app/tests/test_audio_driver.py::StatusTests::test_source_run_looks_in_the_native_build
-mac_app/tests/test_audio_driver.py::VersionTests::test_compare_is_numeric_not_textual
-mac_app/tests/test_audio_driver.py::VersionTests::test_parse
+core/audio/service.py::AudioService::test_input  python-detail: not a test: the audio service's method for testing a microphone, which pytest collects by its name
+core/tests/audio_fixtures.py::FakeService::test_input  python-detail: not a test: a page fixture's stand-in for that method, which pytest collects by its name
+core/tests/test_audio_cluster.py::ConvergenceTests::test_sequences_with_three_audio_machines  mined: audio.cluster.same-status, audio.cluster.in, audio.route.apart, audio.peer.gated, audio.status.streams, audio.sound.sent
+core/tests/test_audio_cluster.py::ConvergenceTests::test_two_hundred_seeded_sequences_with_a_peer_without_audio  mined: audio.cluster.same-status, audio.cluster.in, audio.route.apart, audio.peer.gated, audio.state.has-audio, audio.status.streams, audio.sound.sent
+core/tests/test_audio_cluster.py::ScenarioTests::test_old_peer_receives_nothing  mined: audio.peer.gated, audio.state.has-audio, audio.cluster.links
+core/tests/test_audio_cluster.py::ScenarioTests::test_reconnect_reapplies_the_route  mined: audio.link.down, audio.sound.waiting, audio.link.up
+core/tests/test_audio_cluster.py::ScenarioTests::test_route_survives_a_restart  mined: audio.link.restart, audio.mic.on-demand
+core/tests/test_audio_cluster.py::ScenarioTests::test_three_machines_with_a_non_direct_pair  mined: audio.cluster.in, audio.cluster.links, audio.cluster.no-timer, audio.route.any-machine, audio.sound.sent, audio.mic.direct-only
+core/tests/test_audio_cluster.py::ScenarioTests::test_unplug_and_replug  mined: audio.sound.device-gone, audio.route.found, audio.stream.take
+core/tests/test_audio_helper.py::HelperProcessTests::test_eof_on_stdin_ends_the_helper  python-detail: the separate audio helper process and its stdio protocol (ADR 0004: Beamer is one process, with no audio helper)
+core/tests/test_audio_helper.py::HelperProcessTests::test_exit_restarts_with_backoff_then_gives_up_and_retry_starts_again  python-detail: restarting a crashed audio helper process with a growing wait, and Retry (ADR 0004: no audio helper; audio.state.reasons)
+core/tests/test_audio_helper.py::HelperProcessTests::test_missing_binary_counts_as_a_failure  python-detail: the audio helper's executable missing (ADR 0004: no audio helper)
+core/tests/test_audio_helper.py::HelperProcessTests::test_spawn_ready_and_commands  python-detail: the separate audio helper process and its stdio protocol (ADR 0004: no audio helper)
+core/tests/test_audio_helper.py::HelperProcessTests::test_stderr_is_rate_limited  python-detail: the audio helper process's stderr in the log (ADR 0004: no audio helper)
+core/tests/test_audio_helper.py::HelperProcessTests::test_the_vmic_exclusive_flag_reaches_the_process  python-detail: the low-latency flag on the audio helper's command line (ADR 0004: no audio helper; audio.low-latency.pc)
+core/tests/test_audio_helper.py::HelperProcessTests::test_watchdog_kills_a_helper_that_stops_answering  python-detail: pinging the audio helper process and killing it when it stops answering (ADR 0004: no audio helper)
+core/tests/test_audio_helper.py::LocateTests::test_available_needs_the_flag_and_a_file  python-detail: Python's AUDIO feature flag and finding the audio helper's executable (ADR 0004: no audio helper)
+core/tests/test_audio_helper.py::LocateTests::test_command_line  python-detail: the audio helper's command line (ADR 0004: no audio helper)
+core/tests/test_audio_helper.py::LocateTests::test_frozen_app_finds_the_helper_next_to_its_executable  python-detail: where the frozen app finds the audio helper's executable (ADR 0004: no audio helper)
+core/tests/test_audio_helper.py::LocateTests::test_order_dev_switch_env_build  python-detail: the order in which Python looked for the audio helper's executable (ADR 0004: no audio helper)
+core/tests/test_audio_helper.py::LocateTests::test_python_variables_do_not_reach_the_helper  python-detail: Python's own environment variables kept from the audio helper process (ADR 0004: no audio helper)
+core/tests/test_audio_helper_native.py::NativeHelperTests::test_ready_devices_and_control_answers  python-detail: the C++ audio helper's stdio control protocol (ADR 0004: no audio helper)
+core/tests/test_audio_helper_native.py::NativeHelperTests::test_two_helpers_stream_over_loopback  wire-v6: the separate UDP media flow with its own offer, answer and keys, replaced by media datagrams on the link (link.class.media-datagrams)
+core/tests/test_audio_link_gating.py::CapabilityTableTests::test_every_audio_type_needs_the_audio_capability  mined: audio.peer.gated
+core/tests/test_audio_link_gating.py::CapabilityTableTests::test_linux_never_announces_audio  mined: audio.state.has-audio
+core/tests/test_audio_link_gating.py::CapabilityTableTests::test_no_helper_means_no_audio  python-detail: no audio without the audio helper's executable (ADR 0004: no audio helper)
+core/tests/test_audio_link_gating.py::CapabilityTableTests::test_the_feature_flag_is_on_in_the_fork  python-detail: Python's AUDIO feature flag; F43 ships (#11)
+core/tests/test_audio_link_gating.py::LinkPeersTests::test_mac  wire-v6: the Mac's two TCP links per pair, whose capabilities win and when the pair is up or down, replaced by one link per pair (ADR 0003)
+core/tests/test_audio_link_gating.py::LinkPeersTests::test_udp_host  wire-v6: which addresses the separate UDP media flow may bind towards, replaced by media datagrams on the link (link.class.media-datagrams)
+core/tests/test_audio_link_gating.py::LinkPeersTests::test_windows  wire-v6: the PC's two TCP links per pair, whose capabilities win and when the pair is up or down, replaced by one link per pair (ADR 0003)
+core/tests/test_audio_link_gating.py::LiveLinkTests::test_a_peer_without_audio_neither_gets_nor_gives_audio  mined: audio.peer.gated
+core/tests/test_audio_link_gating.py::LiveLinkTests::test_link_events_and_messages_with_an_audio_peer  mined: audio.peer.gated
+core/tests/test_audio_link_gating.py::LiveLinkTests::test_this_machine_without_audio_hands_nothing_over  mined: audio.peer.gated
+core/tests/test_audio_link_gating.py::LiveServicesTests::test_two_audio_machines_meet_and_an_old_peer_hears_nothing  mined: audio.peer.gated, audio.cluster.links, audio.state.has-audio
+core/tests/test_audio_link_gating.py::MacHostTests::test_identity  python-detail: the Mac app's adapter handing the audio service its own id, name and platform
+core/tests/test_audio_link_gating.py::MacHostTests::test_peer_host  wire-v6: the peer address the separate UDP media flow binds towards, replaced by media datagrams on the link (link.class.media-datagrams)
+core/tests/test_audio_link_gating.py::MacHostTests::test_the_own_link_first_else_the_peers  wire-v6: which of the pair's two TCP links carries audio, replaced by one link per pair (ADR 0003)
+core/tests/test_audio_link_gating.py::OutboundGatingTests::test_audio_is_not_queued_for_a_peer_without_the_capability  mined: audio.peer.gated
+core/tests/test_audio_link_gating.py::OutboundGatingTests::test_audio_is_queued_for_a_peer_with_it  mined: audio.peer.gated
+core/tests/test_audio_link_gating.py::PcHostTests::test_identity  python-detail: the PC app's adapter handing the audio service its own id, name and platform
+core/tests/test_audio_link_gating.py::PcHostTests::test_peer_host  wire-v6: the peer address the separate UDP media flow binds towards, replaced by media datagrams on the link (link.class.media-datagrams)
+core/tests/test_audio_link_gating.py::PcHostTests::test_the_own_link_first_else_the_peers  wire-v6: which of the pair's two TCP links carries audio, replaced by one link per pair (ADR 0003)
+core/tests/test_audio_link_gating.py::ResponderLinkTests::test_dispatch_hands_audio_over_only_when_both_ends_announced_it  mined: audio.peer.gated
+core/tests/test_audio_link_gating.py::ResponderLinkTests::test_post_drops_audio_for_a_peer_without_the_capability  mined: audio.peer.gated
+core/tests/test_audio_link_gating.py::ResponderLinkTests::test_post_keeps_audio_for_a_peer_with_it  mined: audio.peer.gated
+core/tests/test_audio_link_gating.py::ResponderLinkTests::test_set_audio_replaces_the_callbacks  python-detail: replacing the responder's audio callbacks after it was made
+core/tests/test_audio_model.py::MergeTests::test_forms_trimmed_oldest_null_first  mined: audio.form.kept
+core/tests/test_audio_model.py::MergeTests::test_per_entry_newer_wins_and_both_concurrent_edits_survive  mined: audio.route.apart, audio.route.sound
+core/tests/test_audio_model.py::OnlineTests::test_alone_and_cut_off  mined: audio.cluster.in
+core/tests/test_audio_model.py::OnlineTests::test_direct_peers_and_mutual_links_beyond  mined: audio.cluster.in
+core/tests/test_audio_model.py::OnlineTests::test_one_sided_link_does_not_count  mined: audio.cluster.in
+core/tests/test_audio_model.py::ResolveTests::test_key_then_unique_name  mined: audio.route.found
+core/tests/test_audio_model.py::ShapeTests::test_fields_match_the_contract  python-detail: the field names of the Python snapshot dataclasses
+core/tests/test_audio_model.py::ShapeTests::test_frozen_and_mapping_defaults_never_shared  python-detail: frozen dataclasses and unshared dict defaults in Python
+core/tests/test_audio_planner.py::MicTests::test_aec_by_form_override_and_mode  mined: audio.echo.when, audio.form.applied
+core/tests/test_audio_planner.py::MicTests::test_aec_only_where_the_helper_has_it  mined: audio.echo.when
+core/tests/test_audio_planner.py::MicTests::test_hold_keeps_demand_and_wakes  mined: audio.mic.keeps-running
+core/tests/test_audio_planner.py::MicTests::test_no_aec_on_the_loop  mined: audio.mic.own-machine
+core/tests/test_audio_planner.py::MicTests::test_no_aec_while_the_speakers_play_nothing  mined: audio.echo.when, audio.echo.idle, audio.sound.sent
+core/tests/test_audio_planner.py::MicTests::test_not_direct_is_unreachable  mined: audio.mic.direct-only, audio.mic.status
+core/tests/test_audio_planner.py::MicTests::test_offline_mic_machine  mined: audio.mic.machine-gone
+core/tests/test_audio_planner.py::MicTests::test_on_demand_table  mined: audio.mic.off, audio.mic.on-demand, audio.mic.own-machine, audio.mic.no-virtual, audio.mic.can-tell, audio.mic.device-gone, audio.mic.status, audio.route.default-follows
+core/tests/test_audio_planner.py::MicTests::test_two_consumers_and_the_pc_sees_the_same_status  mined: audio.cluster.same-status, audio.mic.on-demand, audio.mic.own-machine
+core/tests/test_audio_planner.py::MicTests::test_unique_name_finds_a_moved_device  mined: audio.route.found
+core/tests/test_audio_planner.py::OutputTests::test_not_direct  mined: audio.sound.unreachable
+core/tests/test_audio_planner.py::OutputTests::test_pc_sound_on_the_mac_is_planned_on_the_pc  mined: audio.sound.sent
+core/tests/test_audio_planner.py::OutputTests::test_redirect_table  mined: audio.sound.here, audio.sound.sent, audio.sound.device-gone, audio.sound.waiting, audio.sound.muted-there, audio.sound.cannot-capture
+core/tests/test_audio_planner.py::OutputTests::test_send_spec_mutes_and_names_the_sink  mined: audio.sound.sent, audio.sound.silent-here, audio.route.found, audio.stream.ask
+core/tests/test_audio_planner.py::SinkTests::test_receiver_checks  mined: audio.stream.take, audio.sound.muted-there
+core/tests/test_audio_service.py::DevCommandTests::test_dev_files  dropped: the audio-dev-* debug files and dev test sources (#11 Drop: dead or dev-only)
+core/tests/test_audio_service.py::DevCommandTests::test_without_the_switch_nothing_is_read  dropped: the audio-dev-* debug files (#11 Drop: dead or dev-only)
+core/tests/test_audio_service.py::HowlTests::test_howl_shows_on_the_sender_and_a_watching_receiver  mined: audio.feedback.report, audio.feedback.ends, audio.levels.drop
+core/tests/test_audio_service.py::HowlTests::test_stream_closed_while_ducked_ends_the_howl  mined: audio.feedback.ends
+core/tests/test_audio_service.py::HowlTests::test_unknown_streams_and_mic_streams_are_ignored  mined: audio.feedback.sound-only
+core/tests/test_audio_service.py::PairTests::test_answerer_helper_restart_asks_for_a_flow  wire-v6: asking the peer for a new UDP media flow after the audio helper restarted, replaced by media datagrams on the link (link.class.media-datagrams)
+core/tests/test_audio_service.py::PairTests::test_flow_state_gives_the_stream_path  wire-v6: whether a stream went over the UDP media flow or fell back to the link, replaced by media datagrams on the link (link.class.media-datagrams)
+core/tests/test_audio_service.py::PairTests::test_form_override_reaches_the_owners_list  mined: audio.form.applied, audio.form.choice
+core/tests/test_audio_service.py::PairTests::test_helper_crash_closes_streams_and_restart_reopens  python-detail: the audio helper process crashing and starting again (ADR 0004: no audio helper)
+core/tests/test_audio_service.py::PairTests::test_helper_failed_and_retry  mined: audio.state.reported
+core/tests/test_audio_service.py::PairTests::test_link_down_stops_everything_with_that_peer  mined: audio.link.down, audio.cluster.links
+core/tests/test_audio_service.py::PairTests::test_link_fallback_posts_frames_and_caps_the_outbox  wire-v6: media falling back from the UDP flow to audio_frame messages on the TCP link, replaced by media datagrams on the link (link.class.media-datagrams)
+core/tests/test_audio_service.py::PairTests::test_link_up_order_hello_devices_route  wire-v6: the audio_hello, audio_devices and audio_route messages at link up, replaced by the store's exchange (#14)
+core/tests/test_audio_service.py::PairTests::test_local_loop_when_the_mic_machine_records  mined: audio.mic.own-machine
+core/tests/test_audio_service.py::PairTests::test_loopback_host_means_no_udp  wire-v6: no UDP media flow towards a loopback address, replaced by media datagrams on the link (link.class.media-datagrams)
+core/tests/test_audio_service.py::PairTests::test_mac_offers_and_pc_answers_on_24823  wire-v6: the UDP media flow's offer and its answer on port 24823, replaced by media datagrams on the link (link.class.media-datagrams)
+core/tests/test_audio_service.py::PairTests::test_malformed_and_capless_messages_are_ignored  mined: audio.message.malformed, audio.peer.gated
+core/tests/test_audio_service.py::PairTests::test_mic_on_demand_open_and_close  mined: audio.mic.status, audio.mic.on-demand, audio.stream.ask, audio.echo.when, audio.echo.reported, audio.mic.keeps-running
+core/tests/test_audio_service.py::PairTests::test_mic_waiting_for_permission_opens_once_granted  mined: audio.permission.mic, audio.permission.answered, audio.status.failed, audio.status.retry
+core/tests/test_audio_service.py::PairTests::test_own_list_rev_only_grows  mined: audio.devices.rewritten
+core/tests/test_audio_service.py::PairTests::test_receiver_refuses_its_muted_endpoint  mined: audio.sound.muted-there
+core/tests/test_audio_service.py::PairTests::test_refused_open_marks_failed_and_retries_on_change  mined: audio.stream.take, audio.status.failed, audio.status.retry
+core/tests/test_audio_service.py::PairTests::test_route_change_closes_and_reopens  mined: audio.stream.change, audio.sound.here
+core/tests/test_audio_service.py::PairTests::test_system_sound_waiting_for_its_prompt_opens_once_answered  mined: audio.permission.answered, audio.status.failed
+core/tests/test_audio_service.py::PairTests::test_test_input_on_a_peer  mined: audio.levels.test
+core/tests/test_audio_service.py::PairTests::test_watch_levels_and_stats  mined: audio.levels.watch, audio.levels.what, audio.levels.rate
+core/tests/test_audio_service.py::RestartTests::test_a_late_dev_test_source_is_what_restarts_the_mic  dropped: the dev test sources set through the audio-dev-* files (#11 Drop: dead or dev-only)
+core/tests/test_audio_service.py::RestartTests::test_pc_mic_and_output_in_one_change_open_each_stream_once  mined: audio.stream.once
+core/tests/test_audio_service.py::RestartTests::test_unrelated_entries_never_restart_a_running_stream  mined: audio.stream.untouched
+core/tests/test_audio_service.py::StoreTests::test_bad_file_loads_empty  mined: audio.low-latency.setting
+core/tests/test_audio_service.py::StoreTests::test_saved_after_the_debounce_and_loaded_on_start  mined: audio.low-latency.setting, audio.link.restart
+core/tests/test_audio_service.py::ThreadTests::test_link_threads_only_enqueue  python-detail: the audio service's worker thread, which link threads only queue work for
+core/tests/test_audio_service.py::VmicExclusiveTests::test_a_replaced_helpers_late_events_are_dropped  python-detail: late events of a replaced audio helper process (ADR 0004: no audio helper)
+core/tests/test_audio_service.py::VmicExclusiveTests::test_dev_command  dropped: the audio-dev-* debug files (#11 Drop: dead or dev-only)
+core/tests/test_audio_service.py::VmicExclusiveTests::test_kept_across_a_restart_and_turned_off  mined: audio.low-latency.setting, audio.low-latency.change
+core/tests/test_audio_service.py::VmicExclusiveTests::test_local_only_and_windows_only  mined: audio.low-latency.setting, audio.low-latency.change
+core/tests/test_audio_service.py::VmicExclusiveTests::test_turning_it_on_restarts_the_helper_with_the_flag  mined: audio.low-latency.change, audio.low-latency.setting
+core/tests/test_audio_wire.py::MalformedTests::test_devices_limits  mined: audio.devices.limits, audio.devices.lenient
+core/tests/test_audio_wire.py::MalformedTests::test_flow_open_frame  wire-v6: the JSON of the audio_flow, audio_open, audio_opened, audio_close, audio_frame, audio_watch and audio_test messages, replaced by the link's messages (link.frame.*)
+core/tests/test_audio_wire.py::MalformedTests::test_forms_over_the_limit_are_trimmed  mined: audio.form.kept
+core/tests/test_audio_wire.py::MalformedTests::test_hello  wire-v6: the audio_hello message, replaced by capabilities in machine records (#14)
+core/tests/test_audio_wire.py::MalformedTests::test_not_audio_or_unknown  wire-v6: the {type, data} JSON of audio_* messages, replaced by the link's messages (link.frame.*)
+core/tests/test_audio_wire.py::MalformedTests::test_route_limits  mined: audio.route.schema
+core/tests/test_audio_wire.py::MalformedTests::test_stats_drops_bad_entries  wire-v6: the JSON of the audio_stats message, replaced by the link's messages (link.frame.*)
+core/tests/test_audio_wire.py::MalformedTests::test_stats_howls  wire-v6: the JSON of the audio_stats message's feedback reports, replaced by the link's messages (link.frame.*)
+core/tests/test_audio_wire.py::RoundTripTests::test_every_builder_reads_back  wire-v6: building and reading back the JSON audio_* messages, replaced by the link's messages (link.frame.round-trip)
+core/tests/test_audio_wire.py::RoundTripTests::test_full_device_lists_fit  wire-v6: the 32 KiB limit of an audio_devices message, replaced by the store's changes of any size (#14)
+mac_app/tests/test_audio_driver.py::InstallPathTests::test_cancelled_prompt  mined: audio.install.page
+mac_app/tests/test_audio_driver.py::InstallPathTests::test_failure_carries_the_output  mined: audio.install.page
+mac_app/tests/test_audio_driver.py::InstallPathTests::test_never_while_a_stream_runs  mined: audio.install.busy
+mac_app/tests/test_audio_driver.py::InstallPathTests::test_nothing_to_install_without_the_bundle_or_script  mined: audio.install.page
+mac_app/tests/test_audio_driver.py::InstallPathTests::test_runner_error_is_a_failure_not_an_exception  mined: audio.install.page
+mac_app/tests/test_audio_driver.py::InstallPathTests::test_the_applescript_compiles  python-detail: the AppleScript Python built to run the install script with administrator rights (#21: the install is `beamer --elevated install-driver`)
+mac_app/tests/test_audio_driver.py::InstallScriptCheckTests::test_a_foreign_bundle_is_refused  mined: audio.install.pinned
+mac_app/tests/test_audio_driver.py::InstallScriptCheckTests::test_a_signed_bundle_passes  mined: audio.install.pinned, audio.install.copies
+mac_app/tests/test_audio_driver.py::InstallScriptCheckTests::test_a_tampered_bundle_is_refused  mined: audio.install.pinned
+mac_app/tests/test_audio_driver.py::InstallScriptCheckTests::test_install_needs_root  mined: audio.install.root
+mac_app/tests/test_audio_driver.py::StatusTests::test_a_running_stream_blocks_the_offer  mined: audio.install.busy
+mac_app/tests/test_audio_driver.py::StatusTests::test_foreign_or_unreadable_install_is_replaced  mined: audio.install.carried
+mac_app/tests/test_audio_driver.py::StatusTests::test_frozen_app_looks_in_its_resources  mined: audio.install.carried
+mac_app/tests/test_audio_driver.py::StatusTests::test_missing_offers_install  mined: audio.install.carried
+mac_app/tests/test_audio_driver.py::StatusTests::test_no_bundle_offers_nothing  mined: audio.install.carried
+mac_app/tests/test_audio_driver.py::StatusTests::test_older_installed_offers_update  mined: audio.install.carried
+mac_app/tests/test_audio_driver.py::StatusTests::test_same_or_newer_installed_offers_nothing  mined: audio.install.carried
+mac_app/tests/test_audio_driver.py::StatusTests::test_source_run_looks_in_the_native_build  python-detail: where a run from the source checkout found the virtual microphone's native build
+mac_app/tests/test_audio_driver.py::VersionTests::test_compare_is_numeric_not_textual  mined: audio.install.carried
+mac_app/tests/test_audio_driver.py::VersionTests::test_parse  mined: audio.install.carried
