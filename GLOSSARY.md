@@ -225,8 +225,9 @@ An audio device that plays, such as speakers or headphones.
 _Avoid_: sink, playback device
 
 **Virtual microphone**:
-The microphone Beamer adds to the Mac, where an audio route delivers another machine's microphone.
-Its product name is Beamer Microphone.
+The microphone each machine's apps record to hear the shared microphone. On a Mac it is the one
+Beamer adds, whose product name is Beamer Microphone; on a PC it is VB-CABLE, which the user
+installs.
 _Avoid_: driver, HAL driver, mac driver
 
 **Virtual camera**:
@@ -247,6 +248,11 @@ _Avoid_: active microphone, active mic
 One machine's microphone or sound carried as media to one other machine, or the shared microphone
 played into its own machine's virtual microphone.
 _Avoid_: audio flow
+
+**Headset choice**:
+A shared entry saying whether one machine's output is a headset, speakers, or as the OS says,
+which sets the form every machine reads for that output.
+_Avoid_: form override, override
 
 **Camera route**:
 A shared entry saying which machine's camera another machine sees.

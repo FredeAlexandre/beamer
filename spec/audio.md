@@ -57,9 +57,16 @@ permission, and failed while it is refused.
 
 > r[audio.state.reasons]
 > When a machine's audio fails, its record says why, as the capability reported it, and nothing of
-> its audio runs: it sends no audio stream and takes none.
+> its audio runs: every audio stream it sends or takes stops, each peer that took one stops playing
+> it, and it sends and takes none while its audio stays failed.
 >
 > - parity: Python's audio also restarted a crashed audio helper with a growing wait, and gave up after repeated crashes until the user pressed Retry (ADR 0004: Beamer is one process, with no audio helper to restart)
+
+> r[audio.state.recovers]
+> When a machine's audio runs again after it failed, the audio streams the routes call for to and
+> from that machine start again, with nothing set again.
+>
+> - model: audio
 
 r[audio.state.has-audio]
 A machine has audio when its record reports its audio devices capability in any state but
@@ -115,36 +122,62 @@ The virtual microphone and its feed, and VB-CABLE's "CABLE Output", "CABLE Input
 microphone or default output is one of them, the record names no default.
 
 > r[audio.devices.left-alone]
-> A device whose name or manufacturer contains "Elgato", in any case, and that is attached as
-> virtual, is a device Beamer leaves alone, and so is each Elgato Wave Link virtual device named in
-> Python's lists (on a Mac "Wave Link Stream", "Wave Link Monitor", "Wave Link MicrophoneFX",
-> "Wave Link System", "Wave Link Music", "Wave Link Browser", "Wave Link Voice Chat",
-> "Wave Link Game", "Wave Link SFX", "Wave Link Aux 1" and "Wave Link Aux 2"; on a PC
-> "Personal Mix (Elgato Virtual Audio)", "Stream Mix (Elgato Virtual Audio)",
-> "Chat Mix (Elgato Virtual Audio)", "System (Elgato Virtual Audio)" and
-> "Wave 3 (Elgato Virtual Audio)", compared without case) when attached as virtual. Beamer never
-> lists, opens, mutes or changes such a device, and a default that is one of them is named as none.
-> A physical Elgato device, such as a Wave:3 on USB, is listed like any other.
+> Beamer never lists, opens, mutes or changes a device it leaves alone, and a default that is one of
+> them is named as none. On a Mac, it leaves alone a device attached as virtual whose name or
+> manufacturer contains "Elgato", in any case, or whose name is exactly one of "Wave Link Stream",
+> "Wave Link Monitor", "Wave Link MicrophoneFX", "Wave Link System", "Wave Link Music",
+> "Wave Link Browser", "Wave Link Voice Chat", "Wave Link Game", "Wave Link SFX", "Wave Link Aux 1"
+> and "Wave Link Aux 2". On a PC, it leaves alone:
+>
+> - a device attached as virtual whose name, adapter name or manufacturer contains "Elgato";
+> - whatever its attachment, a device named "Personal Mix (Elgato Virtual Audio)",
+>   "Stream Mix (Elgato Virtual Audio)", "Chat Mix (Elgato Virtual Audio)",
+>   "System (Elgato Virtual Audio)" or "Wave 3 (Elgato Virtual Audio)";
+> - a device whose adapter's instance id starts with `TUSBAUDIO_ENUM\VID_0FD9&PID_0096` or
+>   `USB\VID_0FD9&PID_0096`, or whose adapter, or any device above it, has an instance id starting
+>   with `ROOT\ELGATO_ROOT_DEVICE`, so that Wave Link's devices stay left alone when a driver update
+>   renames their adapter or attaches them as USB.
+>
+> On a PC, names and ids are compared without case. A physical Elgato device, such as a Wave:3 on
+> USB, is listed like any other.
 
 > r[audio.devices.mac-form]
-> On a Mac, a built-in microphone is a headset when its data source is the external microphone, and
-> a microphone otherwise; a built-in output is headphones when its data source is headphones, and
-> speakers otherwise. A Bluetooth device whose name says "speaker" is speakers, or a microphone when
-> it records; any other Bluetooth microphone is a headset, and a Bluetooth output is a headset when
-> it also records or its name says "headset", "airpods" or "buds", and headphones otherwise. Any
-> other device takes its form from its terminal type: headphones, headset microphone, speaker or
-> microphone, except that a USB device that both records and plays is not taken as speakers or a
-> microphone by its terminal type. A device none of these settles is unknown. Names are compared
+> On a Mac, a device's microphone and its output each take a form, the first of these that holds.
+> A name says headset when it contains "headset", "airpods" or "buds", and names are compared
 > without case.
+>
+> 1. Built in: a microphone is a headset when its data source is the external microphone, and a
+>    microphone otherwise; an output is headphones when its data source is headphones, and speakers
+>    otherwise.
+> 2. Bluetooth: a device whose name contains "speaker" is a microphone when it records and speakers
+>    when it plays; else a microphone is a headset, and an output is a headset when the device also
+>    records or its name says headset, and headphones otherwise.
+> 3. Its terminal type: headphones are headphones, a headset microphone is a headset, a speaker, an
+>    LFE speaker or a receiver speaker is speakers, and a microphone or a receiver microphone is a
+>    microphone, except that a USB device that both records and plays is never speakers or a
+>    microphone by its terminal type.
+> 4. USB: a device whose name contains "speaker" is a microphone when it records and speakers when it
+>    plays; else a device that both records and plays, or whose name says headset, is a headset; else
+>    a device whose name contains "headphone" is headphones; else a microphone is a microphone and an
+>    output is unknown.
+> 5. HDMI or DisplayPort: an output is speakers and a microphone is unknown.
+> 6. Any other device: a headset when its name says headset; else an output whose name contains
+>    "headphone" is headphones; else unknown.
 
 > r[audio.devices.pc-form]
-> On a PC, a device's form comes from its endpoint's form factor: headphones are headphones, a
-> headset or a handset is a headset, and a microphone is a headset when its name or adapter says
-> "headset", "micro-casque" or "sur casque", and a microphone otherwise. With any other form factor,
-> a USB or Bluetooth device whose name or adapter says "headset" is a headset, an output whose name
-> says "headphone" or is or starts with "casque" is headphones, speakers and a digital display are
-> speakers, any other output is unknown and any other microphone is a microphone. Names are
-> compared without case.
+> On a PC, a device's form is the first of these that holds. Its description is the endpoint's own
+> name without its adapter's, such as "Headphones" in "Headphones (2- Elgato Wave:3)". It says
+> headset when its adapter's name contains "headset", or its description contains "headset",
+> "micro-casque" or "sur casque"; it says headphones when its description contains "headphone", is
+> "casque" or starts with "casque ". All are compared without case.
+>
+> 1. Its endpoint's form factor is headphones: headphones.
+> 2. Its form factor is headset or handset: a headset.
+> 3. Its form factor is microphone: a headset when it says headset, and a microphone otherwise.
+> 4. It is attached by USB or Bluetooth and says headset: a headset.
+> 5. It says headphones: headphones when it is an output, and unknown when it is a microphone.
+> 6. Its form factor is speakers or digital display: speakers.
+> 7. Else an output is unknown and a microphone is a microphone.
 
 ## Headset choices
 
@@ -310,10 +343,19 @@ microphone or default output is one of them, the record names no default.
 > - model: audio
 
 > r[audio.mic.status]
-> While the shared microphone streams to at least one machine, its own included, its status is
-> streaming, naming those machines. Otherwise it is unreachable when any machine recording it is
-> (`audio.mic.direct-only`), else without a virtual microphone when any is
-> (`audio.mic.no-virtual`), and else ready: chosen, with no app recording it.
+> The microphone's route has one status, the first of these that holds, whichever other rules of
+> this section also hold:
+>
+> 1. off (`audio.mic.off`);
+> 2. waiting for the shared microphone's machine (`audio.mic.machine-gone`);
+> 3. waiting for the device (`audio.mic.device-gone`);
+> 4. failed, while one of its microphone streams cannot start (`audio.status.failed`);
+> 5. streaming, while the shared microphone streams to at least one machine, its own included,
+>    naming those machines;
+> 6. unreachable, when any machine recording it is (`audio.mic.direct-only`), and else without a
+>    virtual microphone (`audio.mic.no-virtual`), naming in either case every machine recording it
+>    that gets no stream;
+> 7. else ready: chosen, with no app recording it.
 >
 > - model: audio
 
@@ -362,8 +404,24 @@ Core reports whether echo is cancelled on a running microphone stream of this ma
 > While a machine's sound route sends its sound to another machine, and none of
 > `audio.sound.waiting`, `audio.sound.unreachable`, `audio.sound.cannot-capture`,
 > `audio.sound.device-gone` and `audio.sound.muted-there` stops it, that machine streams its sound
-> to the output the route names on the other machine, and plays none of it itself. The route's status is streaming. The machine whose sound it is sends the stream,
-> whichever machine wrote the route.
+> to the output the route names on the other machine, and plays none of it itself. The route's
+> status is streaming, unless its stream cannot start (`audio.sound.status`). The machine whose
+> sound it is sends the stream, whichever machine wrote the route.
+>
+> - model: audio
+
+> r[audio.sound.status]
+> A sound route has one status, the first of these that holds, whichever other rules of this
+> section also hold:
+>
+> 1. here (`audio.sound.here`);
+> 2. waiting for the other machine (`audio.sound.waiting`);
+> 3. unreachable (`audio.sound.unreachable`);
+> 4. failed, because the sending machine cannot capture its sound (`audio.sound.cannot-capture`);
+> 5. waiting for the device (`audio.sound.device-gone`);
+> 6. the output muted there (`audio.sound.muted-there`);
+> 7. failed, while its stream cannot start (`audio.status.failed`);
+> 8. else streaming (`audio.sound.sent`).
 >
 > - model: audio
 
@@ -424,7 +482,7 @@ Core reports whether echo is cancelled on a running microphone stream of this ma
 > Beamer was killed with the output muted.
 >
 > - tier: machine (only a real output's mute and volumes show it)
-> - parity: Python's PC also put a killed audio helper's mutes back within about 30 ms through a guard process of its own (ADR 0004: the watchdog runs no Beamer logic, so a muted output is put back at the start the watchdog relaunches)
+> - parity: Python's PC also put a killed audio helper's mutes back within about 1 s through a guard process of its own (ADR 0004: the watchdog runs no Beamer logic, so a muted output is put back at the start the watchdog relaunches)
 
 > r[audio.sound.user-wins]
 > On a PC, while Beamer holds an output muted for a sound stream, a volume change the user makes to
@@ -449,8 +507,10 @@ Beamer never changes which microphone or output the OS uses by default, on any m
 
 > r[audio.status.retry]
 > A failed audio stream is asked for again only when the record of the machine it goes to changes,
-> when an audio route or headset choice changes, or when a prompt for the permission it waited on is
-> answered (`audio.permission.answered`). Nothing else asks for it again.
+> when an audio route or headset choice changes, when a prompt for the permission it waited on is
+> answered (`audio.permission.answered`), when the link to that machine comes up again
+> (`audio.link.up`), or when the sending machine's audio runs again after it failed
+> (`audio.state.recovers`). Nothing else asks for it again.
 >
 > - model: audio
 
@@ -569,9 +629,9 @@ audio it has a link up with to send its own, a peer whose link comes up meanwhil
 asked to stop, it tells those peers to stop. A request that repeats the one before changes nothing.
 
 r[audio.levels.what]
-A level is the average and the peak of one device, in dBFS to 0.1 dB, at least -100 dBFS. Levels
-are reported for each microphone and output Beamer has open on a machine, by machine and device
-key.
+A level is the root mean square and the peak of one device's samples, over all its channels, in
+dBFS to 0.1 dB, at least -100 dBFS. Levels are reported for each microphone and output Beamer has
+open on a machine, by machine and device key.
 
 r[audio.levels.rate]
 A peer that has asked for levels gets this machine's every 250 ms.

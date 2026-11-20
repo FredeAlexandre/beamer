@@ -66,7 +66,7 @@ core/tests/test_audio_planner.py::MicTests::test_two_consumers_and_the_pc_sees_t
 core/tests/test_audio_planner.py::MicTests::test_unique_name_finds_a_moved_device  mined: audio.route.found
 core/tests/test_audio_planner.py::OutputTests::test_not_direct  mined: audio.sound.unreachable
 core/tests/test_audio_planner.py::OutputTests::test_pc_sound_on_the_mac_is_planned_on_the_pc  mined: audio.sound.sent
-core/tests/test_audio_planner.py::OutputTests::test_redirect_table  mined: audio.sound.here, audio.sound.sent, audio.sound.device-gone, audio.sound.waiting, audio.sound.muted-there, audio.sound.cannot-capture
+core/tests/test_audio_planner.py::OutputTests::test_redirect_table  mined: audio.sound.here, audio.sound.sent, audio.sound.device-gone, audio.sound.waiting, audio.sound.muted-there, audio.sound.cannot-capture, audio.sound.status
 core/tests/test_audio_planner.py::OutputTests::test_send_spec_mutes_and_names_the_sink  mined: audio.sound.sent, audio.sound.silent-here, audio.route.found, audio.stream.ask
 core/tests/test_audio_planner.py::SinkTests::test_receiver_checks  mined: audio.stream.take, audio.sound.muted-there
 core/tests/test_audio_service.py::DevCommandTests::test_dev_files  dropped: the audio-dev-* debug files and dev test sources (#11 Drop: dead or dev-only)
@@ -77,7 +77,7 @@ core/tests/test_audio_service.py::HowlTests::test_unknown_streams_and_mic_stream
 core/tests/test_audio_service.py::PairTests::test_answerer_helper_restart_asks_for_a_flow  wire-v6: asking the peer for a new UDP media flow after the audio helper restarted, replaced by media datagrams on the link (link.class.media-datagrams)
 core/tests/test_audio_service.py::PairTests::test_flow_state_gives_the_stream_path  wire-v6: whether a stream went over the UDP media flow or fell back to the link, replaced by media datagrams on the link (link.class.media-datagrams)
 core/tests/test_audio_service.py::PairTests::test_form_override_reaches_the_owners_list  mined: audio.form.applied, audio.form.choice
-core/tests/test_audio_service.py::PairTests::test_helper_crash_closes_streams_and_restart_reopens  python-detail: the audio helper process crashing and starting again (ADR 0004: no audio helper)
+core/tests/test_audio_service.py::PairTests::test_helper_crash_closes_streams_and_restart_reopens  mined: audio.state.reasons, audio.state.recovers, audio.status.retry
 core/tests/test_audio_service.py::PairTests::test_helper_failed_and_retry  mined: audio.state.reported
 core/tests/test_audio_service.py::PairTests::test_link_down_stops_everything_with_that_peer  mined: audio.link.down, audio.cluster.links
 core/tests/test_audio_service.py::PairTests::test_link_fallback_posts_frames_and_caps_the_outbox  wire-v6: media falling back from the UDP flow to audio_frame messages on the TCP link, replaced by media datagrams on the link (link.class.media-datagrams)
