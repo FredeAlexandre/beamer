@@ -384,12 +384,14 @@ allowed, not allowed, restricted, not asked yet, or unknown.
 > 8. denied, while the camera machine's camera access is not allowed or restricted;
 > 9. waiting for camera access, while it is not asked yet or unknown;
 > 10. then, from the statuses this machine reports for the machines (`camera.status.machine`):
->     streaming, naming every machine streaming; else starting, naming every machine starting; else
+>     streaming, naming every machine streaming or reduced, while any machine is streaming; else
+>     reduced, naming every machine reduced; else starting, naming every machine starting; else
 >     failed, naming the first failed machine in machine id order, with its reason; else
 >     unreachable, naming every machine unreachable; else idle, naming every machine idle; else not
 >     installed, outdated or damaged, in that order, naming every machine in that state; else no
 >     virtual camera.
 >
+> - parity: Python's route status took no account of reduced machines, so a route whose only running streams were reduced fell through to no virtual camera, and a streaming route never named a reduced machine (its own view expected a reduced route status, and a stream that runs reduced still runs)
 > - model: camera
 
 > r[camera.status.machine]
