@@ -322,8 +322,9 @@ Core reports it so (`audio.echo.reported`).
 
 r[media.echo.removes]
 With a reference whose echo reaches the microphone within 100 ms, the echo in the microphone stream
-is at least 20 dB lower than without the canceller 5 s after the echo starts, and a voice at the
-microphone, alone or over the echo, changes by less than 1 dB.
+is at least 20 dB lower than without the canceller 5 s after the echo starts. A voice at the
+microphone alone changes by less than 1 dB. While a voice talks over the echo, it loses less than 3
+dB, and the echo is still more than 10 dB lower.
 
 > r[media.echo.no-path]
 > Until an echo path shows, the microphone passes the canceller with only the filter's DC notch: an
