@@ -552,18 +552,25 @@ On a fragment whose packet number is more than one above the highest yet, the re
 once asks the camera machine to send every missing packet again, as many to a request as fit. It
 asks again for each still missing 15 ms after the first request, and then once more after the retry
 interval, max(2 × QUIC's RTT for the link (`link.rtt.reported`), 15 ms): 3 requests in all. The
-first goes whatever the due time; the second and third only while the oldest picture the gap may
-hold is not yet due: the picture of the last fragment before the gap, or the next one when that
-fragment ended its picture. A gap of more than 64 packets is asked for not at all, and every picture
-it may hold is lost at once: that oldest one, and on to the picture of the fragment after the gap,
-or the one before it when that fragment begins its picture.
+first goes whatever the due time; each later one only while the oldest picture the gap may hold is
+not yet due, and once one is skipped that packet is asked for no more. The pictures a gap may
+hold run from that oldest one, the picture of the last fragment before the gap or the next one when
+that fragment ended its picture, to the picture of the fragment after the gap, or the one before it
+when that fragment begins its picture; they are the oldest one alone when that range is empty. A
+gap of more than 64 packets is asked for not at all. What a gap does to its pictures is
+`media.video.lost`.
 
 r[media.video.lost]
-A picture is lost only on evidence: a packet it may hold is still missing one retry interval after
-its third request (`media.video.nack`), or fell in a gap too large to ask for; it is not whole when
-it falls due and a later packet has arrived; or no fragment of it came, a later picture's has, and
-its due time (`media.video.unseen-due`) has passed. A picture merely late, with nothing later
-arrived, is not lost.
+Loss evidence goes on up to 256 of the pictures a gap may hold (`media.video.nack`), counting from
+the oldest: at once for a gap of more than 64 packets, and otherwise when a packet of the gap is
+still missing one retry interval after its third request. A picture that is not whole is lost when
+it carries loss evidence; when it is due and a later packet has arrived; or when no fragment of it
+came, a later picture's has, and its due time (`media.video.unseen-due`) has passed. A whole
+picture is never lost, and a picture merely late, with nothing later arrived, is not lost. From the
+first key frame on, a picture is lost only in its turn, once every picture before it is decoded or
+lost: until then evidence on it waits, and so does the request for a key frame its loss makes
+(`media.video.asks`). A picture that is whole by its turn is decoded
+(`media.video.decoded-in-order`).
 
 r[media.video.unseen-due]
 A picture of which no fragment came falls due when the next picture of which a fragment came does,
