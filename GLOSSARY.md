@@ -242,3 +242,25 @@ _Avoid_: audio follows input
 A shared entry saying which machine's camera another machine sees.
 _Avoid_: camera follows input
 
+
+## Media
+
+**Media packet**:
+One datagram of media on a link: an audio frame, a fragment of a camera stream's picture, a
+stream's feedback to its sender, or a time map.
+_Avoid_: RTP packet
+
+**Jitter buffer**:
+Where a machine keeps an audio stream's frames as they arrive, and plays them from, so that sound
+arriving unevenly plays evenly.
+_Avoid_: playout buffer, JB
+
+**Time map**:
+A media packet pairing a stream's timestamp with the sending machine's clock, so the receiving
+machine can play a camera stream in step with a microphone stream.
+_Avoid_: sender report, SR
+
+**Feedback guard**:
+The watch on a sound stream, on the machine that sends it, that turns it down while acoustic
+feedback through two machines builds up.
+_Avoid_: howl guard, howl
