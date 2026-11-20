@@ -47,10 +47,9 @@ microphones of the Mac and `lebig` can show is `machine`.
 ## Media packets
 
 > r[media.packet.kinds]
-> A media packet is one of: an audio frame, a fragment of a video frame, a receiver report, a
-> request to send packets again (NACK), a request for a key frame (PLI), or a time map. Each names
-> the stream it belongs to, but a time map, which speaks for every stream its sender sends to that
-> machine.
+> A media packet is one of: an audio frame, a fragment of a picture of a camera stream, a receiver
+> report, a request to send packets again (NACK), a request for a key frame (PLI), or a time map.
+> Each names the stream it belongs to, but a time map, which speaks for several (`media.time-map.carries`).
 >
 > - fuzz: media-frame
 
@@ -59,6 +58,12 @@ microphones of the Mac and `lebig` can show is `machine`.
 > encoding.
 >
 > - parity: Python's media packets carried up to 1400 bytes of payload behind a 24-byte header and a 16-byte tag (#14: payloads of at most 1200 bytes, so a packet fits any path the link takes)
+> - fuzz: media-frame
+
+> r[media.packet.number]
+> Each audio frame and each fragment carries its stream's packet number: 1 for the stream's first
+> packet, and one more for each packet after it. A fragment sent again keeps its number.
+>
 > - fuzz: media-frame
 
 > r[media.packet.round-trip]
@@ -73,9 +78,10 @@ microphones of the Mac and `lebig` can show is `machine`.
 > - fuzz: media-frame
 
 > r[media.packet.out-of-range]
-> A media packet that decodes but whose values are out of range (an audio frame of 0 samples or of
-> more than 5760, or of other than 1 or 2 audio channels, a fragment whose index is not below its
-> frame's fragment count) is ignored, and the link stays up.
+> A media packet that decodes but whose values are out of range is ignored, and the link stays up:
+> a fragment whose picture has no fragments or more than 1024, or whose index is not below its
+> picture's count; a request to send packets again naming none, or more than 32 runs of them; a
+> time map of no stream or of more than 32.
 >
 > - fuzz: media-frame
 
@@ -137,7 +143,9 @@ due to the newest one, and what the resampler holds. Its aim is the level it ste
 
 r[media.jitter.waits]
 Before it plays, the jitter buffer plays silence until the frames it holds span its aim, less half
-of what the output asks for at a time. It then plays from the oldest frame it holds.
+of what the output asks for at a time, and then plays from the oldest frame it holds. When it waits
+again after playing, it plays silence until its level reaches its aim, and goes on from the next
+frame due, or from the oldest frame it holds when that one is newer.
 
 > r[media.jitter.aim]
 > The jitter buffer's aim is the sum of: what the output asks for at a time, but at least 10 ms;
@@ -146,8 +154,6 @@ of what the output asks for at a time. It then plays from the oldest frame it ho
 > time, less the lowest such value over the last 10 s, and an excess of 150 ms or more is left out
 > as an outage. With fewer than 10 frames in the last 10 s, the percentile counts as 10 ms. It is
 > worked out again at most every 20 ms. A new stream's aim starts at 25 ms.
->
-> - fuzz: media-frame
 
 r[media.jitter.aim-moves]
 A higher aim is taken at once. A lower one is approached gradually: at each pull, the aim moves
@@ -247,7 +253,7 @@ cutoff 0.97 of the Nyquist frequency), each phase's taps summing to 1.
 
 > r[media.report.while-receiving]
 > While a machine takes an audio stream from a peer that sent it media in the last 1 s, it sends
-> that peer a receiver report every 10 ms, unless it sent that peer a media packet in the last 9 ms.
+> that peer a receiver report every 10 ms, unless it sent that peer a datagram in the last 9 ms.
 > One report goes per 10 ms per peer, cycling through the audio streams it takes from that peer
 > that sent media in the last 1 s.
 >
@@ -395,4 +401,289 @@ r[media.feedback.reported]
 The guard reports each change, turned down or back up, with the tone's frequency in Hz, to Core
 (`audio.feedback.report`).
 
-<!-- VIDEO -->
+## Camera streams: coding
+
+A camera stream carries H.264 from the camera machine's encoder. Its timestamps count a 90 kHz
+clock, and each coded picture, an access unit, has a frame number.
+
+> r[media.video.encoder]
+> A Mac codes each camera stream with the hardware H.264 encoder, in real time with low-latency
+> rate control: Constrained High profile at the level the size needs, no B-frames, so pictures
+> leave in the order they are decoded, at the camera quality's average bitrate and frame rate
+> (`camera.quality.size`), with long-term references on. It never falls back to a software
+> encoder.
+>
+> - tier: machine (only a real Mac's hardware encoder codes the stream)
+
+r[media.video.no-periodic-key]
+The encoder sends no key frame on a timer. A key frame goes only first, after the camera stream's
+size changes, after the camera changes, and when the receiving machine asks for one
+(`media.video.key-request`). Every key frame carries its parameter sets before it.
+
+r[media.video.timestamp]
+A camera stream's timestamp counts 90 kHz from the capture time of its first picture, modulo
+2^32; a picture captured before the first counts 0. Every fragment of a picture carries its
+timestamp.
+
+r[media.video.frame-number]
+Each picture the encoder hands on gets the next frame number of its stream, from 0. A number is
+never used twice, and a picture dropped after it was numbered leaves a gap.
+
+> r[media.video.fragment]
+> A picture is cut, at any byte, into the fewest fragments that each fit one media packet, at most
+> 1024, numbered from 0; a picture of 0 bytes is one fragment. Each fragment says its frame number,
+> its index, how many fragments the picture has, whether the picture is a key frame, a refresh or
+> a long-term reference, whether it was handed on while a key frame of its stream was still being
+> sent, and how long the encoder took over it, in tenths of a ms up to 6553.5 ms.
+>
+> - fuzz: media-frame
+
+r[media.video.order]
+A picture's fragments are sent in index order, and pictures in frame number order.
+
+## Camera streams: sending
+
+> r[media.video.pacing]
+> The camera machine paces the fragments of every camera stream it sends to one machine together,
+> as a bucket of 38,400 bytes, full at first, refilled at 25 Mbit/s. A key frame's fragments go at
+> 4 times the stream's bitrate, each at its due time counted from the first one's departure, and
+> any that fell due while the sender was late go together. Fragments sent again go before any new
+> fragment, and are never held to a key frame's schedule. Audio frames, feedback and time maps are
+> not paced.
+
+r[media.video.backlog]
+While the pictures waiting to leave would take more than 250 ms at 4 times the stream's bitrate,
+or 6 or more of them wait, the camera machine gives its encoder no new picture. It gives it pictures again
+once they would take less than 100 ms and fewer than 2 wait.
+
+r[media.video.overflow]
+A picture that would make 16 or more wait, or more than 4 MiB, is dropped after it was numbered,
+unless it is a key frame: a key frame drops every waiting picture that is not one, and goes. The
+camera machine then recovers the stream as on a loss (`media.video.key-loss`).
+
+r[media.video.resend]
+The camera machine keeps each fragment it sent for 1 s, or the last 2048 of the stream, whichever
+is fewer. When the receiving machine asks for a fragment it still keeps, of a picture it did not
+drop, it sends it again as it was, with its packet number. It ignores a request for any other.
+
+r[media.video.reduced]
+A camera stream runs at the camera quality's bitrate, at half of it, or at a quarter, and is
+reduced while below the full one. On each receiver report, when the reports of the last 2 s span
+at least 1.5 s and at least 10 pictures were sent over them, the bitrate steps down one level if,
+over them, the pictures lost after repair grew by more than 2 % of the pictures sent, or the
+late pictures by more than 10 %; the reports so far are then set aside. The bitrate steps up one
+level after 10 s without a step down. Neither changes the stream's size or frame rate, or sends a
+key frame.
+
+## Camera streams: key frames
+
+The receiving machine asks for a key frame (PLI) to start a stream, when the stream's size is
+refused, and to repair it after a loss, a decoder error or a stall.
+
+r[media.video.starts-on-request]
+The camera machine codes nothing for a camera stream before the receiving machine first asks for a
+key frame, for whatever reason; the first picture then is a key frame.
+
+r[media.video.no-receiver]
+A camera stream whose receiving machine has not asked for a key frame within 3 s of the stream's
+start, or from which no receiver report, request to send packets again or request for a key frame
+has come for 5 s once it asked, fails because no picture reached that machine
+(`camera.stream.no-receiver`), and the camera machine's camera is closed for it at once.
+
+> r[media.video.key-request]
+> A request for a key frame to start the stream or after its size was refused gets a key frame,
+> unless one is already asked for and its first fragment has not left, or it left less than the
+> link's round trip by QUIC plus its pacing time plus 50 ms ago; such a request is a duplicate.
+> Other such requests get at most one key frame per 1 s since the last key frame, and one inside
+> that time is dropped, never queued.
+>
+> - parity: Python took the round trip from its own pings, assuming 20 ms before the first (#14: QUIC's RTT stands for the round trip)
+
+r[media.video.key-loss]
+A request for a key frame after a loss, a decoder error or a stall gets a refresh, a picture
+coded only from long-term references the receiving machine confirmed, when one is confirmed since
+the last key frame, and a key frame otherwise. Such a request is ignored while a key frame is
+asked for and has not left, and when it names the same last clean picture as the request the last
+refresh answered and comes within the round trip plus 50 ms of that refresh.
+
+r[media.video.key-limit]
+A key frame asked for after a loss, a decoder error or a stall goes at most once per 2 s; inside
+that time the request gets a refresh when a long-term reference is confirmed, and otherwise waits
+for the end of that time, unless a receiver report saying the stream is clean comes first. Every
+key frame counts towards this limit and the one of `media.video.key-request`, whatever asked for
+it.
+
+r[media.video.refresh-fails]
+A refresh after which no receiver report shows a newer clean run within 1 s failed. After 3 failed
+refreshes in a row, the next request after a loss, a decoder error or a stall gets a key frame.
+
+r[media.video.confirmed]
+The camera machine remembers the last 64 long-term references it sent since the last key frame.
+A receiver report's clean run confirms those of its frame numbers inside it, each once, and the
+encoder may then code a refresh from them. A key frame forgets every reference before it.
+
+## Camera streams: receiving
+
+> r[media.video.reassembly]
+> The receiving machine puts a picture together from its fragments in any order; a picture is
+> whole once it holds every fragment its count names. A second copy of a fragment, a fragment whose
+> count differs from the one first seen for its picture, and a fragment of a picture already decoded
+> or given up are ignored. A picture's timestamp and flags are those of its first fragment seen.
+>
+> - fuzz: media-frame
+
+r[media.video.in-flight]
+The receiving machine keeps at most 160 pictures being put together once the stream has started,
+and 64 before, forgetting the oldest for a new one.
+
+r[media.video.nack]
+On a fragment whose packet number is more than one above the highest yet, the receiving machine at
+once asks the camera machine to send every missing packet again, as many to a request as fit, and
+asks again for each still missing every max(2 × the link's round trip by QUIC, 15 ms), 3 times in
+all, as long as its picture is not yet due. A gap of more than 64 packets is asked for not at all,
+and its pictures are lost at once.
+
+r[media.video.lost]
+A picture is lost only on evidence: its missing fragments were asked for 3 times, or a gap was too
+large to ask for; it is not whole when it falls due and a later packet has arrived; or no fragment
+of it came and a later picture's has, and its due time has passed. A picture merely late, with
+nothing later arrived, is not lost.
+
+r[media.video.clean]
+A camera stream is broken from its start until a key frame or a refresh is whole and decodes: from
+there, each picture is clean while every picture before it decoded. A lost picture or a decoder
+error breaks it again.
+
+r[media.video.first-key]
+The receiving machine decodes nothing of a camera stream before a whole key frame newer than its
+request to start, and discards every picture before it. When that key frame is lost, it asks for a
+key frame again.
+
+r[media.video.decoded-in-order]
+From the first key frame on, every whole picture is decoded in frame number order; a picture of a
+broken stream is decoded but never shown. A clean picture that is not a key frame and whose encoder
+output is older than the playout delay plus the lip sync delay plus 150 ms is decoded and not shown.
+
+r[media.video.asks]
+The receiving machine asks for a key frame to start at the stream's start, and every 100 ms until
+the first fragment of a key frame newer than the newest picture it had seen when it began asking,
+and the same way after a size was refused (`media.video.size-refused`). When the stream breaks after it started, it asks at once for a key frame after a loss (after a
+stall, when the loss comes within 1 s of 500 ms or more with no packet), or after a decoder error,
+and again every 300 ms while the stream stays broken and no key frame or refresh it got waits to be
+decoded. A request while another is still pending asks for nothing more. It asks nothing once the
+stream has failed. Each request names the last picture of its clean run.
+
+r[media.video.report]
+The receiving machine sends the camera machine a receiver report for each camera stream it takes
+every 50 ms from the stream's start, on a fixed schedule that a gap of more than 50 ms starts
+again, whatever else it sends, and at once when a key frame or a refresh starts a new clean run. A
+report carries the newest timestamp seen, the smallest margin before a picture's due time over the
+period (none, or 0 when one was late), the highest packet number seen, the pictures lost and the
+pictures shown late so far, the first and last frame numbers of the newest clean run, the kbit/s
+received over the period, and whether the stream is broken.
+
+## Camera streams: showing
+
+> r[media.video.offset]
+> The receiving machine reads the sending machine's clock from each time map: the sending
+> machine's clock when the time map was sent, less the time it arrived here plus half the link's
+> round trip by QUIC. Of the last 10 time maps it takes the one that came fastest, and every due
+> time uses the newest such reading.
+>
+> - parity: Python measured the offset from its own pings and pongs every 1 s, taking the one of the last 10 with the lowest round trip (#14: no pings of media's own; the time map says when it was sent, and QUIC's RTT stands for the round trip)
+
+r[media.video.playout]
+A picture falls due at its encoder output time, read on the receiving machine's clock through the
+time map, plus the playout delay and the lip sync delay. The playout delay is the 99th percentile,
+over the last 10 s, of how long whole pictures took from encoder output to whole, plus 8 ms, kept
+between 50 ms and 150 ms: 70 ms until 20 such samples exist. Key frames and pictures sent behind a
+key frame give no sample. A higher playout delay is taken at once, and a lower one approached at
+30 ms per second at most.
+
+r[media.video.before-map]
+Until the stream's first time map, a picture is shown as soon as it decodes, and falls due, for
+telling a loss, 70 ms after the stream's first packet arrived.
+
+r[media.video.present]
+The virtual camera shows the newest decoded picture that has fallen due, and drops older ones; it
+never shows a picture older than the one it shows. A picture decoded after it fell due is shown as
+soon as it decodes, and a key frame as soon as it decodes. Of more than 12 decoded pictures
+waiting, the oldest is dropped.
+
+r[media.video.decoder-error]
+A picture that fails to decode is dropped with every picture after it that waits to be shown, and
+the stream breaks. After 3 decoder errors within 10 s, the receiving machine asks for a key frame
+to start again.
+
+> r[media.video.decoder-reopen]
+> On a PC, after 3 decoder errors within 10 s the decoder is opened again, in hardware unless it
+> was opened again in hardware less than 30 s before, and in software then. When the GPU is lost,
+> the software decoder takes over at once, and the hardware decoder is tried again after 30 s and
+> takes over at the next key frame, with none asked for. A new decoder asks for a key frame once the
+> stream has started, unless one waits for it.
+>
+> - tier: machine (only a real GPU fails and is lost)
+
+r[media.video.low-latency-decoder]
+A PC's decoder runs in its low-latency mode, so it holds no pictures back.
+
+r[media.video.size-refused]
+A decoded picture of an odd width or height, or outside 64 to 1920 by 64 to 1080 pixels, is not
+shown, and the receiving machine asks for a key frame for its size. When the same size is refused
+3 times within 10 s, it asks no more, and the stream fails because the picture cannot be shown
+(`camera.stream.receiver-ends`).
+
+## The time map and lip sync
+
+> r[media.time-map.carries]
+> A time map carries, for at most 32 streams, each stream's id, a timestamp of it and the sending
+> machine's clock when that timestamp was captured, and the sending machine's clock when the time
+> map was sent. For a camera stream it is the newest picture sent; for an audio stream, the newest
+> frame coded, captured when its first sample was.
+>
+> - parity: Python's time map did not say when it was sent (#14: no pings of media's own; `media.video.offset`)
+> - fuzz: media-frame
+
+r[media.time-map.when]
+A machine sends each machine it sends a camera stream or a timed audio stream to a time map every
+1 s, at once after any of those streams sends its first media packet, and again 20 ms later. It
+sends none while it has nothing to put in it.
+
+> r[media.time-map.audio]
+> An audio stream is timed, and its time map entries sent, only when both its sending machine and
+> its receiving machine have a camera (`camera.state.kinds`).
+>
+> - parity: Python timed an audio stream only towards a peer whose audio hello carried the word `video1` and when its own media helper had it (#14: capabilities become facts in each machine's own record)
+
+r[media.time-map.no-loss]
+A time map uses no packet number of any stream, and its loss is never counted as a stream's loss.
+
+r[media.time-map.newest]
+The receiving machine keeps the newest time map entry of each stream, and reads any timestamp of
+it on the sending machine's clock from there.
+
+r[media.lip-sync.when]
+Lip sync applies only on a machine that takes a camera stream and a microphone stream from the same
+machine, the microphone stream into its virtual microphone, both with time maps. A sound stream, a
+microphone stream from another machine, or one played on an output gives none.
+
+r[media.lip-sync.delay]
+The lip sync delay is how much later the microphone is heard than the picture shows, averaged over
+2 s, kept between 0 and 150 ms: audio is never delayed, and a picture later than the sound is only
+measured. It applies once both streams have run for 2 s without a break, a break starts that count
+again, and it moves at most 10 ms per second, also towards 0.
+
+r[media.lip-sync.audio-side]
+The microphone is heard at the time it is played into the virtual microphone, less its capture time
+read on the receiving machine's clock, plus the virtual microphone's path to the app: on a PC,
+38 ms when Beamer plays into "CABLE Input" exclusively (`audio.low-latency.pc`), 67 ms when shared
+at a 128-sample period, and 110 ms when shared at the default period. A play time older than
+500 ms gives none.
+
+r[media.lip-sync.picture-side]
+The picture shows the encoder's time over it, plus the playout delay, plus 2 ms for the virtual
+camera to take it, while the stream shows a live picture.
+
+r[media.lip-sync.together]
+With the two machines' clocks 3 hours apart, an offset read 20 ms wrong and clocks drifting by
+25 ppm, a picture and the sound captured with it reach the app within 2 ms of each other.
