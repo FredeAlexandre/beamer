@@ -2,7 +2,7 @@
 
 A Mac's camera goes where the user sends it: the apps on every PC of the cluster see one shared
 camera, from a Mac, through the virtual camera, Beamer Camera. It is F44 of #11's inventory,
-"Camera follows input", which ships. The camera route says which Mac's camera the PCs see, and the
+which ships. The camera route says which Mac's camera the PCs see, and the
 camera quality says at what size; both are shared entries. A camera stream runs only while an app
 on a PC has its virtual camera open, so the Mac's camera is on only while an app wants it.
 
@@ -167,9 +167,9 @@ its virtual camera. Nothing else writes it again (`store.record.unchanged`).
 ## The camera route
 
 > r[camera.route.entry]
-> The camera route is one shared entry: off, which is its default, or a Mac and either the camera
-> that Mac prefers, followed, or one named camera of it, named by its camera key and its name. The
-> camera it names is the shared camera, and that Mac is the camera machine.
+> The camera route is one shared entry: off, which is its default, or a machine and either the
+> camera that machine prefers, followed, or one named camera of it, named by its camera key and its
+> name. The camera it names is the shared camera, and that machine is the camera machine.
 >
 > - model: camera
 
@@ -402,6 +402,7 @@ allowed, not allowed, restricted, not asked yet, or unknown.
 > 9. else failed, while the camera machine's capture failed, with its reason; streaming while it
 >    runs or is interrupted; starting otherwise.
 >
+> - parity: Python also reported no direct path, after idle and unreachable, when the camera machine had no UDP path to that machine, as over loopback (#14: media goes as datagrams on the link, so a machine with a link up is reached)
 > - model: camera
 
 > r[camera.status.failed]
@@ -598,7 +599,7 @@ Windows lists Beamer Camera while it has a present video camera interface of a W
 camera device whose friendly name begins with "Beamer Camera", compared without case.
 
 > r[camera.virtual.versions]
-> On a PC, Core reports three DLL versions of the virtual camera: the one this Beamer carries, the
+> On a PC, `Core` reports three DLL versions of the virtual camera: the one this Beamer carries, the
 > installed one (`DllVersion`), and the one Frame Server has loaded (`camera.shm.source`), or none
 > while Beamer has not read it.
 
@@ -738,7 +739,7 @@ apart from the machine's and the camera's names, which go into their template un
 > install state is missing, outdated or damaged, and never while it is installed or unsupported here.
 
 > r[camera.install.page]
-> Asking Core to install the virtual camera, the one request for an install, an update and a repair,
+> Asking `Core` to install the virtual camera, the one request for an install, an update and a repair,
 > runs `beamer --elevated setup` (`app.elevated.steps`) and reports how it ended: installed when the
 > step ends with exit status 0; cancelled when the user declined the UAC prompt; failed for any other
 > end, a non-zero exit status or a step that could not start, with the step's output in the log. On
@@ -807,7 +808,7 @@ apart from the machine's and the camera's names, which go into their template un
 > - parity: Python ran its media helper's `vcam-remove` for the first part, skipped when the helper file was missing (ADR 0004: Beamer removes the camera itself)
 
 > r[camera.install.page-remove]
-> Asking Core to remove the virtual camera runs the elevated step that removes the virtual camera
+> Asking `Core` to remove the virtual camera runs the elevated step that removes the virtual camera
 > alone (`app.elevated.steps`), not the firewall rule or anything else uninstall removes, after the
 > first part (`camera.install.remove-first`), and reports how it ended: removed when the step ends with
 > exit status 0, cancelled when the user declined the UAC prompt, failed for any other end.
