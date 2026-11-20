@@ -63,12 +63,16 @@ What each machine tells the cluster about the displays it could share, in its ma
 
 r[display.record.listed]
 A machine's machine record lists each of its displays that is not built in and has a display key,
-with its display key, its name and whether it is on. A display that is still connected but turned
-off is listed, as off.
+with its display key, its name and whether it is on. On a PC, a display that is still connected
+but turned off is listed, as off, whoever turned it off. On a Mac, a display that is turned off is
+listed only when Beamer turned it off (`display.record.mac-off-kept`): macOS gives no other display
+that is off, so one the user or another program turned off is not listed.
 
-r[display.record.same-key]
-When two or more of a machine's displays have the same display key, none of them is listed. They
-are never shared displays, and Beamer never turns them off or on.
+> r[display.record.same-key]
+> When two or more of a machine's displays have the same display key, none of them is listed. They
+> are never shared displays, and Beamer never turns them off or on.
+>
+> - parity: Python's Mac listed two displays of one model as one display under their display key, and turning that display off turned off whichever of them macOS gave first (`mac_app/shared_display_mac.py:81-92,117-123`), while Python's PC left them alone, as here (`core/display/part.py:166-167`) (a display key cannot tell the two apart on the other machines, so which of them a display owner names is unknowable, and `dev/display/DESIGN.md`'s known limits leave them unmanaged)
 
 r[display.record.limits]
 A peer's list of displays counts only when it has at most 16 displays, each with a display key
@@ -83,8 +87,9 @@ displays again writes nothing.
 
 r[display.record.capability]
 A machine whose OS offers no call to turn a display off and on reports that capability as
-unsupported here. It lists no display for sharing and has no shared displays, and its peers count
-it as having none of their displays.
+unsupported here. It has no shared displays, and its machine record carries no list of displays,
+not even an empty one. Its peers have no list of displays for it, whatever its machine record
+carries, so a display whose display owner it is stays off on them (`display.handover.owner-away`).
 
 > r[display.record.mac-off-kept]
 > On a Mac, a display Beamer turned off stays listed, as off and under the name it had while on,
@@ -132,8 +137,10 @@ is away.
 > - model: handover
 
 > r[display.owner.same]
-> Choosing for a display the machine that already is its display owner, or none when none was the
-> last choice, changes nothing and writes nothing.
+> Choosing for a display the machine that already is its display owner, or none when an earlier
+> choice on any machine gave it none, changes nothing and writes nothing. Choosing none for a
+> display key that was never given a display owner is a new choice: it writes none as the display
+> key's display owner, which every machine of the cluster then has, as `display.owner.entry` says.
 >
 > - model: handover
 
@@ -278,14 +285,16 @@ Identifying displays on a machine asks each peer it has a link up with, once, to
 numbers, a peer kept off the crossing map included. It asks no other machine.
 
 r[display.identify.peer-numbers]
-The request to a peer names each of that peer's displays on this machine's crossing map, by
-display id, with its number as `display.identify.numbering` and `display.identify.unknown` give
-it.
+The request to a peer names each display that peer's machine record declares
+(`crossing.map.displays.record`), by display id, with its number as `display.identify.numbering`
+gives it, a peer kept off the crossing map included. The request to a peer whose displays are not
+known (`display.identify.unknown`) names one display, display id `0`, with number 1.
 
 > r[display.identify.request-valid]
 > A request to identify displays counts only when it names 1 to 16 displays, each display id 1 to
-> 64 characters from letters, digits, `_`, `.`, `:` and `-`, each with a whole number from 1 to 16,
-> and no two with the same number. Any other request is ignored and shows no number.
+> 64 characters from ASCII letters (`A` to `Z`, `a` to `z`), digits `0` to `9`, `_`, `.`, `:` and
+> `-`, each with a whole number from 1 to 16, and no two with the same number. Any other request,
+> one with `é` in a display id included, is ignored and shows no number.
 >
 > - fuzz: link-frame
 
