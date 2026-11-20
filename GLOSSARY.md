@@ -202,6 +202,11 @@ _Avoid_: screen, monitor, output, tile
 A display cabled to two or more machines.
 _Avoid_: shared monitor, KVM display
 
+**Display key**:
+The name a display goes by on every machine it is cabled to: its EDID manufacturer id as three
+letters and its product code as four hexadecimal digits, such as HKC2716.
+_Avoid_: EDID id, model key
+
 **Display owner**:
 The machine allowed to keep a shared display on.
 _Avoid_: display route

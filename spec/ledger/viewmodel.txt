@@ -69,6 +69,7 @@ core/tests/test_camera_view.py::StatusLinesFromThePC::test_the_acceptance_states
 core/tests/test_camera_view.py::ThisMachine::test_mac_rows
 core/tests/test_camera_view.py::ThisMachine::test_pc_rows
 core/tests/test_camera_view.py::ThisMachine::test_the_test_source_says_so
+core/tests/test_display.py::PartTests::test_menus
 core/tests/test_i18n.py::I18nTests::test_a_broken_catalogue_leaves_beamer_in_english
 core/tests/test_i18n.py::I18nTests::test_a_po_file_reads_with_plurals_contexts_and_continuations
 core/tests/test_i18n.py::I18nTests::test_automatic_takes_the_first_preferred_language_beamer_has

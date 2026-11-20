@@ -19,15 +19,15 @@ no Python test is its own:
 | `input` | #58 | 793 |
 | `clipboard` | #59 | 213 |
 | `settings` | #60 | 461 |
-| `display` | #61 | 31 |
+| `display` | #61 | 26 |
 | `audio` | #62 | 148 |
 | `camera` | #63 | 202 |
 | `media` | #64 | 0 |
 | `platform` | #65 | 336 |
 | `runtime` | #66 | 3 |
 | `app` | #67 | 93 |
-| `viewmodel` | #68 | 1046 |
-| `ui` | #69 | 741 |
+| `viewmodel` | #68 | 1047 |
+| `ui` | #69 | 745 |
 | `perf` | #70 | 0 |
 | `observability` | #71 | 0 |
 
@@ -77,7 +77,11 @@ flooded its own messages, and those tests went to the feature), the media engine
 ## Ambiguous assignments
 
 An assignment is ambiguous when rule 3 or 4 had to choose: a second domain is a fair owner too.
-There are 90, covering 1,195 tests. Each row names the other candidates and why the owner won.
+There are 92, covering 1,200 tests. Each row names the other candidates and why the owner won.
+The rows marked "moved from display (#61)" record lines that did move, after #51: the display
+miner found their assertions all another domain's (#147), and moved them to that domain's slice
+with no fate. Each splits a class, an exception to rule 2's "no assignment finer than a class":
+the class's other tests stay display's.
 A miner who finds such a test's assertions are all another domain's settles it as
 `.claude/skills/build-spec-miner/blocked.md` says, without moving the line.
 
@@ -89,6 +93,7 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `core/tests/test_camera_link_gating.py` | 26 | camera | link | capability gating of `camera_*` messages; camera's own messages, so camera |
 | `core/tests/test_camera_texts.py` | 8 | camera | viewmodel | the placeholder text is shown in the virtual camera's picture, not on a screen of Beamer's |
 | `core/tests/test_camera_view.py` | 33 | viewmodel | camera | the Camera module's model, what each state shows |
+| `core/tests/test_display.py`, class `PartTests`: `test_menus` | 1 | viewmodel | display | moved from display (#61): the shared displays' tray menu titles and choices (`viewmodel.tray.display-menu`, `viewmodel.tray.display-choices`) |
 | `core/tests/test_dormant_repair.py` | 19 | pairing | discovery | dormant repair is in both scopes; these tests check the peer entry, re-pairing and capacity, not address probing |
 | `core/tests/test_feature_flags.py` | 1 | pairing | app | its one test checks that phone pairing is hidden by default |
 | `core/tests/test_flatpak_libei_path.py` | 1 | input | platform | where Linux input capture finds libei |
@@ -128,6 +133,7 @@ A miner who finds such a test's assertions are all another domain's settles it a
 | `mac_app/tests/test_dock_visibility.py` | 6 | viewmodel | platform | Show in Dock (F27), which the viewmodel's scope names |
 | `mac_app/tests/test_dock_window.py` | 14 | viewmodel | platform | Show in Dock and menu bar (F27), which the viewmodel's scope names |
 | `mac_app/tests/test_dormant_rows.py` | 11 | viewmodel | pairing, crossing | how a dormant peer's rows show and what re-pair opens |
+| `mac_app/tests/test_identify_screens.py`, class `MapTests`: `test_compact_titles_keep_readable_width_and_separate_number_and_cycle_rows`, `test_display_badges_match_overlay_labels_including_single_display`, `test_numbers_do_not_overlap_name_status_or_footer_on_stacked_or_split_displays`, `test_smallest_valid_tiles_keep_title_number_and_cycle_within_the_tile` | 4 | ui | display | moved from display (#61): the display numbers on the crossing map, their boxes, places and sizes in a footprint (`ui.map.footprint.numbers`) |
 | `mac_app/tests/test_idle_refresh.py` | 6 | viewmodel | runtime, ui | how often the window and menu re-read settings and redraw |
 | `mac_app/tests/test_ignored_titles.py` | 16 | viewmodel | input | the names shown for stays-here inputs |
 | `mac_app/tests/test_link_state.py` | 14 | viewmodel | link | the words each link state shows |
