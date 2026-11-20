@@ -353,9 +353,10 @@ the frame shows to handing the frame to the OS to show.
 > Run: on each machine, the machine agent clicks the other machine on the Audio & Camera page and
 > then this machine, so the page has shown both, and waits 2 s before the run's samples start.
 > Then it clicks the other machine and this machine in turn, one click a second, 40 clicks in all,
-> so every click chooses a machine shown before. The run's samples are every frame made from its first click to
-> 1 s after its last, and each of them meets the bound: the frame times the app writes once a
-> second do not tell the frames that follow a click from the others, so the bound covers them all.
+> so every click chooses a machine shown before. The run's samples are every frame made from its
+> first click to 1 s after its last, and each of them meets the bound: the frame times the app
+> writes once a second do not tell the frames that follow a click from the others, so the bound
+> covers them all.
 >
 > - tier: machine (only a real window on a real display gives frame times)
 > - parity: Python bounded, on the Mac only, the time to deal with the click and lay out the kept devices, without drawing (one toolkit, Rune, draws the window on both machines, ADR 0001; the frame drawn is what the user sees)
@@ -367,9 +368,10 @@ the frame shows to handing the frame to the OS to show.
 > Run: for 20 minutes, with the camera route naming the Mac's camera and the Audio & Camera page
 > shown on both machines at once for the whole run, the PC's machine agent opens the virtual
 > camera as an app does for 2 s, then closes it for 6 s. The stream keeps running for 3 s after
-> each close (`camera.demand.hold`) and then stops, so every cycle starts and stops it, and the
-> camera's status changes 300 times, which the page on each machine shows. Each machine's frames
-> are a run of their own, with the 20 minutes' frames, at least 100 of them (Enough samples).
+> each close (`camera.demand.hold`) and then stops, so each of the 150 cycles takes the camera's
+> status from idle to starting, to streaming and back to idle: 450 changes, which the page on each
+> machine shows. Each machine's frames are a run of their own, with the 20 minutes' frames, at
+> least 100 of them (Enough samples).
 >
 > - tier: machine (only a real window on a real display with a real camera stream gives frame
 >   times)
@@ -379,8 +381,9 @@ the frame shows to handing the frame to the OS to show.
 > Each update of the tray menu takes under 16 ms, at p50, p95 and p99, and at its largest, from
 > starting on what the menu shows to handing it to the OS.
 >
-> Run: on the Mac, the run of `perf.ui.camera-status`, whose 300 changes each show or hide the
-> camera line of the Mac's tray menu (`viewmodel.camera.menu.line`). The PC's tray menu has no
+> Run: on the Mac, the run of `perf.ui.camera-status`, whose 150 starts each show the camera line
+> of the Mac's tray menu and whose 150 stops each hide it (`viewmodel.camera.menu.line`), at least
+> 300 updates. The PC's tray menu has no
 > camera items (`viewmodel.camera.menu.shown`), so on the PC it is the run of
 > `perf.crossing.wifi` with the PC driving, whose 200 crossings out and 200 home each change the
 > drive status the menu shows first (`viewmodel.tray.drive-status`). Each machine's updates are a
@@ -409,10 +412,11 @@ machine's agent plays markers into the device and records them from its micropho
 its one clock, and the median of those is the device's own time. That loop also holds one capture
 of the device by the agent, which Beamer's capture of the device replaces in the run; the two may
 differ by up to one capture period, so each microphone bound is WP16's figure plus a margin of
-10 ms. The margin is this spec's choice, not a measured figure. The PC captured in packets of 480 frames, 10 ms at 48 kHz, in
-every run (`dev/audio/reports/wp14.md`), but on the Mac each process sets its own capture period:
-the audio helper asked for 128 frames and a process that asks for none got 512
-(`dev/audio/reports/wp11.md`), and nothing yet fixes Beamer 2.0's.
+10 ms. The margin is this spec's choice, not a measured figure. The PC captured its system sound,
+not a microphone, in packets of 480 frames, 10 ms at 48 kHz, in every run
+(`dev/audio/reports/wp14.md`), but on the Mac each process sets its own capture period: the audio
+helper asked for 128 frames and a process that asks for none got 512 (`dev/audio/reports/wp11.md`),
+and nothing yet fixes Beamer 2.0's.
 
 In every microphone run, the headset choice of the default output of the machine whose
 microphone is shared is headset, written in the seeded state before the apps start (ADR 0005).
