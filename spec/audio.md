@@ -351,9 +351,9 @@ microphone or default output is one of them, the record names no default.
 > 1. off (`audio.mic.off`);
 > 2. waiting for the shared microphone's machine (`audio.mic.machine-gone`);
 > 3. waiting for the device (`audio.mic.device-gone`);
-> 4. failed, on the shared microphone's machine only, while one of the microphone streams it sends
->    to another machine cannot start (`audio.status.failed`); every other machine goes on to the
->    next step;
+> 4. failed, on the shared microphone's machine only, while any of the microphone streams it sends
+>    to other machines cannot start, naming every machine whose stream cannot start
+>    (`audio.status.failed`); every other machine goes on to the next step;
 > 5. streaming, while the shared microphone streams to at least one machine, its own included,
 >    naming those machines;
 > 6. unreachable, when any machine recording it is (`audio.mic.direct-only`), and else without a
@@ -507,10 +507,13 @@ Beamer never changes which microphone or output the OS uses by default, on any m
 > failed, naming the machine it goes to and why: the device is gone, it is a device Beamer leaves
 > alone (`audio.devices.left-alone`), another app holds it, the OS does not allow it, or the machine
 > cannot do it, on the machine that would send; or, as the machine that would take it answers, its
-> output is gone, it has no virtual microphone, its output is muted there, or it cannot do it. Every
-> other machine, the one that would take it included, reports the status the route's other steps
-> give (`audio.mic.status`, `audio.sound.status`).
+> output is gone, it has no virtual microphone, its output is muted there, or it cannot do it. While
+> several streams of the route cannot start at once, as the shared microphone's can
+> (`audio.mic.many`), the status names every machine whose stream cannot start, in machine id
+> order, each with its own reason. Every other machine, the one that would take a stream included,
+> reports the status the route's other steps give (`audio.mic.status`, `audio.sound.status`).
 >
+> - parity: Python's failed status named one machine, with its reason: of the streams that could not start, the one opened last (`_compose_snapshot` in `core/audio/service.py` set the status once for each failed stream, in the order the streams were opened, which nothing shows; naming every machine gives a status a test can decide)
 > - model: audio
 
 > r[audio.status.retry]
